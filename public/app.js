@@ -97,6 +97,12 @@ const mNetVega = document.getElementById('m-net-vega');
 const mNetTheta = document.getElementById('m-net-theta');
 const mLegsBody = document.getElementById('m-legs-body');
 const mBlockTime = document.getElementById('m-block-time');
+const mStrategyName = document.getElementById('m-strategy-name');
+const mTheoryRef = document.getElementById('m-theory-ref');
+const mMaxProfit = document.getElementById('m-max-profit');
+const mMaxLoss = document.getElementById('m-max-loss');
+const mBreakEven = document.getElementById('m-break-even');
+const mPointersList = document.getElementById('m-pointers-list');
 
 /**
  * Format timestamp or ISO string to UTC+8 "YYYY-MM-DD HH:mm:ss"
@@ -294,6 +300,15 @@ function renderAtmIv(data) {
     elIvGaugeFill.style.width = `${Math.min(100, Math.max(0, data.percentile))}%`;
   }
 
+  const elIvExpectedMove = document.getElementById('iv-expected-move');
+  const elIvStraddleSub = document.getElementById('iv-straddle-sub');
+  if (elIvExpectedMove && data.dailyExpectedMovePct) {
+    elIvExpectedMove.textContent = `日 ±${data.dailyExpectedMovePct}% | 周 ±${data.weeklyExpectedMovePct}%`;
+  }
+  if (elIvStraddleSub && data.atmStraddleEstPct) {
+    elIvStraddleSub.textContent = `1M 跨式平价约 ${data.atmStraddleEstPct}% (时间平方根估值)`;
+  }
+
   elIvNarrativeText.textContent = data.paragraph || '计算完成。';
 }
 
@@ -371,6 +386,11 @@ function renderIvSmile(data) {
   elSmileSmirkDiff.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
   elSmileSmirkDesc.textContent = diff >= 0 ? 'Call 溢价高于 Put (追涨倾斜)' : 'Put 溢价高于 Call (避险倾斜)';
 
+  const elSmileKurtosisVal = document.getElementById('smile-kurtosis-curv');
+  if (elSmileKurtosisVal && typeof data.smileCurvature === 'number') {
+    elSmileKurtosisVal.textContent = `+${data.smileCurvature.toFixed(1)}% IV`;
+  }
+
   const strikes = data.strikes || [];
   if (strikes.length) {
     let stripHtml = '';
@@ -418,6 +438,19 @@ function render25DeltaSkew(data) {
   formatSkewVal(elSkew90d, data.d90);
   formatSkewVal(elSkew180d, data.d180);
   formatSkewVal(elSkew365d, data.d365);
+
+  const elSkewRegimeName = document.getElementById('skew-regime-name');
+  const elSkewRegimeSub = document.getElementById('skew-regime-sub');
+  const elSkewRegimeBadge = document.getElementById('skew-regime-badge');
+  if (elSkewRegimeName && data.skewRegime) {
+    elSkewRegimeName.textContent = data.skewRegime.split('(')[0].trim();
+  }
+  if (elSkewRegimeSub && data.skewRegimeDesc) {
+    elSkewRegimeSub.textContent = data.skewRegimeDesc;
+  }
+  if (elSkewRegimeBadge && data.skewRegime) {
+    elSkewRegimeBadge.textContent = data.skewRegime.includes('Jump') ? '⚡ 状态异动' : (data.skewRegime.includes('Local') ? '📉 负相关主导' : '🎯 Sticky Delta');
+  }
 
   elSkewNarrativeText.textContent = data.paragraph || '';
 }
@@ -470,6 +503,7 @@ function renderBlockTrades(data) {
           </div>
           <div>
             <span class="intent-badge-pill ${c.intentBadgeClass || 'badge-neutral'}">${c.intentBadge || '意图解析'}</span>
+            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${c.strategyNameZh}</div>` : ''}
           </div>
           <div class="cluster-stats">
             <div class="cluster-stat-item">
@@ -502,7 +536,10 @@ function renderBlockTrades(data) {
         <tr onclick="openWhaleDetail(${idx})">
           <td>${b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp)}</td>
           <td><span class="text-accent">${b.blockId}</span></td>
-          <td><span class="intent-badge-pill ${b.intentBadgeClass || 'badge-neutral'}">${b.intentBadge || '--'}</span></td>
+          <td>
+            <span class="intent-badge-pill ${b.intentBadgeClass || 'badge-neutral'}">${b.intentBadge || '--'}</span>
+            ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${b.strategyNameZh}</div>` : ''}
+          </td>
           <td><strong>$${b.notionalUSDM.toFixed(2)}M</strong></td>
           <td>${b.netDeltaBTC >= 0 ? '+' : ''}${b.netDeltaBTC.toFixed(1)} BTC</td>
           <td>${b.netVegaUSD >= 0 ? '+' : ''}$${Math.round(b.netVegaUSD).toLocaleString()}</td>
@@ -532,6 +569,25 @@ window.openWhaleDetail = function(idx) {
   mIntentBadge.textContent = b.intentBadge || '交易意图';
   mIntentBadge.className = `intent-badge-large ${b.intentBadgeClass || ''}`;
   mIntentNarrative.textContent = b.intentNarrative || '交易意图解析生成中...';
+
+  if (mStrategyName) {
+    mStrategyName.textContent = b.strategyNameZh || '机构定制结构';
+  }
+  if (mTheoryRef) {
+    mTheoryRef.textContent = b.theoryRef ? `📚 理论出处：${b.theoryRef}` : '📚 理论出处：Natenberg & Bossu';
+  }
+  if (mMaxProfit) mMaxProfit.textContent = b.riskProfile?.maxProfit || '--';
+  if (mMaxLoss) mMaxLoss.textContent = b.riskProfile?.maxLoss || '--';
+  if (mBreakEven) mBreakEven.textContent = b.riskProfile?.breakEven || '--';
+
+  if (mPointersList) {
+    const pointers = b.theoreticalPointers || [];
+    if (pointers.length) {
+      mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
+    } else {
+      mPointersList.innerHTML = '<li>暂无理论指引要点</li>';
+    }
+  }
 
   const deltaSign = b.netDeltaBTC >= 0 ? '+' : '';
   mNetDelta.textContent = `${deltaSign}${b.netDeltaBTC.toFixed(1)} BTC`;
@@ -585,6 +641,25 @@ window.openIcebergDetail = function(idx) {
   mIntentBadge.className = `intent-badge-large ${c.intentBadgeClass || ''}`;
   mIntentNarrative.textContent = c.intentNarrative || '拆单意图分析生成中...';
 
+  if (mStrategyName) {
+    mStrategyName.textContent = c.strategyNameZh || '机构时间切片拆单 (Iceberg Synthetic)';
+  }
+  if (mTheoryRef) {
+    mTheoryRef.textContent = c.theoryRef ? `📚 理论出处：${c.theoryRef}` : '📚 理论出处：Natenberg & Bossu';
+  }
+  if (mMaxProfit) mMaxProfit.textContent = c.riskProfile?.maxProfit || '--';
+  if (mMaxLoss) mMaxLoss.textContent = c.riskProfile?.maxLoss || '--';
+  if (mBreakEven) mBreakEven.textContent = c.riskProfile?.breakEven || '--';
+
+  if (mPointersList) {
+    const pointers = c.theoreticalPointers || [];
+    if (pointers.length) {
+      mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
+    } else {
+      mPointersList.innerHTML = '<li>暂无拆单理论要点</li>';
+    }
+  }
+
   const deltaSign = c.netDeltaBTC >= 0 ? '+' : '';
   mNetDelta.textContent = `${deltaSign}${c.netDeltaBTC.toFixed(1)} BTC`;
   mNetDeltaUSD.textContent = `${c.netDeltaUSD >= 0 ? '+' : '-'}$${Math.abs(c.netDeltaUSDM).toFixed(2)}M`;
@@ -617,6 +692,7 @@ window.openIcebergDetail = function(idx) {
 
   tradeModalBackdrop.classList.add('open');
 };
+
 
 function closeModal() {
   tradeModalBackdrop.classList.remove('open');

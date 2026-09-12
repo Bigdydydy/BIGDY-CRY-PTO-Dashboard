@@ -474,6 +474,12 @@
             <span class="m-sub" id="iv-curve-sub">--</span>
           </div>
 
+          <div class="metric-pill-box" style="margin-top: 6px;">
+            <span class="m-label">时间平方根预期振幅 (√T 法则)</span>
+            <span class="m-value text-accent" id="iv-expected-move">日 ±--% | 周 ±--%</span>
+            <span class="m-sub" id="iv-straddle-sub">1M 跨式平价约 --%</span>
+          </div>
+
           <div class="gauge-section">
             <div class="gauge-header">
               <span class="gauge-title">历史 2 年 DVOL 极值分位评估</span>
@@ -530,10 +536,17 @@
             </div>
           </div>
 
-          <div class="metric-pill-box">
-            <span class="m-label">偏度不对称性 (Smirk)</span>
-            <span class="m-value" id="smile-smirk-diff">--</span>
-            <span class="m-sub" id="smile-smirk-desc">--</span>
+          <div class="metrics-row" style="margin-top: 6px;">
+            <div class="metric-pill-box">
+              <span class="m-label">偏度不对称性 (Smirk)</span>
+              <span class="m-value" id="smile-smirk-diff">--</span>
+              <span class="m-sub" id="smile-smirk-desc">--</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label">四阶峰度 / 肥尾 (Kurtosis)</span>
+              <span class="m-value text-accent" id="smile-kurtosis-curv">+--% IV</span>
+              <span class="m-sub">两翼较平值凸起 (Volga 敏感)</span>
+            </div>
           </div>
 
           <div class="smile-distribution-container">
@@ -597,6 +610,12 @@
               <span class="term-lbl">365D</span>
               <span class="term-val" id="skew-365d">--</span>
             </div>
+          </div>
+
+          <div class="metric-pill-box" style="margin-top: 6px;">
+            <span class="m-label">偏度动力学机制 (Skew Regime)</span>
+            <span class="m-value text-accent" id="skew-regime-name">--</span>
+            <span class="m-sub" id="skew-regime-sub">--</span>
           </div>
 
           <div class="narrative-brief" id="skew-narrative-box" style="flex: 1;">
@@ -778,9 +797,39 @@
 
       <div class="modal-body">
         <div class="intent-banner" id="m-intent-banner">
-          <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
+          <div class="intent-header-row">
+            <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
+            <div class="strategy-name-badge" id="m-strategy-name">策略结构</div>
+          </div>
+          <div class="theory-citation-tag" id="m-theory-ref">📚 理论出处：Natenberg &amp; Bossu</div>
           <p class="intent-narrative-text" id="m-intent-narrative">分析生成中...</p>
         </div>
+
+        <div class="risk-profile-box" id="m-risk-profile-box">
+          <div class="risk-profile-title">🎯 机构盈亏模型与损益平衡结构 (Risk &amp; Break-even Profile)</div>
+          <div class="risk-profile-grid">
+            <div class="risk-item">
+              <span class="r-lbl">最大理论盈利</span>
+              <span class="r-val text-pos" id="m-max-profit">--</span>
+            </div>
+            <div class="risk-item">
+              <span class="r-lbl">最大理论亏损</span>
+              <span class="r-val text-neg" id="m-max-loss">--</span>
+            </div>
+            <div class="risk-item">
+              <span class="r-lbl">损益平衡点 (Break-even)</span>
+              <span class="r-val text-highlight" id="m-break-even">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pointers-box" id="m-pointers-box">
+          <div class="pointers-title">📐 Natenberg &amp; Bossu 量化微观结构指引 (Key Theoretical Insights)</div>
+          <ul class="pointers-list" id="m-pointers-list">
+            <li>分析中...</li>
+          </ul>
+        </div>
+
 
         <div class="greeks-kpi-grid">
           <div class="gkpi-box">
@@ -842,6 +891,6 @@
 
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
-  <script src="/app.js?v=20260912_5"></script>
+  <script src="/app.js?v=20260912_6"></script>
 </body>
 </html>

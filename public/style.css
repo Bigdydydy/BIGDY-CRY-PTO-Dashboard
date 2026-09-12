@@ -1218,10 +1218,45 @@ body {
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
-  padding: 14px 18px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.intent-header-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.strategy-name-badge {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  padding: 5px 12px;
+  border-radius: 6px;
+}
+
+.badge-strategy-butterfly {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+}
+
+.theory-citation-tag {
+  font-family: var(--font-sans);
+  font-size: 0.73rem;
+  color: #a1a1aa;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 4px 10px;
+  width: fit-content;
 }
 
 .intent-badge-large {
@@ -1233,10 +1268,93 @@ body {
 }
 
 .intent-narrative-text {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: #d4d4d8;
-  line-height: 1.55;
+  line-height: 1.6;
 }
+
+/* Risk Profile Box */
+.risk-profile-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risk-profile-title, .pointers-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.risk-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.risk-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.risk-item .r-lbl {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.risk-item .r-val {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Theoretical Pointers Box */
+.pointers-box {
+  background: rgba(99, 102, 241, 0.03);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pointers-list {
+  list-style-type: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.pointers-list li {
+  font-size: 0.78rem;
+  color: #d4d4d8;
+  line-height: 1.5;
+  position: relative;
+  padding-left: 18px;
+}
+
+.pointers-list li::before {
+  content: "✦";
+  position: absolute;
+  left: 0;
+  color: #818cf8;
+  font-size: 0.7rem;
+}
+
 
 .greeks-kpi-grid {
   display: grid;
