@@ -1,0 +1,22 @@
+﻿{
+  "name": "greeks-quant-dashboard",
+  "version": "1.0.0",
+  "description": "Greeks.live Deribit Options & Macro Quantitative Intelligence Radar",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test_engine.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "options",
+    "deribit",
+    "quant",
+    "bitcoin",
+    "macro"
+  ],
+  "author": "",
+  "license": "MIT"
+}

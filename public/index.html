@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greeks.live 衍生品量化智能研判雷达</title>
+  <link rel="stylesheet" href="/style.css?v=20260912_2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Top Navigation Header (Sticky Glassmorphic Nav) -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>GREEKS.LIVE <span>QUANT</span></h1>
+          <p class="subtitle">Deribit BTC 期权微观结构与大资金行为智能研判</p>
+        </div>
+      </div>
+
+      <div class="header-meta">
+        <div class="meta-pill">
+          <span class="meta-label">BTC 现货</span>
+          <span class="meta-value accent" id="index-price">$--,---</span>
+        </div>
+        <div class="meta-pill">
+          <span class="meta-label">模型版本</span>
+          <span class="version-chip" id="data-version-badge">v1</span>
+        </div>
+        <button id="btn-refresh" class="btn-refresh">
+          <svg id="refresh-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span id="refresh-btn-text">实时同步</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Sync & Change Detection Status Bar -->
+  <div class="sync-status-bar" id="sync-status-bar">
+    <div class="sync-container">
+      <div class="sync-left">
+        <span class="sync-pulse-dot" id="sync-pulse-dot"></span>
+        <span class="sync-msg" id="sync-msg">正在校验最新数据流并同步量化模型...</span>
+      </div>
+      <div class="sync-right">
+        <span class="sync-time-item">上次校验: <strong id="last-sync-time">--:--:--</strong> <span class="tz-badge">UTC+8</span></span>
+        <span class="sync-time-item">最新变动: <strong id="last-change-time">--:--:--</strong> <span class="tz-badge">UTC+8</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container: Bento Grid Architecture -->
+  <main class="main-container">
+
+    <!-- Bento Row 0: Macro & On-Chain Cost Chart (Full Width) -->
+    <section class="bento-card" id="module-macro-chart">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">00 MACRO &amp; ON-CHAIN COST</span>
+          <h2>美债收益率曲线与 MicroStrategy 链上持仓成本实时全景</h2>
+        </div>
+        <div class="view-switch timeframe-switch" id="macro-timeframe-switch">
+          <button class="switch-btn" data-range="3m">3M</button>
+          <button class="switch-btn" data-range="6m">6M</button>
+          <button class="switch-btn active" data-range="1y">1Y</button>
+          <button class="switch-btn" data-range="3y">3Y</button>
+          <button class="switch-btn" data-range="all">ALL (2020~)</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Quick Stats Top Bar -->
+        <div class="macro-metrics-row">
+          <div class="macro-metric-card" id="card-metric-btc">
+            <span class="mm-label">BTC 现货指数</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-amber" id="macro-btc-val">$--,---</span>
+            </div>
+            <span class="mm-sub" id="macro-btc-sub">Binance / Deribit 实时收盘</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-mstr">
+            <span class="mm-label">MSTR 平均持仓成本</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-purple" id="macro-mstr-val">$--,---</span>
+              <span class="mm-chip" id="macro-mstr-mult">--x</span>
+            </div>
+            <span class="mm-sub" id="macro-mstr-sub">bitcointreasuries / SEC 公告核准数据</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-1y">
+            <span class="mm-label">US 1Y T-Bill (1年期)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-cyan" id="macro-1y-val">--%</span>
+            </div>
+            <span class="mm-sub">FRED 美联储常备到期收益率</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-10y">
+            <span class="mm-label">US 10Y T-Note (10年期)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-green" id="macro-10y-val">--%</span>
+            </div>
+            <span class="mm-sub">全球无风险基准利率</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-spread">
+            <span class="mm-label">(10Y - 1Y) 美债期限利差</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="macro-spread-val">--%</span>
+              <span class="mm-chip" id="macro-spread-badge">--</span>
+            </div>
+            <span class="mm-sub" id="macro-spread-sub">衰退倒挂与陡峭化监视</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-velocity">
+            <span class="mm-label">MSTR 加仓速度 (30D 导数)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-fuchsia" id="macro-velocity-val">-- BTC/d</span>
+              <span class="mm-chip" id="macro-velocity-chip">峰值 5,714</span>
+            </div>
+            <span class="mm-sub" id="macro-velocity-sub">近30天日均吸筹速率 (bitcointreasuries.net)</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-mnav">
+            <span class="mm-label">MSTR mNAV (EV 倍数)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-indigo" id="macro-mnav-val">--×</span>
+              <span class="mm-chip" id="macro-mnav-chip">--</span>
+            </div>
+            <span class="mm-sub" id="macro-mnav-sub">企业价值 / BTC NAV 溢折价</span>
+          </div>
+        </div>
+
+        <!-- Custom Interactive Legend Bar with Click to Toggle Visibility -->
+        <div class="interactive-legend-container">
+          <div class="legend-header-note">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            <span>交互式图例（点击任意指标可切换单项/组合显示）：</span>
+          </div>
+          <div class="legend-pills-group" id="macro-legend-group">
+            <button class="legend-pill active" data-dataset="0" id="legend-btn-btc" title="点击隐藏/显示 BTC 价格">
+              <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
+              <span class="legend-name">BTC 价格</span>
+              <span class="legend-axis-tag tag-left">左轴 USD</span>
+            </button>
+            <button class="legend-pill active" data-dataset="1" id="legend-btn-mstr" title="点击隐藏/显示 MSTR 成本">
+              <span class="legend-color-dot" style="background-color: #8b5cf6;"></span>
+              <span class="legend-name">MSTR Average Cost</span>
+              <span class="legend-axis-tag tag-left">左轴 USD</span>
+            </button>
+            <button class="legend-pill active" data-dataset="2" id="legend-btn-1y" title="点击隐藏/显示 US 1Y T-Bill">
+              <span class="legend-color-dot" style="background-color: #06b6d4;"></span>
+              <span class="legend-name">US 1Y T-Bill</span>
+              <span class="legend-axis-tag tag-right">右轴 %</span>
+            </button>
+            <button class="legend-pill active" data-dataset="3" id="legend-btn-10y" title="点击隐藏/显示 US 10Y T-Note">
+              <span class="legend-color-dot" style="background-color: #10b981;"></span>
+              <span class="legend-name">US 10Y T-Note</span>
+              <span class="legend-axis-tag tag-right">右轴 %</span>
+            </button>
+            <button class="legend-pill active" data-dataset="4" id="legend-btn-spread" title="点击隐藏/显示 (10Y - 1Y) 利差">
+              <span class="legend-color-dot" style="background-color: #f43f5e;"></span>
+              <span class="legend-name">(US 10Y - US 1Y) 利差</span>
+              <span class="legend-axis-tag tag-right">右轴 %</span>
+            </button>
+            <button class="legend-pill active" data-dataset="5" id="legend-btn-velocity" title="点击隐藏/显示 MSTR 购买速度 (30D 导数)">
+              <span class="legend-color-dot" style="background-color: #ec4899;"></span>
+              <span class="legend-name">MSTR 购买速度 (30D 导数)</span>
+              <span class="legend-axis-tag tag-velocity">右轴2 BTC/d</span>
+            </button>
+            <button class="legend-pill active" data-dataset="6" id="legend-btn-mnav" title="点击隐藏/显示 MSTR mNAV (EV 倍数)">
+              <span class="legend-color-dot" style="background-color: #6366f1;"></span>
+              <span class="legend-name">MSTR mNAV (EV 倍数)</span>
+              <span class="legend-axis-tag tag-mnav">右轴3 倍数</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chart Canvas Container -->
+        <div class="macro-chart-canvas-wrapper">
+          <canvas id="macro-chart-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bento Hero Card: CoinGlass CDRI (Crypto Derivatives Risk Index) -->
+    <section class="bento-card cdri-hero-card" id="module-cdri">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">COINGLASS CDRI</span>
+          <h2>加密衍生品风险指数 (CDRI)</h2>
+          <span class="card-subtitle-inline">全网杠杆负荷、爆仓脆弱度与多空博弈情绪综合雷达</span>
+        </div>
+        <div class="header-controls">
+          <div class="cdri-live-badge-wrap">
+            <span class="cdri-score-pill" id="cdri-header-score-pill">-- 中性波动</span>
+            <span class="tz-badge" id="cdri-update-time">更新中... (UTC+8)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="cdri-main-layout">
+          <!-- Left: CDRI + BTC Trend Chart (Approx 68%) -->
+          <div class="cdri-chart-panel">
+            <div class="cdri-chart-header">
+              <div class="cdri-chart-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 3v18h18M7 16l4-4 4 4 6-6"/>
+                </svg>
+                <span>CDRI 风险指数历史走势 & BTC 价格</span>
+              </div>
+              <div class="cdri-chart-actions">
+                <div class="btn-group-segmented" id="cdri-timeframe-selector">
+                  <button class="timeframe-btn" data-days="30">1M</button>
+                  <button class="timeframe-btn" data-days="90">3M</button>
+                  <button class="timeframe-btn" data-days="180">6M</button>
+                  <button class="timeframe-btn" data-days="365">1Y</button>
+                  <button class="timeframe-btn active" data-days="all">全部</button>
+                </div>
+                <button class="cdri-toggle-btn active" id="btn-toggle-cdri-btc" title="切换 BTC 价格线条显示">
+                  <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
+                  <span>BTC 现货</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="cdri-chart-legend-strip">
+              <div class="cdri-legend-item"><span class="legend-box" style="background:#22ab94;"></span> 0-30 低风险</div>
+              <div class="cdri-legend-item"><span class="legend-box" style="background:#93ea2a;"></span> 30-60 中性波动</div>
+              <div class="cdri-legend-item"><span class="legend-box" style="background:#ffc800;"></span> 60-80 高风险</div>
+              <div class="cdri-legend-item"><span class="legend-box" style="background:#f23645;"></span> 80-100 极端风险</div>
+            </div>
+
+            <div class="cdri-chart-container">
+              <div id="cdri-echarts" style="width: 100%; height: 430px;"></div>
+            </div>
+          </div>
+
+          <!-- Right: Real-time Gauge & Historical/Extrema Stats (Approx 32%) -->
+          <div class="cdri-stats-panel">
+            <!-- 1. Semicircle Gauge Card -->
+            <div class="cdri-subcard cdri-gauge-card">
+              <div class="cdri-subcard-title">
+                <span>CDRI 实时风险刻度</span>
+                <span class="subcard-tag">0 - 100</span>
+              </div>
+              <div class="cdri-gauge-wrapper">
+                <svg id="cdri-gauge-svg" viewBox="0 0 280 150" class="cdri-gauge-svg">
+                  <!-- Background Track -->
+                  <path d="M 25 135 A 115 115 0 0 1 255 135" fill="none" stroke="#27272a" stroke-width="18" stroke-linecap="round" />
+                  <!-- Colored Segments -->
+                  <path id="gauge-arc-1" d="" fill="none" stroke="#22ab94" stroke-width="18" stroke-linecap="butt" />
+                  <path id="gauge-arc-2" d="" fill="none" stroke="#93ea2a" stroke-width="18" stroke-linecap="butt" />
+                  <path id="gauge-arc-3" d="" fill="none" stroke="#ffc800" stroke-width="18" stroke-linecap="butt" />
+                  <path id="gauge-arc-4" d="" fill="none" stroke="#f23645" stroke-width="18" stroke-linecap="butt" />
+                  <!-- Needle -->
+                  <g id="gauge-needle-group" transform="rotate(0, 140, 135)">
+                    <polygon points="140,32 135,135 145,135" fill="#f4f4f5" />
+                    <circle cx="140" cy="135" r="9" fill="#09090b" stroke="#f4f4f5" stroke-width="3" />
+                  </g>
+                  <!-- Scale labels -->
+                  <text x="16" y="148" class="gauge-scale-text" text-anchor="start">0</text>
+                  <text x="64" y="44" class="gauge-scale-text" text-anchor="middle">30</text>
+                  <text x="176" y="18" class="gauge-scale-text" text-anchor="middle">60</text>
+                  <text x="244" y="68" class="gauge-scale-text" text-anchor="middle">80</text>
+                  <text x="264" y="148" class="gauge-scale-text" text-anchor="end">100</text>
+                </svg>
+                <div class="cdri-gauge-val-display">
+                  <span class="cdri-big-score" id="cdri-gauge-score">--</span>
+                  <div class="cdri-badge" id="cdri-gauge-badge">读取中...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Historical Comparison Card -->
+            <div class="cdri-subcard">
+              <div class="cdri-subcard-title">
+                <span>历史数值对比</span>
+                <span class="subcard-tag">Performance</span>
+              </div>
+              <div class="cdri-metric-list">
+                <div class="cdri-metric-row">
+                  <span class="cdri-metric-name">昨天 (Yesterday)</span>
+                  <div class="cdri-metric-val-wrap" id="cdri-hist-yesterday">
+                    <span class="cdri-num-pill">--</span>
+                  </div>
+                </div>
+                <div class="cdri-metric-row">
+                  <span class="cdri-metric-name">上周 (Last Week)</span>
+                  <div class="cdri-metric-val-wrap" id="cdri-hist-week">
+                    <span class="cdri-num-pill">--</span>
+                  </div>
+                </div>
+                <div class="cdri-metric-row">
+                  <span class="cdri-metric-name">上月 (Last Month)</span>
+                  <div class="cdri-metric-val-wrap" id="cdri-hist-month">
+                    <span class="cdri-num-pill">--</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 52-Week Extrema Card -->
+            <div class="cdri-subcard">
+              <div class="cdri-subcard-title">
+                <span>年度极值统计</span>
+                <span class="subcard-tag">High / Low</span>
+              </div>
+              <div class="cdri-metric-list">
+                <div class="cdri-metric-row">
+                  <div class="cdri-extrema-label-group">
+                    <span class="cdri-metric-name">年度最高点</span>
+                    <span class="cdri-date-tag" id="cdri-year-high-date">(--)</span>
+                  </div>
+                  <div class="cdri-metric-val-wrap" id="cdri-year-high">
+                    <span class="cdri-num-pill">--</span>
+                  </div>
+                </div>
+                <div class="cdri-metric-row">
+                  <div class="cdri-extrema-label-group">
+                    <span class="cdri-metric-name">年度最低点</span>
+                    <span class="cdri-date-tag" id="cdri-year-low-date">(--)</span>
+                  </div>
+                  <div class="cdri-metric-val-wrap" id="cdri-year-low">
+                    <span class="cdri-num-pill">--</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Info & Model Breakdown Accordion -->
+        <div class="cdri-drawer-accordion" id="cdri-accordion">
+          <button class="cdri-drawer-btn" id="btn-toggle-cdri-drawer" type="button">
+            <span class="drawer-title-left">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+              <span>分值解释与 CDRI 核心风控维度拆解说明</span>
+            </span>
+            <span class="drawer-arrow" id="cdri-drawer-arrow">展开规则与核心指标 ▼</span>
+          </button>
+
+          <div class="cdri-drawer-content" id="cdri-drawer-content" style="display: none;">
+            <!-- 4 Risk Levels Reference Table -->
+            <div class="cdri-table-wrapper">
+              <table class="cdri-table">
+                <thead>
+                  <tr>
+                    <th style="width: 15%;">分值区间</th>
+                    <th style="width: 18%;">风险等级</th>
+                    <th style="width: 27%;">市场状态</th>
+                    <th style="width: 40%;">策略建议</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="cdri-range-tag tag-low">0 - 30</span></td>
+                    <td><span class="cdri-status-text text-low">低风险 (Low Risk)</span></td>
+                    <td>市场冷静 / 杠杆保守</td>
+                    <td>市场稳定，适合策略部署与适度加仓</td>
+                  </tr>
+                  <tr>
+                    <td><span class="cdri-range-tag tag-neutral">30 - 60</span></td>
+                    <td><span class="cdri-status-text text-neutral">中性波动 (Neutral Volatility)</span></td>
+                    <td>平衡博弈 / 方向不明</td>
+                    <td>保持灵活，控制仓位，等待趋势明朗</td>
+                  </tr>
+                  <tr>
+                    <td><span class="cdri-range-tag tag-high">60 - 80</span></td>
+                    <td><span class="cdri-status-text text-high">高风险 (High Risk)</span></td>
+                    <td>杠杆堆积 / 情绪激烈</td>
+                    <td>谨慎操作，防范爆仓与强震荡</td>
+                  </tr>
+                  <tr>
+                    <td><span class="cdri-range-tag tag-extreme">80 - 100</span></td>
+                    <td><span class="cdri-status-text text-extreme">极端风险 (Extreme Risk)</span></td>
+                    <td>市场过热 / 多空极端</td>
+                    <td>多空均存在清算风险，警惕双杀或剧烈反转</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 7 Core Risk Components Breakdown -->
+            <div class="cdri-components-grid">
+              <div class="cdri-comp-card">
+                <span class="comp-num">01</span>
+                <span class="comp-title">总未平仓合约 (OI)</span>
+                <p class="comp-desc">全网杠杆体量，OI 急增代表全网头寸与博弈资金剧烈堆积。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">02</span>
+                <span class="comp-title">资金费率 (Funding)</span>
+                <p class="comp-desc">多空持仓倾斜成本，极端持续费率往往是剧烈轧空或多杀多的先兆。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">03</span>
+                <span class="comp-title">平均杠杆倍数</span>
+                <p class="comp-desc">衡量市场整体投机冒险倾向，反映散户与主力资金的真实杠杆使用强度。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">04</span>
+                <span class="comp-title">多空比偏离度</span>
+                <p class="comp-desc">方向性拥挤度监控，单向极度偏离意味着潜在的反向踩踏与连环爆仓风险。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">05</span>
+                <span class="comp-title">隐含波动率 (IV)</span>
+                <p class="comp-desc">期权微观结构对未来非线性波动的定价，IV 飙升代表市场不确定性剧增。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">06</span>
+                <span class="comp-title">24H 清算总额</span>
+                <p class="comp-desc">多空强平清算规模，清算峰值往往是系统性杠杆风险加速释放出清的节点。</p>
+              </div>
+              <div class="cdri-comp-card">
+                <span class="comp-num">07</span>
+                <span class="comp-title">成交量热度变化</span>
+                <p class="comp-desc">异动成交量脉冲，表征短期 FOMO 狂热追高或恐慌斩仓的极端情绪阶段。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Bento Row 1: Volatility Surface Matrix (3 Modular Cards Side-by-Side) -->
+    <div class="bento-row-3">
+      
+      <!-- Bento Card 1: ATM IV 期限结构与极值研判 -->
+      <section class="bento-card" id="module-atm-iv">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-module-tag">01 ATM IV</span>
+            <h2>期限结构与极值研判</h2>
+          </div>
+          <div class="card-badge" id="iv-regime-badge">分析中...</div>
+        </div>
+
+        <div class="card-body">
+          <div class="metrics-row">
+            <div class="metric-pill-box">
+              <span class="m-label">1M ATM IV</span>
+              <span class="m-value text-highlight" id="iv-1m">--%</span>
+              <span class="m-sub" id="iv-1m-sub">--</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label">3M ATM IV</span>
+              <span class="m-value" id="iv-3m">--%</span>
+              <span class="m-sub" id="iv-3m-sub">--</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label">6M ATM IV</span>
+              <span class="m-value" id="iv-6m">--%</span>
+              <span class="m-sub" id="iv-6m-sub">--</span>
+            </div>
+          </div>
+
+          <div class="metric-pill-box">
+            <span class="m-label">期限结构形态</span>
+            <span class="m-value text-accent" id="iv-curve-type">--</span>
+            <span class="m-sub" id="iv-curve-sub">--</span>
+          </div>
+
+          <div class="gauge-section">
+            <div class="gauge-header">
+              <span class="gauge-title">历史 2 年 DVOL 极值分位评估</span>
+              <span class="gauge-percentile" id="iv-percentile-label">当前处于历史 --% 分位</span>
+            </div>
+            <div class="gauge-bar-track">
+              <div class="gauge-bar-fill" id="iv-gauge-fill" style="width: 0%;"></div>
+            </div>
+            <div class="gauge-scale-legend">
+              <span id="gauge-min">Min: 33.8%</span>
+              <span id="gauge-med">中位数: 48.5%</span>
+              <span id="gauge-max">Max: 82.6%</span>
+            </div>
+          </div>
+
+          <div class="narrative-brief" id="iv-narrative-box">
+            <div class="brief-header">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+              <span>量化研判与交易倾向</span>
+            </div>
+            <p class="brief-content" id="iv-narrative-text">正在计算波动率极值与期限结构研判...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bento Card 2: IV Skew 微笑曲线研判 -->
+      <section class="bento-card" id="module-iv-smile">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-module-tag">04 SMILE</span>
+            <h2>行权价微笑偏度研判</h2>
+          </div>
+          <div class="card-badge badge-normal" id="smile-shape-badge">分析中...</div>
+        </div>
+
+        <div class="card-body">
+          <div class="metrics-row">
+            <div class="metric-pill-box">
+              <span class="m-label">ATM 平值 IV</span>
+              <span class="m-value text-accent" id="smile-atm-iv">--%</span>
+              <span class="m-sub" id="smile-atm-strike">ATM: $--</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label">左翼 Put 溢价</span>
+              <span class="m-value text-neg" id="smile-put-wing">--%</span>
+              <span class="m-sub" id="smile-put-sub">--</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label">右翼 Call 溢价</span>
+              <span class="m-value text-pos" id="smile-call-wing">--%</span>
+              <span class="m-sub" id="smile-call-sub">--</span>
+            </div>
+          </div>
+
+          <div class="metric-pill-box">
+            <span class="m-label">偏度不对称性 (Smirk)</span>
+            <span class="m-value" id="smile-smirk-diff">--</span>
+            <span class="m-sub" id="smile-smirk-desc">--</span>
+          </div>
+
+          <div class="smile-distribution-container">
+            <div class="distribution-header">
+              <span>1M 期限行权价 IV 梯度分布 (BTC-1M)</span>
+            </div>
+            <div class="strikes-iv-strip" id="strikes-strip-container">
+              <div class="loading-placeholder">加载行权价偏度中...</div>
+            </div>
+          </div>
+
+          <div class="narrative-brief" id="smile-narrative-box">
+            <div class="brief-header">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+              <span>行权价偏度与尾部预期</span>
+            </div>
+            <p class="brief-content" id="smile-narrative-text">正在评估行权价隐含波动率微笑曲线...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bento Card 3: 25Δ Skew 期限结构研判 -->
+      <section class="bento-card" id="module-25d-skew">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-module-tag">05 25Δ SKEW</span>
+            <h2>期限结构与偏度情绪</h2>
+          </div>
+          <div class="card-badge badge-normal" id="skew-regime-badge">25D RR</div>
+        </div>
+
+        <div class="card-body">
+          <div class="skew-term-grid">
+            <div class="skew-term-item">
+              <span class="term-lbl">1D</span>
+              <span class="term-val" id="skew-1d">--</span>
+            </div>
+            <div class="skew-term-item">
+              <span class="term-lbl">7D</span>
+              <span class="term-val" id="skew-7d">--</span>
+            </div>
+            <div class="skew-term-item highlight">
+              <span class="term-lbl">30D</span>
+              <span class="term-val" id="skew-30d">--</span>
+            </div>
+            <div class="skew-term-item">
+              <span class="term-lbl">60D</span>
+              <span class="term-val" id="skew-60d">--</span>
+            </div>
+            <div class="skew-term-item highlight">
+              <span class="term-lbl">90D</span>
+              <span class="term-val" id="skew-90d">--</span>
+            </div>
+            <div class="skew-term-item">
+              <span class="term-lbl">180D</span>
+              <span class="term-val" id="skew-180d">--</span>
+            </div>
+            <div class="skew-term-item">
+              <span class="term-lbl">365D</span>
+              <span class="term-val" id="skew-365d">--</span>
+            </div>
+          </div>
+
+          <div class="narrative-brief" id="skew-narrative-box" style="flex: 1;">
+            <div class="brief-header">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+              <span>风险逆转 (Risk Reversal) 偏度研判</span>
+            </div>
+            <p class="brief-content" id="skew-narrative-text">正在分析 25 Delta 偏度期限结构...</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Bento Row 2: GEX by Expiration 动态交割期与钉盘 (Full Width) -->
+    <section class="bento-card" id="module-gex">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">02 GEX</span>
+          <h2>GEX by Expiration 动态主力交割期与钉盘研判</h2>
+        </div>
+        <div class="view-switch">
+          <button class="switch-btn active" id="btn-gex-focused">核心主力交割 (动态锁定)</button>
+          <button class="switch-btn" id="btn-gex-all">全部到期日</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="rule-banner">
+          <span>⚙️</span>
+          <span id="gex-rule-text">动态交割期算法已激活：自动锁定当月月底、季度末及年底交割，过滤非当月普通到期。</span>
+        </div>
+
+        <div class="gex-cards-grid" id="gex-cards-container">
+          <div class="loading-placeholder">加载 GEX 数据中...</div>
+        </div>
+
+        <div class="narrative-brief" id="gex-narrative-box">
+          <div class="brief-header">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            <span>做市商 Gamma 敞口与磁吸钉盘区间评估</span>
+          </div>
+          <p class="brief-content" id="gex-narrative-text">正在评估各主力交割期的做市商防御与磁吸区间...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bento Row 3: Block Trade 巨鲸大单与机构拆单雷达 (Full Width) -->
+    <section class="bento-card" id="module-block-trades">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">03 BLOCK TRADE</span>
+          <h2>巨鲸大单与机构冰山拆单智能雷达</h2>
+        </div>
+        <div class="filter-controls">
+          <div class="filter-group">
+            <span class="filter-label">历史沉淀窗口:</span>
+            <select id="time-range-select" class="select-box">
+              <option value="all" selected>过去 1 个月历史沉淀 (至多30天)</option>
+              <option value="7d">近 7 天</option>
+              <option value="3d">近 3 天 (72小时)</option>
+              <option value="24h">近 24 小时</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">重点关注门槛:</span>
+            <select id="threshold-select" class="select-box">
+              <option value="15000000">&gt; $15M USD</option>
+              <option value="30000000" selected>&gt; $30M USD (标准)</option>
+              <option value="50000000">&gt; $50M USD</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="narrative-brief lead" id="block-narrative-box">
+          <div class="brief-header">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            <span>大宗交易资金流向与机构战略意图研判</span>
+          </div>
+          <p class="brief-content" id="block-narrative-text" style="font-size: 0.82rem; font-weight: 500;">正在聚合计算机构拆单与巨鲸大单流向...</p>
+        </div>
+
+        <div class="flow-summary-bar">
+          <div class="flow-stat">
+            <span class="stat-label">巨鲸交易总量</span>
+            <span class="stat-val" id="whale-total-vol">$--M</span>
+          </div>
+          <div class="flow-stat">
+            <span class="stat-label">单笔巨鲸笔数</span>
+            <span class="stat-val" id="whale-single-count">--</span>
+          </div>
+          <div class="flow-stat">
+            <span class="stat-label">捕获机构拆单组合</span>
+            <span class="stat-val text-warning" id="iceberg-cluster-count">-- 组</span>
+          </div>
+          <div class="flow-stat">
+            <span class="stat-label">主流资金倾向</span>
+            <span class="stat-val text-accent" id="flow-bias-label">--</span>
+          </div>
+        </div>
+
+        <div class="store-meta-banner" id="store-meta-banner">
+          <div class="store-meta-left">
+            <span>🗄️</span>
+            <span id="store-text">本地历史数据库：已记录 0 笔大宗成交（滚动沉淀至多 30 天，突破官方 72h 限制）</span>
+          </div>
+          <div class="store-meta-right">
+            <span class="store-span-badge" id="store-span-badge">已沉淀: -- 天</span>
+          </div>
+        </div>
+
+        <div class="sub-tabs">
+          <button class="tab-btn active" id="tab-icebergs">
+            <span>🧊 机构冰山拆单组合 (Synthetic Iceberg Whale)</span>
+            <span class="badge" id="badge-icebergs">0</span>
+          </button>
+          <button class="tab-btn" id="tab-singles">
+            <span>🐋 单笔巨鲸大宗 (Single Whale Blocks &gt; $30M)</span>
+            <span class="badge" id="badge-singles">0</span>
+          </button>
+        </div>
+
+        <div class="tab-content" id="content-icebergs">
+          <div class="table-hint">💡 点击任意拆单行展开 Black-Scholes 希腊字母（Delta/Gamma/Vega/Theta）与看方向/看震荡深度穿透</div>
+          <div class="cluster-cards" id="cluster-cards-container">
+            <div class="loading-placeholder">扫描时间窗口拆单行为中...</div>
+          </div>
+        </div>
+
+        <div class="tab-content hidden" id="content-singles">
+          <div class="table-hint">💡 点击任意成交行展开 Black-Scholes 希腊字母（Delta/Gamma/Vega/Theta）与看方向/看震荡深度穿透</div>
+          <div class="table-responsive">
+            <table class="quant-table clickable-table" id="whale-table">
+              <thead>
+                <tr>
+                  <th>成交时间 (UTC+8)</th>
+                  <th>Block ID</th>
+                  <th>战略意图</th>
+                  <th>名义价值</th>
+                  <th>净 Delta</th>
+                  <th>净 Vega</th>
+                  <th>腿数</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="whale-table-body">
+                <tr><td colspan="8" class="text-center">加载巨鲸大单中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Interactive Modal for Block Trade Analysis (Refined Glassmorphism Drawer) -->
+  <div class="modal-backdrop" id="trade-modal-backdrop">
+    <div class="modal-card" id="trade-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-title-top">
+            <span class="modal-tag" id="m-block-type">WHALE BLOCK</span>
+            <h3 id="m-block-title">BLOCK 深度量化解析</h3>
+          </div>
+          <div class="modal-time-meta" id="m-block-time">-- (UTC+8)</div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="intent-banner" id="m-intent-banner">
+          <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
+          <p class="intent-narrative-text" id="m-intent-narrative">分析生成中...</p>
+        </div>
+
+        <div class="greeks-kpi-grid">
+          <div class="gkpi-box">
+            <span class="gkpi-lbl">净 Delta (标的敞口)</span>
+            <span class="gkpi-val" id="m-net-delta">--</span>
+            <span class="gkpi-sub" id="m-net-delta-usd">$--</span>
+          </div>
+          <div class="gkpi-box">
+            <span class="gkpi-lbl">净 Gamma (凸性敏感度)</span>
+            <span class="gkpi-val" id="m-net-gamma">--</span>
+            <span class="gkpi-sub">变盘敏感指标</span>
+          </div>
+          <div class="gkpi-box">
+            <span class="gkpi-lbl">净 Vega (波动率损益)</span>
+            <span class="gkpi-val" id="m-net-vega">--</span>
+            <span class="gkpi-sub">IV 变动 1% 头寸损益</span>
+          </div>
+          <div class="gkpi-box">
+            <span class="gkpi-lbl">净 Theta (时间价值衰减)</span>
+            <span class="gkpi-val" id="m-net-theta">--</span>
+            <span class="gkpi-sub">每天流逝价值收益</span>
+          </div>
+        </div>
+
+        <div class="modal-sub-title">交易分腿参数与独立希腊字母明细 (Leg Breakdown)</div>
+        <div class="table-responsive">
+          <table class="quant-table modal-table">
+            <thead>
+              <tr>
+                <th>方向</th>
+                <th>合约代码</th>
+                <th>张数</th>
+                <th>成交价</th>
+                <th>成交 IV</th>
+                <th>Delta</th>
+                <th>Vega (USD)</th>
+                <th>Theta (USD/d)</th>
+                <th>名义价值</th>
+              </tr>
+            </thead>
+            <tbody id="m-legs-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-notification" id="toast-notification"></div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <span>Greeks.live Quantitative Intelligence • Real-time Data Feed • Deribit Options</span>
+      <span class="footer-status">● Live Feed Connected</span>
+    </div>
+  </footer>
+
+  <script src="/chart.min.js"></script>
+  <script src="/echarts.min.js"></script>
+  <script src="/app.js?v=20260912_3"></script>
+</body>
+</html>
