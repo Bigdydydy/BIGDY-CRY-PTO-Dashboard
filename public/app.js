@@ -242,7 +242,7 @@ function renderAll() {
   
   const sync = currentMarketData.syncStatus;
   if (sync) {
-    elDataVersionBadge.textContent = `v${sync.dataVersion}`;
+    if (elDataVersionBadge) elDataVersionBadge.textContent = `v${sync.dataVersion}`;
     elSyncMsg.textContent = sync.summary || '数据已校验';
     if (sync.hasAnyUpdate) elSyncMsg.className = 'sync-msg updated';
     else elSyncMsg.className = 'sync-msg';
