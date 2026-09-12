@@ -1677,9 +1677,9 @@ body {
 }
 
 .cdri-toggle-btn.active {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.4);
-  color: #fbbf24;
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
 }
 
 .cdri-toggle-btn.inactive {

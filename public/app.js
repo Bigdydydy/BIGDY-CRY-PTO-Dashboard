@@ -1441,8 +1441,8 @@ function renderCdriChart() {
             </div>`;
           } else if (p.seriesName === 'BTC 现货') {
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
-              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px;"></span>BTC 现货价格:</span>
-              <span style="font-weight:700;color:#fbbf24;">$${Number(p.value).toLocaleString()}</span>
+              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:6px;"></span>BTC 现货价格:</span>
+              <span style="font-weight:700;color:#38bdf8;">$${Number(p.value).toLocaleString()}</span>
             </div>`;
           }
         });
@@ -1483,7 +1483,7 @@ function renderCdriChart() {
       {
         type: 'value',
         name: 'BTC 现货 (USD)',
-        nameTextStyle: { color: '#fbbf24', fontSize: 11 },
+        nameTextStyle: { color: '#38bdf8', fontSize: 11 },
         show: isCdriBtcVisible,
         min: (value) => {
           if (!isFinite(value.min) || isNaN(value.min)) return 0;
@@ -1494,7 +1494,7 @@ function renderCdriChart() {
           return Math.ceil(value.max * 1.05 / 1000) * 1000;
         },
         axisLabel: {
-          color: '#fbbf24',
+          color: '#38bdf8',
           fontFamily: 'JetBrains Mono',
           formatter: (v) => `$${Math.round(v / 1000)}k`
         },
@@ -1581,11 +1581,11 @@ function renderCdriChart() {
         showSymbol: false,
         data: isCdriBtcVisible ? prices : [],
         lineStyle: {
-          width: 1.2,
-          color: '#f59e0b',
-          opacity: 0.85
+          width: 1.5,
+          color: '#38bdf8',
+          opacity: 0.92
         },
-        itemStyle: { color: '#f59e0b' }
+        itemStyle: { color: '#38bdf8' }
       }
     ]
   };
