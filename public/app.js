@@ -98,7 +98,6 @@ const mNetTheta = document.getElementById('m-net-theta');
 const mLegsBody = document.getElementById('m-legs-body');
 const mBlockTime = document.getElementById('m-block-time');
 const mStrategyName = document.getElementById('m-strategy-name');
-const mTheoryRef = document.getElementById('m-theory-ref');
 const mMaxProfit = document.getElementById('m-max-profit');
 const mMaxLoss = document.getElementById('m-max-loss');
 const mBreakEven = document.getElementById('m-break-even');
@@ -573,9 +572,6 @@ window.openWhaleDetail = function(idx) {
   if (mStrategyName) {
     mStrategyName.textContent = b.strategyNameZh || '机构定制结构';
   }
-  if (mTheoryRef) {
-    mTheoryRef.textContent = b.theoryRef ? `📚 理论出处：${b.theoryRef}` : '📚 理论出处：Natenberg & Bossu';
-  }
   if (mMaxProfit) mMaxProfit.textContent = b.riskProfile?.maxProfit || '--';
   if (mMaxLoss) mMaxLoss.textContent = b.riskProfile?.maxLoss || '--';
   if (mBreakEven) mBreakEven.textContent = b.riskProfile?.breakEven || '--';
@@ -585,7 +581,7 @@ window.openWhaleDetail = function(idx) {
     if (pointers.length) {
       mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
     } else {
-      mPointersList.innerHTML = '<li>暂无理论指引要点</li>';
+      mPointersList.innerHTML = '<li>暂无研判要点</li>';
     }
   }
 
@@ -644,9 +640,6 @@ window.openIcebergDetail = function(idx) {
   if (mStrategyName) {
     mStrategyName.textContent = c.strategyNameZh || '机构时间切片拆单 (Iceberg Synthetic)';
   }
-  if (mTheoryRef) {
-    mTheoryRef.textContent = c.theoryRef ? `📚 理论出处：${c.theoryRef}` : '📚 理论出处：Natenberg & Bossu';
-  }
   if (mMaxProfit) mMaxProfit.textContent = c.riskProfile?.maxProfit || '--';
   if (mMaxLoss) mMaxLoss.textContent = c.riskProfile?.maxLoss || '--';
   if (mBreakEven) mBreakEven.textContent = c.riskProfile?.breakEven || '--';
@@ -656,7 +649,7 @@ window.openIcebergDetail = function(idx) {
     if (pointers.length) {
       mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
     } else {
-      mPointersList.innerHTML = '<li>暂无拆单理论要点</li>';
+      mPointersList.innerHTML = '<li>暂无拆单研判要点</li>';
     }
   }
 
