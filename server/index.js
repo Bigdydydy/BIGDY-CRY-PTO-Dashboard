@@ -85,13 +85,35 @@ async function handleApiRequest(req, res, parsedUrl) {
         gex: gexAnalysis,
         blockTrades: blockAnalysis,
         ivSmile: smileAnalysis,
-        delta25Skew: skewAnalysis
+        delta25Skew: skewAnalysis,
+        termPremium: data.termPremium || null
       };
 
       res.writeHead(200);
       res.end(JSON.stringify(payload));
     } catch (err) {
       console.error('[API Error] market-data:', err);
+      res.writeHead(500);
+      res.end(JSON.stringify({ code: -1, error: err.message }));
+    }
+    return;
+  }
+
+  // GET /api/term-premium
+  if (pathname === '/api/term-premium' && req.method === 'GET') {
+    try {
+      const cache = getCachedData();
+      if (!cache.termPremium) {
+        await refreshAllMarketData('BTC');
+      }
+      const data = getCachedData();
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        code: 0,
+        ...data.termPremium
+      }));
+    } catch (err) {
+      console.error('[API Error] term-premium:', err);
       res.writeHead(500);
       res.end(JSON.stringify({ code: -1, error: err.message }));
     }

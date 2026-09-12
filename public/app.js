@@ -267,6 +267,11 @@ function renderAll() {
   renderIvSmile(currentMarketData.ivSmile);
   render25DeltaSkew(currentMarketData.delta25Skew);
   renderBlockTrades(currentMarketData.blockTrades);
+  if (currentMarketData.termPremium) {
+    renderTermPremium(currentMarketData.termPremium);
+  } else {
+    loadTermPremiumData();
+  }
 }
 
 /**
@@ -1715,10 +1720,546 @@ function initCdriEvents() {
 }
 
 // ============================================================================
+// Futures Basis Term Structure & Multi-Span Term Premium Radar Controller
+// ============================================================================
+
+let currentTermPremiumData = null;
+let termPremiumChartInstance = null;
+let currentTpTimeframe = 'all'; // '30', '90', '180', '365', 'all'
+let tpVisibleSeries = {
+  spread90d7d: true,
+  spread30d7d: true,
+  spread180d30d: true,
+  apr30d: true,
+  tbill: true,
+  allCurves: false
+};
+
+// DOM Elements
+const elTpHeaderRegimePill = document.getElementById('tp-header-regime-pill');
+const elTpHeaderScorePill = document.getElementById('tp-header-score-pill');
+const elTpHeaderExcessPill = document.getElementById('tp-header-excess-pill');
+const elTpUpdateTime = document.getElementById('tp-update-time');
+
+const elTpVal7d = document.getElementById('tp-val-7d');
+const elTpVal30d = document.getElementById('tp-val-30d');
+const elTpVal90d = document.getElementById('tp-val-90d');
+const elTpVal180d = document.getElementById('tp-val-180d');
+
+const elTpSpread90d7d = document.getElementById('tp-spread-90d7d');
+const elTpSpread30d7d = document.getElementById('tp-spread-30d7d');
+const elTpSpread180d30d = document.getElementById('tp-spread-180d30d');
+
+const elTpRegimeTag = document.getElementById('tp-regime-tag');
+const elTpScoreValue = document.getElementById('tp-score-value');
+const elTpExcessVal = document.getElementById('tp-excess-val');
+const elTpScoreBarFill = document.getElementById('tp-score-bar-fill');
+
+const elTpInsightsSummary = document.getElementById('tp-insights-summary');
+const elTpInsightsList = document.getElementById('tp-insights-list');
+
+const elTpEcharts = document.getElementById('term-premium-echarts');
+const tpTimeframeSelector = document.getElementById('tp-timeframe-selector');
+
+const btnToggleSpread90d7d = document.getElementById('btn-toggle-spread90d7d');
+const btnToggleSpread30d7d = document.getElementById('btn-toggle-spread30d7d');
+const btnToggleSpread180d30d = document.getElementById('btn-toggle-spread180d30d');
+const btnToggleApr30d = document.getElementById('btn-toggle-apr30d');
+const btnToggleTbill = document.getElementById('btn-toggle-tbill');
+const btnToggleAllCurves = document.getElementById('btn-toggle-all-curves');
+
+/**
+ * Fallback independent fetcher for Term Premium
+ */
+async function loadTermPremiumData() {
+  try {
+    const resp = await fetch('/api/term-premium');
+    if (!resp.ok) return;
+    const json = await resp.json();
+    if (json.code === 0) {
+      renderTermPremium(json);
+    }
+  } catch (err) {
+    console.error('[Term Premium] Error loading data:', err);
+  }
+}
+
+/**
+ * Render all Term Premium metrics and chart
+ */
+function renderTermPremium(data) {
+  if (!data) return;
+  currentTermPremiumData = data;
+
+  const c = data.current;
+  const reg = data.regime || {};
+
+  // Header pills
+  if (elTpHeaderRegimePill && reg.regimeName) {
+    elTpHeaderRegimePill.textContent = reg.regimeName.split(' ')[0] || '升水结构';
+    if (reg.regimeBadgeClass) {
+      elTpHeaderRegimePill.className = `tp-regime-pill ${reg.regimeBadgeClass}`;
+    }
+  }
+  if (elTpHeaderScorePill && c && c.carryScore !== undefined) {
+    elTpHeaderScorePill.textContent = `Carry: ${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
+  }
+  if (elTpHeaderExcessPill && c && c.excessReturn !== undefined) {
+    elTpHeaderExcessPill.textContent = `超额: ${c.excessReturn >= 0 ? '+' : ''}${c.excessReturn.toFixed(2)}%`;
+  }
+  if (elTpUpdateTime && c) {
+    elTpUpdateTime.textContent = `${formatUTC8(c.timestamp || Date.now())} (UTC+8)`;
+  }
+
+  // 1. Constant Maturity Basis Matrix
+  if (c) {
+    if (elTpVal7d) {
+      elTpVal7d.textContent = `${c.apr7d >= 0 ? '+' : ''}${c.apr7d.toFixed(2)}%`;
+      elTpVal7d.style.color = c.apr7d >= 0 ? '#10b981' : '#f43f5e';
+    }
+    if (elTpVal30d) {
+      elTpVal30d.textContent = `${c.apr30d >= 0 ? '+' : ''}${c.apr30d.toFixed(2)}%`;
+      elTpVal30d.style.color = '#f59e0b';
+    }
+    if (elTpVal90d) {
+      elTpVal90d.textContent = `${c.apr90d >= 0 ? '+' : ''}${c.apr90d.toFixed(2)}%`;
+      elTpVal90d.style.color = c.apr90d >= 0 ? '#38bdf8' : '#f43f5e';
+    }
+    if (elTpVal180d) {
+      elTpVal180d.textContent = `${c.apr180d >= 0 ? '+' : ''}${c.apr180d.toFixed(2)}%`;
+      elTpVal180d.style.color = c.apr180d >= 0 ? '#10b981' : '#f43f5e';
+    }
+
+    // 2. Multi-Span Spreads Breakdown
+    if (elTpSpread90d7d) {
+      elTpSpread90d7d.textContent = `${c.spread90d7d >= 0 ? '+' : ''}${c.spread90d7d.toFixed(2)}%`;
+      elTpSpread90d7d.className = `tp-sp-num ${c.spread90d7d >= 0 ? 'text-pos' : 'text-neg'}`;
+    }
+    if (elTpSpread30d7d) {
+      elTpSpread30d7d.textContent = `${c.spread30d7d >= 0 ? '+' : ''}${c.spread30d7d.toFixed(2)}%`;
+      elTpSpread30d7d.className = `tp-sp-num ${c.spread30d7d >= 0 ? 'text-pos' : 'text-neg'}`;
+    }
+    if (elTpSpread180d30d) {
+      elTpSpread180d30d.textContent = `${c.spread180d30d >= 0 ? '+' : ''}${c.spread180d30d.toFixed(2)}%`;
+      elTpSpread180d30d.className = `tp-sp-num ${c.spread180d30d >= 0 ? 'text-pos' : 'text-neg'}`;
+    }
+
+    // 3. Carry Score & Excess Return
+    if (elTpRegimeTag && reg.regimeCode) {
+      elTpRegimeTag.textContent = reg.regimeCode.replace(/_/g, ' ');
+    }
+    if (elTpScoreValue && c.carryScore !== undefined) {
+      elTpScoreValue.textContent = `${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
+      if (c.carryScore > 15) elTpScoreValue.style.color = '#10b981';
+      else if (c.carryScore > 5) elTpScoreValue.style.color = '#f59e0b';
+      else elTpScoreValue.style.color = '#f43f5e';
+    }
+    if (elTpExcessVal && c.excessReturn !== undefined) {
+      elTpExcessVal.textContent = `${c.excessReturn >= 0 ? '+' : ''}${c.excessReturn.toFixed(2)}%`;
+      elTpExcessVal.style.color = c.excessReturn >= 0 ? '#10b981' : '#f43f5e';
+    }
+    if (elTpScoreBarFill && c.carryScore !== undefined) {
+      const pct = Math.max(5, Math.min(95, ((c.carryScore + 10) / 40) * 100));
+      elTpScoreBarFill.style.width = `${pct}%`;
+    }
+  }
+
+  // 4. Institutional Insights
+  if (elTpInsightsSummary && reg.statusSummary) {
+    elTpInsightsSummary.textContent = reg.statusSummary;
+  }
+  if (elTpInsightsList && reg.keyPointers) {
+    elTpInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${p}</li>`).join('');
+  }
+
+  // Render Dual-Grid Chart
+  renderTermPremiumChart();
+}
+
+/**
+ * Render Dual-Grid ECharts: Constant Maturity Basis & Multi-Span Spreads
+ */
+function renderTermPremiumChart() {
+  if (!elTpEcharts || !currentTermPremiumData || !currentTermPremiumData.series) return;
+
+  if (!termPremiumChartInstance) {
+    termPremiumChartInstance = echarts.init(elTpEcharts, 'dark');
+  }
+
+  let rawSeries = currentTermPremiumData.series;
+  if (!rawSeries || !rawSeries.length) return;
+
+  // Filter series by timeframe
+  let sliced = rawSeries;
+  if (currentTpTimeframe === '30') sliced = rawSeries.slice(-30);
+  else if (currentTpTimeframe === '90') sliced = rawSeries.slice(-90);
+  else if (currentTpTimeframe === '180') sliced = rawSeries.slice(-180);
+  else if (currentTpTimeframe === '365') sliced = rawSeries.slice(-365);
+
+  const dates = sliced.map(s => s.date);
+  const apr30dData = sliced.map(s => s.apr30d);
+  const tbillData = sliced.map(() => 4.5);
+  const spread90d7dData = sliced.map(s => s.spread90d7d);
+  const spread30d7dData = sliced.map(s => s.spread30d7d);
+  const spread180d30dData = sliced.map(s => s.spread180d30d);
+
+  const seriesList = [];
+
+  // Top Grid Series: 30D Basis APR
+  if (tpVisibleSeries.apr30d) {
+    seriesList.push({
+      id: 'top-apr30d',
+      name: '30D 基差 APR',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      smooth: 0.2,
+      data: apr30dData,
+      lineStyle: { width: 2.2, color: '#f59e0b' },
+      itemStyle: { color: '#f59e0b' },
+      markArea: {
+        silent: true,
+        data: [[
+          {
+            yAxis: -15,
+            itemStyle: { color: 'rgba(244, 63, 94, 0.05)' },
+            label: {
+              show: true,
+              position: 'insideBottomRight',
+              color: 'rgba(244, 63, 94, 0.65)',
+              fontSize: 10,
+              formatter: '美债机会成本劣势区 (<5%)'
+            }
+          },
+          { yAxis: 5.0 }
+        ]]
+      }
+    });
+  }
+
+  // Top Grid Series: 4.5% T-Bill Cost Line
+  if (tpVisibleSeries.tbill) {
+    seriesList.push({
+      id: 'top-tbill',
+      name: '4.5% 美债机会成本',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: tbillData,
+      lineStyle: { width: 1.8, color: '#f43f5e', type: 'dashed' },
+      itemStyle: { color: '#f43f5e' }
+    });
+  }
+
+  // Top Grid Series: Optional Full Curve (7D, 90D, 180D)
+  if (tpVisibleSeries.allCurves) {
+    seriesList.push({
+      id: 'top-apr7d',
+      name: '7D 超短端 APR',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: sliced.map(s => s.apr7d),
+      lineStyle: { width: 1.2, color: '#a1a1aa', type: 'dotted' },
+      itemStyle: { color: '#a1a1aa' }
+    });
+    seriesList.push({
+      id: 'top-apr90d',
+      name: '90D 季度端 APR',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: sliced.map(s => s.apr90d),
+      lineStyle: { width: 1.5, color: '#38bdf8' },
+      itemStyle: { color: '#38bdf8' }
+    });
+    seriesList.push({
+      id: 'top-apr180d',
+      name: '180D 半年端 APR',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: sliced.map(s => s.apr180d),
+      lineStyle: { width: 1.5, color: '#10b981' },
+      itemStyle: { color: '#10b981' }
+    });
+  }
+
+  // Bottom Grid Series: 90D - 7D Main Spread
+  if (tpVisibleSeries.spread90d7d) {
+    seriesList.push({
+      id: 'bot-spread90d7d',
+      name: '90D - 7D 主跨度',
+      type: 'line',
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      showSymbol: false,
+      smooth: 0.15,
+      data: spread90d7dData,
+      lineStyle: { width: 2.0, color: '#38bdf8' },
+      itemStyle: { color: '#38bdf8' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(56, 189, 248, 0.18)' },
+          { offset: 1, color: 'rgba(56, 189, 248, 0.0)' }
+        ])
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        data: [
+          {
+            yAxis: 0,
+            lineStyle: { color: 'rgba(255, 255, 255, 0.22)', type: 'dashed', width: 1 },
+            label: { show: true, position: 'end', formatter: '平水线 (0%)', color: '#71717a', fontSize: 10 }
+          }
+        ]
+      }
+    });
+  }
+
+  // Bottom Grid Series: 30D - 7D Short-term Steepness
+  if (tpVisibleSeries.spread30d7d) {
+    seriesList.push({
+      id: 'bot-spread30d7d',
+      name: '30D - 7D 短端陡峭度',
+      type: 'line',
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      showSymbol: false,
+      smooth: 0.15,
+      data: spread30d7dData,
+      lineStyle: { width: 1.8, color: '#a855f7' },
+      itemStyle: { color: '#a855f7' }
+    });
+  }
+
+  // Bottom Grid Series: 180D - 30D Long-term Slope
+  if (tpVisibleSeries.spread180d30d) {
+    seriesList.push({
+      id: 'bot-spread180d30d',
+      name: '180D - 30D 远端斜率',
+      type: 'line',
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      showSymbol: false,
+      smooth: 0.15,
+      data: spread180d30dData,
+      lineStyle: { width: 1.8, color: '#10b981' },
+      itemStyle: { color: '#10b981' }
+    });
+  }
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: [
+      {
+        left: '4%',
+        right: '3%',
+        top: '7%',
+        height: '48%',
+        containLabel: true
+      },
+      {
+        left: '4%',
+        right: '3%',
+        top: '64%',
+        height: '26%',
+        containLabel: true
+      }
+    ],
+    axisPointer: {
+      link: [{ xAxisIndex: 'all' }],
+      label: {
+        backgroundColor: '#27272a',
+        fontFamily: 'JetBrains Mono',
+        fontSize: 11
+      }
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(18, 18, 24, 0.94)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+      borderWidth: 1,
+      padding: [10, 14],
+      textStyle: {
+        color: '#e4e4e7',
+        fontFamily: 'JetBrains Mono',
+        fontSize: 12
+      },
+      formatter: function (params) {
+        if (!params || !params.length) return '';
+        const date = params[0].name;
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:#fafafa;">${date}</div>`;
+
+        // Top grid items
+        const topItems = params.filter(p => p.seriesId && p.seriesId.startsWith('top-'));
+        if (topItems.length) {
+          html += `<div style="font-size:11px;color:#a1a1aa;margin-top:2px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:2px;">常数期限基差率 (APR):</div>`;
+          topItems.forEach(p => {
+            html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
+              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
+              <span style="font-weight:700;color:${p.color};">${Number(p.value).toFixed(2)}%</span>
+            </div>`;
+          });
+        }
+
+        // Bottom grid items
+        const botItems = params.filter(p => p.seriesId && p.seriesId.startsWith('bot-'));
+        if (botItems.length) {
+          html += `<div style="font-size:11px;color:#a1a1aa;margin-top:6px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:2px;">期限溢价利差 (Spreads):</div>`;
+          botItems.forEach(p => {
+            const val = Number(p.value);
+            const sign = val >= 0 ? '+' : '';
+            const col = val >= 0 ? '#38bdf8' : '#f43f5e';
+            html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
+              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
+              <span style="font-weight:700;color:${col};">${sign}${val.toFixed(2)}%</span>
+            </div>`;
+          });
+        }
+
+        return html;
+      }
+    },
+    xAxis: [
+      {
+        type: 'category',
+        gridIndex: 0,
+        data: dates,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+        axisTick: { show: false },
+        axisLabel: { show: false }
+      },
+      {
+        type: 'category',
+        gridIndex: 1,
+        data: dates,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: '#71717a',
+          fontFamily: 'JetBrains Mono',
+          fontSize: 11
+        }
+      }
+    ],
+    yAxis: [
+      {
+        type: 'value',
+        gridIndex: 0,
+        name: '基差 APR (%)',
+        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        axisLabel: {
+          color: '#71717a',
+          fontFamily: 'JetBrains Mono',
+          formatter: '{value}%'
+        },
+        splitLine: {
+          lineStyle: { color: 'rgba(255, 255, 255, 0.04)' }
+        }
+      },
+      {
+        type: 'value',
+        gridIndex: 1,
+        name: '期限利差 (%)',
+        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        axisLabel: {
+          color: '#71717a',
+          fontFamily: 'JetBrains Mono',
+          formatter: '{value}%'
+        },
+        splitLine: {
+          lineStyle: { color: 'rgba(255, 255, 255, 0.04)' }
+        }
+      }
+    ],
+    series: seriesList
+  };
+
+  termPremiumChartInstance.setOption(option, true);
+  setTimeout(() => {
+    if (termPremiumChartInstance) termPremiumChartInstance.resize();
+  }, 50);
+}
+
+/**
+ * Initialize Term Premium UI event listeners
+ */
+function initTermPremiumEvents() {
+  // Timeframe selector
+  if (tpTimeframeSelector) {
+    tpTimeframeSelector.addEventListener('click', (e) => {
+      const btn = e.target.closest('.timeframe-btn');
+      if (!btn) return;
+      const days = btn.dataset.days;
+      if (!days || days === currentTpTimeframe) return;
+
+      currentTpTimeframe = days;
+      tpTimeframeSelector.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTermPremiumChart();
+    });
+  }
+
+  // Toggle buttons helper
+  function setupToggle(btn, key) {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      tpVisibleSeries[key] = !tpVisibleSeries[key];
+      if (tpVisibleSeries[key]) {
+        btn.classList.add('active');
+        btn.classList.remove('inactive');
+      } else {
+        btn.classList.remove('active');
+        btn.classList.add('inactive');
+      }
+      renderTermPremiumChart();
+    });
+  }
+
+  setupToggle(btnToggleSpread90d7d, 'spread90d7d');
+  setupToggle(btnToggleSpread30d7d, 'spread30d7d');
+  setupToggle(btnToggleSpread180d30d, 'spread180d30d');
+  setupToggle(btnToggleApr30d, 'apr30d');
+  setupToggle(btnToggleTbill, 'tbill');
+
+  if (btnToggleAllCurves) {
+    btnToggleAllCurves.addEventListener('click', () => {
+      tpVisibleSeries.allCurves = !tpVisibleSeries.allCurves;
+      if (tpVisibleSeries.allCurves) {
+        btnToggleAllCurves.classList.add('active');
+        btnToggleAllCurves.classList.remove('inactive');
+        btnToggleAllCurves.querySelector('span:last-child').textContent = '收起常数曲线';
+      } else {
+        btnToggleAllCurves.classList.remove('active');
+        btnToggleAllCurves.classList.remove('inactive');
+        btnToggleAllCurves.querySelector('span:last-child').textContent = '展开全期限曲线';
+      }
+      renderTermPremiumChart();
+    });
+  }
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    if (termPremiumChartInstance) termPremiumChartInstance.resize();
+  });
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initMacroChartEvents();
 initCdriEvents();
+initTermPremiumEvents();
 loadMarketData(false);
 
 

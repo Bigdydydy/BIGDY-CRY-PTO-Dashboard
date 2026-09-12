@@ -435,6 +435,179 @@
         </div>
       </div>
     </section>
+
+    <!-- Bento Hero Card: Futures Basis Term Structure & Multi-Span Term Premium Radar -->
+    <section class="bento-card term-premium-hero-card" id="module-term-premium">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">FUTURES BASIS &amp; TERM PREMIUM</span>
+          <h2>期现基差期限结构与期限溢价雷达</h2>
+          <span class="card-subtitle-inline">常数期限基差谱系、多跨度期限溢价与机构套利综合评分</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <span class="tp-regime-pill" id="tp-header-regime-pill">-- 升水结构</span>
+            <span class="tp-score-pill" id="tp-header-score-pill">Carry: --</span>
+            <span class="tp-excess-pill" id="tp-header-excess-pill">超额: --</span>
+            <span class="tz-badge" id="tp-update-time">更新中... (UTC+8)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="tp-main-layout">
+          <!-- Left: Dual-Grid ECharts Panel (Approx 68%) -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 3v18h18M7 16l4-4 4 4 6-6"/>
+                </svg>
+                <span>常数期限基差谱系走势、美债机会成本线与多跨度期限溢价</span>
+              </div>
+              <div class="tp-chart-actions">
+                <div class="btn-group-segmented" id="tp-timeframe-selector">
+                  <button class="timeframe-btn" data-days="30">1M</button>
+                  <button class="timeframe-btn" data-days="90">3M</button>
+                  <button class="timeframe-btn" data-days="180">6M</button>
+                  <button class="timeframe-btn" data-days="365">1Y</button>
+                  <button class="timeframe-btn active" data-days="all">全部</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Multi-Spread & Curve Filter Pills -->
+            <div class="tp-legend-strip">
+              <button class="tp-legend-btn active" data-series="spread90d7d" id="btn-toggle-spread90d7d" title="主跨度：季度 - 周度期限溢价">
+                <span class="legend-color-dot" style="background-color: #38bdf8;"></span>
+                <span>90D - 7D 主跨度</span>
+              </button>
+              <button class="tp-legend-btn active" data-series="spread30d7d" id="btn-toggle-spread30d7d" title="短端陡峭度：捕捉短端拥挤倒挂">
+                <span class="legend-color-dot" style="background-color: #a855f7;"></span>
+                <span>30D - 7D 短端陡峭度</span>
+              </button>
+              <button class="tp-legend-btn active" data-series="spread180d30d" id="btn-toggle-spread180d30d" title="远端期限斜率：中长线机构对冲定价">
+                <span class="legend-color-dot" style="background-color: #10b981;"></span>
+                <span>180D - 30D 远端斜率</span>
+              </button>
+              <button class="tp-legend-btn active" data-series="apr30d" id="btn-toggle-apr30d" title="30D 常数期限主力套利基差">
+                <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
+                <span>30D 基差 APR</span>
+              </button>
+              <button class="tp-legend-btn active" data-series="tbill" id="btn-toggle-tbill" title="4.5% 美债无风险利率基准">
+                <span class="legend-color-dot" style="background-color: #f43f5e;"></span>
+                <span>4.5% 美债机会成本</span>
+              </button>
+              <button class="tp-legend-btn" data-series="allCurves" id="btn-toggle-all-curves" title="显示全部常数基差曲线 (7D/90D/180D)">
+                <span class="legend-color-dot" style="background-color: #64748b;"></span>
+                <span>展开全期限曲线</span>
+              </button>
+            </div>
+
+            <!-- ECharts Container -->
+            <div class="tp-chart-container">
+              <div id="term-premium-echarts" style="width: 100%; height: 490px;"></div>
+            </div>
+          </div>
+
+          <!-- Right: KPIs, Multi-Spreads & Institutional Diagnostics Panel (Approx 32%) -->
+          <div class="tp-stats-panel">
+            <!-- 1. Constant Maturity Basis Matrix -->
+            <div class="tp-subcard">
+              <div class="tp-subcard-title">
+                <span>常数期限基差率谱系 (Basis APR)</span>
+                <span class="subcard-tag">年化折算</span>
+              </div>
+              <div class="tp-basis-grid">
+                <div class="tp-basis-item">
+                  <span class="tp-b-lbl">7D 超短端</span>
+                  <span class="tp-b-val" id="tp-val-7d">--%</span>
+                </div>
+                <div class="tp-basis-item highlight">
+                  <span class="tp-b-lbl">30D 主力端</span>
+                  <span class="tp-b-val" id="tp-val-30d">--%</span>
+                </div>
+                <div class="tp-basis-item">
+                  <span class="tp-b-lbl">90D 季度端</span>
+                  <span class="tp-b-val" id="tp-val-90d">--%</span>
+                </div>
+                <div class="tp-basis-item">
+                  <span class="tp-b-lbl">180D 半年端</span>
+                  <span class="tp-b-val" id="tp-val-180d">--%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Multi-Span Spreads Breakdown -->
+            <div class="tp-subcard">
+              <div class="tp-subcard-title">
+                <span>多期限跨度溢价体系 (Term Spreads)</span>
+                <span class="subcard-tag">微观结构</span>
+              </div>
+              <div class="tp-spread-list">
+                <div class="tp-spread-row">
+                  <div class="tp-spread-info">
+                    <span class="tp-sp-title">90D - 7D (主跨度)</span>
+                    <span class="tp-sp-desc">季度与短端利差 / 宏观升贴水</span>
+                  </div>
+                  <span class="tp-sp-num text-pos" id="tp-spread-90d7d">--%</span>
+                </div>
+                <div class="tp-spread-row">
+                  <div class="tp-spread-info">
+                    <span class="tp-sp-title">30D - 7D (短端陡峭度)</span>
+                    <span class="tp-sp-desc">热钱拥挤度与短端倒挂预警</span>
+                  </div>
+                  <span class="tp-sp-num" id="tp-spread-30d7d">--%</span>
+                </div>
+                <div class="tp-spread-row">
+                  <div class="tp-spread-info">
+                    <span class="tp-sp-title">180D - 30D (远端斜率)</span>
+                    <span class="tp-sp-desc">中长线长钱对冲与展期定价</span>
+                  </div>
+                  <span class="tp-sp-num" id="tp-spread-180d30d">--%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Carry Score & Excess Return -->
+            <div class="tp-subcard tp-score-card">
+              <div class="tp-subcard-title">
+                <span>机构综合套利评分 (Carry Score)</span>
+                <span class="subcard-tag" id="tp-regime-tag">--</span>
+              </div>
+              <div class="tp-score-metric-box">
+                <div class="tp-score-number" id="tp-score-value">--</div>
+                <div class="tp-score-desc-wrap">
+                  <div class="tp-excess-line">
+                    <span class="tp-ex-lbl">30D 相对美债超额:</span>
+                    <span class="tp-ex-val" id="tp-excess-val">--%</span>
+                  </div>
+                  <div class="tp-score-level-bar">
+                    <div class="tp-level-fill" id="tp-score-bar-fill" style="width: 50%;"></div>
+                  </div>
+                  <div class="tp-bar-ticks">
+                    <span>回避 (&lt;10)</span>
+                    <span>微利 (10-20)</span>
+                    <span>极佳 (&gt;20)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Institutional Insights Box -->
+            <div class="tp-subcard tp-insights-card">
+              <div class="tp-subcard-title">
+                <span>📐 机构微观结构研判要点 (Key Insights)</span>
+              </div>
+              <p class="tp-insights-summary" id="tp-insights-summary">分析生成中...</p>
+              <ul class="tp-insights-list" id="tp-insights-list">
+                <li>加载分析要点中...</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
     
     <!-- Bento Row 1: Volatility Surface Matrix (3 Modular Cards Side-by-Side) -->
     <div class="bento-row-3">
@@ -890,6 +1063,6 @@
 
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
-  <script src="/app.js?v=20260912_7"></script>
+  <script src="/app.js?v=20260912_8"></script>
 </body>
 </html>

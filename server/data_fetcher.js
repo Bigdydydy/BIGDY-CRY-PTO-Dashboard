@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { getXSign } = require('./crypto_signer');
 const { recordAndMergeTrades, getCachedTrades } = require('./trade_store');
+const { analyzeTermPremium } = require('./term_premium_engine');
 
 const GREEKS_BASE_URL = 'https://api.greeks.live/api/v1';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -19,6 +20,7 @@ let dataCache = {
   skewChart: null,
   ivSkewMonth: null,
   dvolStats: null,
+  termPremium: null,
   lastFingerprints: {},
   lastChanges: {
     hasAnyUpdate: false,
@@ -121,6 +123,22 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
   } catch (err) {
     console.warn('Failed to fetch DVOL stats, fallback to standard bounds:', err.message);
     return null;
+  }
+}
+
+/**
+ * Fetch Deribit futures book summary for term structure calculation
+ */
+async function fetchDeribitFutures(currency = 'BTC') {
+  try {
+    const url = `https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${currency}&kind=future`;
+    const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return json.result || [];
+  } catch (err) {
+    console.warn('Failed to fetch Deribit futures:', err.message);
+    return [];
   }
 }
 
@@ -228,7 +246,8 @@ async function refreshAllMarketData(currency = 'BTC') {
     ivHistoryRes,
     skewChartRes,
     ivSkewMonthRes,
-    dvolStatsRes
+    dvolStatsRes,
+    futuresRes
   ] = await Promise.allSettled([
     fetchBlockTrades(currency),
     fetchGreeksDataLab('atm_data', { currency }),
@@ -236,7 +255,8 @@ async function refreshAllMarketData(currency = 'BTC') {
     fetchGreeksDataLab('iv_history', { currency, gap: '1d' }),
     fetchGreeksDataLab('skew_chart', { currency, gap: '1d' }),
     fetchGreeksDataLab('iv_skew_month', { currency }),
-    fetchDvolHistoricalStats(currency)
+    fetchDvolHistoricalStats(currency),
+    fetchDeribitFutures(currency)
   ]);
 
   let accumulatedTrades = dataCache.blockTrades;
@@ -256,6 +276,15 @@ async function refreshAllMarketData(currency = 'BTC') {
   const newIvHistory = ivHistoryRes.status === 'fulfilled' ? ivHistoryRes.value : dataCache.ivHistory;
   const newSkewChart = skewChartRes.status === 'fulfilled' ? skewChartRes.value : dataCache.skewChart;
   const newIvSkewMonth = ivSkewMonthRes.status === 'fulfilled' ? ivSkewMonthRes.value : dataCache.ivSkewMonth;
+  const spotPrice = newGex?.index_price || 77400;
+
+  // Calculate Term Premium & Basis Structure
+  try {
+    const futuresList = futuresRes.status === 'fulfilled' && Array.isArray(futuresRes.value) ? futuresRes.value : [];
+    dataCache.termPremium = await analyzeTermPremium(futuresList, spotPrice);
+  } catch (err) {
+    console.warn('[DataFetcher] Term Premium analysis error:', err.message);
+  }
 
   // Run change detection with persistent trade store additions
   const changeReport = detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades);
