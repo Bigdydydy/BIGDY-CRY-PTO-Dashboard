@@ -1,5 +1,5 @@
 /**
- * Frontend Application Controller for Greeks.live Quantitative Dashboard
+ * Frontend Application Controller for BIGDY Quantitative Dashboard
  * Includes Update Detection, Analysis Re-computation verification, and Greeks Modal
  */
 
