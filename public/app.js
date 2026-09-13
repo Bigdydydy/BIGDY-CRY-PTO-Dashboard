@@ -529,12 +529,17 @@ function renderBlockTrades(data) {
     elClusterCardsContainer.innerHTML = clusterHtml;
   }
 
-  // 2. Render Single Whale Blocks Table
+  // 2. Render Single Whale Blocks Table & Mobile Cards
   const blocks = data.whaleBlocks || [];
+  const elWhaleMobileCards = document.getElementById('whale-mobile-cards');
   if (!blocks.length) {
     elWhaleTableBody.innerHTML = '<tr><td colspan="8" class="text-center">在当前门槛下未检测到单笔巨鲸大单</td></tr>';
+    if (elWhaleMobileCards) {
+      elWhaleMobileCards.innerHTML = '<div style="text-align:center;padding:24px;color:#71717a;font-size:0.75rem;">在当前门槛下未检测到单笔巨鲸大单</div>';
+    }
   } else {
     let tableHtml = '';
+    let cardsHtml = '';
     blocks.forEach((b, idx) => {
       tableHtml += `
         <tr onclick="openWhaleDetail(${idx})">
@@ -551,8 +556,45 @@ function renderBlockTrades(data) {
           <td><button class="action-btn" onclick="event.stopPropagation(); openWhaleDetail(${idx})">穿透解析</button></td>
         </tr>
       `;
+
+      cardsHtml += `
+        <div class="whale-mobile-card" onclick="openWhaleDetail(${idx})">
+          <div class="wmc-header">
+            <div class="wmc-id-group">
+              <span class="wmc-id">${b.blockId}</span>
+              <span class="wmc-time">${(b.dateTimeUTC8 || b.dateTime || '').slice(5, 16)}</span>
+            </div>
+            <span class="intent-badge-pill ${b.intentBadgeClass || 'badge-neutral'}">${b.intentBadge || '--'}</span>
+          </div>
+          <div class="wmc-strategy">${b.strategyNameZh || '机构定制结构'}</div>
+          <div class="wmc-grid">
+            <div class="wmc-stat">
+              <span class="wmc-lbl">名义价值</span>
+              <span class="wmc-val text-highlight">$${b.notionalUSDM.toFixed(1)}M</span>
+            </div>
+            <div class="wmc-stat">
+              <span class="wmc-lbl">最大理论盈利</span>
+              <span class="wmc-val text-accent">${b.riskProfile?.maxProfit || '--'}</span>
+            </div>
+            <div class="wmc-stat">
+              <span class="wmc-lbl">净 Delta</span>
+              <span class="wmc-val">${b.netDeltaBTC >= 0 ? '+' : ''}${b.netDeltaBTC.toFixed(1)} BTC</span>
+            </div>
+            <div class="wmc-stat">
+              <span class="wmc-lbl">结构腿数</span>
+              <span class="wmc-val">${b.legCount} 腿</span>
+            </div>
+          </div>
+          <div class="wmc-footer">
+            <span class="wmc-tap-hint">点击穿透希腊字母与战略意图 →</span>
+          </div>
+        </div>
+      `;
     });
     elWhaleTableBody.innerHTML = tableHtml;
+    if (elWhaleMobileCards) {
+      elWhaleMobileCards.innerHTML = cardsHtml;
+    }
   }
 }
 
@@ -1488,6 +1530,7 @@ function renderCdriChart() {
     },
     tooltip: {
       trigger: 'axis',
+      confine: true,
       backgroundColor: 'rgba(18, 18, 24, 0.94)',
       borderColor: 'rgba(255, 255, 255, 0.12)',
       borderWidth: 1,
@@ -2084,6 +2127,7 @@ function renderTermPremiumChart() {
     },
     tooltip: {
       trigger: 'axis',
+      confine: true,
       backgroundColor: 'rgba(18, 18, 24, 0.94)',
       borderColor: 'rgba(255, 255, 255, 0.12)',
       borderWidth: 1,
@@ -2255,11 +2299,161 @@ function initTermPremiumEvents() {
 }
 
 // ============================================================================
+// Multi-View & Responsive Navigation Controller
+// ============================================================================
+
+const VIEW_TITLES = {
+  'view-overview': '宏观与风控总览',
+  'view-term-premium': '期现基差与期限溢价',
+  'view-options': '期权微观结构套件',
+  'view-block-trades': '大宗巨鲸战略雷达',
+  'view-all': '全模块平铺画卷'
+};
+
+let currentActiveView = 'view-overview';
+
+/**
+ * Switch active view panel and synchronize desktop sidebar and mobile navigation
+ */
+function switchView(viewId, updateHash = true) {
+  if (!VIEW_TITLES[viewId]) {
+    viewId = 'view-overview';
+  }
+  currentActiveView = viewId;
+
+  const mainViewport = document.getElementById('main-viewport');
+  const viewPanels = document.querySelectorAll('.view-panel');
+  const sidebarNavItems = document.querySelectorAll('.sidebar-nav-item');
+  const mobNavItems = document.querySelectorAll('.mob-nav-item');
+  const activeViewName = document.getElementById('active-view-name');
+  const appSidebar = document.getElementById('app-sidebar');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+  // 1. Toggle view panels display
+  if (viewId === 'view-all') {
+    if (mainViewport) mainViewport.classList.add('view-mode-all');
+    viewPanels.forEach(p => p.classList.add('active'));
+  } else {
+    if (mainViewport) mainViewport.classList.remove('view-mode-all');
+    viewPanels.forEach(p => {
+      p.classList.toggle('active', p.id === viewId);
+    });
+  }
+
+  // 2. Update sidebar navigation items
+  sidebarNavItems.forEach(item => {
+    item.classList.toggle('active', item.dataset.view === viewId);
+  });
+
+  // 3. Update mobile bottom navigation items
+  mobNavItems.forEach(item => {
+    item.classList.toggle('active', item.dataset.view === viewId);
+  });
+
+  // 4. Update header view title
+  if (activeViewName) {
+    activeViewName.textContent = VIEW_TITLES[viewId] || '宏观与风控总览';
+  }
+
+  // 5. Close mobile drawer and backdrop if open
+  if (appSidebar) appSidebar.classList.remove('open');
+  if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+
+  // 6. Update URL hash
+  if (updateHash) {
+    const hashTag = viewId.replace('view-', '');
+    if (window.location.hash !== `#${hashTag}`) {
+      window.history.replaceState(null, '', `#${hashTag}`);
+    }
+  }
+
+  // 7. Scroll to top smoothly
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // 8. Trigger chart resizes for freshly displayed views
+  setTimeout(() => {
+    if (cdriChartInstance) cdriChartInstance.resize();
+    if (termPremiumChartInstance) termPremiumChartInstance.resize();
+    window.dispatchEvent(new Event('resize'));
+  }, 60);
+}
+
+/**
+ * Initialize Navigation Listeners (Sidebar, Mobile Drawer, Bottom Bar, Hash Routing)
+ */
+function initNavigation() {
+  const appSidebar = document.getElementById('app-sidebar');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  const btnMobileMenu = document.getElementById('btn-mobile-menu');
+  const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+
+  // Sidebar item click handlers
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      if (view) switchView(view);
+    });
+  });
+
+  // Mobile bottom nav click handlers
+  document.querySelectorAll('.mob-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      if (view) switchView(view);
+    });
+  });
+
+  // Mobile hamburger menu toggle
+  if (btnMobileMenu) {
+    btnMobileMenu.addEventListener('click', () => {
+      if (appSidebar) appSidebar.classList.toggle('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.toggle('active');
+    });
+  }
+
+  // Mobile drawer close button
+  if (btnCloseSidebar) {
+    btnCloseSidebar.addEventListener('click', () => {
+      if (appSidebar) appSidebar.classList.remove('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+    });
+  }
+
+  // Backdrop click closes drawer
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', () => {
+      if (appSidebar) appSidebar.classList.remove('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+    });
+  }
+
+  // Hash change routing
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      const viewId = `view-${hash}`;
+      if (VIEW_TITLES[viewId] && currentActiveView !== viewId) {
+        switchView(viewId, false);
+      }
+    }
+  });
+
+  // Initial load from URL hash
+  const initialHash = window.location.hash.replace('#', '');
+  if (initialHash && VIEW_TITLES[`view-${initialHash}`]) {
+    switchView(`view-${initialHash}`, false);
+  } else {
+    switchView('view-overview', false);
+  }
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
+initNavigation();
 loadMarketData(false);
 
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BIGDY 衍生品量化智能研判雷达</title>
-  <link rel="stylesheet" href="/style.css?v=20260912_3">
+  <link rel="stylesheet" href="/style.css?v=20260913_1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -12,15 +12,28 @@
   <!-- Top Navigation Header (Sticky Glassmorphic Nav) -->
   <header class="app-header">
     <div class="header-container">
-      <div class="brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      <div class="header-left-group">
+        <button class="mobile-menu-toggle" id="btn-mobile-menu" aria-label="切换侧边栏导航">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
+        </button>
+        <div class="brand">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>BIGDY <span>QUANT</span></h1>
+            <p class="subtitle">Deribit BTC 期权微观结构与大资金行为智能研判</p>
+          </div>
         </div>
-        <div class="brand-text">
-          <h1>BIGDY <span>QUANT</span></h1>
-          <p class="subtitle">Deribit BTC 期权微观结构与大资金行为智能研判</p>
+        <div class="active-view-tag" id="active-view-tag">
+          <span class="view-tag-dot"></span>
+          <span id="active-view-name">宏观与风控总览</span>
         </div>
       </div>
 
@@ -55,8 +68,126 @@
     </div>
   </div>
 
-  <!-- Main Container: Bento Grid Architecture -->
-  <main class="main-container">
+  <!-- App Shell Layout: Sidebar Navigation + Main Viewport -->
+  <div class="app-layout" id="app-layout">
+    <!-- Left Vertical Sidebar Navigation -->
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand-badge">
+          <span class="pulse-status-dot"></span>
+          <span>BIGDY RADAR</span>
+        </div>
+        <button class="sidebar-close-btn" id="btn-close-sidebar" aria-label="关闭侧边栏菜单">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-menu-group">
+        <div class="sidebar-group-title">核心监控矩阵</div>
+        <nav class="sidebar-nav" id="sidebar-nav">
+          <button class="sidebar-nav-item active" data-view="view-overview" id="nav-item-overview">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">宏观与风控总览</span>
+              <span class="nav-desc">美债/MSTR + CDRI</span>
+            </div>
+            <span class="nav-badge-pill">首屏</span>
+          </button>
+
+          <button class="sidebar-nav-item" data-view="view-term-premium" id="nav-item-term-premium">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">期现基差与溢价</span>
+              <span class="nav-desc">常数期限谱系与利差</span>
+            </div>
+            <span class="nav-badge-pill accent">Carry</span>
+          </button>
+
+          <button class="sidebar-nav-item" data-view="view-options" id="nav-item-options">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 3"></path>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">期权微观结构套件</span>
+              <span class="nav-desc">ATM IV / GEX / 偏度 / 微笑</span>
+            </div>
+            <span class="nav-badge-pill">4大模型</span>
+          </button>
+
+          <button class="sidebar-nav-item" data-view="view-block-trades" id="nav-item-block-trades">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">大宗巨鲸战略雷达</span>
+              <span class="nav-desc">冰山拆单与 BTC 确界盈亏</span>
+            </div>
+            <span class="nav-badge-pill warning">$30M+</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-menu-group">
+        <div class="sidebar-group-title">全景模式</div>
+        <nav class="sidebar-nav">
+          <button class="sidebar-nav-item" data-view="view-all" id="nav-item-all">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">全模块平铺画卷</span>
+              <span class="nav-desc">展开全部 5 大模块</span>
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-status-card">
+          <div class="status-indicator-line">
+            <span class="live-dot-green"></span>
+            <span class="status-txt">Deribit 实盘直连</span>
+          </div>
+          <div class="status-sub-txt">实时高频计算引擎 • UTC+8</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Backdrop for mobile drawer -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Main Viewport -->
+    <main class="main-viewport" id="main-viewport">
+      <!-- View 1: 宏观与风控总览 (Module 1 上 + Module 2 下) -->
+      <div class="view-panel active" id="view-overview">
 
     <!-- Bento Row 0: Macro & On-Chain Cost Chart (Full Width) -->
     <section class="bento-card" id="module-macro-chart">
@@ -435,7 +566,10 @@
         </div>
       </div>
     </section>
+  </div> <!-- /#view-overview -->
 
+  <!-- View 2: 期现基差期限结构与期限溢价雷达 -->
+  <div class="view-panel" id="view-term-premium">
     <!-- Bento Hero Card: Futures Basis Term Structure & Multi-Span Term Premium Radar -->
     <section class="bento-card term-premium-hero-card" id="module-term-premium">
       <div class="card-header">
@@ -608,7 +742,10 @@
         </div>
       </div>
     </section>
-    
+  </div> <!-- /#view-term-premium -->
+
+  <!-- View 3: 期权微观结构量化套件 -->
+  <div class="view-panel" id="view-options">
     <!-- Bento Row 1: Volatility Surface Matrix (3 Modular Cards Side-by-Side) -->
     <div class="bento-row-3">
       
@@ -839,7 +976,10 @@
         </div>
       </div>
     </section>
+  </div> <!-- /#view-options -->
 
+  <!-- View 4: 大宗巨鲸与战略雷达 -->
+  <div class="view-panel" id="view-block-trades">
     <!-- Bento Row 3: Block Trade 巨鲸大单与机构拆单雷达 (Full Width) -->
     <section class="bento-card" id="module-block-trades">
       <div class="card-header">
@@ -947,12 +1087,16 @@
               </tbody>
             </table>
           </div>
+          <!-- Mobile Whale Cards Stream (<768px) -->
+          <div class="whale-mobile-cards" id="whale-mobile-cards"></div>
         </div>
 
       </div>
     </section>
+  </div> <!-- /#view-block-trades -->
 
-  </main>
+</main> <!-- /#main-viewport -->
+</div> <!-- /#app-layout -->
 
   <!-- Interactive Modal for Block Trade Analysis (Refined Glassmorphism Drawer) -->
   <div class="modal-backdrop" id="trade-modal-backdrop">
@@ -1061,8 +1205,42 @@
     </div>
   </footer>
 
+  <!-- Mobile Bottom Navigation Bar (<768px) -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+    <button class="mob-nav-item active" data-view="view-overview" id="mob-nav-overview">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="9"></rect>
+        <rect x="14" y="3" width="7" height="5"></rect>
+        <rect x="14" y="12" width="7" height="9"></rect>
+        <rect x="3" y="16" width="7" height="5"></rect>
+      </svg>
+      <span>宏观总览</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-term-premium" id="mob-nav-term-premium">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      </svg>
+      <span>基差溢价</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-options" id="mob-nav-options">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v5l3 3"></path>
+      </svg>
+      <span>期权矩阵</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-block-trades" id="mob-nav-block-trades">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+      <span>巨鲸大单</span>
+    </button>
+  </nav>
+
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
-  <script src="/app.js?v=20260912_8"></script>
+  <script src="/app.js?v=20260913_1"></script>
 </body>
 </html>
