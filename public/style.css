@@ -2971,6 +2971,9 @@ body {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
   }
+}
+
+/* Overview View Layout: Space between Module 1 (Macro) and Module 2 (CDRI) */
 #view-overview #module-macro-chart {
   margin-bottom: 24px;
 }

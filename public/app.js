@@ -272,6 +272,13 @@ function renderAll() {
   } else {
     loadTermPremiumData();
   }
+
+  if (rawMacroData) {
+    renderMacroSummary(rawMacroData.summary);
+    if (!macroChartInstance) {
+      renderMacroChart();
+    }
+  }
 }
 
 /**
@@ -1134,168 +1141,172 @@ function renderMacroChart() {
     }
   ];
 
-  macroChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: datasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 300 },
-      interaction: {
-        mode: 'index',
-        intersect: false
+  try {
+    macroChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: datasets
       },
-      plugins: {
-        legend: {
-          display: false // Custom external interactive legend
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        interaction: {
+          mode: 'index',
+          intersect: false
         },
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(18, 18, 24, 0.94)',
-          borderColor: 'rgba(255, 255, 255, 0.12)',
-          borderWidth: 1,
-          titleColor: '#fafafa',
-          titleFont: { family: 'JetBrains Mono', size: 12, weight: '600' },
-          bodyColor: '#e4e4e7',
-          bodyFont: { family: 'JetBrains Mono', size: 11 },
-          padding: 12,
-          boxPadding: 6,
-          usePointStyle: true,
-          callbacks: {
-            title: function(items) {
-              if (!items.length) return '';
-              return `${items[0].label} (UTC+8)`;
-            },
-            label: function(context) {
-              const label = context.dataset.label || '';
-              const val = context.parsed.y;
-              if (val === null || val === undefined || isNaN(val)) return ` ${label}: --`;
-              if (context.dataset.yAxisID === 'yUSD') {
-                return ` ${label}: $${Number(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-              } else if (context.dataset.yAxisID === 'yVelocity') {
-                return ` ${label}: +${Number(val).toLocaleString()} BTC/d`;
-              } else if (context.dataset.yAxisID === 'yMNAV') {
-                const premiumPct = ((val - 1) * 100).toFixed(1);
-                const status = val >= 1 ? `溢价 +${premiumPct}%` : `折价 ${premiumPct}%`;
-                return ` ${label}: ${val.toFixed(2)}× (${status})`;
-              } else {
-                const sign = (label.includes('利差') && val >= 0) ? '+' : '';
-                return ` ${label}: ${sign}${val.toFixed(2)}%`;
+        plugins: {
+          legend: {
+            display: false // Custom external interactive legend
+          },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(18, 18, 24, 0.94)',
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            borderWidth: 1,
+            titleColor: '#fafafa',
+            titleFont: { family: 'JetBrains Mono', size: 12, weight: '600' },
+            bodyColor: '#e4e4e7',
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            padding: 12,
+            boxPadding: 6,
+            usePointStyle: true,
+            callbacks: {
+              title: function(items) {
+                if (!items.length) return '';
+                return `${items[0].label} (UTC+8)`;
+              },
+              label: function(context) {
+                const label = context.dataset.label || '';
+                const val = context.parsed.y;
+                if (val === null || val === undefined || isNaN(val)) return ` ${label}: --`;
+                if (context.dataset.yAxisID === 'yUSD') {
+                  return ` ${label}: $${Number(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                } else if (context.dataset.yAxisID === 'yVelocity') {
+                  return ` ${label}: +${Number(val).toLocaleString()} BTC/d`;
+                } else if (context.dataset.yAxisID === 'yMNAV') {
+                  const premiumPct = ((val - 1) * 100).toFixed(1);
+                  const status = val >= 1 ? `溢价 +${premiumPct}%` : `折价 ${premiumPct}%`;
+                  return ` ${label}: ${val.toFixed(2)}× (${status})`;
+                } else {
+                  const sign = (label.includes('利差') && val >= 0) ? '+' : '';
+                  return ` ${label}: ${sign}${val.toFixed(2)}%`;
+                }
               }
             }
           }
-        }
-      },
-      scales: {
-        x: {
-          grid: {
-            color: 'rgba(255, 255, 255, 0.04)',
-            borderColor: 'rgba(255, 255, 255, 0.08)'
+        },
+        scales: {
+          x: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.04)',
+              borderColor: 'rgba(255, 255, 255, 0.08)'
+            },
+            ticks: {
+              color: '#71717a',
+              font: { family: 'JetBrains Mono', size: 10 },
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10
+            }
           },
-          ticks: {
-            color: '#71717a',
-            font: { family: 'JetBrains Mono', size: 10 },
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 10
+          yUSD: {
+            type: 'linear',
+            position: 'left',
+            grid: {
+              color: 'rgba(255, 255, 255, 0.04)',
+              borderColor: 'rgba(255, 255, 255, 0.08)'
+            },
+            ticks: {
+              color: '#fbbf24',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) {
+                if (v >= 1000) return '$' + Math.round(v / 1000) + 'k';
+                return '$' + v;
+              }
+            },
+            title: {
+              display: true,
+              text: 'BTC & MSTR Cost (USD)',
+              color: '#fbbf24',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            }
+          },
+          yYield: {
+            type: 'linear',
+            position: 'right',
+            grid: {
+              drawOnChartArea: false,
+              borderColor: 'rgba(255, 255, 255, 0.08)'
+            },
+            ticks: {
+              color: '#38bdf8',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) {
+                return v.toFixed(1) + '%';
+              }
+            },
+            title: {
+              display: true,
+              text: '美债利率与利差 (%)',
+              color: '#38bdf8',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            }
+          },
+          yVelocity: {
+            type: 'linear',
+            position: 'right',
+            grid: {
+              drawOnChartArea: false,
+              borderColor: 'rgba(236, 72, 153, 0.15)'
+            },
+            ticks: {
+              color: '#f472b6',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) {
+                if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+                return v;
+              }
+            },
+            title: {
+              display: true,
+              text: 'MSTR 速度 (BTC/天)',
+              color: '#f472b6',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            },
+            suggestedMin: 0
+          },
+          yMNAV: {
+            type: 'linear',
+            position: 'right',
+            grid: {
+              drawOnChartArea: false,
+              borderColor: 'rgba(99, 102, 241, 0.18)'
+            },
+            ticks: {
+              color: '#818cf8',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) {
+                return v.toFixed(1) + '×';
+              }
+            },
+            title: {
+              display: true,
+              text: 'MSTR mNAV (倍数)',
+              color: '#818cf8',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            },
+            suggestedMin: 0.5,
+            suggestedMax: 3.5
           }
-        },
-        yUSD: {
-          type: 'linear',
-          position: 'left',
-          grid: {
-            color: 'rgba(255, 255, 255, 0.04)',
-            borderColor: 'rgba(255, 255, 255, 0.08)'
-          },
-          ticks: {
-            color: '#fbbf24',
-            font: { family: 'JetBrains Mono', size: 10 },
-            callback: function(v) {
-              if (v >= 1000) return '$' + Math.round(v / 1000) + 'k';
-              return '$' + v;
-            }
-          },
-          title: {
-            display: true,
-            text: 'BTC & MSTR Cost (USD)',
-            color: '#fbbf24',
-            font: { family: 'Inter', size: 10, weight: '500' }
-          }
-        },
-        yYield: {
-          type: 'linear',
-          position: 'right',
-          grid: {
-            drawOnChartArea: false,
-            borderColor: 'rgba(255, 255, 255, 0.08)'
-          },
-          ticks: {
-            color: '#38bdf8',
-            font: { family: 'JetBrains Mono', size: 10 },
-            callback: function(v) {
-              return v.toFixed(1) + '%';
-            }
-          },
-          title: {
-            display: true,
-            text: '美债利率与利差 (%)',
-            color: '#38bdf8',
-            font: { family: 'Inter', size: 10, weight: '500' }
-          }
-        },
-        yVelocity: {
-          type: 'linear',
-          position: 'right',
-          grid: {
-            drawOnChartArea: false,
-            borderColor: 'rgba(236, 72, 153, 0.15)'
-          },
-          ticks: {
-            color: '#f472b6',
-            font: { family: 'JetBrains Mono', size: 10 },
-            callback: function(v) {
-              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
-              return v;
-            }
-          },
-          title: {
-            display: true,
-            text: 'MSTR 速度 (BTC/天)',
-            color: '#f472b6',
-            font: { family: 'Inter', size: 10, weight: '500' }
-          },
-          suggestedMin: 0
-        },
-        yMNAV: {
-          type: 'linear',
-          position: 'right',
-          grid: {
-            drawOnChartArea: false,
-            borderColor: 'rgba(99, 102, 241, 0.18)'
-          },
-          ticks: {
-            color: '#818cf8',
-            font: { family: 'JetBrains Mono', size: 10 },
-            callback: function(v) {
-              return v.toFixed(1) + '×';
-            }
-          },
-          title: {
-            display: true,
-            text: 'MSTR mNAV (倍数)',
-            color: '#818cf8',
-            font: { family: 'Inter', size: 10, weight: '500' }
-          },
-          suggestedMin: 0.5,
-          suggestedMax: 3.5
         }
       }
-    }
-  });
-  window.macroChartInstance = macroChartInstance;
+    });
+    window.macroChartInstance = macroChartInstance;
+  } catch (err) {
+    console.error('[MacroChart] Chart creation error:', err);
+  }
 
   // Sync custom legend button active/inactive states
   if (macroLegendGroup) {
@@ -2392,6 +2403,12 @@ function switchView(viewId, updateHash = true) {
 
   // 8. Trigger chart resizes for freshly displayed views
   setTimeout(() => {
+    if (macroChartInstance) {
+      macroChartInstance.resize();
+    } else if (rawMacroData && (viewId === 'view-overview' || viewId === 'view-all')) {
+      renderMacroChart();
+    }
+
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
     window.dispatchEvent(new Event('resize'));

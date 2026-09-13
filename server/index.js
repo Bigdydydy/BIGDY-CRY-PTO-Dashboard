@@ -222,28 +222,49 @@ function handleStaticRequest(req, res, parsedUrl) {
 
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
-  if (parsedUrl.pathname.startsWith('/api/')) {
+  const pathname = parsedUrl.pathname;
+
+  // Universal Health Check Endpoints for Render / Cloud deployments (instant 200 OK)
+  if (pathname === '/healthz' || pathname === '/health' || pathname === '/ping' || pathname === '/api/health') {
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache'
+    });
+    res.end('OK');
+    return;
+  }
+
+  // Handle HEAD requests for health checkers
+  if (req.method === 'HEAD') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end();
+    return;
+  }
+
+  if (pathname.startsWith('/api/')) {
     await handleApiRequest(req, res, parsedUrl);
   } else {
     handleStaticRequest(req, res, parsedUrl);
   }
 });
 
-async function startServer() {
-  console.log('[Server] Initializing market data cache...');
-  try {
-    await refreshAllMarketData('BTC');
-  } catch (e) {
-    console.warn('[Server] Initial fetch warning:', e.message);
-  }
-  fetchCdriData().catch(e => console.warn('[Server] Initial CDRI fetch warning:', e.message));
-
+function startServer() {
+  // Bind port immediately so Render health checks succeed instantly without timing out
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`  Greeks.live Quantitative Market Intelligence Server  `);
     console.log(`  Running on 0.0.0.0:${PORT}                           `);
     console.log(`=======================================================`);
   });
+
+  console.log('[Server] Initializing market data cache...');
+  refreshAllMarketData('BTC')
+    .then(() => console.log('[Server] Initial market data cache ready.'))
+    .catch(e => console.warn('[Server] Initial fetch warning:', e.message));
+
+  fetchCdriData()
+    .then(() => console.log('[Server] Initial CDRI data cache ready.'))
+    .catch(e => console.warn('[Server] Initial CDRI fetch warning:', e.message));
 
   // Background auto-refresh every 30 seconds
   setInterval(async () => {
