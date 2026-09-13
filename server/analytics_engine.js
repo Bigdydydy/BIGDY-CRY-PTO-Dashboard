@@ -905,18 +905,20 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     };
   }
 
-  // 1. Single Block Trade grouping & Greeks Calculation
+  // 1. Group Trades by Block Trade ID (or unique trade ID for non-blocks) & Calculate Greeks
   const byBlock = {};
   for (const t of rawTrades) {
-    const bid = t.block_trade_id;
-    if (!bid) continue;
+    const bid = t.block_trade_id || (`TRADE-${t.trade_id}`);
     if (!byBlock[bid]) byBlock[bid] = [];
     byBlock[bid].push(t);
   }
 
   const whaleBlocks = [];
+  const blockUnits = [];
+
   for (const [bid, legs] of Object.entries(byBlock)) {
     let totalNotional = 0;
+    let totalContracts = 0;
     let netDeltaBTC = 0;
     let netDeltaUSD = 0;
     let netGamma = 0;
@@ -925,9 +927,19 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
 
     const processedLegs = [];
 
-    for (const leg of legs) {
+    // Sort legs deterministically by direction + instrument_name
+    const sortedLegs = [...legs].sort((a, b) => {
+      const ka = (a.direction || '') + ':' + (a.instrument_name || '');
+      const kb = (b.direction || '') + ':' + (b.instrument_name || '');
+      return ka.localeCompare(kb);
+    });
+
+    const legSignatures = [];
+
+    for (const leg of sortedLegs) {
       const notional = (leg.amount || 0) * (leg.index_price || 0);
       totalNotional += notional;
+      totalContracts += (leg.amount || 0);
 
       const inst = parseInstrument(leg.instrument_name);
       const isCall = inst ? inst.isCall : leg.instrument_name.includes('-C');
@@ -964,25 +976,46 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         price: leg.price,
         iv: leg.iv,
         strike,
+        isCall,
         indexPrice: leg.index_price,
+        notionalUSD: notional,
         notionalM: notional / 1e6,
         delta: legDelta,
         gamma: legGamma,
         vegaUSD: legVega,
         thetaUSD: legTheta
       });
+
+      legSignatures.push(`${leg.direction}:${leg.instrument_name}`);
     }
+
+    const structureSignature = legSignatures.join('|');
+    const timestamp = Math.min(...legs.map(l => l.timestamp));
+
+    blockUnits.push({
+      blockId: bid,
+      timestamp,
+      legs: processedLegs,
+      structureSignature,
+      totalNotional,
+      totalContracts,
+      netDeltaBTC,
+      netDeltaUSD,
+      netGamma,
+      netVegaUSD,
+      netThetaUSD
+    });
 
     if (totalNotional >= notionalThresholdUSD) {
       const intent = classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional);
 
-      const dateUtc8 = formatUTC8(legs[0].timestamp);
+      const dateUtc8 = formatUTC8(timestamp);
       whaleBlocks.push({
         blockId: bid,
-        timestamp: legs[0].timestamp,
+        timestamp,
         dateTimeUTC8: dateUtc8,
         dateTime: dateUtc8,
-        dateTimeUTC: new Date(legs[0].timestamp).toISOString().replace('T', ' ').slice(0, 19),
+        dateTimeUTC: new Date(timestamp).toISOString().replace('T', ' ').slice(0, 19),
         notionalUSD: totalNotional,
         notionalUSDM: totalNotional / 1e6,
         netDeltaBTC,
@@ -1000,81 +1033,145 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   whaleBlocks.sort((a, b) => b.timestamp - a.timestamp);
 
   // 2. Iceberg / Split Order Clustering with Greeks & Intent
-  const sortedTrades = [...rawTrades].sort((a, b) => a.timestamp - b.timestamp);
-  const CLUSTER_WINDOW_MS = 15 * 60 * 1000; // 15 minutes window
+  blockUnits.sort((a, b) => a.timestamp - b.timestamp);
+
+  const CLUSTER_GAP_MS = 25 * 60 * 1000; // 25 minutes rolling gap between consecutive trades
+  const MAX_SPAN_MS = 2 * 60 * 60 * 1000; // 2 hours maximum cluster span
   const visited = new Set();
   const icebergClusters = [];
 
-  for (let i = 0; i < sortedTrades.length; i++) {
+  for (let i = 0; i < blockUnits.length; i++) {
     if (visited.has(i)) continue;
-    const base = sortedTrades[i];
-    const currentGroup = [base];
+    const base = blockUnits[i];
+    const group = [base];
     visited.add(i);
 
     let lastTs = base.timestamp;
-    for (let j = i + 1; j < sortedTrades.length; j++) {
+    for (let j = i + 1; j < blockUnits.length; j++) {
       if (visited.has(j)) continue;
-      const candidate = sortedTrades[j];
-      if (candidate.timestamp - lastTs > CLUSTER_WINDOW_MS) break;
-
-      if (candidate.instrument_name === base.instrument_name && candidate.direction === base.direction) {
-        currentGroup.push(candidate);
+      const cand = blockUnits[j];
+      if (cand.timestamp - lastTs > CLUSTER_GAP_MS || cand.timestamp - base.timestamp > MAX_SPAN_MS) {
+        break;
+      }
+      if (cand.structureSignature === base.structureSignature) {
+        group.push(cand);
         visited.add(j);
-        lastTs = candidate.timestamp;
+        lastTs = cand.timestamp;
       }
     }
 
-    let clusterNotional = 0;
-    let totalContracts = 0;
-    let clusterDeltaBTC = 0;
-    let clusterVegaUSD = 0;
-    let clusterThetaUSD = 0;
-    const blockIds = new Set();
+    const clusterNotional = group.reduce((acc, b) => acc + b.totalNotional, 0);
+    if (group.length >= 2 && clusterNotional >= notionalThresholdUSD) {
+      const startTimeUTC8 = formatUTC8(group[0].timestamp);
+      const endTimeUTC8 = formatUTC8(group[group.length - 1].timestamp);
+      const durationMin = Math.round((group[group.length - 1].timestamp - group[0].timestamp) / 60000);
 
-    const inst = parseInstrument(base.instrument_name);
-    const S = base.index_price || 77200;
-    const strike = inst ? inst.strike : 77000;
-    const isCall = inst ? inst.isCall : base.instrument_name.includes('-C');
-    const expDate = inst ? parseDeribitExpiry(inst.expiryStr) : new Date(base.timestamp + 14 * 86400000);
-    const T_years = Math.max(0.001, (expDate.getTime() - base.timestamp) / (365.25 * 86400000));
-    const iv = base.iv || 35.0;
-    const greeks = calcGreeks(S, strike, T_years, iv, isCall);
-    const sign = base.direction === 'buy' ? 1 : -1;
+      const clusterDeltaBTC = group.reduce((acc, b) => acc + b.netDeltaBTC, 0);
+      const clusterDeltaUSD = group.reduce((acc, b) => acc + b.netDeltaUSD, 0);
+      const clusterGamma = group.reduce((acc, b) => acc + b.netGamma, 0);
+      const clusterVegaUSD = group.reduce((acc, b) => acc + b.netVegaUSD, 0);
+      const clusterThetaUSD = group.reduce((acc, b) => acc + b.netThetaUSD, 0);
+      const totalContracts = group.reduce((acc, b) => acc + b.totalContracts, 0);
+      const blockIds = group.map(b => b.blockId);
+      const splitCount = group.reduce((acc, b) => acc + b.legs.length, 0);
 
-    for (const c of currentGroup) {
-      const notional = (c.amount || 0) * (c.index_price || 0);
-      clusterNotional += notional;
-      totalContracts += c.amount || 0;
-      if (c.block_trade_id) blockIds.add(c.block_trade_id);
+      // Aggregate legs across blocks in cluster
+      const legMap = new Map();
+      for (const b of group) {
+        for (const l of b.legs) {
+          const key = `${l.direction}:${l.instrument}`;
+          if (!legMap.has(key)) {
+            legMap.set(key, {
+              instrument: l.instrument,
+              direction: l.direction,
+              amount: 0,
+              totalPriceAmount: 0,
+              totalIvAmount: 0,
+              strike: l.strike,
+              isCall: l.isCall,
+              indexPrice: l.indexPrice,
+              delta: 0,
+              gamma: 0,
+              vegaUSD: 0,
+              thetaUSD: 0,
+              notionalUSD: 0
+            });
+          }
+          const agg = legMap.get(key);
+          agg.amount += l.amount;
+          agg.totalPriceAmount += (l.price || 0) * l.amount;
+          agg.totalIvAmount += (l.iv || 0) * l.amount;
+          agg.delta += l.delta;
+          agg.gamma += l.gamma;
+          agg.vegaUSD += l.vegaUSD;
+          agg.thetaUSD += l.thetaUSD;
+          agg.notionalUSD += (l.notionalUSD || (l.amount * (l.indexPrice || 77200)));
+        }
+      }
 
-      clusterDeltaBTC += sign * greeks.delta * (c.amount || 0);
-      clusterVegaUSD += sign * greeks.vega * (c.amount || 0);
-      clusterThetaUSD += sign * greeks.theta * (c.amount || 0);
-    }
+      const aggregatedLegs = Array.from(legMap.values()).map(l => ({
+        instrument: l.instrument,
+        direction: l.direction,
+        amount: l.amount,
+        price: l.amount > 0 ? l.totalPriceAmount / l.amount : 0,
+        iv: l.amount > 0 ? l.totalIvAmount / l.amount : 0,
+        strike: l.strike,
+        isCall: l.isCall,
+        indexPrice: l.indexPrice,
+        delta: l.delta,
+        gamma: l.gamma,
+        vegaUSD: l.vegaUSD,
+        thetaUSD: l.thetaUSD,
+        notionalUSD: l.notionalUSD,
+        notionalM: l.notionalUSD / 1e6
+      }));
 
-    if (clusterNotional >= notionalThresholdUSD && currentGroup.length >= 2) {
-      const startTimeUTC8 = formatUTC8(currentGroup[0].timestamp);
-      const endTimeUTC8 = formatUTC8(currentGroup[currentGroup.length - 1].timestamp);
-      const durationMin = Math.round((currentGroup[currentGroup.length - 1].timestamp - currentGroup[0].timestamp) / 60000);
-      const clusterDeltaUSD = clusterDeltaBTC * S;
+      const intent = classifyTradeIntent(
+        aggregatedLegs,
+        clusterDeltaUSD,
+        clusterVegaUSD,
+        clusterThetaUSD,
+        clusterNotional
+      );
 
-      const clusterLegObj = [{
-        instrument: base.instrument_name,
-        direction: base.direction,
-        amount: totalContracts,
-        strike,
-        isCall
-      }];
-      const intent = classifyTradeIntent(clusterLegObj, clusterDeltaUSD, clusterVegaUSD, clusterThetaUSD, clusterNotional);
+      const isMultiLeg = aggregatedLegs.length > 1;
+      let displayInstrument = '';
+      if (!isMultiLeg) {
+        displayInstrument = aggregatedLegs[0].instrument;
+      } else {
+        const stratClean = intent.strategyNameZh ? (intent.strategyNameZh.split('(')[0].trim() || intent.strategyNameZh) : '组合策略';
+        const legSummary = aggregatedLegs.map(l => {
+          const s = l.strike >= 1000 ? (l.strike / 1000) + 'k' : l.strike;
+          return `${l.direction === 'buy' ? '+' : '-'}${s}${l.isCall ? 'C' : 'P'}`;
+        }).join(' ');
+
+        // Extract expiry if all legs share expiry
+        const inst0 = parseInstrument(aggregatedLegs[0].instrument);
+        const expSummary = inst0 ? inst0.expiryStr : '';
+        displayInstrument = `${expSummary ? `[${expSummary}] ` : ''}${stratClean} [${legSummary}]`;
+      }
+
+      let primaryDirection = 'buy';
+      if (isMultiLeg) {
+        if (Math.abs(clusterDeltaUSD) > 500000) {
+          primaryDirection = clusterDeltaUSD >= 0 ? 'buy' : 'sell';
+        } else {
+          primaryDirection = clusterVegaUSD >= 0 ? 'buy' : 'sell';
+        }
+      } else {
+        primaryDirection = aggregatedLegs[0].direction;
+      }
 
       icebergClusters.push({
-        instrument: base.instrument_name,
-        direction: base.direction,
+        instrument: displayInstrument,
+        instrumentRaw: base.structureSignature,
+        direction: primaryDirection,
+        isMultiLeg,
         totalContracts,
         clusterNotionalUSD: clusterNotional,
         clusterNotionalM: clusterNotional / 1e6,
-        splitCount: currentGroup.length,
-        blockCount: blockIds.size,
+        splitCount,
+        blockCount: group.length,
         durationMin,
         startTime: startTimeUTC8,
         endTime: endTimeUTC8,
@@ -1083,10 +1180,12 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         netDeltaBTC: clusterDeltaBTC,
         netDeltaUSD: clusterDeltaUSD,
         netDeltaUSDM: clusterDeltaUSD / 1e6,
+        netGamma: clusterGamma,
         netVegaUSD: clusterVegaUSD,
         netThetaUSD: clusterThetaUSD,
-        avgPrice: currentGroup.reduce((acc, c) => acc + (c.price || 0) * (c.amount || 0), 0) / (totalContracts || 1),
-        blockIds: Array.from(blockIds),
+        avgPrice: aggregatedLegs.length === 1 ? aggregatedLegs[0].price : (aggregatedLegs.reduce((acc, l) => acc + l.price * l.amount, 0) / (totalContracts || 1)),
+        blockIds,
+        legs: aggregatedLegs,
         ...intent
       });
     }
@@ -1125,7 +1224,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   else if (bullRatio <= 40) flowBias = '对冲防守与空头价差布控';
 
   const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : '过去 30 天历史沉淀'));
-  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单行为（如在 15 分钟内针对同一合约的多笔隐蔽累加）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。大资金目前主要集中在 9 月底交割（25SEP26）的深度虚值看涨牛市价差（Call Spread）与卖出看跌期权（Short Put），显示主流期权做市与宏观机构对近端下跌空间有较强防护信心，倾向于在低波震荡中吃进 Theta 时间价值。`;
+  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。大资金目前主要集中在 9 月底交割（25SEP26）的深度虚值看涨牛市价差（Call Spread）与卖出看跌期权（Short Put），显示主流期权做市与宏观机构对近端下跌空间有较强防护信心，倾向于在低波震荡中吃进 Theta 时间价值。`;
 
   return {
     whaleBlocks,

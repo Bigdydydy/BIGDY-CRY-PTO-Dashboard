@@ -494,7 +494,7 @@ function renderBlockTrades(data) {
     clusters.forEach((c, idx) => {
       const isBuy = c.direction === 'buy';
       const dirClass = isBuy ? 'dir-buy' : 'dir-sell';
-      const dirText = isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单';
+      const dirText = c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单');
 
       clusterHtml += `
         <div class="cluster-card" onclick="openIcebergDetail(${idx})">
@@ -704,7 +704,7 @@ window.openIcebergDetail = function(idx) {
   mNetDelta.textContent = `${deltaSign}${c.netDeltaBTC.toFixed(1)} BTC`;
   mNetDeltaUSD.textContent = `${c.netDeltaUSD >= 0 ? '+' : '-'}$${Math.abs(c.netDeltaUSDM).toFixed(2)}M`;
 
-  mNetGamma.textContent = '--';
+  mNetGamma.textContent = c.netGamma != null ? (c.netGamma >= 0 ? '+' : '') + c.netGamma.toFixed(4) : '--';
 
   const vegaSign = c.netVegaUSD >= 0 ? '+' : '';
   mNetVega.textContent = `${vegaSign}$${Math.round(c.netVegaUSD).toLocaleString()}`;
@@ -714,21 +714,41 @@ window.openIcebergDetail = function(idx) {
   mNetTheta.textContent = `${thetaSign}$${Math.round(c.netThetaUSD).toLocaleString()}/d`;
   mNetTheta.className = c.netThetaUSD >= 0 ? 'gkpi-val text-pos' : 'gkpi-val text-neg';
 
-  const isBuy = c.direction === 'buy';
-  const dirClass = isBuy ? 'text-pos' : 'text-neg';
-  mLegsBody.innerHTML = `
-    <tr>
-      <td class="${dirClass}"><strong>${c.direction.toUpperCase()}</strong></td>
-      <td><strong>${c.instrument}</strong> (合成累计)</td>
-      <td>${c.totalContracts} BTC</td>
-      <td>均价: ${c.avgPrice.toFixed(4)}</td>
-      <td>--</td>
-      <td>${c.netDeltaBTC >= 0 ? '+' : ''}${c.netDeltaBTC.toFixed(2)}</td>
-      <td>${c.netVegaUSD >= 0 ? '+' : ''}$${Math.round(c.netVegaUSD).toLocaleString()}</td>
-      <td>${c.netThetaUSD >= 0 ? '+' : ''}$${Math.round(c.netThetaUSD).toLocaleString()}</td>
-      <td>$${c.clusterNotionalM.toFixed(2)}M</td>
-    </tr>
-  `;
+  if (c.legs && c.legs.length > 0) {
+    mLegsBody.innerHTML = c.legs.map(l => {
+      const legBuy = l.direction === 'buy';
+      const legClass = legBuy ? 'text-pos' : 'text-neg';
+      return `
+        <tr>
+          <td class="${legClass}"><strong>${l.direction.toUpperCase()}</strong></td>
+          <td><strong>${l.instrument}</strong></td>
+          <td>${l.amount} BTC</td>
+          <td>均价: ${(l.price || 0).toFixed(4)}</td>
+          <td>${l.iv ? l.iv.toFixed(1) + '%' : '--'}</td>
+          <td>${(l.delta || 0) >= 0 ? '+' : ''}${(l.delta || 0).toFixed(2)}</td>
+          <td>${(l.vegaUSD || 0) >= 0 ? '+' : ''}$${Math.round(l.vegaUSD || 0).toLocaleString()}</td>
+          <td>${(l.thetaUSD || 0) >= 0 ? '+' : ''}$${Math.round(l.thetaUSD || 0).toLocaleString()}</td>
+          <td>$${(l.notionalM || 0).toFixed(2)}M</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    const isBuy = c.direction === 'buy';
+    const dirClass = isBuy ? 'text-pos' : 'text-neg';
+    mLegsBody.innerHTML = `
+      <tr>
+        <td class="${dirClass}"><strong>${c.direction.toUpperCase()}</strong></td>
+        <td><strong>${c.instrument}</strong> (合成累计)</td>
+        <td>${c.totalContracts} BTC</td>
+        <td>均价: ${(c.avgPrice || 0).toFixed(4)}</td>
+        <td>--</td>
+        <td>${c.netDeltaBTC >= 0 ? '+' : ''}${c.netDeltaBTC.toFixed(2)}</td>
+        <td>${c.netVegaUSD >= 0 ? '+' : ''}$${Math.round(c.netVegaUSD).toLocaleString()}</td>
+        <td>${c.netThetaUSD >= 0 ? '+' : ''}$${Math.round(c.netThetaUSD).toLocaleString()}</td>
+        <td>$${c.clusterNotionalM.toFixed(2)}M</td>
+      </tr>
+    `;
+  }
 
   tradeModalBackdrop.classList.add('open');
 };
