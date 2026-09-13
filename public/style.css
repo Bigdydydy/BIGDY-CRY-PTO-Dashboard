@@ -2978,6 +2978,269 @@ body {
   margin-bottom: 24px;
 }
 
+/* ==========================================================================
+   SSRO (Stablecoin Supply Ratio Oscillator) Module Styling
+   ========================================================================== */
 
+.ssro-hero-card {
+  margin-bottom: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+}
 
+.ssro-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  width: 450px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+  pointer-events: none;
+}
 
+.ssro-metrics-row {
+  margin-bottom: 20px;
+}
+
+.ssro-charts-wrapper {
+  position: relative;
+  width: 100%;
+  background: rgba(10, 14, 23, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 24px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.ssro-chart-container {
+  width: 100%;
+  height: 530px;
+}
+
+/* SSRO Theory & PineScript Section */
+.ssro-theory-container {
+  margin-top: 10px;
+}
+
+.ssro-theory-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.ssro-code-card,
+.ssro-rules-card {
+  background: rgba(13, 17, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-card-header,
+.rules-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.code-card-title,
+.rules-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.code-card-title svg {
+  color: #38bdf8;
+}
+
+.rules-card-title svg {
+  color: #10b981;
+}
+
+.code-badge,
+.rules-status-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.rules-status-badge {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.pinescript-pre {
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  color: #e2e8f0;
+}
+
+.ps-kw {
+  color: #ec4899;
+  font-weight: 600;
+}
+
+.ps-fn {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.ps-type {
+  color: #a78bfa;
+}
+
+.ps-cm {
+  color: #64748b;
+  font-style: italic;
+}
+
+.code-expl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.code-expl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.code-expl-item strong {
+  color: var(--text-primary);
+}
+
+.expl-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+/* SSRO Zones in Rules Card */
+.ssro-zones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ssro-zone-row {
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background var(--transition-fast);
+}
+
+.ssro-zone-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ssro-zone-row.zone-oversold {
+  border-left-color: #10b981;
+}
+
+.ssro-zone-row.zone-neutral {
+  border-left-color: #38bdf8;
+}
+
+.ssro-zone-row.zone-overbought {
+  border-left-color: #ef4444;
+}
+
+.zone-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zone-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.zone-pill.pill-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.zone-pill.pill-blue {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.zone-pill.pill-red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.zone-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.zone-desc {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .ssro-theory-grid {
+    grid-template-columns: 1fr;
+  }
+  .ssro-chart-container {
+    height: 440px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ssro-chart-container {
+    height: 380px;
+  }
+  .ssro-charts-wrapper {
+    padding: 8px 4px;
+  }
+}

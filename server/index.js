@@ -13,6 +13,7 @@ const {
 } = require('./analytics_engine');
 const { getMacroChartData } = require('./macro_fetcher');
 const { fetchCdriData } = require('./cdri_fetcher');
+const { getSsroData } = require('./ssro_fetcher');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -156,15 +157,31 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/ssro
+  if (pathname === '/api/ssro' && req.method === 'GET') {
+    try {
+      const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+      const ssroData = await getSsroData(forceParam);
+      res.writeHead(200);
+      res.end(JSON.stringify(ssroData));
+    } catch (err) {
+      console.error('[API Error] ssro:', err);
+      res.writeHead(500);
+      res.end(JSON.stringify({ code: -1, error: err.message }));
+    }
+    return;
+  }
+
   // POST /api/refresh
   if (pathname === '/api/refresh' && req.method === 'POST') {
     try {
       console.log('[API] Live sync refresh requested by client');
-      // Trigger market data, macro chart, and CDRI refresh in parallel
+      // Trigger market data, macro chart, CDRI, and SSRO refresh in parallel
       const [syncResult] = await Promise.all([
         refreshAllMarketData('BTC'),
         getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
-        fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message))
+        fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
+        getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message))
       ]);
       res.writeHead(200);
       res.end(JSON.stringify({

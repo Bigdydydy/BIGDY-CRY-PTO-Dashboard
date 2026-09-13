@@ -196,11 +196,12 @@ async function loadMarketData(triggerRefresh = false) {
     const threshold = thresholdSelect ? thresholdSelect.value : 30000000;
     const timeRange = timeRangeSelect ? timeRangeSelect.value : 'all';
     
-    // Fetch options market data, macro chart data, and CDRI data in parallel
+    // Fetch options market data, macro chart data, CDRI, and SSRO data in parallel
     const [mResp] = await Promise.all([
       fetch(`/api/market-data?threshold=${threshold}&timeRange=${timeRange}`),
       loadMacroData(triggerRefresh).catch(e => console.error('[App] Macro fetch error:', e.message)),
-      loadCdriData(triggerRefresh).catch(e => console.error('[App] CDRI fetch error:', e.message))
+      loadCdriData(triggerRefresh).catch(e => console.error('[App] CDRI fetch error:', e.message)),
+      fetchSsroData(triggerRefresh).catch(e => console.error('[App] SSRO fetch error:', e.message))
     ]);
 
     if (!mResp.ok) throw new Error(`Server returned ${mResp.status}`);
@@ -2330,6 +2331,375 @@ function initTermPremiumEvents() {
 }
 
 // ============================================================================
+// Module: Stablecoin Supply Ratio Oscillator (SSRO) Controller
+// ============================================================================
+
+let rawSsroData = null;
+let ssroChartInstance = null;
+let ssroTimeframe = 'all'; // '3m' | '6m' | '1y' | '3y' | 'all'
+let ssroLen = 200; // 200 (macro) or 50 (tactical)
+
+/**
+ * Fetch SSRO dataset from backend /api/ssro
+ */
+async function fetchSsroData(force = false) {
+  try {
+    const url = `/api/ssro${force ? '?force=1' : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.code !== 0) throw new Error(data.error || 'Failed to load SSRO');
+
+    rawSsroData = data;
+    updateSsroKpiCards(data);
+    renderSsroChart();
+  } catch (err) {
+    console.error('[SSRO] Failed to load data:', err);
+  }
+}
+
+/**
+ * Update top KPI Metric cards
+ */
+function updateSsroKpiCards(data) {
+  if (!data || !data.latest) return;
+  const latest = data.latest;
+
+  const elBtc = document.getElementById('ssro-btc-val');
+  const elStable = document.getElementById('ssro-stable-val');
+  const elStableChange = document.getElementById('ssro-stable-change');
+  const elSsr = document.getElementById('ssro-ssr-val');
+  const elSsrMa = document.getElementById('ssro-ssr-ma');
+  const elZscore = document.getElementById('ssro-zscore-val');
+  const elZscoreBadge = document.getElementById('ssro-zscore-badge');
+  const elZoneLabel = document.getElementById('ssro-zone-label');
+  const elStatusBadge = document.getElementById('ssro-current-status-badge');
+
+  if (elBtc) elBtc.textContent = `$${Math.round(latest.btcPrice).toLocaleString()}`;
+  if (elStable) elStable.textContent = `$${latest.stableCapBillions}B`;
+
+  if (elStableChange && latest.tvQuote) {
+    const ch = latest.tvQuote.change24h;
+    if (ch !== null && !isNaN(ch)) {
+      const isPos = ch >= 0;
+      elStableChange.textContent = `${isPos ? '+' : ''}${ch.toFixed(2)}%`;
+      elStableChange.className = `mm-chip ${isPos ? 'chip-green' : 'chip-red'}`;
+    }
+  }
+
+  if (elSsr) elSsr.textContent = latest.ssr?.toFixed(3) || '--';
+
+  const lastPt = data.points && data.points.length > 0 ? data.points[data.points.length - 1] : null;
+  const currentSma = ssroLen === 200 ? lastPt?.sma200 : lastPt?.sma50;
+  if (elSsrMa) elSsrMa.textContent = currentSma ? `MA: ${currentSma.toFixed(3)}` : 'MA: --';
+
+  const z = ssroLen === 200 ? latest.ssro200 : latest.ssro50;
+  if (elZscore) {
+    const zFormatted = z !== null ? (z > 0 ? '+' : '') + z.toFixed(2) : '--';
+    elZscore.textContent = zFormatted;
+    if (z <= -2.0) elZscore.className = 'mm-val text-green';
+    else if (z >= 2.0) elZscore.className = 'mm-val text-red';
+    else elZscore.className = 'mm-val text-cyan';
+  }
+
+  if (elZscoreBadge) {
+    if (z <= -2.0) {
+      elZscoreBadge.textContent = '超卖底背离';
+      elZscoreBadge.className = 'mm-chip chip-green';
+    } else if (z >= 2.0) {
+      elZscoreBadge.textContent = '购买力透支';
+      elZscoreBadge.className = 'mm-chip chip-red';
+    } else {
+      elZscoreBadge.textContent = '常态均衡';
+      elZscoreBadge.className = 'mm-chip';
+    }
+  }
+
+  if (elZoneLabel && latest.quantEvaluation) {
+    elZoneLabel.textContent = latest.quantEvaluation.label;
+    elZoneLabel.className = `mm-val ${latest.quantEvaluation.colorClass || ''}`;
+  }
+
+  if (elStatusBadge && latest.quantEvaluation) {
+    elStatusBadge.textContent = latest.quantEvaluation.label;
+    if (z <= -2.0) {
+      elStatusBadge.style.color = '#34d399';
+      elStatusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+      elStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    } else if (z >= 2.0) {
+      elStatusBadge.style.color = '#f87171';
+      elStatusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+      elStatusBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+    } else {
+      elStatusBadge.style.color = '#38bdf8';
+      elStatusBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+      elStatusBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+    }
+  }
+}
+
+/**
+ * Render Dual-Pane ECharts: Upper BTC Price, Lower SSRO Oscillator
+ */
+function renderSsroChart() {
+  const dom = document.getElementById('ssro-echart-dom');
+  if (!dom || !rawSsroData || !Array.isArray(rawSsroData.points)) return;
+
+  if (!ssroChartInstance) {
+    ssroChartInstance = echarts.init(dom, 'dark');
+  }
+
+  let filtered = [...rawSsroData.points];
+  if (ssroTimeframe === '3m') {
+    filtered = filtered.slice(-90);
+  } else if (ssroTimeframe === '6m') {
+    filtered = filtered.slice(-180);
+  } else if (ssroTimeframe === '1y') {
+    filtered = filtered.slice(-365);
+  } else if (ssroTimeframe === '3y') {
+    filtered = filtered.slice(-1095);
+  }
+
+  const dates = filtered.map(p => p.date);
+  const btcPrices = filtered.map(p => p.btcPrice);
+  const ssroVals = filtered.map(p => ssroLen === 200 ? p.ssro200 : p.ssro50);
+
+  const validZ = ssroVals.filter(v => v !== null && !isNaN(v));
+  const minZ = validZ.length > 0 ? Math.min(-2.5, Math.floor(Math.min(...validZ) - 0.5)) : -3;
+  const maxZ = validZ.length > 0 ? Math.max(2.5, Math.ceil(Math.max(...validZ) + 0.5)) : 3;
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: true,
+    animationDuration: 400,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+        crossStyle: { color: '#64748b' },
+        lineStyle: { color: '#475569', type: 'dashed' }
+      },
+      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+      borderColor: 'rgba(56, 189, 248, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: function(params) {
+        if (!params || params.length === 0) return '';
+        const idx = params[0].dataIndex;
+        const pt = filtered[idx];
+        if (!pt) return '';
+        const zVal = ssroLen === 200 ? pt.ssro200 : pt.ssro50;
+        let zoneText = '均衡博弈';
+        let zoneColor = '#38bdf8';
+        if (zVal !== null) {
+          if (zVal <= -2.0) { zoneText = '极度充沛 (高胜率大底)'; zoneColor = '#34d399'; }
+          else if (zVal >= 2.0) { zoneText = '购买力透支 (顶部警戒)'; zoneColor = '#f87171'; }
+          else if (zVal > 1.0) { zoneText = '偏热警戒'; zoneColor = '#fbbf24'; }
+          else if (zVal < -1.0) { zoneText = '充裕健康'; zoneColor = '#6ee7b7'; }
+        }
+
+        return `
+          <div style="font-weight:700; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; color:#94a3b8;">
+            📅 ${pt.date}
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
+            <span style="color:#f59e0b;">🪙 BTC 现货价格:</span>
+            <strong style="color:#f8fafc;">$${Math.round(pt.btcPrice).toLocaleString()}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
+            <span style="color:#38bdf8;">💵 稳定币市值 (STABLE.C):</span>
+            <strong style="color:#f8fafc;">$${(pt.stableCap / 1e9).toFixed(2)}B</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
+            <span style="color:#a855f7;">📊 原始 SSR (BTC/STABLE):</span>
+            <strong style="color:#e2e8f0;">${pt.ssr?.toFixed(3) || '--'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
+            <span style="color:${zoneColor};">⚡ SSRO Z-Score (len=${ssroLen}):</span>
+            <strong style="color:${zoneColor};">${zVal !== null ? (zVal > 0 ? '+' : '') + zVal.toFixed(2) + 'σ' : '--'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:16px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1);">
+            <span style="color:#94a3b8;">🎯 流动性研判:</span>
+            <strong style="color:${zoneColor};">${zoneText}</strong>
+          </div>
+        `;
+      }
+    },
+    axisPointer: {
+      link: [{ xAxisIndex: 'all' }]
+    },
+    grid: [
+      {
+        left: 65,
+        right: 35,
+        top: '6%',
+        height: '42%'
+      },
+      {
+        left: 65,
+        right: 35,
+        top: '56%',
+        height: '34%'
+      }
+    ],
+    xAxis: [
+      {
+        type: 'category',
+        gridIndex: 0,
+        data: dates,
+        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
+        axisLabel: { show: false },
+        axisTick: { show: false }
+      },
+      {
+        type: 'category',
+        gridIndex: 1,
+        data: dates,
+        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.15)' } },
+        axisLabel: { color: '#94a3b8', fontSize: 11 },
+        axisTick: { alignWithLabel: true }
+      }
+    ],
+    yAxis: [
+      {
+        type: 'value',
+        gridIndex: 0,
+        scale: true,
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+        axisLabel: {
+          color: '#f59e0b',
+          fontSize: 11,
+          formatter: function(val) {
+            return `$${Math.round(val / 1000)}k`;
+          }
+        }
+      },
+      {
+        type: 'value',
+        gridIndex: 1,
+        min: minZ,
+        max: maxZ,
+        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+        axisLabel: {
+          color: '#38bdf8',
+          fontSize: 11,
+          formatter: '{value}σ'
+        }
+      }
+    ],
+    series: [
+      {
+        name: 'BTC 现货价格',
+        type: 'line',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        data: btcPrices,
+        smooth: 0.2,
+        symbol: 'none',
+        lineStyle: {
+          color: '#f59e0b',
+          width: 2.2,
+          shadowColor: 'rgba(245, 158, 11, 0.35)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(245, 158, 11, 0.22)' },
+            { offset: 1, color: 'rgba(245, 158, 11, 0.01)' }
+          ])
+        }
+      },
+      {
+        name: 'SSRO 震荡指标',
+        type: 'line',
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        data: ssroVals,
+        smooth: 0.15,
+        symbol: 'none',
+        lineStyle: {
+          color: '#38bdf8',
+          width: 2.2,
+          shadowColor: 'rgba(56, 189, 248, 0.4)',
+          shadowBlur: 6
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [
+            {
+              yAxis: 0,
+              lineStyle: { color: 'rgba(255, 255, 255, 0.25)', width: 1, type: 'solid' },
+              label: { position: 'end', formatter: '0 轴基线', color: '#94a3b8', fontSize: 10 }
+            },
+            {
+              yAxis: 2.0,
+              lineStyle: { color: '#ef4444', width: 1.5, type: 'dashed' },
+              label: { position: 'end', formatter: '+2.0σ 衰竭区', color: '#f87171', fontSize: 10 }
+            },
+            {
+              yAxis: -2.0,
+              lineStyle: { color: '#10b981', width: 1.5, type: 'dashed' },
+              label: { position: 'end', formatter: '-2.0σ 充沛区', color: '#34d399', fontSize: 10 }
+            }
+          ]
+        },
+        markArea: {
+          silent: true,
+          data: [
+            [
+              { yAxis: 2.0, itemStyle: { color: 'rgba(239, 68, 68, 0.08)' } },
+              { yAxis: maxZ }
+            ],
+            [
+              { yAxis: minZ, itemStyle: { color: 'rgba(16, 185, 129, 0.08)' } },
+              { yAxis: -2.0 }
+            ]
+          ]
+        }
+      }
+    ]
+  };
+
+  ssroChartInstance.setOption(option);
+}
+
+/**
+ * Initialize SSRO UI Event Listeners
+ */
+function initSsroEvents() {
+  const tfSwitch = document.getElementById('ssro-timeframe-switch');
+  if (tfSwitch) {
+    tfSwitch.querySelectorAll('.switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        tfSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ssroTimeframe = btn.dataset.range || 'all';
+        renderSsroChart();
+      });
+    });
+  }
+
+  const lenSwitch = document.getElementById('ssro-len-switch');
+  if (lenSwitch) {
+    lenSwitch.querySelectorAll('.switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        lenSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ssroLen = parseInt(btn.dataset.len, 10) || 200;
+        if (rawSsroData) updateSsroKpiCards(rawSsroData);
+        renderSsroChart();
+      });
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    if (ssroChartInstance) ssroChartInstance.resize();
+  });
+}
+
+// ============================================================================
 // Multi-View & Responsive Navigation Controller
 // ============================================================================
 
@@ -2338,6 +2708,7 @@ const VIEW_TITLES = {
   'view-term-premium': '期现基差与期限溢价',
   'view-options': '期权微观结构套件',
   'view-block-trades': '大宗巨鲸战略雷达',
+  'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-all': '全模块平铺画卷'
 };
 
@@ -2411,6 +2782,13 @@ function switchView(viewId, updateHash = true) {
 
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
+
+    if (ssroChartInstance) {
+      ssroChartInstance.resize();
+    } else if (rawSsroData && (viewId === 'view-ssro' || viewId === 'view-all')) {
+      renderSsroChart();
+    }
+
     window.dispatchEvent(new Event('resize'));
   }, 60);
 }
@@ -2490,7 +2868,9 @@ function initNavigation() {
 initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
+initSsroEvents();
 initNavigation();
 loadMarketData(false);
+fetchSsroData(false);
 
 

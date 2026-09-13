@@ -145,6 +145,22 @@
             </div>
             <span class="nav-badge-pill warning">$30M+</span>
           </button>
+
+          <button class="sidebar-nav-item" data-view="view-ssro" id="nav-item-ssro">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/>
+                <path d="M18 17V9"/>
+                <path d="M13 17V5"/>
+                <path d="M8 17v-3"/>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">稳定币供应比率 (SSRO)</span>
+              <span class="nav-desc">宏观流动性与 BTC 购买力</span>
+            </div>
+            <span class="nav-badge-pill" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3);">SSRO</span>
+          </button>
         </nav>
       </div>
 
@@ -1095,6 +1111,161 @@
     </section>
   </div> <!-- /#view-block-trades -->
 
+  <!-- View 5: 稳定币供应比率震荡指标 (SSRO) 与 BTC 宏观购买力 -->
+  <div class="view-panel" id="view-ssro">
+    <section class="bento-card ssro-hero-card" id="module-ssro-chart">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">04 STABLECOIN &amp; MACRO LIQUIDITY</span>
+          <h2>稳定币供应比率震荡指标 (SSRO) 与 BTC 宏观购买力</h2>
+          <span class="card-subtitle-inline">PineScript 忠实复现 • TradingView STABLE.C 实时市值 • 流动性 Z-Score 确界</span>
+        </div>
+        <div class="header-controls">
+          <div class="view-switch timeframe-switch" id="ssro-timeframe-switch">
+            <button class="switch-btn" data-range="3m">3M</button>
+            <button class="switch-btn" data-range="6m">6M</button>
+            <button class="switch-btn" data-range="1y">1Y</button>
+            <button class="switch-btn" data-range="3y">3Y</button>
+            <button class="switch-btn active" data-range="all">全部 (2021~)</button>
+          </div>
+          <div class="view-switch ssro-len-switch" id="ssro-len-switch" style="margin-left: 8px;">
+            <button class="switch-btn active" data-len="200" title="200日长周期宏观均线与波动率 Z-Score">len = 200 (宏观周期)</button>
+            <button class="switch-btn" data-len="50" title="50日中短期战术均线与波动率 Z-Score">len = 50 (战术短线)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Quick Stats Metrics Row -->
+        <div class="macro-metrics-row ssro-metrics-row">
+          <div class="macro-metric-card" id="card-ssro-btc">
+            <span class="mm-label">BTC 现货价格</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-amber" id="ssro-btc-val">$--,---</span>
+            </div>
+            <span class="mm-sub" id="ssro-btc-sub">Binance / Deribit 实时收盘</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-ssro-stable">
+            <span class="mm-label">稳定币总市值 (STABLE.C)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-cyan" id="ssro-stable-val">$--B</span>
+              <span class="mm-chip" id="ssro-stable-change">--%</span>
+            </div>
+            <span class="mm-sub">TradingView 实时流 / DefiLlama 历史</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-ssro-ssr">
+            <span class="mm-label">原始 SSR (BTC 市值 / STABLE.C)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-purple" id="ssro-ssr-val">--</span>
+              <span class="mm-chip" id="ssro-ssr-ma">MA: --</span>
+            </div>
+            <span class="mm-sub">每 1 美元稳定币对应 BTC 估值</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-ssro-zscore">
+            <span class="mm-label">SSRO (Z-Score 震荡值)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-pos" id="ssro-zscore-val">--</span>
+              <span class="mm-chip" id="ssro-zscore-badge">--</span>
+            </div>
+            <span class="mm-sub">标称离差: (SSR - SMA) / StDev</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-ssro-status">
+            <span class="mm-label">宏观购买力研判</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="ssro-zone-label">研判中...</span>
+            </div>
+            <span class="mm-sub" id="ssro-zone-sub">极度充沛 / 均衡 / 购买力衰竭</span>
+          </div>
+        </div>
+
+        <!-- Dual Chart Container: Upper BTC Price, Lower SSRO Oscillator -->
+        <div class="ssro-charts-wrapper">
+          <div class="ssro-chart-container" id="ssro-echart-dom" style="width: 100%; height: 530px;"></div>
+        </div>
+
+        <!-- PineScript Strategy & Quant Interpretation Section -->
+        <div class="ssro-theory-container">
+          <div class="ssro-theory-grid">
+            <!-- Left: PineScript Official Implementation Box -->
+            <div class="ssro-code-card">
+              <div class="code-card-header">
+                <div class="code-card-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                  <span>PineScript 算法核心 (Faithful Pine Implementation)</span>
+                </div>
+                <span class="code-badge">TradingView STABLE.C 60M/1D</span>
+              </div>
+              <pre class="pinescript-pre"><code><span class="ps-kw">method</span> <span class="ps-fn">ssro</span>(<span class="ps-type">float</span> src, <span class="ps-type">array&lt;float&gt;</span> stblsrc, <span class="ps-type">int</span> len) =&gt;
+    <span class="ps-type">float</span> ssr = src / stblsrc.sum()               <span class="ps-cm">// Source of the underlying divided by the sum of stablecoin sources</span>
+    
+    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) <span class="ps-cm">// Z-Score Transformed</span></code></pre>
+              <div class="code-expl-list">
+                <div class="code-expl-item">
+                  <span class="expl-dot"></span>
+                  <span><strong>分子 <code>src</code></strong>: BTC 现货全网流通市值 ($P_{\text{BTC}} \times \text{Circulating Supply}$)。</span>
+                </div>
+                <div class="code-expl-item">
+                  <span class="expl-dot"></span>
+                  <span><strong>分母 <code>stblsrc.sum()</code></strong>: 全网主要美元稳定币总市值 (TradingView <code>CRYPTOCAP:STABLE.C</code>)。</span>
+                </div>
+                <div class="code-expl-item">
+                  <span class="expl-dot"></span>
+                  <span><strong>数学本质</strong>: 标准分变换 (Z-Score)，消除市值绝对数值膨胀，捕捉相对稳定币资金池的极端过热与极端枯竭。</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Quant Trading Rules & Liquidity Boundary -->
+            <div class="ssro-rules-card">
+              <div class="rules-card-header">
+                <div class="rules-card-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <span>SSRO 量化确界信号与实战指导手册</span>
+                </div>
+                <span class="rules-status-badge" id="ssro-current-status-badge">动态信号</span>
+              </div>
+              <div class="ssro-zones-list">
+                <div class="ssro-zone-row zone-oversold">
+                  <div class="zone-badge-wrap">
+                    <span class="zone-pill pill-green">Z &le; -2.0</span>
+                    <span class="zone-name text-green">极度充沛 / 强力买盘蓄水池 (周期大底)</span>
+                  </div>
+                  <p class="zone-desc">稳定币蓄水池相对于 BTC 市值处于历史最高分位，场外买盘弹药极其充盈。历史上多次精准锁定大周期底部（如 2022 年底 16k-18k、2023 年初硅谷银行事件等），具备极高胜率的大级别抄底安全垫。</p>
+                </div>
+                <div class="ssro-zone-row zone-neutral">
+                  <div class="zone-badge-wrap">
+                    <span class="zone-pill pill-blue">-2.0 &lt; Z &lt; +2.0</span>
+                    <span class="zone-name text-cyan">均衡博弈区间 (宏观稳态运行)</span>
+                  </div>
+                  <p class="zone-desc">流动性供求处于正态分布常态，稳定币增长与 BTC 市值增长维持动态平衡，价格变动主导权交由期权 Gamma/期现基差与链上微观结构驱动。</p>
+                </div>
+                <div class="ssro-zone-row zone-overbought">
+                  <div class="zone-badge-wrap">
+                    <span class="zone-pill pill-red">Z &ge; +2.0</span>
+                    <span class="zone-name text-red">购买力衰竭 / 顶部风险警戒区 (过度透支)</span>
+                  </div>
+                  <p class="zone-desc">BTC 市值上涨过猛脱离稳定币总量蓄水池的承接能力，潜在法币买力被深度消耗，流动性挤压风险剧增，多头动能易出现耗尽式顶部反转。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div> <!-- /#view-ssro -->
+
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
 
@@ -1236,6 +1407,15 @@
         <polyline points="2 12 12 17 22 12"></polyline>
       </svg>
       <span>巨鲸大单</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-ssro" id="mob-nav-ssro">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 3v18h18"/>
+        <path d="M18 17V9"/>
+        <path d="M13 17V5"/>
+        <path d="M8 17v-3"/>
+      </svg>
+      <span>SSRO</span>
     </button>
   </nav>
 
