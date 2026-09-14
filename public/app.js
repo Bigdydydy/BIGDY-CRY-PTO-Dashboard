@@ -3122,6 +3122,13 @@ function initCoinbaseLiquidityEvents() {
     if (cbDepthChartInstance) cbDepthChartInstance.resize();
     if (cbSlippageChartInstance) cbSlippageChartInstance.resize();
   });
+
+  // Auto-refresh Coinbase order book liquidity every 15 seconds when viewing
+  setInterval(() => {
+    if (currentActiveView === 'view-coinbase-liquidity' || currentActiveView === 'view-all') {
+      fetchCoinbaseLiquidityData(false);
+    }
+  }, 15000);
 }
 
 // ============================================================================

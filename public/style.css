@@ -3051,8 +3051,8 @@ body {
 
 .cb-main-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1.35fr);
+  gap: 16px;
 }
 
 .cb-chart-panel {
@@ -3207,7 +3207,7 @@ body {
 
 /* Multi-Tier Table */
 .cb-table-wrap {
-  max-height: 220px;
+  max-height: 180px;
   overflow-y: auto;
 }
 
@@ -3236,9 +3236,9 @@ body {
     grid-template-columns: 1fr;
   }
   #cb-depth-echarts {
-    height: 280px !important;
+    height: 230px !important;
   }
   #cb-slippage-echarts {
-    height: 250px !important;
+    height: 210px !important;
   }
 }
