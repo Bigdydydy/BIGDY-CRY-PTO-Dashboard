@@ -2137,15 +2137,15 @@ function renderTermPremiumChart() {
       {
         left: '4%',
         right: '3%',
-        top: '7%',
-        height: '48%',
+        top: '6%',
+        height: '42%',
         containLabel: true
       },
       {
         left: '4%',
         right: '3%',
-        top: '64%',
-        height: '26%',
+        top: '55%',
+        height: '39%',
         containLabel: true
       }
     ],

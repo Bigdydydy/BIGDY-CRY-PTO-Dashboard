@@ -2238,6 +2238,7 @@ body {
 .tp-chart-container {
   position: relative;
   width: 100%;
+  min-height: 650px;
 }
 
 /* Right Stats Panel */
@@ -2436,6 +2437,12 @@ body {
 @media (max-width: 1024px) {
   .tp-main-layout {
     grid-template-columns: 1fr;
+  }
+  .tp-chart-container {
+    min-height: 540px;
+  }
+  #term-premium-echarts {
+    height: 540px !important;
   }
 }
 
