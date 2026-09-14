@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-09-14T04:31:12.927Z",
+  "updatedAt": "2026-09-14T05:08:54.654Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
     "date": "2026-09-14",
-    "btcPrice": 77647.39,
-    "stableCap": 309221807155,
+    "btcPrice": 77622.06,
+    "stableCap": 309224028946,
     "stableCapBillions": "309.22",
-    "ssr": 5.039,
-    "ssro200": 1.407,
-    "ssro50": 0.868,
+    "ssr": 5.037,
+    "ssro200": 1.403,
+    "ssro50": 0.864,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.044272453611745935,
-      "priceUsd": 309221807155
+      "change24h": -0.04355426126333341,
+      "priceUsd": 309224028946
     },
     "quantEvaluation": {
-      "zScore": 1.407,
+      "zScore": 1.403,
       "zone": "moderately_overbought",
       "label": "偏热警戒 (买力消耗)",
       "colorClass": "text-amber",
@@ -29182,15 +29182,15 @@
     },
     {
       "date": "2026-09-14",
-      "btcPrice": 77647.39,
-      "stableCap": 309221807155,
-      "ssr": 5.039,
-      "ssro200": 1.407,
+      "btcPrice": 77622.06,
+      "stableCap": 309224028946,
+      "ssr": 5.037,
+      "ssro200": 1.403,
       "sma200": 4.496,
       "stdev200": 0.385,
       "upper2_200": 5.267,
-      "lower2_200": 3.725,
-      "ssro50": 0.868,
+      "lower2_200": 3.726,
+      "ssro50": 0.864,
       "sma50": 4.654,
       "stdev50": 0.443
     }

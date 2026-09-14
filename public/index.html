@@ -156,6 +156,18 @@
               <span class="nav-desc">宏观流动性与 BTC 购买力</span>
             </div>
           </button>
+
+          <button class="sidebar-nav-item" data-view="view-coinbase-liquidity" id="nav-item-coinbase-liquidity">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">Coinbase 深度雷达</span>
+              <span class="nav-desc">阶梯深度谱系与大单滑点</span>
+            </div>
+          </button>
         </nav>
       </div>
 
@@ -1188,6 +1200,181 @@
     </section>
   </div> <!-- /#view-ssro -->
 
+  <!-- View 6: Coinbase BTC 订单簿多阶深度与微观流动性雷达 -->
+  <div class="view-panel" id="view-coinbase-liquidity">
+    <section class="bento-card cb-hero-card" id="module-coinbase-liquidity">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">05 COINBASE MICRO-LIQUIDITY &amp; DEPTH</span>
+          <h2>Coinbase BTC 订单簿多阶深度与微观流动性雷达</h2>
+          <span class="card-subtitle-inline">Amberdata 阶梯深度模型 • 买卖盘失衡度 • 真实大单滑点模拟 • 90天滚动分位数</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <span class="tp-regime-pill" id="cb-header-regime-pill">-- 诊断中</span>
+            <span class="tp-score-pill" id="cb-header-bid-pill">10bp买盘: --%</span>
+            <span class="tp-excess-pill" id="cb-header-spread-pill">价差: -- bps</span>
+            <span class="tz-badge" id="cb-update-time">更新中... (UTC+8)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="cb-main-layout">
+          <!-- Left: Dual ECharts Panel (65%) -->
+          <div class="cb-chart-panel">
+            <!-- Chart 1: Butterfly Depth & Imbalance Chart -->
+            <div class="cb-chart-section">
+              <div class="tp-chart-header">
+                <div class="tp-chart-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <line x1="12" y1="3" x2="12" y2="21"></line>
+                    <line x1="7" y1="8" x2="12" y2="8"></line>
+                    <line x1="12" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="12" y2="16"></line>
+                  </svg>
+                  <span>多层阶梯双向挂单深度与买单占比 (Butterfly Depth Profile)</span>
+                </div>
+                <div class="cb-chart-legend-badge">
+                  <span class="cb-leg-item"><span class="legend-color-dot" style="background:#10b981;"></span>买盘深度 ($M)</span>
+                  <span class="cb-leg-item"><span class="legend-color-dot" style="background:#f43f5e;"></span>卖盘深度 ($M)</span>
+                  <span class="cb-leg-item"><span class="legend-color-dot" style="background:#a855f7;"></span>买单占比 (Bid %)</span>
+                </div>
+              </div>
+              <div class="cb-chart-container">
+                <div id="cb-depth-echarts" style="width: 100%; height: 320px;"></div>
+              </div>
+            </div>
+
+            <!-- Chart 2: Slippage Simulation Curve -->
+            <div class="cb-chart-section" style="margin-top: 14px;">
+              <div class="tp-chart-header">
+                <div class="tp-chart-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                  </svg>
+                  <span>Coinbase 机构大单真实执行滑点模拟曲线 (Simulated Slippage Impact)</span>
+                </div>
+                <div class="cb-chart-legend-badge">
+                  <span class="cb-leg-item"><span class="legend-color-dot" style="background:#10b981;"></span>市价买入滑点 (Lifting Asks)</span>
+                  <span class="cb-leg-item"><span class="legend-color-dot" style="background:#f43f5e;"></span>市价卖出滑点 (Hitting Bids)</span>
+                </div>
+              </div>
+              <div class="cb-chart-container">
+                <div id="cb-slippage-echarts" style="width: 100%; height: 290px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: KPIs, Percentile Heatmap & Institutional Insights (35%) -->
+          <div class="tp-stats-panel cb-stats-panel">
+            <!-- 1. 90-Day Rolling Percentile Scorecard -->
+            <div class="tp-subcard cb-subcard">
+              <div class="tp-subcard-title">
+                <span>Coinbase 90 天滚动分位数热力看板 (Percentiles)</span>
+                <span class="subcard-tag">标准化度量</span>
+              </div>
+              <div class="cb-pctl-grid">
+                <div class="cb-pctl-item" id="pctl-card-price">
+                  <span class="cb-p-lbl">BTC 现货价格分位</span>
+                  <div class="cb-p-val-row">
+                    <span class="cb-p-val" id="cb-pctl-price">--%</span>
+                    <span class="cb-p-badge" id="cb-badge-price">--</span>
+                  </div>
+                  <div class="cb-bar-bg"><div class="cb-bar-fill" id="cb-bar-price" style="width: 50%;"></div></div>
+                </div>
+                <div class="cb-pctl-item" id="pctl-card-vol24h">
+                  <span class="cb-p-lbl">24h 现货成交量分位</span>
+                  <div class="cb-p-val-row">
+                    <span class="cb-p-val" id="cb-pctl-vol24h">--%</span>
+                    <span class="cb-p-badge" id="cb-badge-vol24h">--</span>
+                  </div>
+                  <div class="cb-bar-bg"><div class="cb-bar-fill" id="cb-bar-vol24h" style="width: 50%;"></div></div>
+                </div>
+                <div class="cb-pctl-item" id="pctl-card-vol7d">
+                  <span class="cb-p-lbl">7D 移动平均量分位</span>
+                  <div class="cb-p-val-row">
+                    <span class="cb-p-val" id="cb-pctl-vol7d">--%</span>
+                    <span class="cb-p-badge" id="cb-badge-vol7d">--</span>
+                  </div>
+                  <div class="cb-bar-bg"><div class="cb-bar-fill" id="cb-bar-vol7d" style="width: 50%;"></div></div>
+                </div>
+                <div class="cb-pctl-item" id="pctl-card-bid10">
+                  <span class="cb-p-lbl">10 bps 买单占比</span>
+                  <div class="cb-p-val-row">
+                    <span class="cb-p-val" id="cb-pctl-bid10">--%</span>
+                    <span class="cb-p-badge" id="cb-badge-bid10">--</span>
+                  </div>
+                  <div class="cb-bar-bg"><div class="cb-bar-fill" id="cb-bar-bid10" style="width: 50%;"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Pyramid Ratio Verification -->
+            <div class="tp-subcard cb-subcard">
+              <div class="tp-subcard-title">
+                <span>金字塔结构倍数检验 (Pyramid Health)</span>
+                <span class="subcard-tag" id="cb-pyramid-tag">基准: 3.1x</span>
+              </div>
+              <div class="cb-pyramid-row">
+                <div class="cb-pyr-metric">
+                  <span class="cb-pyr-num" id="cb-pyr-100-10">--x</span>
+                  <span class="cb-pyr-desc">100bp / 10bp 倍数</span>
+                </div>
+                <div class="cb-pyr-metric">
+                  <span class="cb-pyr-num" id="cb-pyr-50-10">--x</span>
+                  <span class="cb-pyr-desc">50bp / 10bp 倍数</span>
+                </div>
+                <div class="cb-pyr-metric">
+                  <span class="cb-pyr-num" id="cb-val-mid">$--</span>
+                  <span class="cb-pyr-desc">Coinbase 中间价</span>
+                </div>
+              </div>
+              <div class="cb-pyr-eval" id="cb-pyr-eval-text">
+                计算中...
+              </div>
+            </div>
+
+            <!-- 3. Multi-Tier Breakdown Table -->
+            <div class="tp-subcard cb-subcard">
+              <div class="tp-subcard-title">
+                <span>多阶梯双向深度矩阵 (USD / BTC)</span>
+                <span class="subcard-tag">L2 订单簿</span>
+              </div>
+              <div class="table-responsive cb-table-wrap">
+                <table class="quant-table cb-table">
+                  <thead>
+                    <tr>
+                      <th>阶梯</th>
+                      <th>买单深度</th>
+                      <th>卖单深度</th>
+                      <th>买单占比</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cb-depth-table-body">
+                    <tr><td colspan="4" style="text-align:center; color:#71717a;">加载阶梯数据中...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 4. Institutional Insights & Execution Directives -->
+            <div class="tp-subcard cb-subcard tp-insights-card">
+              <div class="tp-subcard-title">
+                <span>📐 Coinbase 机构微观结构研判要点 (Key Insights)</span>
+              </div>
+              <ul class="tp-insights-list" id="cb-insights-list">
+                <li>加载分析要点中...</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div> <!-- /#view-coinbase-liquidity -->
+
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
 
@@ -1338,6 +1525,12 @@
         <path d="M8 17v-3"/>
       </svg>
       <span>SSRO</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-coinbase-liquidity" id="mob-nav-coinbase-liquidity">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span>CB深度</span>
     </button>
   </nav>
 

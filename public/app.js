@@ -2700,6 +2700,431 @@ function initSsroEvents() {
 }
 
 // ============================================================================
+// Module 6: Coinbase BTC Micro-Liquidity & Depth Engine
+// ============================================================================
+
+let rawCoinbaseData = null;
+let cbDepthChartInstance = null;
+let cbSlippageChartInstance = null;
+
+// DOM references
+const elCbHeaderRegimePill = document.getElementById('cb-header-regime-pill');
+const elCbHeaderBidPill = document.getElementById('cb-header-bid-pill');
+const elCbHeaderSpreadPill = document.getElementById('cb-header-spread-pill');
+const elCbUpdateTime = document.getElementById('cb-update-time');
+
+const elCbPctlPrice = document.getElementById('cb-pctl-price');
+const elCbBadgePrice = document.getElementById('cb-badge-price');
+const elCbBarPrice = document.getElementById('cb-bar-price');
+
+const elCbPctlVol24h = document.getElementById('cb-pctl-vol24h');
+const elCbBadgeVol24h = document.getElementById('cb-badge-vol24h');
+const elCbBarVol24h = document.getElementById('cb-bar-vol24h');
+
+const elCbPctlVol7d = document.getElementById('cb-pctl-vol7d');
+const elCbBadgeVol7d = document.getElementById('cb-badge-vol7d');
+const elCbBarVol7d = document.getElementById('cb-bar-vol7d');
+
+const elCbPctlBid10 = document.getElementById('cb-pctl-bid10');
+const elCbBadgeBid10 = document.getElementById('cb-badge-bid10');
+const elCbBarBid10 = document.getElementById('cb-bar-bid10');
+
+const elCbPyr100_10 = document.getElementById('cb-pyr-100-10');
+const elCbPyr50_10 = document.getElementById('cb-pyr-50-10');
+const elCbValMid = document.getElementById('cb-val-mid');
+const elCbPyrEvalText = document.getElementById('cb-pyr-eval-text');
+
+const elCbDepthTableBody = document.getElementById('cb-depth-table-body');
+const elCbInsightsList = document.getElementById('cb-insights-list');
+
+const elCbDepthEcharts = document.getElementById('cb-depth-echarts');
+const elCbSlippageEcharts = document.getElementById('cb-slippage-echarts');
+
+/**
+ * Fetch Coinbase Liquidity dataset from backend
+ */
+async function fetchCoinbaseLiquidityData(forceRefresh = false) {
+  try {
+    const url = forceRefresh ? '/api/coinbase-liquidity?force=1' : '/api/coinbase-liquidity';
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const json = await resp.json();
+    if (json.code === 0) {
+      rawCoinbaseData = json;
+      renderCoinbaseLiquidity(json);
+    }
+  } catch (err) {
+    console.error('[Coinbase Liquidity] Fetch error:', err);
+  }
+}
+
+/**
+ * Render all metrics and charts for Coinbase Liquidity
+ */
+function renderCoinbaseLiquidity(data) {
+  if (!data) return;
+
+  // Header badges
+  if (elCbHeaderRegimePill && data.regime) {
+    elCbHeaderRegimePill.textContent = data.regime.label || '诊断完成';
+    if (data.regime.color) {
+      elCbHeaderRegimePill.style.color = data.regime.color;
+      elCbHeaderRegimePill.style.borderColor = `${data.regime.color}44`;
+      elCbHeaderRegimePill.style.background = `${data.regime.color}15`;
+    }
+  }
+
+  const d10 = data.depthProfile ? data.depthProfile['10'] : null;
+  if (elCbHeaderBidPill && d10) {
+    elCbHeaderBidPill.textContent = `10bp买盘: ${d10.bidPct}%`;
+    elCbHeaderBidPill.style.color = d10.bidPct >= 50 ? '#10b981' : '#f43f5e';
+  }
+
+  if (elCbHeaderSpreadPill && data.spreadBps !== undefined) {
+    elCbHeaderSpreadPill.textContent = `价差: ${data.spreadBps} bps ($${data.spreadUsd})`;
+  }
+
+  if (elCbUpdateTime && data.updatedAt) {
+    const timeStr = new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false });
+    elCbUpdateTime.textContent = `${timeStr} (UTC+8)`;
+  }
+
+  // 1. Percentile Heatmap
+  const p = data.percentiles || {};
+  if (elCbPctlPrice && p.pricePctl !== undefined) {
+    elCbPctlPrice.textContent = `${p.pricePctl}%`;
+    if (elCbBarPrice) elCbBarPrice.style.width = `${p.pricePctl}%`;
+    if (elCbBadgePrice) {
+      if (p.pricePctl >= 75) {
+        elCbBadgePrice.textContent = '高位偏热';
+        elCbBadgePrice.style.color = '#f43f5e';
+      } else if (p.pricePctl <= 25) {
+        elCbBadgePrice.textContent = '低位低估';
+        elCbBadgePrice.style.color = '#10b981';
+      } else {
+        elCbBadgePrice.textContent = '常态中枢';
+        elCbBadgePrice.style.color = '#f59e0b';
+      }
+    }
+  }
+
+  if (elCbPctlVol24h && p.volume24hPctl !== undefined) {
+    elCbPctlVol24h.textContent = `${p.volume24hPctl}%`;
+    if (elCbBarVol24h) elCbBarVol24h.style.width = `${Math.max(5, p.volume24hPctl)}%`;
+    if (elCbBadgeVol24h) {
+      if (p.volume24hPctl <= 15) {
+        elCbBadgeVol24h.textContent = '❄️ 极度冰封';
+        elCbBadgeVol24h.style.color = '#38bdf8';
+      } else if (p.volume24hPctl >= 75) {
+        elCbBadgeVol24h.textContent = '放量活跃';
+        elCbBadgeVol24h.style.color = '#10b981';
+      } else {
+        elCbBadgeVol24h.textContent = '中性温和';
+        elCbBadgeVol24h.style.color = '#a1a1aa';
+      }
+    }
+  }
+
+  if (elCbPctlVol7d && p.volume7dPctl !== undefined) {
+    elCbPctlVol7d.textContent = `${p.volume7dPctl}%`;
+    if (elCbBarVol7d) elCbBarVol7d.style.width = `${Math.max(5, p.volume7dPctl)}%`;
+    if (elCbBadgeVol7d) {
+      if (p.volume7dPctl <= 30) {
+        elCbBadgeVol7d.textContent = '周度低迷';
+        elCbBadgeVol7d.style.color = '#f59e0b';
+      } else {
+        elCbBadgeVol7d.textContent = '稳健';
+        elCbBadgeVol7d.style.color = '#10b981';
+      }
+    }
+  }
+
+  if (elCbPctlBid10 && d10) {
+    elCbPctlBid10.textContent = `${d10.bidPct}%`;
+    if (elCbBarBid10) elCbBarBid10.style.width = `${d10.bidPct}%`;
+    if (elCbBadgeBid10) {
+      if (d10.bidPct < 48) {
+        elCbBadgeBid10.textContent = '卖方压制';
+        elCbBadgeBid10.style.color = '#f43f5e';
+      } else if (d10.bidPct > 52) {
+        elCbBadgeBid10.textContent = '买方承接';
+        elCbBadgeBid10.style.color = '#10b981';
+      } else {
+        elCbBadgeBid10.textContent = '买卖均衡';
+        elCbBadgeBid10.style.color = '#a1a1aa';
+      }
+    }
+  }
+
+  // 2. Pyramid Ratios
+  const pyr = data.pyramidRatios || {};
+  if (elCbPyr100_10 && pyr.ratio100_10) {
+    elCbPyr100_10.textContent = `${pyr.ratio100_10}x`;
+    elCbPyr100_10.style.color = pyr.ratio100_10 > 6.0 ? '#f59e0b' : '#10b981';
+  }
+  if (elCbPyr50_10 && pyr.ratio50_10) {
+    elCbPyr50_10.textContent = `${pyr.ratio50_10}x`;
+  }
+  if (elCbValMid && data.midPrice) {
+    elCbValMid.textContent = `$${Math.round(data.midPrice).toLocaleString()}`;
+  }
+  if (elCbPyrEvalText && pyr.ratio100_10) {
+    if (pyr.ratio100_10 >= 6.0) {
+      elCbPyrEvalText.innerHTML = `⚠️ <strong>近端薄弱，防线下移</strong>：100bp/10bp 比率达 <strong>${pyr.ratio100_10}x</strong>（显著偏离 3.1x 基准），做市商挂单大幅后撤至远端，即时缓冲层相对中空。`;
+    } else {
+      elCbPyrEvalText.innerHTML = `🟢 <strong>金字塔结构稳健</strong>：阶梯倍数维持在 <strong>${pyr.ratio100_10}x</strong>（贴合 3.1x 理论中枢），具备良好的逐级缓冲吸收能力。`;
+    }
+  }
+
+  // 3. Multi-tier Depth Table
+  if (elCbDepthTableBody && data.depthProfile) {
+    const tiers = [5, 10, 20, 50, 100, 200];
+    let html = '';
+    tiers.forEach(t => {
+      const item = data.depthProfile[t];
+      if (!item) return;
+      const bidClass = item.bidPct >= 50 ? 'text-pos' : 'text-neg';
+      html += `<tr>
+        <td style="font-weight:600; color:#fafafa;">${item.label}</td>
+        <td style="color:#10b981;">$${item.bidUsdM}M <span style="color:#71717a; font-size:10px;">(${item.bidBtc} ₿)</span></td>
+        <td style="color:#f43f5e;">$${item.askUsdM}M <span style="color:#71717a; font-size:10px;">(${item.askBtc} ₿)</span></td>
+        <td class="${bidClass}" style="font-weight:700;">${item.bidPct}%</td>
+      </tr>`;
+    });
+    elCbDepthTableBody.innerHTML = html;
+  }
+
+  // 4. Institutional Insights List
+  if (elCbInsightsList && Array.isArray(data.insights)) {
+    elCbInsightsList.innerHTML = data.insights.map(str => `<li>${str}</li>`).join('');
+  }
+
+  // Render Charts
+  renderCbDepthChart(data);
+  renderCbSlippageChart(data);
+}
+
+/**
+ * Render Butterfly Depth Chart with dual horizontal bars
+ */
+function renderCbDepthChart(data) {
+  if (!elCbDepthEcharts || !data || !data.depthProfile) return;
+
+  if (!cbDepthChartInstance) {
+    cbDepthChartInstance = echarts.init(elCbDepthEcharts, 'dark');
+  }
+
+  const tiers = [5, 10, 20, 50, 100, 200];
+  const categories = tiers.map(t => `±${t} bps`);
+  const bidUsdVals = tiers.map(t => -(data.depthProfile[t].bidUsdM || 0)); // negative for left bar
+  const askUsdVals = tiers.map(t => (data.depthProfile[t].askUsdM || 0));   // positive for right bar
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(18, 18, 24, 0.94)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+      textStyle: { color: '#e4e4e7', fontFamily: 'JetBrains Mono', fontSize: 12 },
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        const tierName = params[0].name;
+        const tierNum = parseInt(tierName.replace(/[^0-9]/g, ''), 10) || 5;
+        const item = data.depthProfile[tierNum] || {};
+        return `<div style="font-weight:700;margin-bottom:6px;color:#fafafa;">Coinbase 深度切片: ${tierName}</div>
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
+            <span style="color:#10b981;">🟢 买单深度 (Bid):</span>
+            <span style="font-weight:700;color:#10b981;">$${item.bidUsdM}M (${item.bidBtc} ₿)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
+            <span style="color:#f43f5e;">🔴 卖单深度 (Ask):</span>
+            <span style="font-weight:700;color:#f43f5e;">$${item.askUsdM}M (${item.askBtc} ₿)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:4px 0 0 0;padding-top:4px;border-top:1px solid rgba(255,255,255,0.08);">
+            <span style="color:#a855f7;">🟣 买单占比 (Bid %):</span>
+            <span style="font-weight:700;color:${item.bidPct >= 50 ? '#10b981' : '#f43f5e'};">${item.bidPct}%</span>
+          </div>`;
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      top: '12%',
+      bottom: '6%',
+      containLabel: true
+    },
+    xAxis: [
+      {
+        type: 'value',
+        name: '买盘 ← 挂单金额 ($M) → 卖盘',
+        nameLocation: 'middle',
+        nameGap: 24,
+        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        axisLabel: {
+          color: '#71717a',
+          fontFamily: 'JetBrains Mono',
+          fontSize: 10,
+          formatter: function(val) {
+            return Math.abs(val) + 'M';
+          }
+        },
+        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+      }
+    ],
+    yAxis: {
+      type: 'category',
+      data: categories,
+      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#a1a1aa', fontFamily: 'JetBrains Mono', fontSize: 11 }
+    },
+    series: [
+      {
+        name: '买盘挂单 ($M)',
+        type: 'bar',
+        stack: 'total',
+        data: bidUsdVals,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.85)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.35)' }
+          ]),
+          borderRadius: [4, 0, 0, 4]
+        }
+      },
+      {
+        name: '卖盘挂单 ($M)',
+        type: 'bar',
+        stack: 'total',
+        data: askUsdVals,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: 'rgba(244, 63, 94, 0.35)' },
+            { offset: 1, color: 'rgba(244, 63, 94, 0.85)' }
+          ]),
+          borderRadius: [0, 4, 4, 0]
+        }
+      }
+    ]
+  };
+
+  cbDepthChartInstance.setOption(option);
+}
+
+/**
+ * Render Simulated Institutional Slippage Curve
+ */
+function renderCbSlippageChart(data) {
+  if (!elCbSlippageEcharts || !data || !Array.isArray(data.slippageSimulation)) return;
+
+  if (!cbSlippageChartInstance) {
+    cbSlippageChartInstance = echarts.init(elCbSlippageEcharts, 'dark');
+  }
+
+  const sim = data.slippageSimulation;
+  const labels = sim.map(s => s.sizeLabel);
+  const buySlippage = sim.map(s => s.buy.slippageBps);
+  const sellSlippage = sim.map(s => s.sell.slippageBps);
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(18, 18, 24, 0.94)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+      textStyle: { color: '#e4e4e7', fontFamily: 'JetBrains Mono', fontSize: 12 },
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        const idx = params[0].dataIndex;
+        const item = sim[idx];
+        if (!item) return '';
+
+        return `<div style="font-weight:700;margin-bottom:6px;color:#fafafa;">市价冲击模拟规模: ${item.sizeLabel}</div>
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
+            <span style="color:#10b981;">🟢 买入滑点:</span>
+            <span style="font-weight:700;color:#10b981;">+${item.buy.slippageBps} bps (均价 $${item.buy.avgPrice.toLocaleString()})</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
+            <span style="color:#f43f5e;">🔴 卖出滑点:</span>
+            <span style="font-weight:700;color:#f43f5e;">+${item.sell.slippageBps} bps (均价 $${item.sell.avgPrice.toLocaleString()})</span>
+          </div>
+          <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#f59e0b;">
+            ⚠️ 下行惩罚比率: <strong>${item.asymmetryRatio}x</strong> (卖出比买入多承受 ${item.penaltyBps} bps 滑点)
+          </div>`;
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      top: '12%',
+      bottom: '8%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#a1a1aa', fontFamily: 'JetBrains Mono', fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      name: '执行滑点 (bps)',
+      nameTextStyle: { color: '#71717a', fontSize: 11 },
+      axisLabel: {
+        color: '#71717a',
+        fontFamily: 'JetBrains Mono',
+        formatter: '{value} bps'
+      },
+      splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.04)' } }
+    },
+    series: [
+      {
+        name: '市价买入滑点 (Lifting Asks)',
+        type: 'line',
+        smooth: 0.2,
+        data: buySlippage,
+        lineStyle: { width: 2.2, color: '#10b981' },
+        itemStyle: { color: '#10b981' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.18)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.0)' }
+          ])
+        }
+      },
+      {
+        name: '市价卖出滑点 (Hitting Bids)',
+        type: 'line',
+        smooth: 0.2,
+        data: sellSlippage,
+        lineStyle: { width: 2.2, color: '#f43f5e' },
+        itemStyle: { color: '#f43f5e' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(244, 63, 94, 0.25)' },
+            { offset: 1, color: 'rgba(244, 63, 94, 0.0)' }
+          ])
+        }
+      }
+    ]
+  };
+
+  cbSlippageChartInstance.setOption(option);
+}
+
+/**
+ * Initialize Coinbase Liquidity UI Event Listeners
+ */
+function initCoinbaseLiquidityEvents() {
+  window.addEventListener('resize', () => {
+    if (cbDepthChartInstance) cbDepthChartInstance.resize();
+    if (cbSlippageChartInstance) cbSlippageChartInstance.resize();
+  });
+}
+
+// ============================================================================
 // Multi-View & Responsive Navigation Controller
 // ============================================================================
 
@@ -2709,6 +3134,7 @@ const VIEW_TITLES = {
   'view-options': '期权微观结构套件',
   'view-block-trades': '大宗巨鲸战略雷达',
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
+  'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-all': '全模块平铺画卷'
 };
 
@@ -2787,6 +3213,18 @@ function switchView(viewId, updateHash = true) {
       ssroChartInstance.resize();
     } else if (rawSsroData && (viewId === 'view-ssro' || viewId === 'view-all')) {
       renderSsroChart();
+    }
+
+    if (cbDepthChartInstance) {
+      cbDepthChartInstance.resize();
+    } else if (rawCoinbaseData && (viewId === 'view-coinbase-liquidity' || viewId === 'view-all')) {
+      renderCbDepthChart(rawCoinbaseData);
+    }
+
+    if (cbSlippageChartInstance) {
+      cbSlippageChartInstance.resize();
+    } else if (rawCoinbaseData && (viewId === 'view-coinbase-liquidity' || viewId === 'view-all')) {
+      renderCbSlippageChart(rawCoinbaseData);
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -2869,8 +3307,10 @@ initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
 initSsroEvents();
+initCoinbaseLiquidityEvents();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
+fetchCoinbaseLiquidityData(false);
 
 

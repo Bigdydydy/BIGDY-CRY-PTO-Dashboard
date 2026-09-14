@@ -14,6 +14,7 @@ const {
 const { getMacroChartData } = require('./macro_fetcher');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
+const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -172,16 +173,35 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/coinbase-liquidity
+  if (pathname === '/api/coinbase-liquidity' && req.method === 'GET') {
+    try {
+      const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+      const cbData = await getCoinbaseLiquidityData(forceParam);
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        code: 0,
+        ...cbData
+      }));
+    } catch (err) {
+      console.error('[API Error] coinbase-liquidity:', err);
+      res.writeHead(500);
+      res.end(JSON.stringify({ code: -1, error: err.message }));
+    }
+    return;
+  }
+
   // POST /api/refresh
   if (pathname === '/api/refresh' && req.method === 'POST') {
     try {
       console.log('[API] Live sync refresh requested by client');
-      // Trigger market data, macro chart, CDRI, and SSRO refresh in parallel
+      // Trigger market data, macro chart, CDRI, SSRO, and Coinbase liquidity refresh in parallel
       const [syncResult] = await Promise.all([
         refreshAllMarketData('BTC'),
         getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
         fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
-        getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message))
+        getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
+        getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message))
       ]);
       res.writeHead(200);
       res.end(JSON.stringify({
@@ -282,6 +302,10 @@ function startServer() {
   fetchCdriData()
     .then(() => console.log('[Server] Initial CDRI data cache ready.'))
     .catch(e => console.warn('[Server] Initial CDRI fetch warning:', e.message));
+
+  getCoinbaseLiquidityData()
+    .then(() => console.log('[Server] Initial Coinbase liquidity cache ready.'))
+    .catch(e => console.warn('[Server] Initial Coinbase fetch warning:', e.message));
 
   // Background auto-refresh every 30 seconds
   setInterval(async () => {
