@@ -2224,7 +2224,9 @@ function renderTermPremiumChart() {
         axisLabel: {
           color: '#71717a',
           fontFamily: 'JetBrains Mono',
-          fontSize: 11
+          fontSize: 11,
+          showMinLabel: true,
+          showMaxLabel: true
         }
       }
     ],

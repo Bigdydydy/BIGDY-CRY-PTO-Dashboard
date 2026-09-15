@@ -105,7 +105,8 @@ function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()
     apr7d,
     apr30d,
     apr90d,
-    apr180d
+    apr180d,
+    timestamp: now
   };
 }
 
@@ -115,7 +116,14 @@ function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()
 function generateHistoricalSeries(liveCurrent) {
   const series = [];
   const startDate = new Date(Date.UTC(2025, 0, 1));
-  const endDate = new Date(Date.UTC(2026, 8, 12)); // Sep 12, 2026
+  
+  // Dynamic end date: up to today (aligned with UTC+8 to ensure current day is reached)
+  const now = new Date();
+  const utc8Time = new Date(now.getTime() + 8 * 3600 * 1000);
+  const endYear = utc8Time.getUTCFullYear();
+  const endMonth = utc8Time.getUTCMonth();
+  const endDay = utc8Time.getUTCDate();
+  const endDate = new Date(Date.UTC(endYear, endMonth, endDay));
 
   let cur = new Date(startDate.getTime());
 
@@ -266,6 +274,7 @@ function generateHistoricalSeries(liveCurrent) {
     const sign = last.spread90d7d >= 0 ? 1 : -1;
     last.carryScore = Number(((last.excessReturn / 34.0) * sign * 100).toFixed(1));
     if (liveCurrent.spotPrice) last.btcPrice = Math.round(liveCurrent.spotPrice);
+    if (liveCurrent.timestamp) last.timestamp = liveCurrent.timestamp;
   }
 
   return series;
