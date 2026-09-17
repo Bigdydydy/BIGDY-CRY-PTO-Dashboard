@@ -202,7 +202,7 @@ function analyzeAtmIv(ivHistory, dvolStats) {
     const countBelow = series.filter(v => v <= iv1m).length;
     percentile = (countBelow / series.length) * 100;
 
-    if (percentile <= 5 || iv1m <= 35.0) {
+    if (percentile <= 5) {
       regime = 'Extreme Low';
       regimeTag = '🚨 历史极端低估区间';
       extremeAlert = true;
@@ -211,7 +211,7 @@ function analyzeAtmIv(ivHistory, dvolStats) {
       regime = 'Low Volatility';
       regimeTag = '📉 偏低压缩区间';
       recommendation = `波动率处于偏低分位（日预期波动 ±${dailyExpectedMovePct}%），市场处于低波盘整期。期权买方保护成本较为便宜，适合以借方价差 (Debit Spread) 替代单腿期权构建不对称下行保护或现货替代。`;
-    } else if (percentile >= 90 || iv1m >= 70.0) {
+    } else if (percentile >= 90) {
       regime = 'Extreme High';
       regimeTag = '🔥 历史极端高估区间';
       extremeAlert = true;
@@ -225,12 +225,26 @@ function analyzeAtmIv(ivHistory, dvolStats) {
       regimeTag = '⚖️ 历史中性合理区间';
       recommendation = `波动率定价处于中位数附近（日预期波动 ±${dailyExpectedMovePct}%），期限结构平衡，适合结合方向性 Delta 观点构建标准垂直价差组合。`;
     }
+  } else if (iv1m !== null && iv1m !== undefined) {
+    // Fallback based on absolute implied volatility thresholds when historical distribution is unavailable
+    if (iv1m <= 35.0) {
+      regime = 'Extreme Low';
+      regimeTag = '🚨 绝对值偏低区间';
+      extremeAlert = true;
+      recommendation = `当前 1M IV (${iv1m.toFixed(1)}%) 处于绝对值偏低区间（日预期波动 ±${dailyExpectedMovePct}%），期权买方溢价处于低位。`;
+    } else if (iv1m >= 70.0) {
+      regime = 'Extreme High';
+      regimeTag = '🔥 绝对值偏高区间';
+      extremeAlert = true;
+      recommendation = `当前 1M IV (${iv1m.toFixed(1)}%) 处于绝对值高估区间（日预期波动 ±${dailyExpectedMovePct}%），建议警惕高方差回撤风险。`;
+    }
   }
 
+  const percentileText = percentile !== null ? `${percentile.toFixed(1)}%` : '参考常模';
   const paragraph = `当下 Bitcoin ATM 隐含波动率呈现【${curveDesc}】期限结构（1M: ${iv1m?.toFixed(1)}%, 3M: ${iv3m?.toFixed(1)}%, 6M: ${iv6m?.toFixed(1)}%），时间平方根法则对应【日均预期振幅 ±${dailyExpectedMovePct}%】（周预期 ±${weeklyExpectedMovePct}%，1M 跨式平价约 ${atmStraddleEstPct}%）。${
     extremeAlert
-      ? `【极值预警】ATM 1M IV 目前处于约 ${percentile?.toFixed(1)}% 历史低分位，${regimeTag}。${recommendation}`
-      : `波动率处于【${regimeTag}】（历史分位约 ${percentile ? percentile.toFixed(1) + '%' : '合理'}）。${recommendation}`
+      ? `【极值预警】ATM 1M IV 目前处于约 ${percentileText} 历史分位，${regimeTag}。${recommendation}`
+      : `波动率处于【${regimeTag}】（历史分位约 ${percentileText}）。${recommendation}`
   }`;
 
   return {
@@ -241,7 +255,7 @@ function analyzeAtmIv(ivHistory, dvolStats) {
     iv1y,
     curveType,
     curveDesc,
-    percentile: percentile ? Math.round(percentile * 10) / 10 : null,
+    percentile: percentile !== null ? Math.round(percentile * 10) / 10 : null,
     dailyExpectedMovePct,
     weeklyExpectedMovePct,
     atmStraddleEstPct,

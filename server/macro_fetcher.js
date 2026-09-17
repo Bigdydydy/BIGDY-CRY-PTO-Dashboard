@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const { fetchWithTimeout } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'macro_chart.json');
 const BT_STRATEGY_FILE = path.join(__dirname, '..', 'data', 'bitcointreasuries_strategy.json');
@@ -60,7 +61,7 @@ async function fetchMstrCost() {
   try {
     const url = 'https://capi.coinglass.com/api/escape/index/microStrategyCostV2';
     const now = Date.now().toString();
-    const resp = await fetch(url, {
+    const resp = await fetchWithTimeout(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://www.coinglass.com/pro/i/micro-strategy-cost',
@@ -115,7 +116,7 @@ async function fetchMstrCost() {
  */
 async function fetchFredSeries(id) {
   try {
-    const resp = await fetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=' + id, {
+    const resp = await fetchWithTimeout('https://fred.stlouisfed.org/graph/fredgraph.csv?id=' + id, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     });
     if (!resp.ok) throw new Error('FRED HTTP ' + resp.status);
@@ -148,7 +149,7 @@ async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
     const now = Date.now();
     const allKlines = [];
     while (start < now) {
-      const resp = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
+      const resp = await fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
       if (!resp.ok) break;
       const data = await resp.json();
       if (!Array.isArray(data) || data.length === 0) break;

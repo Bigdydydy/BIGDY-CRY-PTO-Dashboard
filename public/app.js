@@ -3,6 +3,19 @@
  * Includes Update Detection, Analysis Re-computation verification, and Greeks Modal
  */
 
+/**
+ * Robust HTML escaping utility to prevent XSS attacks across dynamic DOM injections
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 let currentMarketData = null;
 let currentGexMode = 'focused'; // 'focused' or 'all'
 let currentBlockTab = 'icebergs'; // 'icebergs' or 'singles'
@@ -348,25 +361,25 @@ function renderGex(data) {
     html += `
       <div class="gex-card">
         <div class="gex-card-header">
-          <span class="gex-expiry">${exp.expiry}</span>
-          <span class="gex-tag ${exp.isFocused ? 'tag-lead' : ''}">${exp.categoryTag}</span>
+          <span class="gex-expiry">${escapeHtml(exp.expiry)}</span>
+          <span class="gex-tag ${exp.isFocused ? 'tag-lead' : ''}">${escapeHtml(exp.categoryTag)}</span>
         </div>
         <div class="gex-details">
           <div class="gex-detail-row">
             <span class="gex-d-label">净 GEX 敞口:</span>
-            <span class="gex-d-val ${gexColor}">${signStr}$${Math.abs(exp.totalGexM).toFixed(2)}M</span>
+            <span class="gex-d-val ${gexColor}">${signStr}$${Math.abs(Number(exp.totalGexM) || 0).toFixed(2)}M</span>
           </div>
           <div class="gex-detail-row">
             <span class="gex-d-label">Call Wall (阻力位):</span>
-            <span class="gex-d-val text-pos">$${exp.callWall ? exp.callWall.toLocaleString() : '--'}</span>
+            <span class="gex-d-val text-pos">$${exp.callWall ? Number(exp.callWall).toLocaleString() : '--'}</span>
           </div>
           <div class="gex-detail-row">
             <span class="gex-d-label">Put Wall (支撑位):</span>
-            <span class="gex-d-val text-neg">$${exp.putWall ? exp.putWall.toLocaleString() : '--'}</span>
+            <span class="gex-d-val text-neg">$${exp.putWall ? Number(exp.putWall).toLocaleString() : '--'}</span>
           </div>
           <div class="gex-detail-row">
             <span class="gex-d-label">覆盖行权价数:</span>
-            <span class="gex-d-val">${exp.strikeCount} 个 Strikes</span>
+            <span class="gex-d-val">${Number(exp.strikeCount) || 0} 个 Strikes</span>
           </div>
         </div>
       </div>
@@ -385,16 +398,16 @@ function renderIvSmile(data) {
   }
 
   elSmileShapeBadge.textContent = data.skewShape ? data.skewShape.split('/')[0].trim() : '标准微笑';
-  elSmileAtmIv.textContent = `${data.atmIv.toFixed(1)}%`;
+  elSmileAtmIv.textContent = `${Number(data.atmIv || 0).toFixed(1)}%`;
   elSmileAtmStrike.textContent = `行权价: $${data.atmStrike?.toLocaleString()}`;
 
-  elSmilePutWing.textContent = `+${data.putWingPremium.toFixed(1)}%`;
-  elSmilePutSub.textContent = `行权价: $${data.lowestStrike?.toLocaleString()} (IV: ${data.lowestIv.toFixed(1)}%)`;
+  elSmilePutWing.textContent = `+${Number(data.putWingPremium || 0).toFixed(1)}%`;
+  elSmilePutSub.textContent = `行权价: $${data.lowestStrike?.toLocaleString()} (IV: ${Number(data.lowestIv || 0).toFixed(1)}%)`;
 
-  elSmileCallWing.textContent = `+${data.callWingPremium.toFixed(1)}%`;
-  elSmileCallSub.textContent = `行权价: $${data.highestStrike?.toLocaleString()} (IV: ${data.highestIv.toFixed(1)}%)`;
+  elSmileCallWing.textContent = `+${Number(data.callWingPremium || 0).toFixed(1)}%`;
+  elSmileCallSub.textContent = `行权价: $${data.highestStrike?.toLocaleString()} (IV: ${Number(data.highestIv || 0).toFixed(1)}%)`;
 
-  const diff = data.asymmetryDiff || 0;
+  const diff = Number(data.asymmetryDiff) || 0;
   elSmileSmirkDiff.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
   elSmileSmirkDesc.textContent = diff >= 0 ? 'Call 溢价高于 Put (追涨倾斜)' : 'Put 溢价高于 Call (避险倾斜)';
 
@@ -410,9 +423,9 @@ function renderIvSmile(data) {
       const isAtm = s.strike === data.atmStrike;
       stripHtml += `
         <div class="strike-pill ${isAtm ? 'is-atm' : ''}">
-          <span class="sp-strike">$${(s.strike / 1000).toFixed(0)}k</span>
-          <span class="sp-iv ${isAtm ? 'text-accent' : ''}">${s.iv.toFixed(1)}%</span>
-          <span class="sp-delta">${isAtm ? 'ATM' : (s.delta !== null ? `Δ ${s.delta}` : '')}</span>
+          <span class="sp-strike">$${((Number(s.strike) || 0) / 1000).toFixed(0)}k</span>
+          <span class="sp-iv ${isAtm ? 'text-accent' : ''}">${(Number(s.iv) || 0).toFixed(1)}%</span>
+          <span class="sp-delta">${isAtm ? 'ATM' : (s.delta !== null ? `Δ ${escapeHtml(s.delta)}` : '')}</span>
         </div>
       `;
     }
@@ -486,7 +499,7 @@ function renderBlockTrades(data) {
   if (data.tradeStoreStats) {
     const s = data.tradeStoreStats;
     if (elStoreText) {
-      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${s.totalStored.toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${s.earliestTimeUTC8}</strong> ~ <strong>${s.latestTimeUTC8}</strong> UTC+8，至多滚动保存 <strong>30 天</strong>，已突破官方 72h 上限）`;
+      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${Number(s.totalStored || 0).toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${escapeHtml(s.earliestTimeUTC8)}</strong> ~ <strong>${escapeHtml(s.latestTimeUTC8)}</strong> UTC+8，至多滚动保存 <strong>30 天</strong>，已突破官方 72h 上限）`;
     }
     if (elStoreSpanBadge) {
       elStoreSpanBadge.textContent = `已沉淀: ${s.historySpanDays} 天 / 30天`;
@@ -505,30 +518,30 @@ function renderBlockTrades(data) {
       const dirText = c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单');
 
       clusterHtml += `
-        <div class="cluster-card" onclick="openIcebergDetail(${idx})">
+        <div class="cluster-card" onclick="openIcebergDetail(${Number(idx)})">
           <div class="cluster-info">
             <span class="cluster-dir-badge ${dirClass}">${dirText}</span>
             <div>
-              <div class="cluster-inst">${c.instrument}</div>
-              <div class="cluster-meta">时间窗: ${formatTimeWindowUTC8(c.startTimeUTC8 || c.startTime, c.endTimeUTC8 || c.endTime, c.durationMin)}</div>
+              <div class="cluster-inst">${escapeHtml(c.instrument)}</div>
+              <div class="cluster-meta">时间窗: ${escapeHtml(formatTimeWindowUTC8(c.startTimeUTC8 || c.startTime, c.endTimeUTC8 || c.endTime, c.durationMin))}</div>
             </div>
           </div>
           <div>
-            <span class="intent-badge-pill ${c.intentBadgeClass || 'badge-neutral'}">${c.intentBadge || '意图解析'}</span>
-            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${c.strategyNameZh}</div>` : ''}
+            <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
+            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
           </div>
           <div class="cluster-stats">
             <div class="cluster-stat-item">
               <span class="stat-label">拆单笔数 / 块数</span>
-              <span class="c-val">${c.splitCount} 笔 (${c.blockCount} 个 Block)</span>
+              <span class="c-val">${Number(c.splitCount) || 0} 笔 (${Number(c.blockCount) || 0} 个 Block)</span>
             </div>
             <div class="cluster-stat-item">
               <span class="stat-label">累计张数</span>
-              <span class="c-val text-accent">${c.totalContracts.toLocaleString()} BTC</span>
+              <span class="c-val text-accent">${Number(c.totalContracts || 0).toLocaleString()} BTC</span>
             </div>
             <div class="cluster-stat-item">
               <span class="stat-label">累计名义价值</span>
-              <span class="c-val text-highlight">$${c.clusterNotionalM.toFixed(2)}M</span>
+              <span class="c-val text-highlight">$${(Number(c.clusterNotionalM) || 0).toFixed(2)}M</span>
             </div>
           </div>
         </div>
@@ -550,47 +563,47 @@ function renderBlockTrades(data) {
     let cardsHtml = '';
     blocks.forEach((b, idx) => {
       tableHtml += `
-        <tr onclick="openWhaleDetail(${idx})">
-          <td>${b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp)}</td>
-          <td><span class="text-accent">${b.blockId}</span></td>
+        <tr onclick="openWhaleDetail(${Number(idx)})">
+          <td>${escapeHtml(b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp))}</td>
+          <td><span class="text-accent">${escapeHtml(b.blockId)}</span></td>
           <td>
-            <span class="intent-badge-pill ${b.intentBadgeClass || 'badge-neutral'}">${b.intentBadge || '--'}</span>
-            ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${b.strategyNameZh}</div>` : ''}
+            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+            ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
           </td>
-          <td><strong>$${b.notionalUSDM.toFixed(2)}M</strong></td>
-          <td>${b.netDeltaBTC >= 0 ? '+' : ''}${b.netDeltaBTC.toFixed(1)} BTC</td>
-          <td>${b.netVegaUSD >= 0 ? '+' : ''}$${Math.round(b.netVegaUSD).toLocaleString()}</td>
-          <td>${b.legCount} 腿</td>
-          <td><button class="action-btn" onclick="event.stopPropagation(); openWhaleDetail(${idx})">穿透解析</button></td>
+          <td><strong>$${(Number(b.notionalUSDM) || 0).toFixed(2)}M</strong></td>
+          <td>${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</td>
+          <td>${(Number(b.netVegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(b.netVegaUSD) || 0).toLocaleString()}</td>
+          <td>${Number(b.legCount) || 0} 腿</td>
+          <td><button class="action-btn" onclick="event.stopPropagation(); openWhaleDetail(${Number(idx)})">穿透解析</button></td>
         </tr>
       `;
 
       cardsHtml += `
-        <div class="whale-mobile-card" onclick="openWhaleDetail(${idx})">
+        <div class="whale-mobile-card" onclick="openWhaleDetail(${Number(idx)})">
           <div class="wmc-header">
             <div class="wmc-id-group">
-              <span class="wmc-id">${b.blockId}</span>
-              <span class="wmc-time">${(b.dateTimeUTC8 || b.dateTime || '').slice(5, 16)}</span>
+              <span class="wmc-id">${escapeHtml(b.blockId)}</span>
+              <span class="wmc-time">${escapeHtml((b.dateTimeUTC8 || b.dateTime || '').slice(5, 16))}</span>
             </div>
-            <span class="intent-badge-pill ${b.intentBadgeClass || 'badge-neutral'}">${b.intentBadge || '--'}</span>
+            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
           </div>
-          <div class="wmc-strategy">${b.strategyNameZh || '机构定制结构'}</div>
+          <div class="wmc-strategy">${escapeHtml(b.strategyNameZh || '机构定制结构')}</div>
           <div class="wmc-grid">
             <div class="wmc-stat">
               <span class="wmc-lbl">名义价值</span>
-              <span class="wmc-val text-highlight">$${b.notionalUSDM.toFixed(1)}M</span>
+              <span class="wmc-val text-highlight">$${(Number(b.notionalUSDM) || 0).toFixed(1)}M</span>
             </div>
             <div class="wmc-stat">
               <span class="wmc-lbl">最大理论盈利</span>
-              <span class="wmc-val text-accent">${b.riskProfile?.maxProfit || '--'}</span>
+              <span class="wmc-val text-accent">${escapeHtml(b.riskProfile?.maxProfit || '--')}</span>
             </div>
             <div class="wmc-stat">
               <span class="wmc-lbl">净 Delta</span>
-              <span class="wmc-val">${b.netDeltaBTC >= 0 ? '+' : ''}${b.netDeltaBTC.toFixed(1)} BTC</span>
+              <span class="wmc-val">${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</span>
             </div>
             <div class="wmc-stat">
               <span class="wmc-lbl">结构腿数</span>
-              <span class="wmc-val">${b.legCount} 腿</span>
+              <span class="wmc-val">${Number(b.legCount) || 0} 腿</span>
             </div>
           </div>
           <div class="wmc-footer">
@@ -634,7 +647,7 @@ window.openWhaleDetail = function(idx) {
   if (mPointersList) {
     const pointers = b.theoreticalPointers || [];
     if (pointers.length) {
-      mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
+      mPointersList.innerHTML = pointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
     } else {
       mPointersList.innerHTML = '<li>暂无研判要点</li>';
     }
@@ -660,15 +673,15 @@ window.openWhaleDetail = function(idx) {
     const dirClass = isBuy ? 'text-pos' : 'text-neg';
     legsHtml += `
       <tr>
-        <td class="${dirClass}"><strong>${leg.direction.toUpperCase()}</strong></td>
-        <td><strong>${leg.instrument}</strong></td>
-        <td>${leg.amount} BTC</td>
-        <td>${leg.price}</td>
-        <td>${leg.iv ? leg.iv.toFixed(1) + '%' : '--'}</td>
-        <td>${leg.delta >= 0 ? '+' : ''}${leg.delta.toFixed(2)}</td>
-        <td>${leg.vegaUSD >= 0 ? '+' : ''}$${Math.round(leg.vegaUSD).toLocaleString()}</td>
-        <td>${leg.thetaUSD >= 0 ? '+' : ''}$${Math.round(leg.thetaUSD).toLocaleString()}</td>
-        <td>$${leg.notionalM.toFixed(2)}M</td>
+        <td class="${dirClass}"><strong>${escapeHtml(leg.direction).toUpperCase()}</strong></td>
+        <td><strong>${escapeHtml(leg.instrument)}</strong></td>
+        <td>${Number(leg.amount) || 0} BTC</td>
+        <td>${escapeHtml(leg.price)}</td>
+        <td>${leg.iv ? (Number(leg.iv) || 0).toFixed(1) + '%' : '--'}</td>
+        <td>${(Number(leg.delta) || 0) >= 0 ? '+' : ''}${(Number(leg.delta) || 0).toFixed(2)}</td>
+        <td>${(Number(leg.vegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(leg.vegaUSD) || 0).toLocaleString()}</td>
+        <td>${(Number(leg.thetaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(leg.thetaUSD) || 0).toLocaleString()}</td>
+        <td>$${(Number(leg.notionalM) || 0).toFixed(2)}M</td>
       </tr>
     `;
   }
@@ -702,7 +715,7 @@ window.openIcebergDetail = function(idx) {
   if (mPointersList) {
     const pointers = c.theoreticalPointers || [];
     if (pointers.length) {
-      mPointersList.innerHTML = pointers.map(p => `<li>${p}</li>`).join('');
+      mPointersList.innerHTML = pointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
     } else {
       mPointersList.innerHTML = '<li>暂无拆单研判要点</li>';
     }
@@ -728,15 +741,15 @@ window.openIcebergDetail = function(idx) {
       const legClass = legBuy ? 'text-pos' : 'text-neg';
       return `
         <tr>
-          <td class="${legClass}"><strong>${l.direction.toUpperCase()}</strong></td>
-          <td><strong>${l.instrument}</strong></td>
-          <td>${l.amount} BTC</td>
-          <td>均价: ${(l.price || 0).toFixed(4)}</td>
-          <td>${l.iv ? l.iv.toFixed(1) + '%' : '--'}</td>
-          <td>${(l.delta || 0) >= 0 ? '+' : ''}${(l.delta || 0).toFixed(2)}</td>
-          <td>${(l.vegaUSD || 0) >= 0 ? '+' : ''}$${Math.round(l.vegaUSD || 0).toLocaleString()}</td>
-          <td>${(l.thetaUSD || 0) >= 0 ? '+' : ''}$${Math.round(l.thetaUSD || 0).toLocaleString()}</td>
-          <td>$${(l.notionalM || 0).toFixed(2)}M</td>
+          <td class="${legClass}"><strong>${escapeHtml(l.direction).toUpperCase()}</strong></td>
+          <td><strong>${escapeHtml(l.instrument)}</strong></td>
+          <td>${Number(l.amount) || 0} BTC</td>
+          <td>均价: ${(Number(l.price) || 0).toFixed(4)}</td>
+          <td>${l.iv ? (Number(l.iv) || 0).toFixed(1) + '%' : '--'}</td>
+          <td>${(Number(l.delta) || 0) >= 0 ? '+' : ''}${(Number(l.delta) || 0).toFixed(2)}</td>
+          <td>${(Number(l.vegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(l.vegaUSD) || 0).toLocaleString()}</td>
+          <td>${(Number(l.thetaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(l.thetaUSD) || 0).toLocaleString()}</td>
+          <td>$${(Number(l.notionalM) || 0).toFixed(2)}M</td>
         </tr>
       `;
     }).join('');
@@ -745,15 +758,15 @@ window.openIcebergDetail = function(idx) {
     const dirClass = isBuy ? 'text-pos' : 'text-neg';
     mLegsBody.innerHTML = `
       <tr>
-        <td class="${dirClass}"><strong>${c.direction.toUpperCase()}</strong></td>
-        <td><strong>${c.instrument}</strong> (合成累计)</td>
-        <td>${c.totalContracts} BTC</td>
-        <td>均价: ${(c.avgPrice || 0).toFixed(4)}</td>
+        <td class="${dirClass}"><strong>${escapeHtml(c.direction).toUpperCase()}</strong></td>
+        <td><strong>${escapeHtml(c.instrument)}</strong> (合成累计)</td>
+        <td>${Number(c.totalContracts) || 0} BTC</td>
+        <td>均价: ${(Number(c.avgPrice) || 0).toFixed(4)}</td>
         <td>--</td>
-        <td>${c.netDeltaBTC >= 0 ? '+' : ''}${c.netDeltaBTC.toFixed(2)}</td>
-        <td>${c.netVegaUSD >= 0 ? '+' : ''}$${Math.round(c.netVegaUSD).toLocaleString()}</td>
-        <td>${c.netThetaUSD >= 0 ? '+' : ''}$${Math.round(c.netThetaUSD).toLocaleString()}</td>
-        <td>$${c.clusterNotionalM.toFixed(2)}M</td>
+        <td>${(Number(c.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(c.netDeltaBTC) || 0).toFixed(2)}</td>
+        <td>${(Number(c.netVegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(c.netVegaUSD) || 0).toLocaleString()}</td>
+        <td>${(Number(c.netThetaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(c.netThetaUSD) || 0).toLocaleString()}</td>
+        <td>$${(Number(c.clusterNotionalM) || 0).toFixed(2)}M</td>
       </tr>
     `;
   }
@@ -1545,7 +1558,7 @@ async function loadCdriData(forceRefresh = false) {
 function createRiskPillHtml(score, riskInfo) {
   if (score === null || score === undefined) return '<span class="cdri-num-pill">--</span>';
   const info = riskInfo || { color: '#93ea2a', bg: 'rgba(147,234,42,0.15)', border: '#93ea2a', level: '中性波动' };
-  return `<span class="cdri-num-pill" style="color:${info.color}; background:${info.bg}; border:1px solid ${info.border};">${score} ${info.level}</span>`;
+  return `<span class="cdri-num-pill" style="color:${escapeHtml(info.color)}; background:${escapeHtml(info.bg)}; border:1px solid ${escapeHtml(info.border)};">${Number(score) || 0} ${escapeHtml(info.level)}</span>`;
 }
 
 /**
@@ -2032,7 +2045,7 @@ function renderTermPremium(data) {
     elTpInsightsSummary.textContent = reg.statusSummary;
   }
   if (elTpInsightsList && reg.keyPointers) {
-    elTpInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${p}</li>`).join('');
+    elTpInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
   }
 
   // Render Dual-Grid Chart
@@ -2959,10 +2972,11 @@ function renderCoinbaseLiquidity(data) {
     elCbValMid.textContent = `$${Math.round(data.midPrice).toLocaleString()}`;
   }
   if (elCbPyrEvalText && pyr.ratio100_10) {
-    if (pyr.ratio100_10 >= 6.0) {
-      elCbPyrEvalText.innerHTML = `⚠️ <strong>近端薄弱，防线下移</strong>：100bp/10bp 比率达 <strong>${pyr.ratio100_10}x</strong>（显著偏离 3.1x 基准），做市商挂单大幅后撤至远端，即时缓冲层相对中空。`;
+    const ratioVal = Number(pyr.ratio100_10) || 0;
+    if (ratioVal >= 6.0) {
+      elCbPyrEvalText.innerHTML = `⚠️ <strong>近端薄弱，防线下移</strong>：100bp/10bp 比率达 <strong>${ratioVal}x</strong>（显著偏离 3.1x 基准），做市商挂单大幅后撤至远端，即时缓冲层相对中空。`;
     } else {
-      elCbPyrEvalText.innerHTML = `🟢 <strong>金字塔结构稳健</strong>：阶梯倍数维持在 <strong>${pyr.ratio100_10}x</strong>（贴合 3.1x 理论中枢），具备良好的逐级缓冲吸收能力。`;
+      elCbPyrEvalText.innerHTML = `🟢 <strong>金字塔结构稳健</strong>：阶梯倍数维持在 <strong>${ratioVal}x</strong>（贴合 3.1x 理论中枢），具备良好的逐级缓冲吸收能力。`;
     }
   }
 
@@ -2973,12 +2987,12 @@ function renderCoinbaseLiquidity(data) {
     tiers.forEach(t => {
       const item = data.depthProfile[t];
       if (!item) return;
-      const bidClass = item.bidPct >= 50 ? 'text-pos' : 'text-neg';
+      const bidClass = (Number(item.bidPct) || 0) >= 50 ? 'text-pos' : 'text-neg';
       html += `<tr>
-        <td style="font-weight:600; color:#fafafa;">${item.label}</td>
-        <td style="color:#10b981;">$${item.bidUsdM}M <span style="color:#71717a; font-size:10px;">(${item.bidBtc} ₿)</span></td>
-        <td style="color:#f43f5e;">$${item.askUsdM}M <span style="color:#71717a; font-size:10px;">(${item.askBtc} ₿)</span></td>
-        <td class="${bidClass}" style="font-weight:700;">${item.bidPct}%</td>
+        <td style="font-weight:600; color:#fafafa;">${escapeHtml(item.label)}</td>
+        <td style="color:#10b981;">$${Number(item.bidUsdM) || 0}M <span style="color:#71717a; font-size:10px;">(${Number(item.bidBtc) || 0} ₿)</span></td>
+        <td style="color:#f43f5e;">$${Number(item.askUsdM) || 0}M <span style="color:#71717a; font-size:10px;">(${Number(item.askBtc) || 0} ₿)</span></td>
+        <td class="${bidClass}" style="font-weight:700;">${Number(item.bidPct) || 0}%</td>
       </tr>`;
     });
     elCbDepthTableBody.innerHTML = html;
@@ -2986,7 +3000,7 @@ function renderCoinbaseLiquidity(data) {
 
   // 4. Institutional Insights List
   if (elCbInsightsList && Array.isArray(data.insights)) {
-    elCbInsightsList.innerHTML = data.insights.map(str => `<li>${str}</li>`).join('');
+    elCbInsightsList.innerHTML = data.insights.map(str => `<li>${escapeHtml(str)}</li>`).join('');
   }
 
   // Render Charts

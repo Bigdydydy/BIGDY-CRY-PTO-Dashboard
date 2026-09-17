@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const { fetchWithTimeout } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'cdri_data.json');
 let inMemoryCache = null;
@@ -40,7 +41,7 @@ function getRe(url) {
 async function callCoinglassEndpoint(endpoint) {
   const url = 'https://capi.coinglass.com' + endpoint;
   const now = Date.now().toString();
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
       'Referer': 'https://www.coinglass.com/pro/i/CDRI',

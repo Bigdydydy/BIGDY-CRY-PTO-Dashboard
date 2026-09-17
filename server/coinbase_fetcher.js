@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { fetchWithTimeout } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity.json');
 const CACHE_TTL_MS = 15000; // 15 seconds memory cache
@@ -25,7 +26,7 @@ let isFetching = false;
  */
 async function fetchCoinbaseOrderBook() {
   const url = 'https://api.exchange.coinbase.com/products/BTC-USD/book?level=2';
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       'Accept': 'application/json'
@@ -43,7 +44,7 @@ async function fetchCoinbaseOrderBook() {
  */
 async function fetchCoinbaseDailyCandles() {
   const url = 'https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400';
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       'Accept': 'application/json'
@@ -60,10 +61,10 @@ async function fetchCoinbaseDailyCandles() {
  */
 async function fetchCoinbaseTickerAndStats() {
   const [tickerResp, statsResp] = await Promise.all([
-    fetch('https://api.exchange.coinbase.com/products/BTC-USD/ticker', {
+    fetchWithTimeout('https://api.exchange.coinbase.com/products/BTC-USD/ticker', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     }),
-    fetch('https://api.exchange.coinbase.com/products/BTC-USD/stats', {
+    fetchWithTimeout('https://api.exchange.coinbase.com/products/BTC-USD/stats', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     })
   ]);

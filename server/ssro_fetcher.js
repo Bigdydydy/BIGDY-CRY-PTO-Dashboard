@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { fetchWithTimeout } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'ssro_chart.json');
 let inMemoryCache = null;
@@ -7,26 +8,21 @@ let lastFetchTime = 0;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
 /**
- * Fetch JSON with basic timeout and headers
+ * Fetch JSON with resilient timeout, retries, and headers
  */
 async function fetchJson(url, options = {}) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
-  try {
-    const res = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        ...(options.headers || {})
-      }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const res = await fetchWithTimeout(url, {
+    timeout: 12000,
+    retries: 1,
+    ...options,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+  return await res.json();
 }
 
 /**

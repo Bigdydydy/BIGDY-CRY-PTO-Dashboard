@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { getXSign } = require('./crypto_signer');
 const { recordAndMergeTrades, getCachedTrades } = require('./trade_store');
 const { analyzeTermPremium } = require('./term_premium_engine');
+const { fetchWithTimeout } = require('./http_client');
 
 const GREEKS_BASE_URL = 'https://api.greeks.live/api/v1';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -49,7 +50,7 @@ function hashObject(obj) {
 async function fetchGreeksDataLab(endpoint, payload) {
   const url = `${GREEKS_BASE_URL}/deribit/datalab/${endpoint}`;
   const xSign = getXSign();
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -76,7 +77,7 @@ async function fetchGreeksDataLab(endpoint, payload) {
  */
 async function fetchBlockTrades(currency = 'BTC') {
   const url = `${GREEKS_BASE_URL}/block_trade`;
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -100,7 +101,7 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
     const endTs = Date.now();
     const startTs = endTs - 2 * 365 * 24 * 3600 * 1000;
     const url = `https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=${currency}&start_timestamp=${startTs}&end_timestamp=${endTs}&resolution=1D`;
-    const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!resp.ok) return null;
     const json = await resp.json();
     const data = json.result?.data || [];
@@ -132,7 +133,7 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
 async function fetchDeribitFutures(currency = 'BTC') {
   try {
     const url = `https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${currency}&kind=future`;
-    const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!resp.ok) return [];
     const json = await resp.json();
     return json.result || [];
