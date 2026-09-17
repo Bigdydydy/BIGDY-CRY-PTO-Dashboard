@@ -18,7 +18,7 @@ const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
-const { getXPulseData } = require('./x_pulse_fetcher');
+const { getXPulseData, syncLivePostsFromUpstream } = require('./x_pulse_fetcher');
 const { askGeminiCopilot } = require('./gemini_service');
 
 const PORT = process.env.PORT || 3000;
@@ -291,6 +291,11 @@ async function handleApiRequest(req, res, parsedUrl) {
   // GET /api/x-pulse (Module 8: Macro & Crypto 7-day Feed)
   if (pathname === '/api/x-pulse' && req.method === 'GET') {
     try {
+      const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+      if (forceParam) {
+        await syncLivePostsFromUpstream();
+      }
+
       const data = getXPulseData();
       const authorFilter = parsedUrl.query?.author;
       const tagFilter = parsedUrl.query?.tag;
@@ -325,7 +330,7 @@ async function handleApiRequest(req, res, parsedUrl) {
   if (pathname === '/api/ask-gemini' && req.method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const { postId, promptType = 'macro_logic', customQuestion = '', apiKey = null } = body;
+      const { postId, promptType = 'macro_logic', customQuestion = '', apiKey = null, model = 'gemini-2.5-flash' } = body;
 
       const data = getXPulseData();
       let targetPost = data.posts.find(p => p.id === postId);
@@ -347,7 +352,8 @@ async function handleApiRequest(req, res, parsedUrl) {
         post: targetPost,
         promptType,
         customQuestion,
-        apiKey
+        apiKey,
+        model
       });
 
       sendJsonResponse(req, res, 200, {
@@ -397,7 +403,8 @@ async function handleApiRequest(req, res, parsedUrl) {
             getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
             fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
-            getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message))
+            getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
+            syncLivePostsFromUpstream().catch(e => console.error('[XPulse] Sync refresh error:', e.message))
           ]);
           return syncResult;
         })().finally(() => {

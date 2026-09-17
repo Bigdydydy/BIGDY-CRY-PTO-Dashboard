@@ -3834,13 +3834,7 @@ body {
   word-break: break-word;
 }
 
-.kw-highlight {
-  color: #fde047;
-  font-weight: 600;
-  background: rgba(253, 224, 71, 0.1);
-  padding: 0 3px;
-  border-radius: 2px;
-}
+
 
 .x-post-footer {
   display: flex;
@@ -3969,6 +3963,31 @@ body {
 .copilot-sub {
   font-size: 0.65rem;
   color: var(--text-muted);
+}
+
+.copilot-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-model-select {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: var(--radius-xs);
+  color: #e0e7ff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.copilot-model-select:hover,
+.copilot-model-select:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
 }
 
 .copilot-status-badge {

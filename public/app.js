@@ -4021,16 +4021,8 @@ function renderXPulseFeed() {
     const isActive = post.id === currentActivePostId;
     const relTime = formatRelativeTime(post.timestamp);
 
-    // Highlight keywords in text
-    let highlightedText = escapeHtml(post.text);
-    if (Array.isArray(post.matchedKeywords)) {
-      post.matchedKeywords.forEach(kw => {
-        if (kw && kw.length >= 2) {
-          const regex = new RegExp(`(${kw})`, 'gi');
-          highlightedText = highlightedText.replace(regex, '<span class="kw-highlight">$1</span>');
-        }
-      });
-    }
+    // Clean text rendering without active yellow highlighting
+    const renderedText = escapeHtml(post.text);
 
     // Build tags badges
     const tagsHtml = (post.tags || []).map(t => {
@@ -4058,7 +4050,7 @@ function renderXPulseFeed() {
           <div class="x-post-time">⏱ ${relTime}</div>
         </div>
 
-        <div class="x-post-text">${highlightedText}</div>
+        <div class="x-post-text">${renderedText}</div>
 
         <div class="x-post-footer">
           <div class="x-post-tags">
@@ -4147,6 +4139,8 @@ async function runGeminiAnalysis(promptType = 'macro_logic', customQuestion = ''
 
   try {
     const savedApiKey = localStorage.getItem('gemini_api_key') || null;
+    const modelSelect = document.getElementById('copilot-model-select');
+    const selectedModel = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
 
     const resp = await fetch('/api/ask-gemini', {
       method: 'POST',
@@ -4156,7 +4150,8 @@ async function runGeminiAnalysis(promptType = 'macro_logic', customQuestion = ''
         post,
         promptType,
         customQuestion,
-        apiKey: savedApiKey
+        apiKey: savedApiKey,
+        model: selectedModel
       })
     });
 
@@ -4270,6 +4265,14 @@ function initXPulseEvents() {
       elCopilotPromptsButtons.querySelectorAll('.copilot-pbtn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentCopilotPrompt = btn.dataset.prompt;
+      runGeminiAnalysis(currentCopilotPrompt);
+    });
+  }
+
+  // Gemini model switch (Flash vs Pro)
+  const elCopilotModelSelect = document.getElementById('copilot-model-select');
+  if (elCopilotModelSelect) {
+    elCopilotModelSelect.addEventListener('change', () => {
       runGeminiAnalysis(currentCopilotPrompt);
     });
   }

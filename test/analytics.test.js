@@ -676,13 +676,14 @@ describe('Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Engine', () => 
 
           const firstPost = feedJson.posts[0];
 
-          // 2. POST /api/ask-gemini
+          // 2. POST /api/ask-gemini with Gemini 2.5 Flash
           const geminiResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               postId: firstPost.id,
-              promptType: 'macro_logic'
+              promptType: 'macro_logic',
+              model: 'gemini-2.5-flash'
             })
           });
 
@@ -691,6 +692,29 @@ describe('Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Engine', () => 
           assert.equal(geminiJson.code, 0);
           assert.ok(geminiJson.analysis);
           assert.ok(geminiJson.model);
+
+          // 3. POST /api/ask-gemini with Gemini 2.5 Pro
+          const geminiProResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: firstPost.id,
+              promptType: 'macro_logic',
+              model: 'gemini-2.5-pro'
+            })
+          });
+
+          assert.equal(geminiProResp.status, 200);
+          const geminiProJson = await geminiProResp.json();
+          assert.equal(geminiProJson.code, 0);
+          assert.ok(geminiProJson.analysis.includes('Pro') || geminiProJson.model.includes('Pro'));
+
+          // 4. GET /api/x-pulse?force=1 triggers syncLivePostsFromUpstream
+          const syncResp = await fetch(`http://127.0.0.1:${port}/api/x-pulse?force=1`);
+          assert.equal(syncResp.status, 200);
+          const syncJson = await syncResp.json();
+          assert.equal(syncJson.code, 0);
+          assert.ok(syncJson.posts.length >= 15);
         } finally {
           server.close(resolve);
         }

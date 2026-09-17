@@ -1,20 +1,20 @@
 {
   "code": 0,
-  "updatedAt": "2026-09-17T16:44:16.634Z",
+  "updatedAt": "2026-09-17T16:51:46.668Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
     "date": "2026-09-17",
-    "btcPrice": 76666.45,
-    "stableCap": 308544293635,
-    "stableCapBillions": "308.54",
+    "btcPrice": 76666.51,
+    "stableCap": 308546599514,
+    "stableCapBillions": "308.55",
     "ssr": 4.986,
     "ssro200": 1.236,
-    "ssro50": 0.664,
+    "ssro50": 0.663,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.03076542716822362,
-      "priceUsd": 308544293635
+      "change24h": -0.030018315769948133,
+      "priceUsd": 308546599514
     },
     "quantEvaluation": {
       "zScore": 1.236,
@@ -29224,15 +29224,15 @@
     },
     {
       "date": "2026-09-17",
-      "btcPrice": 76666.45,
-      "stableCap": 308544293635,
+      "btcPrice": 76666.51,
+      "stableCap": 308546599514,
       "ssr": 4.986,
       "ssro200": 1.236,
       "sma200": 4.506,
       "stdev200": 0.389,
       "upper2_200": 5.283,
       "lower2_200": 3.729,
-      "ssro50": 0.664,
+      "ssro50": 0.663,
       "sma50": 4.7,
       "stdev50": 0.431
     }
