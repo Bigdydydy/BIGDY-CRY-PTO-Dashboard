@@ -18,9 +18,36 @@ const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
+const { getXPulseData } = require('./x_pulse_fetcher');
+const { askGeminiCopilot } = require('./gemini_service');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+/**
+ * Parse JSON request body helper
+ */
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 1e6) {
+        req.destroy();
+        reject(new Error('Payload too large (limit 1MB)'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        resolve(parsed);
+      } catch (e) {
+        reject(new Error('Invalid JSON payload'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 // Rate limiting & Single-flight locks
 const refreshRateLimitMap = new Map();
@@ -261,6 +288,79 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/x-pulse (Module 8: Macro & Crypto 7-day Feed)
+  if (pathname === '/api/x-pulse' && req.method === 'GET') {
+    try {
+      const data = getXPulseData();
+      const authorFilter = parsedUrl.query?.author;
+      const tagFilter = parsedUrl.query?.tag;
+
+      let filteredPosts = data.posts;
+      if (authorFilter && authorFilter !== 'all') {
+        filteredPosts = filteredPosts.filter(p => p.authorHandle === authorFilter);
+      }
+      if (tagFilter && tagFilter !== 'all') {
+        filteredPosts = filteredPosts.filter(p => p.tags.includes(tagFilter));
+      }
+
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        posts: filteredPosts,
+        totalCount: filteredPosts.length,
+        unfilteredCount: data.totalCount,
+        authors: data.authors,
+        availableTags: data.availableTags,
+        timeWindow: data.timeWindow,
+        filterStrictness: data.filterStrictness,
+        lastSyncTime: data.lastSyncTime
+      });
+    } catch (err) {
+      console.error('[API Error] x-pulse:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/ask-gemini (Module 8: In-module Gemini Copilot)
+  if (pathname === '/api/ask-gemini' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const { postId, promptType = 'macro_logic', customQuestion = '', apiKey = null } = body;
+
+      const data = getXPulseData();
+      let targetPost = data.posts.find(p => p.id === postId);
+
+      if (!targetPost && body.post) {
+        targetPost = body.post;
+      }
+
+      if (!targetPost) {
+        targetPost = data.posts[0];
+      }
+
+      if (!targetPost) {
+        sendJsonResponse(req, res, 404, { code: 404, error: '未找到指定的推文上下文' });
+        return;
+      }
+
+      const copilotResult = await askGeminiCopilot({
+        post: targetPost,
+        promptType,
+        customQuestion,
+        apiKey
+      });
+
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...copilotResult
+      });
+    } catch (err) {
+      console.error('[API Error] ask-gemini:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
   // POST /api/refresh
   if (pathname === '/api/refresh' && req.method === 'POST') {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
@@ -406,6 +506,13 @@ function startServer() {
   getCoinbaseLiquidityData()
     .then(() => console.log('[Server] Initial Coinbase liquidity cache ready.'))
     .catch(e => console.warn('[Server] Initial Coinbase fetch warning:', e.message));
+
+  try {
+    getXPulseData();
+    console.log('[Server] Initial X-Pulse feed cache ready.');
+  } catch (e) {
+    console.warn('[Server] Initial X-Pulse fetch warning:', e.message);
+  }
 
   // Background auto-refresh every 30 seconds
   setInterval(async () => {

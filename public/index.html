@@ -182,6 +182,18 @@
               <span class="nav-desc">XAU/BTC 比价 &amp; 30D 宏观联动</span>
             </div>
           </button>
+
+          <button class="sidebar-nav-item" data-view="view-x-pulse" id="nav-item-x-pulse">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">社群情报与 Gemini 智囊</span>
+              <span class="nav-desc">11位顶流博主 &amp; AI 穿透研判</span>
+            </div>
+          </button>
         </nav>
       </div>
 
@@ -1624,8 +1636,170 @@
           </div>
         </div>
       </div>
-    </section>
   </div> <!-- /#view-gold-correlation -->
+
+      <!-- View 8: 宏观与加密社交情报流 & Gemini 智囊联动 (Module 8) -->
+      <div class="view-panel" id="view-x-pulse">
+        <section class="bento-card" id="module-x-pulse">
+          <div class="card-header x-pulse-header">
+            <div class="card-title-group">
+              <span class="card-module-tag">08 MACRO &amp; CRYPTO X-PULSE FEED &amp; GEMINI COPILOT</span>
+              <h2>宏观与加密社群脉搏情报流 &amp; 嵌入式 Gemini 穿透研判工作台</h2>
+            </div>
+            <div class="x-header-actions">
+              <div class="x-badge-pill" title="严格限定：仅收录用户提供的 11 位宏观与加密核心博主">
+                <span class="live-dot-green"></span>
+                <span>白名单 11 位博主</span>
+              </div>
+              <div class="x-badge-pill" title="时效性：严格仅保留最近 7 天以内的最新推文">
+                <span class="badge-icon">⏱</span>
+                <span>7天内推文: <strong id="x-pulse-count">--</strong> 条</span>
+              </div>
+              <div class="x-badge-pill filter-pure" title="纯度机制：严格过滤掉任何日常生活杂谈与非金融娱乐政治内容">
+                <span class="badge-icon">🛡</span>
+                <span>金融/Crypto 过滤纯度 100%</span>
+              </div>
+              <button class="btn-gemini-key-config" id="btn-open-gemini-modal" title="配置您的 Google Gemini API Key 以启用官方大模型">
+                <span class="sparkle-icon">✦</span>
+                <span>Gemini Key 配置</span>
+              </button>
+              <button class="btn-sm-action" id="btn-refresh-x-pulse" title="刷新推文流与量化过滤状态">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 4v6h-6M1 20v-6h6"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                <span>刷新情报流</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body x-pulse-body">
+            <!-- Split Workspace: 58% Feed Stream + 42% Embedded Gemini Copilot -->
+            <div class="x-split-workspace">
+              <!-- Left Column: Posts Stream -->
+              <div class="x-feed-column">
+                <!-- Toolbar: Author selector, Search input, Tag pills -->
+                <div class="x-feed-toolbar">
+                  <div class="x-filter-row">
+                    <div class="x-select-wrap">
+                      <select id="x-author-select" class="x-select-control" aria-label="筛选博主">
+                        <option value="all">全部 11 位博主</option>
+                      </select>
+                    </div>
+                    <div class="x-search-wrap">
+                      <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                      </svg>
+                      <input type="text" id="x-feed-search" class="x-search-input" placeholder="搜索关键词（如 CPI、基差、付鹏、流动性...）" />
+                    </div>
+                  </div>
+
+                  <!-- Tag Pills -->
+                  <div class="x-tag-strip" id="x-tag-strip">
+                    <button class="x-tag-pill active" data-tag="all">全部领域</button>
+                    <button class="x-tag-pill" data-tag="#Macro">#Macro 宏观</button>
+                    <button class="x-tag-pill" data-tag="#Crypto">#Crypto 加密</button>
+                    <button class="x-tag-pill" data-tag="#FedRates">#FedRates 联储与利率</button>
+                    <button class="x-tag-pill" data-tag="#Derivatives">#Derivatives 衍生品</button>
+                    <button class="x-tag-pill" data-tag="#CrudeOil">#CrudeOil 原油大宗</button>
+                    <button class="x-tag-pill" data-tag="#US_Equities">#US_Equities 美股</button>
+                  </div>
+                </div>
+
+                <!-- Feed Stream Container -->
+                <div class="x-posts-stream" id="x-posts-stream">
+                  <div class="x-feed-loading">
+                    <span class="spinner-dot"></span>
+                    <span>正在加载 7 天内金融/加密脉搏流...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Embedded Gemini Copilot -->
+              <div class="x-copilot-column">
+                <div class="gemini-copilot-card">
+                  <!-- Copilot Header -->
+                  <div class="copilot-header">
+                    <div class="copilot-brand">
+                      <span class="copilot-sparkle">✦</span>
+                      <div class="copilot-title-wrap">
+                        <div class="copilot-name">Gemini 2.5 Quantitative Copilot</div>
+                        <div class="copilot-sub">同屏宏观逻辑穿透 &amp; 加密微观传导分析</div>
+                      </div>
+                    </div>
+                    <div class="copilot-status-badge" id="copilot-status-badge">
+                      <span class="copilot-status-dot"></span>
+                      <span id="copilot-status-label">就绪</span>
+                    </div>
+                  </div>
+
+                  <!-- Active Post Context Preview -->
+                  <div class="copilot-context-box" id="copilot-context-box">
+                    <div class="context-header">
+                      <span class="context-label">📌 当前聚焦推文上下文</span>
+                      <span class="context-author" id="copilot-ctx-author">请选择推文</span>
+                      <span class="context-time" id="copilot-ctx-time">--</span>
+                    </div>
+                    <div class="context-snippet" id="copilot-ctx-snippet">
+                      请点击左侧任意推文的「⚡ 问问 Gemini」按钮，或直接点击推文卡片以将其锁定为当前分析上下文。
+                    </div>
+                  </div>
+
+                  <!-- Quick Action Prompts -->
+                  <div class="copilot-prompts-strip">
+                    <span class="prompts-label">一键量化预设:</span>
+                    <div class="prompts-buttons" id="copilot-prompts-buttons">
+                      <button class="copilot-pbtn active" data-prompt="macro_logic" title="拆解宏观经济底层假设与资产负债表传导机制">
+                        <span>📊 宏观逻辑穿透</span>
+                      </button>
+                      <button class="copilot-pbtn" data-prompt="crypto_impact" title="分析对 BTC 现货、期现基差与波动率曲面的具体影响">
+                        <span>🪙 对 BTC/加密走势影响</span>
+                      </button>
+                      <button class="copilot-pbtn" data-prompt="trading_implication" title="评估多空风险收益比与跨资产套利/对冲策略">
+                        <span>⚖️ 多空交易蕴涵</span>
+                      </button>
+                      <button class="copilot-pbtn" data-prompt="falsification_risk" title="识别潜在认知盲区、反向黑天鹅与论点证伪阈值">
+                        <span>🔍 逻辑证伪与反向风险</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Analysis Report Area -->
+                  <div class="copilot-report-scroll" id="copilot-report-scroll">
+                    <div class="copilot-report-content markdown-body" id="copilot-report-content">
+                      <div class="copilot-empty-state">
+                        <div class="empty-sparkle">✦</div>
+                        <h4>欢迎使用 Gemini 量化研判工作台</h4>
+                        <p>左侧推文已按 <strong>用户指定的 11 位博主白名单</strong> 严格采集，全部限定在 <strong>7 天之内</strong>，且 <strong>100% 过滤非金融娱乐杂谈</strong>。</p>
+                        <p>点击推文上的 <strong>「⚡ 问问 Gemini」</strong> 即可在此视窗就地生成机构级穿透报告，支持深度追问与多轮推演，无需跳转任何外部网页！</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Interactive Follow-up Bar -->
+                  <div class="copilot-input-area">
+                    <div class="copilot-input-box">
+                      <input type="text" id="copilot-custom-input" class="copilot-text-input" placeholder="针对当前推文向 Gemini 追问（如：若非农超预期该观点如何修正？）..." />
+                      <button id="btn-copilot-submit" class="btn-copilot-send" title="发送提问">
+                        <span>发送</span>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="22" y1="2" x2="11" y2="13"/>
+                          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="copilot-engine-meta">
+                      <span id="copilot-engine-source">⚡ 模式: Gemini 2.5 Flash / 启发式双模保障</span>
+                      <span id="copilot-latency-badge"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div> <!-- /#view-x-pulse -->
 
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
@@ -1724,6 +1898,49 @@
         </div>
       </div>
     </div>
+  </div> <!-- /#trade-modal-backdrop -->
+
+  <!-- Gemini API Key Settings Modal -->
+  <div class="modal-backdrop" id="gemini-key-modal-backdrop" style="display: none;">
+    <div class="modal-card gemini-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-title-top">
+            <span class="modal-tag" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border-color: rgba(99, 102, 241, 0.4);">AI ENGINE CONFIG</span>
+            <h3>配置 Google Gemini API Key</h3>
+          </div>
+          <div class="modal-time-meta">直连 Google 官方 Gemini 2.5 Flash 模型</div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-gemini-modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="gemini-modal-desc">
+          输入您的 Google Gemini API Key，即可在 Module 8 中直接调用最新的 <strong>Gemini 2.5 Flash</strong> 进行实时毫秒级宏观量化推演。Key 仅保存在您本地浏览器的 <code>localStorage</code> 中，绝不向未授权服务器泄露。
+        </p>
+
+        <div class="gemini-key-field">
+          <label for="input-gemini-api-key" class="gemini-input-label">Gemini API Key</label>
+          <input type="password" id="input-gemini-api-key" class="gemini-key-input" placeholder="AIzaSy..." autocomplete="off" />
+        </div>
+
+        <div class="gemini-modal-tips">
+          <div class="tip-item">
+            <strong>💡 免费获取 Key：</strong>
+            <span>可随时在 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a> 免费生成个人 API Key。</span>
+          </div>
+          <div class="tip-item">
+            <strong>🛡️ 零依赖启发式回退：</strong>
+            <span>若未配置 Key，系统将自动启用内置的高精度机构量化启发式研判引擎，所有推文分析功能依然 100% 正常可用！</span>
+          </div>
+        </div>
+
+        <div class="gemini-modal-actions">
+          <button class="btn-clear-key" id="btn-clear-gemini-key">清除本地 Key</button>
+          <button class="btn-save-key" id="btn-save-gemini-key">保存并启用</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification -->
@@ -1791,6 +2008,12 @@
         <path d="M12 7v10"></path>
       </svg>
       <span>金/BTC</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-x-pulse" id="mob-nav-x-pulse">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      <span>X脉搏</span>
     </button>
   </nav>
 

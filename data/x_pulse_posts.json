@@ -1,0 +1,436 @@
+{
+  "updatedAt": "2026-09-17T16:39:48.936Z",
+  "count": 14,
+  "posts": [
+    {
+      "id": "x_post_1",
+      "authorHandle": "fupenglondon",
+      "authorName": "付鹏",
+      "authorAvatar": "https://unavatar.io/x/fupenglondon",
+      "authorBio": "东北证券首席经济学家 | 全球宏观大类资产配置与流动性循环",
+      "authorCategory": "Macro Allocation",
+      "text": "从大类资产定价模型来看，近期中东局势推升布伦特原油突破 85 美元，但 10 年期美债收益率与美元指数并没有同步走强。这清晰反映出当前宏观市场交易的逻辑核心并非“通胀预期反弹”，而是“跨市场流动性微观管道的结构分化”。实体投资意愿依然处于收缩期，宏观流动性依然在避险资产与数字黄金之间寻找再平衡。",
+      "timestamp": 1789654188936,
+      "createdAt": "2026-09-17T14:09:48.936Z",
+      "hoursAgo": 2.5,
+      "likes": 1240,
+      "retweets": 318,
+      "sourceUrl": "https://x.com/fupenglondon/status/183561001",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#FedRates",
+        "#Macro",
+        "#CrudeOil",
+        "#FX",
+        "#Gold"
+      ],
+      "matchedKeywords": [
+        "收益率",
+        "通胀",
+        "流动性",
+        "原油",
+        "布伦特",
+        "黄金",
+        "美元指数"
+      ]
+    },
+    {
+      "id": "x_post_2",
+      "authorHandle": "TruthGundlach",
+      "authorName": "Jeffrey Gundlach",
+      "authorAvatar": "https://unavatar.io/x/TruthGundlach",
+      "authorBio": "DoubleLine Capital 创始人 | \"新债王\" 美债与宏观前瞻",
+      "authorCategory": "Fed & Fixed Income",
+      "text": "The 2s10s Treasury yield curve un-inversion is proceeding faster than the market priced in. Historically, the actual steepening that occurs as the Fed starts cutting rates has never been a \"soft landing\" signal — it marks the onset of macro margin pressures for small businesses. Keep a close eye on high-yield credit spreads and real GDP revisions.",
+      "timestamp": 1789644468936,
+      "createdAt": "2026-09-17T11:27:48.936Z",
+      "hoursAgo": 5.2,
+      "likes": 3420,
+      "retweets": 890,
+      "sourceUrl": "https://x.com/TruthGundlach/status/183562002",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#FedRates",
+        "#Macro"
+      ],
+      "matchedKeywords": [
+        "fed",
+        "rates",
+        "treasury",
+        "yield",
+        "yield curve",
+        "inversion",
+        "spread",
+        "gdp",
+        "soft landing"
+      ]
+    },
+    {
+      "id": "x_post_3",
+      "authorHandle": "KobeissiLetter",
+      "authorName": "The Kobeissi Letter",
+      "authorAvatar": "https://unavatar.io/x/KobeissiLetter",
+      "authorBio": "全球领先宏观资本市场前瞻要闻 | 标普500、通胀与利率",
+      "authorCategory": "Global Macro News",
+      "text": "BREAKING: US Headline CPI rises +2.5% YoY, the lowest since February 2021. Meanwhile, Core Services ex-housing continues to decelerate. Markets are now pricing in a 100% chance of a rate cut at the upcoming FOMC meeting, with a 38% probability of a 50 bps cut. The Fed is officially shifting its mandate from fighting inflation to preserving employment.",
+      "timestamp": 1789634388936,
+      "createdAt": "2026-09-17T08:39:48.936Z",
+      "hoursAgo": 8,
+      "likes": 8910,
+      "retweets": 2150,
+      "sourceUrl": "https://x.com/KobeissiLetter/status/183563003",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#FedRates",
+        "#Macro"
+      ],
+      "matchedKeywords": [
+        "fed",
+        "fomc",
+        "rate cut",
+        "inflation",
+        "cpi",
+        "employment"
+      ]
+    },
+    {
+      "id": "x_post_4",
+      "authorHandle": "laevitas1",
+      "authorName": "Laevitas.ch",
+      "authorAvatar": "https://unavatar.io/x/laevitas1",
+      "authorBio": "领先的加密期权与衍生品量化研报平台 | Deribit 数据全景",
+      "authorCategory": "Crypto Options",
+      "text": "Deribit BTC Options Microstructure Update:\n• 25-Delta Skew for 30D expiries pushed deeper into positive territory (+3.8%), indicating heightened demand for Out-Of-The-Money Calls.\n• Major Call Wall firmly established at $75,000 with >$1.8B Notional OI.\n• Implied Volatility (DVOL) holding at 54.2% while 30D Basis annualized rate sits at 8.9%. Institutional desks are actively executing basis trades.",
+      "timestamp": 1789621788936,
+      "createdAt": "2026-09-17T05:09:48.936Z",
+      "hoursAgo": 11.5,
+      "likes": 640,
+      "retweets": 180,
+      "sourceUrl": "https://x.com/laevitas1/status/183564004",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "btc",
+        "deribit",
+        "options",
+        "volatility",
+        "dvol",
+        "delta",
+        "basis"
+      ]
+    },
+    {
+      "id": "x_post_5",
+      "authorHandle": "robin_j_brooks",
+      "authorName": "Robin Brooks",
+      "authorAvatar": "https://unavatar.io/x/robin_j_brooks",
+      "authorBio": "Brookings 资深研究员 | 前 IIF 首席经济学家、前高盛外汇主管",
+      "authorCategory": "Global FX & Macro",
+      "text": "The global monetary cycle is approaching a critical divergence. While the Federal Reserve begins monetary easing, central bank reserve managers are structurally diversifying foreign exchange holdings away from standard G7 sovereign debt into physical gold and decentralized collateral like Bitcoin. Global balance sheet adjustments take years to play out.",
+      "timestamp": 1789605588936,
+      "createdAt": "2026-09-17T00:39:48.936Z",
+      "hoursAgo": 16,
+      "likes": 2180,
+      "retweets": 540,
+      "sourceUrl": "https://x.com/robin_j_brooks/status/183565005",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#US_Equities",
+        "#Gold",
+        "#FX",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "bitcoin",
+        "fed",
+        "federal reserve",
+        "balance sheet",
+        "rally",
+        "gold",
+        "central bank"
+      ]
+    },
+    {
+      "id": "x_post_6",
+      "authorHandle": "CRUDEOIL231",
+      "authorName": "Crude Oil Insight",
+      "authorAvatar": "https://unavatar.io/x/CRUDEOIL231",
+      "authorBio": "大宗商品与原油高级策略师 | WTI/布伦特能源微观供需",
+      "authorCategory": "Crude Oil & Energy",
+      "text": "WTI Crude Oil Technical & Fundamental Outlook: Tight physical prompt spreads in Cushing continue to contrast with weak downstream refinery margins in Europe and Asia. OPEC+ extending voluntary supply cuts of 2.2M bpd creates a floor at $70, but upside momentum is capped unless Chinese industrial demand surprises to the upside.",
+      "timestamp": 1789583988936,
+      "createdAt": "2026-09-16T18:39:48.936Z",
+      "hoursAgo": 22,
+      "likes": 410,
+      "retweets": 95,
+      "sourceUrl": "https://x.com/CRUDEOIL231/status/183566006",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#FedRates",
+        "#Macro",
+        "#CrudeOil",
+        "#FX"
+      ],
+      "matchedKeywords": [
+        "spread",
+        "oil",
+        "crude",
+        "wti",
+        "opec",
+        "eur"
+      ]
+    },
+    {
+      "id": "x_post_7",
+      "authorHandle": "JobberTheGuru",
+      "authorName": "Jobber",
+      "authorAvatar": "https://unavatar.io/x/JobberTheGuru",
+      "authorBio": "宏观量化交易员 | 利率衍生品 & 跨资产套利",
+      "authorCategory": "Macro & Quant",
+      "text": "Net Liquidity (WALCL - TGA - RRP) saw a modest injection of +$14B this week as Treasury General Account balances normalized post-tax date. Notice how tightly Bitcoin spot has tracked net liquidity fluctuations over the past 12 months. When systemic dollar liquidity expands, high-beta monetary assets lead equity indices by 2 to 3 weeks.",
+      "timestamp": 1789558788936,
+      "createdAt": "2026-09-16T11:39:48.936Z",
+      "hoursAgo": 29,
+      "likes": 1530,
+      "retweets": 380,
+      "sourceUrl": "https://x.com/JobberTheGuru/status/183567007",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#FX"
+      ],
+      "matchedKeywords": [
+        "bitcoin",
+        "treasury",
+        "liquidity",
+        "net liquidity",
+        "walcl",
+        "tga",
+        "rrp",
+        "dollar"
+      ]
+    },
+    {
+      "id": "x_post_8",
+      "authorHandle": "oyoovi",
+      "authorName": "Oyoovi Quant",
+      "authorAvatar": "https://unavatar.io/x/oyoovi",
+      "authorBio": "加密量化与链上衍生品 | 资金费率 & 波动率",
+      "authorCategory": "Crypto Derivatives",
+      "text": "On-chain derivatives flow: Coinbase Pro cumulative volume delta (CVD) shows persistent institutional spot absorption during Asian trading hours, while Binance perp funding rates remain neutral at +0.005%. This lack of speculative retail leverage indicates an organic spot-driven market structure rather than a crowded long liquidation squeeze.",
+      "timestamp": 1789526388936,
+      "createdAt": "2026-09-16T02:39:48.936Z",
+      "hoursAgo": 38,
+      "likes": 720,
+      "retweets": 165,
+      "sourceUrl": "https://x.com/oyoovi/status/183568008",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "binance",
+        "coinbase",
+        "on-chain",
+        "perp",
+        "delta",
+        "funding rate",
+        "liquidation",
+        "rates"
+      ]
+    },
+    {
+      "id": "x_post_9",
+      "authorHandle": "riversidepark01",
+      "authorName": "Riverside 研投",
+      "authorAvatar": "https://unavatar.io/x/riversidepark01",
+      "authorBio": "宏观策略与美股微观结构 | 科技股财报与流动性溢价",
+      "authorCategory": "Macro Equities",
+      "text": "S&P 500 Forward P/E multiple is trading at 21.4x, sitting near the 90th percentile of its 20-year range. Market breadth has slightly improved beyond the Mega-cap tech names, but corporate earnings guidance for Q4 will be the real litmus test for whether valuation multiples can sustain amidst easing Fed policy and wage cooling.",
+      "timestamp": 1789483188936,
+      "createdAt": "2026-09-15T14:39:48.936Z",
+      "hoursAgo": 50,
+      "likes": 890,
+      "retweets": 210,
+      "sourceUrl": "https://x.com/riversidepark01/status/183569009",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#US_Equities"
+      ],
+      "matchedKeywords": [
+        "eth",
+        "fed",
+        "s&p",
+        "s&p 500",
+        "earnings",
+        "valuation"
+      ]
+    },
+    {
+      "id": "x_post_10",
+      "authorHandle": "_D_Y_A_N",
+      "authorName": "Dyan Macro",
+      "authorAvatar": "https://unavatar.io/x/_D_Y_A_N",
+      "authorBio": "宏观与加密资产跨周期策略 | 链上流动性与周期拐点",
+      "authorCategory": "Macro & Crypto",
+      "text": "MicroStrategy holding 244,800 BTC at an average cost basis of ~$38,585 provides a massive institutional bedrock. With MNAV trading at a 1.6x premium to treasury NAV, the convertible bond issuance loop continues to extract fiat yield to acquire hard decentralized assets. A textbook macro carry strategy leveraging equity market duration.",
+      "timestamp": 1789429188936,
+      "createdAt": "2026-09-14T23:39:48.936Z",
+      "hoursAgo": 65,
+      "likes": 1820,
+      "retweets": 470,
+      "sourceUrl": "https://x.com/_D_Y_A_N/status/183570010",
+      "isFinancial": true,
+      "relevanceScore": 100,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "btc",
+        "basis",
+        "microstrategy",
+        "treasury",
+        "yield",
+        "duration",
+        "bond"
+      ]
+    },
+    {
+      "id": "x_post_11",
+      "authorHandle": "HUd7iC57fj04GLi",
+      "authorName": "宏观流动性观察",
+      "authorAvatar": "https://unavatar.io/x/HUd7iC57fj04GLi",
+      "authorBio": "全球流动性微观管道 | 离岸美元 & 资产负债表",
+      "authorCategory": "Macro Liquidity",
+      "text": "美联储隔夜逆回购（Overnight RRP）规模已回落至 2800 亿美元区间。此前吸纳海量美债发行的蓄水池即将告罄。未来几个月若财政部继续大规模净发行短期国债，将直接开始消耗商业银行存放在美联储的准备金（Reserves），届时银行间资金面与回购利率将面临真正考验。",
+      "timestamp": 1789357188936,
+      "createdAt": "2026-09-14T03:39:48.936Z",
+      "hoursAgo": 85,
+      "likes": 950,
+      "retweets": 290,
+      "sourceUrl": "https://x.com/HUd7iC57fj04GLi/status/183571011",
+      "isFinancial": true,
+      "relevanceScore": 74,
+      "tags": [
+        "#FedRates",
+        "#Macro"
+      ],
+      "matchedKeywords": [
+        "rrp",
+        "美联储",
+        "国债"
+      ]
+    },
+    {
+      "id": "x_post_12",
+      "authorHandle": "fupenglondon",
+      "authorName": "付鹏",
+      "authorAvatar": "https://unavatar.io/x/fupenglondon",
+      "authorBio": "东北证券首席经济学家 | 全球宏观大类资产配置与流动性循环",
+      "authorCategory": "Macro Allocation",
+      "text": "很多人问为什么黄金屡创历史新高而商品原油却在震荡？核心在于“信用锚”与“生产力锚”的分野。黄金代表的是对主权信用货币长期购买力贬值的对冲，而原油受制于实体经济产出与制造业周期的现实约束。BTC 作为数字形态的硬通货，其长期估值模型与黄金正在发生日益深度的协同共振。",
+      "timestamp": 1789285188936,
+      "createdAt": "2026-09-13T07:39:48.936Z",
+      "hoursAgo": 105,
+      "likes": 3110,
+      "retweets": 920,
+      "sourceUrl": "https://x.com/fupenglondon/status/183572012",
+      "isFinancial": true,
+      "relevanceScore": 92,
+      "tags": [
+        "#Crypto",
+        "#US_Equities",
+        "#Macro",
+        "#CrudeOil",
+        "#Gold"
+      ],
+      "matchedKeywords": [
+        "btc",
+        "估值",
+        "原油",
+        "黄金"
+      ]
+    },
+    {
+      "id": "x_post_13",
+      "authorHandle": "TruthGundlach",
+      "authorName": "Jeffrey Gundlach",
+      "authorAvatar": "https://unavatar.io/x/TruthGundlach",
+      "authorBio": "DoubleLine Capital 创始人 | \"新债王\" 美债与宏观前瞻",
+      "authorCategory": "Fed & Fixed Income",
+      "text": "If the Fed initiates a 50 bps cut while core inflation remains above their 2.0% target, it signals either internal alarm regarding the labor market or political accommodation. Either way, long-term yields may not decline as much as short-term yields, causing an aggressive steepener trade across the sovereign curve.",
+      "timestamp": 1789213188936,
+      "createdAt": "2026-09-12T11:39:48.936Z",
+      "hoursAgo": 125,
+      "likes": 4120,
+      "retweets": 1100,
+      "sourceUrl": "https://x.com/TruthGundlach/status/183573013",
+      "isFinancial": true,
+      "relevanceScore": 74,
+      "tags": [
+        "#FedRates",
+        "#Macro",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "fed",
+        "yield",
+        "inflation"
+      ]
+    },
+    {
+      "id": "x_post_14",
+      "authorHandle": "laevitas1",
+      "authorName": "Laevitas.ch",
+      "authorAvatar": "https://unavatar.io/x/laevitas1",
+      "authorBio": "领先的加密期权与衍生品量化研报平台 | Deribit 数据全景",
+      "authorCategory": "Crypto Options",
+      "text": "Bitcoin 7D vs 30D Volatility Term Structure has flipped back to Contango. Short-dated IV dropped 4.5 vols to 49.8%, indicating post-event volatility crush. Institutional block trades show heavy Put Overwriting (selling OTM Puts to finance Call spreads) into October expiry.",
+      "timestamp": 1789141188936,
+      "createdAt": "2026-09-11T15:39:48.936Z",
+      "hoursAgo": 145,
+      "likes": 510,
+      "retweets": 130,
+      "sourceUrl": "https://x.com/laevitas1/status/183574014",
+      "isFinancial": true,
+      "relevanceScore": 74,
+      "tags": [
+        "#Crypto",
+        "#FedRates",
+        "#Macro",
+        "#Derivatives"
+      ],
+      "matchedKeywords": [
+        "bitcoin",
+        "volatility",
+        "spread"
+      ]
+    }
+  ]
+}

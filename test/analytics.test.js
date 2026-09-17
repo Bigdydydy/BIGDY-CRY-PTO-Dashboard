@@ -519,4 +519,185 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
   });
 });
 
+describe('Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Engine', () => {
+  const {
+    WHITELIST_HANDLES,
+    evaluateFinancialRelevance,
+    filterWithin7Days,
+    filterAndSanitizePosts,
+    getXPulseData
+  } = require('../server/x_pulse_fetcher');
+
+  const { askGeminiCopilot } = require('../server/gemini_service');
+
+  const EXPECTED_11_HANDLES = [
+    'JobberTheGuru',
+    'HUd7iC57fj04GLi',
+    'oyoovi',
+    'TruthGundlach',
+    'robin_j_brooks',
+    'riversidepark01',
+    'KobeissiLetter',
+    'CRUDEOIL231',
+    'fupenglondon',
+    'laevitas1',
+    '_D_Y_A_N'
+  ];
+
+  test('Whitelist strictly contains all 11 user-specified accounts', () => {
+    assert.equal(WHITELIST_HANDLES.length, 11);
+    EXPECTED_11_HANDLES.forEach(handle => {
+      assert.ok(WHITELIST_HANDLES.includes(handle), `Whitelist must include ${handle}`);
+    });
+  });
+
+  test('Financial & Crypto Classifier accurately identifies financial content', () => {
+    // 1. Chinese Macro & Rates
+    const p1 = evaluateFinancialRelevance('近期中东局势推升布伦特原油突破 85 美元，但美债收益率并没有同步走强，流动性管道分化。');
+    assert.equal(p1.isFinancial, true);
+    assert.ok(p1.relevanceScore >= 35);
+    assert.ok(p1.tags.includes('#Macro'));
+
+    // 2. English Fed & CPI
+    const p2 = evaluateFinancialRelevance('US Headline CPI rises +2.5% YoY. FOMC rate cut probability is now 100% with high chance of 50 bps.');
+    assert.equal(p2.isFinancial, true);
+    assert.ok(p2.relevanceScore >= 35);
+    assert.ok(p2.tags.includes('#FedRates'));
+
+    // 3. Crypto & Derivatives
+    const p3 = evaluateFinancialRelevance('Deribit BTC options 25-Delta skew moved higher to +3.8%, DVOL holds at 54% and spot basis is 8.5%.');
+    assert.equal(p3.isFinancial, true);
+    assert.ok(p3.tags.includes('#Crypto'));
+    assert.ok(p3.tags.includes('#Derivatives'));
+  });
+
+  test('Financial & Crypto Classifier strictly rejects non-financial casual noise', () => {
+    // Casual dinner / birthday / pets / movie
+    const noise1 = evaluateFinancialRelevance('Had a delicious dinner with friends tonight! Happy birthday to my lovely sister.');
+    assert.equal(noise1.isFinancial, false);
+    assert.equal(noise1.relevanceScore, 0);
+
+    const noise2 = evaluateFinancialRelevance('Check out my cute puppy playing in the sunshine during this weekend trip!');
+    assert.equal(noise2.isFinancial, false);
+
+    const noise3 = evaluateFinancialRelevance('今天和朋友去电影院看了新上映的科幻大片，剧情非常精彩，打卡一家新咖啡！');
+    assert.equal(noise3.isFinancial, false);
+
+    const noise4 = evaluateFinancialRelevance('');
+    assert.equal(noise4.isFinancial, false);
+  });
+
+  test('filterWithin7Days strictly enforces the <= 7 days time constraint', () => {
+    const now = Date.now();
+    const mockPosts = [
+      { id: 'p1', timestamp: now - 1 * 3600 * 1000 }, // 1 hour ago
+      { id: 'p2', timestamp: now - 3 * 86400 * 1000 }, // 3 days ago
+      { id: 'p3', timestamp: now - 6.9 * 86400 * 1000 }, // 6.9 days ago (valid)
+      { id: 'p4', timestamp: now - 7.5 * 86400 * 1000 }, // 7.5 days ago (expired)
+      { id: 'p5', timestamp: now - 15 * 86400 * 1000 } // 15 days ago (expired)
+    ];
+
+    const validPosts = filterWithin7Days(mockPosts, now);
+    assert.equal(validPosts.length, 3);
+    const validIds = validPosts.map(p => p.id);
+    assert.deepEqual(validIds, ['p1', 'p2', 'p3']);
+  });
+
+  test('getXPulseData returns sanitized 7-day feed with 100% whitelist integrity', () => {
+    const data = getXPulseData();
+    assert.ok(data);
+    assert.ok(Array.isArray(data.posts));
+    assert.ok(data.posts.length >= 10, 'Feed should have sufficient seed posts');
+
+    const now = Date.now();
+    data.posts.forEach(post => {
+      // Whitelist assertion
+      assert.ok(WHITELIST_HANDLES.includes(post.authorHandle), `Post author ${post.authorHandle} must be in whitelist`);
+      // 7-day assertion
+      const ageMs = now - post.timestamp;
+      assert.ok(ageMs >= 0 && ageMs <= 7 * 86400 * 1000, `Post ${post.id} must be within 7 days`);
+      // Financial assertion
+      assert.equal(post.isFinancial, true, `Post ${post.id} must be strictly financial`);
+      assert.ok(post.relevanceScore >= 35);
+      assert.ok(post.tags && post.tags.length > 0);
+    });
+  });
+
+  test('Gemini Copilot generates institutional analysis across all prompt presets', async () => {
+    const samplePost = {
+      id: 'test_p1',
+      authorName: '付鹏',
+      authorHandle: 'fupenglondon',
+      text: '从大类资产定价模型来看，近期中东局势推升布伦特原油突破 85 美元，但 10 年期美债收益率与美元指数并没有同步走强。',
+      tags: ['#Macro', '#CrudeOil']
+    };
+
+    // 1. Macro logic
+    const res1 = await askGeminiCopilot({ post: samplePost, promptType: 'macro_logic' });
+    assert.ok(res1.ok);
+    assert.ok(res1.analysis.includes('宏观逻辑穿透'));
+    assert.ok(res1.analysis.includes('付鹏'));
+
+    // 2. Crypto impact
+    const res2 = await askGeminiCopilot({ post: samplePost, promptType: 'crypto_impact' });
+    assert.ok(res2.ok);
+    assert.ok(res2.analysis.includes('BTC'));
+
+    // 3. Trading implication
+    const res3 = await askGeminiCopilot({ post: samplePost, promptType: 'trading_implication' });
+    assert.ok(res3.ok);
+    assert.ok(res3.analysis.includes('多空'));
+
+    // 4. Falsification risk
+    const res4 = await askGeminiCopilot({ post: samplePost, promptType: 'falsification_risk' });
+    assert.ok(res4.ok);
+    assert.ok(res4.analysis.includes('证伪'));
+
+    // 5. Custom follow-up question
+    const res5 = await askGeminiCopilot({ post: samplePost, promptType: 'custom', customQuestion: '这会对纳斯达克开盘产生多大冲击？' });
+    assert.ok(res5.ok);
+    assert.ok(res5.analysis.includes('纳斯达克'));
+  });
+
+  test('HTTP endpoints: GET /api/x-pulse and POST /api/ask-gemini work as expected', async () => {
+    const { server } = require('../server/index');
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', async () => {
+        const port = server.address().port;
+        try {
+          // 1. GET /api/x-pulse
+          const feedResp = await fetch(`http://127.0.0.1:${port}/api/x-pulse`);
+          assert.equal(feedResp.status, 200);
+          const feedJson = await feedResp.json();
+          assert.equal(feedJson.code, 0);
+          assert.ok(Array.isArray(feedJson.posts));
+          assert.ok(feedJson.posts.length > 0);
+          assert.ok(feedJson.authors);
+
+          const firstPost = feedJson.posts[0];
+
+          // 2. POST /api/ask-gemini
+          const geminiResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: firstPost.id,
+              promptType: 'macro_logic'
+            })
+          });
+
+          assert.equal(geminiResp.status, 200);
+          const geminiJson = await geminiResp.json();
+          assert.equal(geminiJson.code, 0);
+          assert.ok(geminiJson.analysis);
+          assert.ok(geminiJson.model);
+        } finally {
+          server.close(resolve);
+        }
+      });
+    });
+  });
+});
+
+
 

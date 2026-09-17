@@ -10,13 +10,13 @@
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 76696,
-    "goldPrice": 4363.92,
-    "btcGoldRatio": 17.57,
-    "goldBtcRatio": 0.0569,
-    "ratioChange24h": -1.4,
-    "marketCapShare": 8.21,
-    "rollingCorr30d": 0.713,
+    "btcPrice": 76632,
+    "goldPrice": 4358.56,
+    "btcGoldRatio": 17.58,
+    "goldBtcRatio": 0.05688,
+    "ratioChange24h": -1.35,
+    "marketCapShare": 8.2,
+    "rollingCorr30d": 0.714,
     "timestamp": 1789603200000,
     "date": "2026-09-17"
   },
@@ -10026,12 +10026,12 @@
     {
       "date": "2026-09-17",
       "timestamp": 1789603200000,
-      "btcPrice": 76696,
-      "goldPrice": 4363.92,
-      "btcGoldRatio": 17.57,
-      "goldBtcRatio": 0.0569,
-      "marketCapShare": 8.21,
-      "rollingCorr30d": 0.713
+      "btcPrice": 76632,
+      "goldPrice": 4358.56,
+      "btcGoldRatio": 17.58,
+      "goldBtcRatio": 0.05688,
+      "marketCapShare": 8.2,
+      "rollingCorr30d": 0.714
     }
   ]
 }

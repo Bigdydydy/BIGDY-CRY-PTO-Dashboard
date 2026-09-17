@@ -3272,6 +3272,7 @@ const VIEW_TITLES = {
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
+  'view-x-pulse': '社群情报与 Gemini 智囊',
   'view-all': '全模块平铺画卷'
 };
 
@@ -3368,6 +3369,10 @@ function switchView(viewId, updateHash = true) {
       goldChartInstance.resize();
     } else if (rawGoldData && (viewId === 'view-gold-correlation' || viewId === 'view-all')) {
       renderGoldChart();
+    }
+
+    if (viewId === 'view-x-pulse' || viewId === 'view-all') {
+      if (!rawXPulseData) fetchXPulseData(false);
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -3837,6 +3842,510 @@ function initGoldCorrelationEvents() {
 }
 
 // ============================================================================
+// Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Controller
+// ============================================================================
+
+let rawXPulseData = null;
+let currentActivePostId = null;
+let currentAuthorFilter = 'all';
+let currentTagFilter = 'all';
+let currentSearchQuery = '';
+let currentCopilotPrompt = 'macro_logic';
+let isCopilotThinking = false;
+let xPulseEtag = null;
+
+// DOM Elements for Module 8
+const elXPulseCount = document.getElementById('x-pulse-count');
+const elXAuthorSelect = document.getElementById('x-author-select');
+const elXFeedSearch = document.getElementById('x-feed-search');
+const elXTagStrip = document.getElementById('x-tag-strip');
+const elXPostsStream = document.getElementById('x-posts-stream');
+const btnRefreshXPulse = document.getElementById('btn-refresh-x-pulse');
+
+const elCopilotStatusBadge = document.getElementById('copilot-status-badge');
+const elCopilotStatusLabel = document.getElementById('copilot-status-label');
+const elCopilotCtxAuthor = document.getElementById('copilot-ctx-author');
+const elCopilotCtxTime = document.getElementById('copilot-ctx-time');
+const elCopilotCtxSnippet = document.getElementById('copilot-ctx-snippet');
+const elCopilotPromptsButtons = document.getElementById('copilot-prompts-buttons');
+const elCopilotReportContent = document.getElementById('copilot-report-content');
+const elCopilotCustomInput = document.getElementById('copilot-custom-input');
+const btnCopilotSubmit = document.getElementById('btn-copilot-submit');
+const elCopilotEngineSource = document.getElementById('copilot-engine-source');
+const elCopilotLatencyBadge = document.getElementById('copilot-latency-badge');
+
+const geminiKeyModal = document.getElementById('gemini-key-modal-backdrop');
+const btnOpenGeminiModal = document.getElementById('btn-open-gemini-modal');
+const btnCloseGeminiModal = document.getElementById('btn-close-gemini-modal');
+const inputGeminiApiKey = document.getElementById('input-gemini-api-key');
+const btnSaveGeminiKey = document.getElementById('btn-save-gemini-key');
+const btnClearGeminiKey = document.getElementById('btn-clear-gemini-key');
+
+/**
+ * Format relative time in Chinese
+ */
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return '--';
+  const diffMs = Date.now() - timestamp;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  if (diffHours < 24) return `${diffHours}小时前`;
+  if (diffDays === 1) return '昨天';
+  return `${diffDays}天前`;
+}
+
+/**
+ * Safe client-side markdown renderer for Gemini reports
+ */
+function renderMarkdownText(mdText) {
+  if (!mdText) return '';
+  let html = escapeHtml(mdText);
+
+  // Headers (### Header -> <h3>Header</h3>)
+  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+  html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+
+  // Bold (**text** -> <strong>text</strong>)
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Italic (*text* -> <em>$1</em>)
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  // Blockquotes (> text -> <blockquote>text</blockquote>)
+  html = html.replace(/^\&gt; (.*$)/gim, '<blockquote>$1</blockquote>');
+
+  // Unordered Lists (- item -> <li>item</li>)
+  html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+  // Code snippets (`code` -> <code>code</code>)
+  html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+
+  // Line breaks
+  html = html.replace(/\n\n/g, '<br/><br/>');
+
+  return html;
+}
+
+/**
+ * Fetch 7-day filtered X-Pulse feed
+ */
+async function fetchXPulseData(force = false) {
+  try {
+    const headers = {};
+    if (!force && xPulseEtag) {
+      headers['If-None-Match'] = xPulseEtag;
+    }
+
+    const resp = await fetch('/api/x-pulse', { headers });
+    if (resp.status === 304 && rawXPulseData) {
+      renderXPulseFeed();
+      return;
+    }
+
+    if (resp.ok) {
+      const etag = resp.headers.get('ETag');
+      if (etag) xPulseEtag = etag;
+
+      const data = await resp.json();
+      if (data && data.code === 0) {
+        rawXPulseData = data;
+        populateAuthorSelect(data.authors);
+        if (elXPulseCount) {
+          elXPulseCount.textContent = data.posts ? data.posts.length : 0;
+        }
+        renderXPulseFeed();
+      }
+    }
+  } catch (err) {
+    console.error('[XPulse] Error fetching feed:', err);
+  }
+}
+
+/**
+ * Populate author dropdown
+ */
+function populateAuthorSelect(authors) {
+  if (!elXAuthorSelect || !authors || elXAuthorSelect.options.length > 1) return;
+  Object.values(authors).forEach(author => {
+    const opt = document.createElement('option');
+    opt.value = author.handle;
+    opt.textContent = `${author.name} (@${author.handle})`;
+    elXAuthorSelect.appendChild(opt);
+  });
+}
+
+/**
+ * Render Post stream based on current filters
+ */
+function renderXPulseFeed() {
+  if (!elXPostsStream || !rawXPulseData || !rawXPulseData.posts) return;
+
+  const posts = rawXPulseData.posts;
+  let filtered = posts.filter(post => {
+    if (currentAuthorFilter !== 'all' && post.authorHandle !== currentAuthorFilter) {
+      return false;
+    }
+    if (currentTagFilter !== 'all' && (!post.tags || !post.tags.includes(currentTagFilter))) {
+      return false;
+    }
+    if (currentSearchQuery) {
+      const query = currentSearchQuery.toLowerCase();
+      const matchText = (post.text || '').toLowerCase().includes(query);
+      const matchAuthor = (post.authorName || '').toLowerCase().includes(query) || (post.authorHandle || '').toLowerCase().includes(query);
+      if (!matchText && !matchAuthor) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    elXPostsStream.innerHTML = `
+      <div class="x-feed-empty" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
+        <p style="font-size: 0.85rem;">未找到匹配条件的 7 天内金融/加密推文</p>
+        <p style="font-size: 0.72rem; margin-top: 4px;">当前已过滤非金融讨论，请尝试调整筛选标签或博主</p>
+      </div>
+    `;
+    return;
+  }
+
+  // If no post is active yet, activate first one
+  if (!currentActivePostId && filtered.length > 0) {
+    selectPostForCopilot(filtered[0].id, false);
+  }
+
+  const html = filtered.map(post => {
+    const isActive = post.id === currentActivePostId;
+    const relTime = formatRelativeTime(post.timestamp);
+
+    // Highlight keywords in text
+    let highlightedText = escapeHtml(post.text);
+    if (Array.isArray(post.matchedKeywords)) {
+      post.matchedKeywords.forEach(kw => {
+        if (kw && kw.length >= 2) {
+          const regex = new RegExp(`(${kw})`, 'gi');
+          highlightedText = highlightedText.replace(regex, '<span class="kw-highlight">$1</span>');
+        }
+      });
+    }
+
+    // Build tags badges
+    const tagsHtml = (post.tags || []).map(t => {
+      let tagClass = 'x-ftag';
+      if (t === '#Macro') tagClass += ' tag-macro';
+      else if (t === '#Crypto') tagClass += ' tag-crypto';
+      else if (t === '#FedRates') tagClass += ' tag-fedrates';
+      else if (t === '#Derivatives') tagClass += ' tag-derivatives';
+      else if (t === '#CrudeOil') tagClass += ' tag-crudeoil';
+      return `<span class="${tagClass}">${escapeHtml(t)}</span>`;
+    }).join(' ');
+
+    return `
+      <div class="x-post-card ${isActive ? 'active' : ''}" data-post-id="${escapeHtml(post.id)}">
+        <div class="x-post-header">
+          <img class="x-author-avatar" src="${escapeHtml(post.authorAvatar)}" alt="${escapeHtml(post.authorName)}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'36\\' height=\\'36\\' viewBox=\\'0 0 24 24\\'><circle cx=\\'12\\' cy=\\'12\\' r=\\'12\\' fill=\\'%23334155\\'/><text x=\\'12\\' y=\\'16\\' font-size=\\'12\\' text-anchor=\\'middle\\' fill=\\'%23cbd5e1\\'>X</text></svg>'" />
+          <div class="x-post-author-meta">
+            <div class="x-author-line">
+              <span class="x-author-name">${escapeHtml(post.authorName)}</span>
+              <span class="x-verified-badge" title="已验证认证博主">✓</span>
+              <span class="x-author-handle">@${escapeHtml(post.authorHandle)}</span>
+            </div>
+            <span class="x-author-role-tag">${escapeHtml(post.authorBio || post.authorCategory || '')}</span>
+          </div>
+          <div class="x-post-time">⏱ ${relTime}</div>
+        </div>
+
+        <div class="x-post-text">${highlightedText}</div>
+
+        <div class="x-post-footer">
+          <div class="x-post-tags">
+            ${tagsHtml}
+            <span class="x-ftag" style="color: #34d399; background: rgba(16, 185, 129, 0.1);" title="金融/加密相关性置信度得分">
+              相关度: ${post.relevanceScore || 90}%
+            </span>
+          </div>
+          <div class="x-post-actions">
+            <button class="btn-ask-gemini" data-post-id="${escapeHtml(post.id)}" title="在右侧 Gemini 视窗就地穿透解析此推文">
+              <span>⚡ 问问 Gemini</span>
+            </button>
+            <a href="${escapeHtml(post.sourceUrl || '#')}" target="_blank" rel="noopener noreferrer" class="btn-x-source" title="查看原始 X 推文">
+              <span>↗ 原推</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  elXPostsStream.innerHTML = html;
+}
+
+/**
+ * Select a post as active context for Gemini Copilot
+ */
+function selectPostForCopilot(postId, autoTrigger = true) {
+  currentActivePostId = postId;
+  if (!rawXPulseData || !rawXPulseData.posts) return;
+
+  const post = rawXPulseData.posts.find(p => p.id === postId);
+  if (!post) return;
+
+  // Update active class in DOM
+  if (elXPostsStream) {
+    elXPostsStream.querySelectorAll('.x-post-card').forEach(card => {
+      card.classList.toggle('active', card.dataset.postId === postId);
+    });
+  }
+
+  // Update context strip
+  if (elCopilotCtxAuthor) elCopilotCtxAuthor.textContent = `${post.authorName} (@${post.authorHandle})`;
+  if (elCopilotCtxTime) elCopilotCtxTime.textContent = formatRelativeTime(post.timestamp);
+  if (elCopilotCtxSnippet) elCopilotCtxSnippet.textContent = post.text;
+
+  if (autoTrigger) {
+    runGeminiAnalysis(currentCopilotPrompt);
+  }
+}
+
+/**
+ * Run Gemini Quantitative Analysis
+ */
+async function runGeminiAnalysis(promptType = 'macro_logic', customQuestion = '') {
+  if (isCopilotThinking) return;
+
+  if (!rawXPulseData || !rawXPulseData.posts || rawXPulseData.posts.length === 0) {
+    return;
+  }
+
+  let post = rawXPulseData.posts.find(p => p.id === currentActivePostId);
+  if (!post) {
+    post = rawXPulseData.posts[0];
+    currentActivePostId = post.id;
+  }
+
+  isCopilotThinking = true;
+  if (elCopilotStatusBadge) elCopilotStatusBadge.classList.add('thinking');
+  if (elCopilotStatusLabel) elCopilotStatusLabel.textContent = '思考穿透中...';
+
+  // Show skeleton loading in report container
+  if (elCopilotReportContent) {
+    elCopilotReportContent.innerHTML = `
+      <div style="padding: 24px 8px; text-align: center;">
+        <span class="sync-pulse-dot" style="display: inline-block; width: 10px; height: 10px; margin-bottom: 12px;"></span>
+        <div style="font-size: 0.82rem; color: #c7d2fe; margin-bottom: 6px;">
+          Gemini 正在针对 <strong>${escapeHtml(post.authorName)}</strong> 的观点进行宏观量化穿透...
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted);">
+          正在对齐美债收益率、Deribit IV 波动率曲面与流动性传导微观管道...
+        </div>
+      </div>
+    `;
+  }
+
+  try {
+    const savedApiKey = localStorage.getItem('gemini_api_key') || null;
+
+    const resp = await fetch('/api/ask-gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postId: post.id,
+        post,
+        promptType,
+        customQuestion,
+        apiKey: savedApiKey
+      })
+    });
+
+    const result = await resp.json();
+    if (result && result.code === 0 && result.analysis) {
+      if (elCopilotReportContent) {
+        elCopilotReportContent.innerHTML = renderMarkdownText(result.analysis);
+      }
+      if (elCopilotEngineSource) {
+        elCopilotEngineSource.textContent = result.source === 'gemini-api'
+          ? `✦ 模式: ${result.model} (API 实时接入)`
+          : `⚡ 模式: ${result.model} (高精度量化引擎)`;
+      }
+      if (elCopilotLatencyBadge) {
+        elCopilotLatencyBadge.textContent = `耗时: ${result.latencyMs || 120}ms`;
+      }
+    } else {
+      if (elCopilotReportContent) {
+        elCopilotReportContent.innerHTML = `
+          <div style="color: #f87171; padding: 16px;">
+            分析生成受阻: ${escapeHtml(result.error || '未知错误')}
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    console.error('[Gemini] Request failed:', err);
+    if (elCopilotReportContent) {
+      elCopilotReportContent.innerHTML = `
+        <div style="color: #f87171; padding: 16px;">
+          请求发生网络异常: ${escapeHtml(err.message)}
+        </div>
+      `;
+    }
+  } finally {
+    isCopilotThinking = false;
+    if (elCopilotStatusBadge) elCopilotStatusBadge.classList.remove('thinking');
+    if (elCopilotStatusLabel) elCopilotStatusLabel.textContent = '就绪';
+  }
+}
+
+/**
+ * Initialize Module 8 Event Listeners
+ */
+function initXPulseEvents() {
+  // Author filter select
+  if (elXAuthorSelect) {
+    elXAuthorSelect.addEventListener('change', () => {
+      currentAuthorFilter = elXAuthorSelect.value;
+      renderXPulseFeed();
+    });
+  }
+
+  // Tag filter pills
+  if (elXTagStrip) {
+    elXTagStrip.addEventListener('click', e => {
+      const btn = e.target.closest('.x-tag-pill');
+      if (!btn) return;
+      elXTagStrip.querySelectorAll('.x-tag-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTagFilter = btn.dataset.tag;
+      renderXPulseFeed();
+    });
+  }
+
+  // Search input with debounce
+  if (elXFeedSearch) {
+    let debounceTimer = null;
+    elXFeedSearch.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        currentSearchQuery = elXFeedSearch.value.trim();
+        renderXPulseFeed();
+      }, 200);
+    });
+  }
+
+  // Refresh feed button
+  if (btnRefreshXPulse) {
+    btnRefreshXPulse.addEventListener('click', () => {
+      fetchXPulseData(true);
+      showToast('正在更新 7 天内金融推文流...');
+    });
+  }
+
+  // Post Card Click & Ask Gemini button delegate
+  if (elXPostsStream) {
+    elXPostsStream.addEventListener('click', e => {
+      const askBtn = e.target.closest('.btn-ask-gemini');
+      const card = e.target.closest('.x-post-card');
+
+      if (askBtn) {
+        e.stopPropagation();
+        const postId = askBtn.dataset.postId;
+        selectPostForCopilot(postId, true);
+        return;
+      }
+
+      if (card) {
+        const postId = card.dataset.postId;
+        selectPostForCopilot(postId, true);
+      }
+    });
+  }
+
+  // Copilot preset prompt buttons
+  if (elCopilotPromptsButtons) {
+    elCopilotPromptsButtons.addEventListener('click', e => {
+      const btn = e.target.closest('.copilot-pbtn');
+      if (!btn) return;
+      elCopilotPromptsButtons.querySelectorAll('.copilot-pbtn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentCopilotPrompt = btn.dataset.prompt;
+      runGeminiAnalysis(currentCopilotPrompt);
+    });
+  }
+
+  // Custom question follow-up submit
+  const submitCustomQuestion = () => {
+    if (!elCopilotCustomInput) return;
+    const q = elCopilotCustomInput.value.trim();
+    if (!q) return;
+    elCopilotCustomInput.value = '';
+    runGeminiAnalysis('custom', q);
+  };
+
+  if (btnCopilotSubmit) {
+    btnCopilotSubmit.addEventListener('click', submitCustomQuestion);
+  }
+  if (elCopilotCustomInput) {
+    elCopilotCustomInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitCustomQuestion();
+      }
+    });
+  }
+
+  // Gemini API Key Modal
+  if (btnOpenGeminiModal && geminiKeyModal) {
+    btnOpenGeminiModal.addEventListener('click', () => {
+      if (inputGeminiApiKey) {
+        inputGeminiApiKey.value = localStorage.getItem('gemini_api_key') || '';
+      }
+      geminiKeyModal.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseGeminiModal && geminiKeyModal) {
+    btnCloseGeminiModal.addEventListener('click', () => {
+      geminiKeyModal.style.display = 'none';
+    });
+  }
+
+  if (geminiKeyModal) {
+    geminiKeyModal.addEventListener('click', e => {
+      if (e.target === geminiKeyModal) {
+        geminiKeyModal.style.display = 'none';
+      }
+    });
+  }
+
+  if (btnSaveGeminiKey) {
+    btnSaveGeminiKey.addEventListener('click', () => {
+      const key = (inputGeminiApiKey ? inputGeminiApiKey.value : '').trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        showToast('Gemini API Key 已保存至本地并激活！');
+      } else {
+        localStorage.removeItem('gemini_api_key');
+        showToast('未输入有效 Key，已恢复内置量化启发式模式');
+      }
+      if (geminiKeyModal) geminiKeyModal.style.display = 'none';
+      runGeminiAnalysis(currentCopilotPrompt);
+    });
+  }
+
+  if (btnClearGeminiKey) {
+    btnClearGeminiKey.addEventListener('click', () => {
+      localStorage.removeItem('gemini_api_key');
+      if (inputGeminiApiKey) inputGeminiApiKey.value = '';
+      showToast('已清除本地 API Key，使用内置高精度量化引擎');
+      if (geminiKeyModal) geminiKeyModal.style.display = 'none';
+      runGeminiAnalysis(currentCopilotPrompt);
+    });
+  }
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initMacroChartEvents();
@@ -3845,11 +4354,13 @@ initTermPremiumEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
+initXPulseEvents();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 loadGoldCorrelationData(false);
+fetchXPulseData(false);
 
 
 
