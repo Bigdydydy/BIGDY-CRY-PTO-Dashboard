@@ -1493,7 +1493,7 @@ body {
 
 .macro-metrics-row {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -1679,8 +1679,16 @@ body {
   color: #818cf8;
 }
 
+.legend-axis-tag.tag-liquidity {
+  color: #60a5fa;
+}
+
 .text-indigo {
   color: #818cf8 !important;
+}
+
+.text-blue {
+  color: #3b82f6 !important;
 }
 
 
@@ -1691,9 +1699,15 @@ body {
   width: 100%;
 }
 
+@media (max-width: 1600px) {
+  .macro-metrics-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 @media (max-width: 1180px) {
   .macro-metrics-row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
   .macro-chart-canvas-wrapper {
     height: 330px;

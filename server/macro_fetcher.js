@@ -174,14 +174,17 @@ async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
  */
 async function fetchAndBuildMacroData() {
   console.log('[MacroFetcher] Starting data fetch for Macro Chart...');
-  const [mstrList, fred1y, fred10y, btcMap] = await Promise.all([
+  const [mstrList, fred1y, fred10y, fredWalcl, fredWtregen, fredRrp, btcMap] = await Promise.all([
     fetchMstrCost(),
     fetchFredSeries('DGS1'),
     fetchFredSeries('DGS10'),
+    fetchFredSeries('WALCL'),
+    fetchFredSeries('WTREGEN'),
+    fetchFredSeries('RRPONTSYD'),
     fetchBtcDailyPrices('2020-08-01')
   ]);
 
-  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', BTC=' + btcMap.size + ' days');
+  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', WALCL=' + fredWalcl.size + ', WTREGEN=' + fredWtregen.size + ', RRP=' + fredRrp.size + ', BTC=' + btcMap.size + ' days');
 
   // Load authoritative bitcointreasuries.net data
   const btData = loadBitcoinTreasuriesStrategy();
@@ -227,6 +230,15 @@ async function fetchAndBuildMacroData() {
   let last1y = null;
   let last10y = null;
 
+  // Initialize Fed Liquidity with last known values before allDates[0]
+  let lastWalcl = null;
+  let lastWtregen = null;
+  let lastRrp = null;
+  const firstDate = allDates[0] || '2020-08-01';
+  for (const [d, v] of fredWalcl) { if (d <= firstDate) lastWalcl = v; }
+  for (const [d, v] of fredWtregen) { if (d <= firstDate) lastWtregen = v; }
+  for (const [d, v] of fredRrp) { if (d <= firstDate) lastRrp = v; }
+
   const points = [];
   for (let i = 0; i < allDates.length; i++) {
     const date = allDates[i];
@@ -264,7 +276,19 @@ async function fetchAndBuildMacroData() {
     if (fred1y.has(date)) last1y = fred1y.get(date);
     if (fred10y.has(date)) last10y = fred10y.get(date);
 
+    if (fredWalcl.has(date)) lastWalcl = fredWalcl.get(date);
+    if (fredWtregen.has(date)) lastWtregen = fredWtregen.get(date);
+    if (fredRrp.has(date)) lastRrp = fredRrp.get(date);
+
     const yieldSpread = (last10y !== null && last1y !== null) ? Number((last10y - last1y).toFixed(3)) : null;
+
+    // Net Liquidity = WALCL (M$) - WTREGEN (M$) - RRPONTSYD (B$ * 1000 = M$)
+    // Value in Trillions ($T)
+    let fedNetLiquidity = null;
+    if (lastWalcl !== null && lastWtregen !== null && lastRrp !== null) {
+      const netM = lastWalcl - lastWtregen - (lastRrp * 1000);
+      fedNetLiquidity = Number((netM / 1000000).toFixed(4));
+    }
 
     points.push({
       date,
@@ -275,8 +299,28 @@ async function fetchAndBuildMacroData() {
       mnav: curMnav,
       us1y: last1y,
       us10y: last10y,
-      yieldSpread
+      yieldSpread,
+      fedWalcl: lastWalcl !== null ? Number((lastWalcl / 1000000).toFixed(3)) : null,
+      fedTga: lastWtregen !== null ? Number((lastWtregen / 1000000).toFixed(3)) : null,
+      fedRrp: lastRrp !== null ? Number((lastRrp / 1000).toFixed(3)) : null,
+      fedNetLiquidity,
+      fedNetLiqSma20: null
     });
+  }
+
+  // Compute 20D SMA for Net Liquidity: ta.sma(netLiquidity, 20)
+  for (let i = 0; i < points.length; i++) {
+    if (points[i].fedNetLiquidity === null) continue;
+    let sum = 0;
+    let count = 0;
+    const windowStart = Math.max(0, i - 19);
+    for (let j = windowStart; j <= i; j++) {
+      if (points[j].fedNetLiquidity !== null) {
+        sum += points[j].fedNetLiquidity;
+        count++;
+      }
+    }
+    points[i].fedNetLiqSma20 = count > 0 ? Number((sum / count).toFixed(4)) : points[i].fedNetLiquidity;
   }
 
   // Find peak 30-day velocity
@@ -289,6 +333,9 @@ async function fetchAndBuildMacroData() {
   }
 
   const latest = points[points.length - 1];
+  const prevPoint = points.length >= 2 ? points[points.length - 2] : null;
+  const point20dAgo = points.length >= 21 ? points[points.length - 21] : null;
+
   const summary = {
     currentBtc: latest ? latest.btcPrice : null,
     currentMstrCost: latest ? latest.mstrCost : null,
@@ -304,6 +351,17 @@ async function fetchAndBuildMacroData() {
     currentSpread: latest ? latest.yieldSpread : null,
     isCurveInverted: latest ? (latest.yieldSpread !== null && latest.yieldSpread < 0) : false,
     mstrProfitMultiplier: (latest && latest.btcPrice && latest.mstrCost) ? Number((latest.btcPrice / latest.mstrCost).toFixed(2)) : null,
+    currentFedNetLiquidity: latest ? latest.fedNetLiquidity : null,
+    currentFedNetLiqSma20: latest ? latest.fedNetLiqSma20 : null,
+    currentFedWalcl: latest ? latest.fedWalcl : null,
+    currentFedTga: latest ? latest.fedTga : null,
+    currentFedRrp: latest ? latest.fedRrp : null,
+    fedNetLiqDailyChange: (latest && prevPoint && latest.fedNetLiquidity !== null && prevPoint.fedNetLiquidity !== null)
+      ? Number((latest.fedNetLiquidity - prevPoint.fedNetLiquidity).toFixed(4))
+      : 0,
+    fedNetLiqChange20d: (latest && point20dAgo && latest.fedNetLiquidity !== null && point20dAgo.fedNetLiquidity !== null)
+      ? Number((latest.fedNetLiquidity - point20dAgo.fedNetLiquidity).toFixed(4))
+      : null,
     totalPoints: points.length,
     dateRange: {
       start: points[0] ? points[0].date : null,

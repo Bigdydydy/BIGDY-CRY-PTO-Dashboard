@@ -844,6 +844,9 @@ const elMacroVelocitySub = document.getElementById('macro-velocity-sub');
 const elMacroMnavVal = document.getElementById('macro-mnav-val');
 const elMacroMnavChip = document.getElementById('macro-mnav-chip');
 const elMacroMnavSub = document.getElementById('macro-mnav-sub');
+const elMacroNetliqVal = document.getElementById('macro-netliq-val');
+const elMacroNetliqChip = document.getElementById('macro-netliq-chip');
+const elMacroNetliqSub = document.getElementById('macro-netliq-sub');
 const macroTimeframeSwitch = document.getElementById('macro-timeframe-switch');
 const macroLegendGroup = document.getElementById('macro-legend-group');
 
@@ -962,6 +965,27 @@ function renderMacroSummary(summary) {
   if (elMacroMnavSub && summary.minMnav !== null && summary.maxMnav !== null) {
     elMacroMnavSub.textContent = `历史全域: ${summary.minMnav.toFixed(2)}× ~ ${summary.maxMnav.toFixed(2)}× (EV mNAV)`;
   }
+
+  // 8. FED Net Liquidity (WALCL - TGA - RRP)
+  if (elMacroNetliqVal && summary.currentFedNetLiquidity !== null && summary.currentFedNetLiquidity !== undefined) {
+    elMacroNetliqVal.textContent = `$${summary.currentFedNetLiquidity.toFixed(2)}T`;
+  }
+  if (elMacroNetliqChip && summary.currentFedNetLiquidity !== null && summary.currentFedNetLiquidity !== undefined) {
+    const diff20d = summary.fedNetLiqChange20d;
+    const isExp = diff20d !== null ? diff20d >= 0 : (summary.currentFedNetLiquidity >= (summary.currentFedNetLiqSma20 || summary.currentFedNetLiquidity));
+    const diffB = diff20d !== null ? Math.round(Math.abs(diff20d) * 1000) : 0;
+    if (isExp) {
+      elMacroNetliqChip.textContent = `20D 扩张 +$${diffB}B`;
+      elMacroNetliqChip.className = 'mm-chip chip-positive';
+    } else {
+      elMacroNetliqChip.textContent = `20D 紧缩 -$${diffB}B`;
+      elMacroNetliqChip.className = 'mm-chip chip-negative';
+    }
+  }
+  if (elMacroNetliqSub && summary.currentFedWalcl !== null && summary.currentFedTga !== null && summary.currentFedRrp !== null) {
+    const rrpStr = summary.currentFedRrp < 0.01 ? `$${(summary.currentFedRrp * 1000).toFixed(1)}B` : `$${summary.currentFedRrp.toFixed(2)}T`;
+    elMacroNetliqSub.textContent = `WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}`;
+  }
 }
 
 /**
@@ -1003,11 +1027,13 @@ function renderMacroChart() {
   const spreads = points.map(p => p.yieldSpread);
   const velocities = points.map(p => p.mstrBuyVelocity30d || 0);
   const mnavs = points.map(p => (p.mnav !== null && p.mnav !== undefined) ? p.mnav : null);
+  const netLiqs = points.map(p => (p.fedNetLiquidity !== null && p.fedNetLiquidity !== undefined) ? p.fedNetLiquidity : null);
+  const netLiqSmas = points.map(p => (p.fedNetLiqSma20 !== null && p.fedNetLiqSma20 !== undefined) ? p.fedNetLiqSma20 : null);
 
-  // Preserve visibility state across re-renders for all 7 datasets
-  let visibilityStates = [true, true, true, true, true, true, true];
+  // Preserve visibility state across re-renders for all 9 datasets
+  let visibilityStates = [true, true, true, true, true, true, true, true, true];
   if (macroChartInstance) {
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 9; i++) {
       visibilityStates[i] = macroChartInstance.isDatasetVisible(i);
     }
     macroChartInstance.destroy();
@@ -1029,6 +1055,11 @@ function renderMacroChart() {
   const velGradient = ctx.createLinearGradient(0, 0, 0, 350);
   velGradient.addColorStop(0, 'rgba(236, 72, 153, 0.12)');
   velGradient.addColorStop(1, 'rgba(236, 72, 153, 0.00)');
+
+  // Gradient for Net Liquidity
+  const netLiqGradient = ctx.createLinearGradient(0, 0, 0, 350);
+  netLiqGradient.addColorStop(0, 'rgba(59, 130, 246, 0.14)');
+  netLiqGradient.addColorStop(1, 'rgba(59, 130, 246, 0.00)');
 
   const datasets = [
     {
@@ -1139,6 +1170,38 @@ function renderMacroChart() {
       yAxisID: 'yMNAV',
       tension: 0.12,
       hidden: !visibilityStates[6]
+    },
+    {
+      label: 'FED 净流动性 ($T)',
+      data: netLiqs,
+      borderColor: '#3b82f6',
+      backgroundColor: netLiqGradient,
+      fill: true,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: '#3b82f6',
+      pointHoverBorderColor: '#ffffff',
+      pointHoverBorderWidth: 2,
+      yAxisID: 'yLiquidity',
+      tension: 0.15,
+      hidden: !visibilityStates[7]
+    },
+    {
+      label: '净流动性 20D SMA ($T)',
+      data: netLiqSmas,
+      borderColor: '#60a5fa',
+      backgroundColor: 'transparent',
+      borderWidth: 1.6,
+      borderDash: [4, 4],
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: '#60a5fa',
+      pointHoverBorderColor: '#ffffff',
+      pointHoverBorderWidth: 2,
+      yAxisID: 'yLiquidity',
+      tension: 0.15,
+      hidden: !visibilityStates[8]
     }
   ];
 
@@ -1190,6 +1253,8 @@ function renderMacroChart() {
                   const premiumPct = ((val - 1) * 100).toFixed(1);
                   const status = val >= 1 ? `溢价 +${premiumPct}%` : `折价 ${premiumPct}%`;
                   return ` ${label}: ${val.toFixed(2)}× (${status})`;
+                } else if (context.dataset.yAxisID === 'yLiquidity') {
+                  return ` ${label}: $${val.toFixed(3)}T ($${Math.round(val * 1000).toLocaleString()}B)`;
                 } else {
                   const sign = (label.includes('利差') && val >= 0) ? '+' : '';
                   return ` ${label}: ${sign}${val.toFixed(2)}%`;
@@ -1300,6 +1365,29 @@ function renderMacroChart() {
             },
             suggestedMin: 0.5,
             suggestedMax: 3.5
+          },
+          yLiquidity: {
+            type: 'linear',
+            position: 'right',
+            grid: {
+              drawOnChartArea: false,
+              borderColor: 'rgba(59, 130, 246, 0.18)'
+            },
+            ticks: {
+              color: '#60a5fa',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) {
+                return '$' + v.toFixed(1) + 'T';
+              }
+            },
+            title: {
+              display: true,
+              text: 'Fed 净流动性 ($T)',
+              color: '#60a5fa',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            },
+            suggestedMin: 4.8,
+            suggestedMax: 7.5
           }
         }
       }

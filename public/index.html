@@ -290,6 +290,15 @@
             </div>
             <span class="mm-sub" id="macro-mnav-sub">企业价值 / BTC NAV 溢折价</span>
           </div>
+
+          <div class="macro-metric-card" id="card-metric-netliq">
+            <span class="mm-label">FED 净流动性 (WALCL-TGA-RRP)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-blue" id="macro-netliq-val">$--.-T</span>
+              <span class="mm-chip" id="macro-netliq-chip">--</span>
+            </div>
+            <span class="mm-sub" id="macro-netliq-sub">美联储总资产 - 财政部TGA - 逆回购RRP</span>
+          </div>
         </div>
 
         <!-- Custom Interactive Legend Bar with Click to Toggle Visibility -->
@@ -335,6 +344,16 @@
               <span class="legend-color-dot" style="background-color: #6366f1;"></span>
               <span class="legend-name">MSTR mNAV (EV 倍数)</span>
               <span class="legend-axis-tag tag-mnav">右轴3 倍数</span>
+            </button>
+            <button class="legend-pill active" data-dataset="7" id="legend-btn-netliq" title="点击隐藏/显示 FED 净流动性 (WALCL - TGA - RRP)">
+              <span class="legend-color-dot" style="background-color: #3b82f6;"></span>
+              <span class="legend-name">Fed 净流动性</span>
+              <span class="legend-axis-tag tag-liquidity">右轴4 $T</span>
+            </button>
+            <button class="legend-pill active" data-dataset="8" id="legend-btn-netliq-sma" title="点击隐藏/显示 Fed 净流动性 20D SMA">
+              <span class="legend-color-dot" style="background-color: #60a5fa; border: 1px dashed #ffffff;"></span>
+              <span class="legend-name">净流动性 20D SMA</span>
+              <span class="legend-axis-tag tag-liquidity">右轴4 $T</span>
             </button>
           </div>
         </div>
