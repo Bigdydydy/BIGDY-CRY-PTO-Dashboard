@@ -17,6 +17,7 @@ const { getMacroChartData } = require('./macro_fetcher');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
+const { getGoldCorrelationData } = require('./gold_fetcher');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -239,6 +240,22 @@ async function handleApiRequest(req, res, parsedUrl) {
       });
     } catch (err) {
       console.error('[API Error] coinbase-liquidity:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/gold-correlation
+  if (pathname === '/api/gold-correlation' && req.method === 'GET') {
+    try {
+      const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+      const goldData = await getGoldCorrelationData(forceParam);
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...goldData
+      });
+    } catch (err) {
+      console.error('[API Error] gold-correlation:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
     }
     return;

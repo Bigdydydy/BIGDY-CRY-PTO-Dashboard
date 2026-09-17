@@ -168,6 +168,20 @@
               <span class="nav-desc">阶梯深度谱系与大单滑点</span>
             </div>
           </button>
+
+          <button class="sidebar-nav-item" data-view="view-gold-correlation" id="nav-item-gold-correlation">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M14.5 9h-5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-5"></path>
+                <path d="M12 7v10"></path>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">金/BTC 比率与相关性</span>
+              <span class="nav-desc">XAU/BTC 比价 &amp; 30D 宏观联动</span>
+            </div>
+          </button>
         </nav>
       </div>
 
@@ -1408,6 +1422,211 @@
     </section>
   </div> <!-- /#view-coinbase-liquidity -->
 
+  <!-- View 7: 黄金与比特币比率及宏观相关性矩阵 (Gold / BTC Ratio & Macro Correlation) -->
+  <div class="view-panel" id="view-gold-correlation">
+    <section class="bento-card gold-hero-card" id="module-gold-correlation">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag gold-tag">GOLD &amp; BITCOIN CORRELATION</span>
+          <h2>金/BTC 比率与宏观相关性矩阵</h2>
+          <span class="card-subtitle-inline">XAU/BTC 相对估值、30 天滚动皮尔逊相关性与全球黄金市值渗透率</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <span class="gold-source-badge" id="gold-data-source-badge" title="数据源：Binance PAXG/USDT (1:1 锚定伦敦合格交割实物黄金) + BTC/USDT 24/7 连续日线，对标 Newhedge.io 方法论">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v10M14.5 9h-5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-5"/>
+              </svg>
+              Binance PAXG / BTC 真实连续日线
+            </span>
+            <span class="tp-regime-pill" id="gold-header-regime-pill">-- 宏观联动</span>
+            <a href="https://newhedge.io/bitcoin/gold-correlation" target="_blank" rel="noopener noreferrer" class="newhedge-external-link" title="在官方新窗口中直达并对照 Newhedge.io 原版量化终端">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              直达 Newhedge 原版
+            </a>
+            <span class="tz-badge" id="gold-update-time">更新中... (UTC+8)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Top Metrics Grid -->
+        <div class="gold-metrics-row">
+          <div class="gold-metric-card highlight">
+            <div class="gold-metric-header">
+              <span class="gold-metric-label">1 BTC 等价黄金 (BTC/Gold)</span>
+              <span class="gold-metric-tag">购买力</span>
+            </div>
+            <div class="gold-metric-value" id="gold-val-btc-gold">-- oz</div>
+            <div class="gold-metric-sub" id="gold-sub-btc-gold">24h 涨跌: --%</div>
+          </div>
+
+          <div class="gold-metric-card">
+            <div class="gold-metric-header">
+              <span class="gold-metric-label">1 盎司金价 (PAXG / XAU)</span>
+              <span class="gold-metric-tag">伦敦金锚定</span>
+            </div>
+            <div class="gold-metric-value" id="gold-val-gold-price">$--</div>
+            <div class="gold-metric-sub" id="gold-sub-gold-price">BTC 报价: $--</div>
+          </div>
+
+          <div class="gold-metric-card">
+            <div class="gold-metric-header">
+              <span class="gold-metric-label">30D 滚动皮尔逊相关性</span>
+              <span class="gold-metric-tag" id="gold-tag-corr-regime">--</span>
+            </div>
+            <div class="gold-metric-value" id="gold-val-corr30d">r = --</div>
+            <div class="gold-corr-track">
+              <div class="gold-corr-fill" id="gold-corr-bar" style="width: 50%;"></div>
+            </div>
+            <div class="gold-corr-labels">
+              <span>负相关 (-1)</span>
+              <span>脱钩 (0)</span>
+              <span>强共振 (+1)</span>
+            </div>
+          </div>
+
+          <div class="gold-metric-card">
+            <div class="gold-metric-header">
+              <span class="gold-metric-label">BTC 占黄金总市值渗透率</span>
+              <span class="gold-metric-tag">$18.5T 基准</span>
+            </div>
+            <div class="gold-metric-value" id="gold-val-mcap-share">--%</div>
+            <div class="gold-metric-sub" id="gold-sub-mcap-share">地上黄金存量: 21.25万吨</div>
+          </div>
+        </div>
+
+        <!-- Main Chart & Insights Layout -->
+        <div class="tp-main-layout" style="margin-top: 16px;">
+          <!-- Left: Dual-Grid ECharts Panel -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 3v18h18M7 16l4-4 4 4 6-6"/>
+                </svg>
+                <span>BTC/Gold 比率走势与 30 天滚动皮尔逊相关系数波动</span>
+              </div>
+              <div class="tp-chart-actions">
+                <div class="btn-group-segmented" id="gold-timeframe-selector">
+                  <button class="timeframe-btn" data-days="30">1M</button>
+                  <button class="timeframe-btn" data-days="90">3M</button>
+                  <button class="timeframe-btn" data-days="180">6M</button>
+                  <button class="timeframe-btn" data-days="365">1Y</button>
+                  <button class="timeframe-btn active" data-days="all">全部</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filter / Toggle Pills -->
+            <div class="tp-legend-strip">
+              <button class="tp-legend-btn active" data-series="ratio" id="btn-gold-toggle-ratio" title="BTC / 黄金比率（1 BTC 等价黄金盎司数）">
+                <span class="legend-color-dot" style="background-color: #eab308;"></span>
+                <span>BTC/Gold 盎司比率</span>
+              </button>
+              <button class="tp-legend-btn active" data-series="corr" id="btn-gold-toggle-corr" title="30 天滚动相关系数 r ∈ [-1, +1]">
+                <span class="legend-color-dot" style="background-color: #10b981;"></span>
+                <span>30D 滚动相关系数</span>
+              </button>
+              <button class="tp-legend-btn" data-series="btcPrice" id="btn-gold-toggle-btc" title="BTC 现货收盘价">
+                <span class="legend-color-dot" style="background-color: #f7931a;"></span>
+                <span>BTC 价格 ($)</span>
+              </button>
+              <button class="tp-legend-btn" data-series="goldPrice" id="btn-gold-toggle-gold" title="伦敦黄金盎司现货价 (PAXG)">
+                <span class="legend-color-dot" style="background-color: #38bdf8;"></span>
+                <span>金价 XAU ($)</span>
+              </button>
+            </div>
+
+            <!-- ECharts Container -->
+            <div class="tp-chart-container">
+              <div id="gold-correlation-echarts" style="width: 100%; height: 620px;"></div>
+            </div>
+
+            <!-- Data Audit Strip -->
+            <div class="tp-data-audit-strip">
+              <div class="tp-audit-left">
+                <span><strong class="text-cyan">数据基准:</strong> Binance PAXG 伦敦金 1:1 实物现货 + BTCUSDT 连续日线</span>
+                <span><strong class="text-cyan">算法模型:</strong> 对数收益率 30D 滑动窗口皮尔逊相关系数</span>
+                <span><strong class="text-cyan">宏观对标:</strong> Newhedge.io Bitcoin vs Gold Correlation</span>
+              </div>
+              <span id="gold-history-points-badge" class="tp-audit-right">1000+ 连续日线</span>
+            </div>
+          </div>
+
+          <!-- Right: Institutional Diagnostics & Insights -->
+          <div class="tp-stats-panel">
+            <!-- 1. Gold vs BTC Comparison Matrix -->
+            <div class="tp-subcard">
+              <div class="tp-subcard-title">
+                <span>黄金与数字黄金对比矩阵</span>
+                <span class="subcard-tag">硬通货属性</span>
+              </div>
+              <div class="gold-compare-table">
+                <div class="gold-cmp-row">
+                  <span class="gold-cmp-lbl">当前比价 (1 BTC)</span>
+                  <span class="gold-cmp-val highlight" id="gold-side-btc-gold">-- oz</span>
+                </div>
+                <div class="gold-cmp-row">
+                  <span class="gold-cmp-lbl">反向比价 (1 oz 金)</span>
+                  <span class="gold-cmp-val" id="gold-side-gold-btc">-- BTC</span>
+                </div>
+                <div class="gold-cmp-row">
+                  <span class="gold-cmp-lbl">BTC 市值渗透率</span>
+                  <span class="gold-cmp-val" id="gold-side-mcap-share">--%</span>
+                </div>
+                <div class="gold-cmp-row">
+                  <span class="gold-cmp-lbl">30D 联动系数</span>
+                  <span class="gold-cmp-val" id="gold-side-corr">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Regime Status & Interpretation -->
+            <div class="tp-subcard tp-score-card">
+              <div class="tp-subcard-title">
+                <span>宏观流动性机制研判</span>
+                <span class="subcard-tag" id="gold-side-regime-tag">--</span>
+              </div>
+              <div class="tp-score-metric-box">
+                <div class="gold-regime-name" id="gold-side-regime-name">分析生成中...</div>
+                <p class="gold-regime-summary" id="gold-side-regime-summary">正在解算资产联动关系...</p>
+              </div>
+            </div>
+
+            <!-- 3. Key Pointers / Methodology Box -->
+            <div class="tp-subcard tp-insights-card">
+              <div class="tp-subcard-title">
+                <span>📐 机构研判与 Newhedge 方法论要点</span>
+              </div>
+              <ul class="tp-insights-list" id="gold-insights-list">
+                <li>正在加载资产共振分析要点...</li>
+              </ul>
+            </div>
+
+            <!-- 4. Newhedge Terminal Deep-Link Card -->
+            <div class="tp-subcard newhedge-promo-card">
+              <div class="tp-subcard-title">
+                <span>🔗 Newhedge 官方量化终端联动</span>
+              </div>
+              <p class="newhedge-promo-desc">
+                本模块算法严格对标 Newhedge 30-Day Rolling Correlation 与 Market Cap Share 模型。如需查看海外原版交互式 Highcharts 或参与指标预警，可点击下方直达：
+              </p>
+              <a href="https://newhedge.io/bitcoin/gold-correlation" target="_blank" rel="noopener noreferrer" class="newhedge-jump-btn">
+                <span>打开 newhedge.io/bitcoin/gold-correlation ↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div> <!-- /#view-gold-correlation -->
+
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
 
@@ -1564,6 +1783,14 @@
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
       </svg>
       <span>CB深度</span>
+    </button>
+    <button class="mob-nav-item" data-view="view-gold-correlation" id="mob-nav-gold-correlation">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M14.5 9h-5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-5"></path>
+        <path d="M12 7v10"></path>
+      </svg>
+      <span>金/BTC</span>
     </button>
   </nav>
 

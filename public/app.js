@@ -288,6 +288,13 @@ function renderAll() {
     loadTermPremiumData();
   }
 
+  if (currentMarketData.goldCorrelation) {
+    const shouldForce = !goldChartInstance || !!(currentMarketData.syncStatus && currentMarketData.syncStatus.hasAnyUpdate);
+    renderGoldCorrelation(currentMarketData.goldCorrelation, shouldForce);
+  } else {
+    loadGoldCorrelationData();
+  }
+
   if (rawMacroData) {
     renderMacroSummary(rawMacroData.summary);
     if (!macroChartInstance) {
@@ -3264,6 +3271,7 @@ const VIEW_TITLES = {
   'view-block-trades': '大宗巨鲸战略雷达',
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
+  'view-gold-correlation': '金/BTC 比率与相关性',
   'view-all': '全模块平铺画卷'
 };
 
@@ -3356,6 +3364,12 @@ function switchView(viewId, updateHash = true) {
       renderCbSlippageChart(rawCoinbaseData);
     }
 
+    if (goldChartInstance) {
+      goldChartInstance.resize();
+    } else if (rawGoldData && (viewId === 'view-gold-correlation' || viewId === 'view-all')) {
+      renderGoldChart();
+    }
+
     window.dispatchEvent(new Event('resize'));
   }, 60);
 }
@@ -3430,6 +3444,399 @@ function initNavigation() {
 }
 
 // ============================================================================
+// Module 7: Gold & Bitcoin Correlation & Ratio Controller (Newhedge Benchmark)
+// ============================================================================
+
+let rawGoldData = null;
+let goldChartInstance = null;
+let currentGoldTimeframe = 'all';
+const goldVisibleSeries = {
+  ratio: true,
+  corr: true,
+  btcPrice: false,
+  goldPrice: false
+};
+
+// DOM Elements
+const elGoldDataSourceBadge = document.getElementById('gold-data-source-badge');
+const elGoldHeaderRegimePill = document.getElementById('gold-header-regime-pill');
+const elGoldUpdateTime = document.getElementById('gold-update-time');
+
+const elGoldValBtcGold = document.getElementById('gold-val-btc-gold');
+const elGoldSubBtcGold = document.getElementById('gold-sub-btc-gold');
+const elGoldValGoldPrice = document.getElementById('gold-val-gold-price');
+const elGoldSubGoldPrice = document.getElementById('gold-sub-gold-price');
+const elGoldValCorr30d = document.getElementById('gold-val-corr30d');
+const elGoldTagCorrRegime = document.getElementById('gold-tag-corr-regime');
+const elGoldCorrBar = document.getElementById('gold-corr-bar');
+const elGoldValMcapShare = document.getElementById('gold-val-mcap-share');
+const elGoldSubMcapShare = document.getElementById('gold-sub-mcap-share');
+
+const elGoldEcharts = document.getElementById('gold-correlation-echarts');
+const goldTimeframeSelector = document.getElementById('gold-timeframe-selector');
+const elGoldHistoryPointsBadge = document.getElementById('gold-history-points-badge');
+
+const btnGoldToggleRatio = document.getElementById('btn-gold-toggle-ratio');
+const btnGoldToggleCorr = document.getElementById('btn-gold-toggle-corr');
+const btnGoldToggleBtc = document.getElementById('btn-gold-toggle-btc');
+const btnGoldToggleGold = document.getElementById('btn-gold-toggle-gold');
+
+const elGoldSideBtcGold = document.getElementById('gold-side-btc-gold');
+const elGoldSideGoldBtc = document.getElementById('gold-side-gold-btc');
+const elGoldSideMcapShare = document.getElementById('gold-side-mcap-share');
+const elGoldSideCorr = document.getElementById('gold-side-corr');
+const elGoldSideRegimeTag = document.getElementById('gold-side-regime-tag');
+const elGoldSideRegimeName = document.getElementById('gold-side-regime-name');
+const elGoldSideRegimeSummary = document.getElementById('gold-side-regime-summary');
+const elGoldInsightsList = document.getElementById('gold-insights-list');
+
+async function loadGoldCorrelationData(force = false) {
+  try {
+    const resp = await fetch(`/api/gold-correlation${force ? '?refresh=true' : ''}`);
+    if (!resp.ok) return;
+    const json = await resp.json();
+    if (json.code === 0 && json.series) {
+      renderGoldCorrelation(json, force);
+    }
+  } catch (err) {
+    console.error('[GoldCorrelation] Error fetching data:', err);
+  }
+}
+
+function renderGoldCorrelation(data, forceRedraw = false) {
+  if (!data) return;
+  const prevTimestamp = rawGoldData?.current?.timestamp;
+  const prevLen = rawGoldData?.series?.length;
+  rawGoldData = data;
+
+  const c = data.current || {};
+  const reg = data.regime || {};
+  const meta = data.metadata || {};
+
+  // Header badges
+  if (elGoldHeaderRegimePill && reg.regimeName) {
+    elGoldHeaderRegimePill.textContent = reg.regimeName.split(' ')[0] || '宏观联动';
+    if (reg.badgeClass) {
+      elGoldHeaderRegimePill.className = `tp-regime-pill ${reg.badgeClass}`;
+    }
+  }
+  if (elGoldDataSourceBadge && meta.dataSource) {
+    elGoldDataSourceBadge.title = `数据基准：${meta.dataSource} | 跨度: ${meta.timeRange} | 对标: ${meta.targetReference}`;
+  }
+  if (elGoldUpdateTime && c.timestamp) {
+    elGoldUpdateTime.textContent = `${formatUTC8(c.timestamp)} (UTC+8)`;
+  }
+  if (elGoldHistoryPointsBadge && data.series) {
+    elGoldHistoryPointsBadge.textContent = `${data.series.length} 连续日线 (2023~至今)`;
+  }
+
+  // Top KPIs
+  if (elGoldValBtcGold && c.btcGoldRatio !== undefined) {
+    elGoldValBtcGold.textContent = `${c.btcGoldRatio.toFixed(2)} oz`;
+  }
+  if (elGoldSubBtcGold && c.ratioChange24h !== undefined) {
+    const sign = c.ratioChange24h >= 0 ? '+' : '';
+    elGoldSubBtcGold.textContent = `24h 比率涨跌: ${sign}${c.ratioChange24h.toFixed(2)}%`;
+    elGoldSubBtcGold.style.color = c.ratioChange24h >= 0 ? '#10b981' : '#f43f5e';
+  }
+  if (elGoldValGoldPrice && c.goldPrice !== undefined) {
+    elGoldValGoldPrice.textContent = `$${c.goldPrice.toLocaleString()}`;
+  }
+  if (elGoldSubGoldPrice && c.btcPrice !== undefined) {
+    elGoldSubGoldPrice.textContent = `BTC 报价: $${c.btcPrice.toLocaleString()}`;
+  }
+  if (elGoldValCorr30d && c.rollingCorr30d !== undefined) {
+    const sign = c.rollingCorr30d >= 0 ? '+' : '';
+    elGoldValCorr30d.textContent = `r = ${sign}${c.rollingCorr30d.toFixed(3)}`;
+    if (c.rollingCorr30d >= 0.5) elGoldValCorr30d.style.color = '#10b981';
+    else if (c.rollingCorr30d >= 0.1) elGoldValCorr30d.style.color = '#38bdf8';
+    else if (c.rollingCorr30d >= -0.2) elGoldValCorr30d.style.color = '#f59e0b';
+    else elGoldValCorr30d.style.color = '#f43f5e';
+  }
+  if (elGoldTagCorrRegime && reg.regimeCode) {
+    elGoldTagCorrRegime.textContent = reg.regimeCode.replace(/_/g, ' ');
+  }
+  if (elGoldCorrBar && c.rollingCorr30d !== undefined) {
+    const pct = Math.max(5, Math.min(95, ((c.rollingCorr30d + 1) / 2) * 100));
+    elGoldCorrBar.style.width = `${pct}%`;
+  }
+  if (elGoldValMcapShare && c.marketCapShare !== undefined) {
+    elGoldValMcapShare.textContent = `${c.marketCapShare.toFixed(2)}%`;
+  }
+
+  // Side Matrix & Insights
+  if (elGoldSideBtcGold && c.btcGoldRatio !== undefined) {
+    elGoldSideBtcGold.textContent = `${c.btcGoldRatio.toFixed(2)} oz/BTC`;
+  }
+  if (elGoldSideGoldBtc && c.goldBtcRatio !== undefined) {
+    elGoldSideGoldBtc.textContent = `${c.goldBtcRatio.toFixed(5)} BTC/oz`;
+  }
+  if (elGoldSideMcapShare && c.marketCapShare !== undefined) {
+    elGoldSideMcapShare.textContent = `${c.marketCapShare.toFixed(2)}%`;
+  }
+  if (elGoldSideCorr && c.rollingCorr30d !== undefined) {
+    const sign = c.rollingCorr30d >= 0 ? '+' : '';
+    elGoldSideCorr.textContent = `${sign}${c.rollingCorr30d.toFixed(3)}`;
+    elGoldSideCorr.style.color = elGoldValCorr30d?.style?.color || '#38bdf8';
+  }
+  if (elGoldSideRegimeTag && reg.regimeCode) {
+    elGoldSideRegimeTag.textContent = reg.regimeCode;
+  }
+  if (elGoldSideRegimeName && reg.regimeName) {
+    elGoldSideRegimeName.textContent = reg.regimeName;
+    elGoldSideRegimeName.style.color = reg.color || '#10b981';
+  }
+  if (elGoldSideRegimeSummary && reg.summary) {
+    elGoldSideRegimeSummary.textContent = reg.summary;
+  }
+  if (elGoldInsightsList && reg.keyPointers) {
+    elGoldInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
+  }
+
+  // Render chart conditionally
+  const shouldRedraw = forceRedraw ||
+                       !goldChartInstance ||
+                       prevTimestamp !== c.timestamp ||
+                       prevLen !== data.series?.length;
+  if (shouldRedraw) {
+    renderGoldChart();
+  }
+}
+
+function renderGoldChart() {
+  if (!elGoldEcharts || !rawGoldData || !rawGoldData.series) return;
+
+  if (!goldChartInstance) {
+    goldChartInstance = echarts.init(elGoldEcharts, 'dark');
+  }
+
+  let seriesData = rawGoldData.series;
+  if (currentGoldTimeframe === '30') seriesData = seriesData.slice(-30);
+  else if (currentGoldTimeframe === '90') seriesData = seriesData.slice(-90);
+  else if (currentGoldTimeframe === '180') seriesData = seriesData.slice(-180);
+  else if (currentGoldTimeframe === '365') seriesData = seriesData.slice(-365);
+
+  const dates = seriesData.map(s => s.date);
+  const ratioData = seriesData.map(s => s.btcGoldRatio);
+  const corrData = seriesData.map(s => s.rollingCorr30d);
+  const btcPrices = seriesData.map(s => s.btcPrice);
+  const goldPrices = seriesData.map(s => s.goldPrice);
+
+  const chartSeries = [];
+
+  // 1. BTC / Gold Ratio (Top Grid, primary Y)
+  if (goldVisibleSeries.ratio) {
+    chartSeries.push({
+      id: 'series-gold-ratio',
+      name: 'BTC/Gold 比率 (oz)',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      smooth: 0.15,
+      data: ratioData,
+      lineStyle: { width: 2.5, color: '#eab308' },
+      itemStyle: { color: '#eab308' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(234, 179, 8, 0.22)' },
+          { offset: 1, color: 'rgba(234, 179, 8, 0.00)' }
+        ])
+      }
+    });
+  }
+
+  // 2. BTC Price (Top Grid, secondary Y)
+  if (goldVisibleSeries.btcPrice) {
+    chartSeries.push({
+      id: 'series-gold-btc-price',
+      name: 'BTC 现货 ($)',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 1,
+      showSymbol: false,
+      smooth: 0.15,
+      data: btcPrices,
+      lineStyle: { width: 1.5, color: '#f7931a', type: 'dashed' },
+      itemStyle: { color: '#f7931a' }
+    });
+  }
+
+  // 3. Gold Price (Top Grid, secondary Y)
+  if (goldVisibleSeries.goldPrice) {
+    chartSeries.push({
+      id: 'series-gold-paxg-price',
+      name: '金价 XAU ($/oz)',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 1,
+      showSymbol: false,
+      smooth: 0.15,
+      data: goldPrices,
+      lineStyle: { width: 1.5, color: '#38bdf8', type: 'dotted' },
+      itemStyle: { color: '#38bdf8' }
+    });
+  }
+
+  // 4. 30D Rolling Correlation (Bottom Grid)
+  if (goldVisibleSeries.corr) {
+    chartSeries.push({
+      id: 'series-gold-corr',
+      name: '30D 滚动相关性 r',
+      type: 'line',
+      xAxisIndex: 1,
+      yAxisIndex: 2,
+      showSymbol: false,
+      smooth: 0.2,
+      data: corrData,
+      lineStyle: { width: 2.0, color: '#10b981' },
+      itemStyle: { color: '#10b981' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(16, 185, 129, 0.25)' },
+          { offset: 1, color: 'rgba(16, 185, 129, 0.02)' }
+        ])
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        lineStyle: { type: 'dashed', width: 1 },
+        data: [
+          { yAxis: 0.5, lineStyle: { color: 'rgba(16, 185, 129, 0.5)' }, label: { formatter: '+0.5 强共振', position: 'end', fontSize: 10, color: '#10b981' } },
+          { yAxis: 0, lineStyle: { color: 'rgba(255, 255, 255, 0.25)' }, label: { formatter: '0 脱钩线', position: 'end', fontSize: 10, color: '#94a3b8' } },
+          { yAxis: -0.2, lineStyle: { color: 'rgba(244, 63, 94, 0.5)' }, label: { formatter: '-0.2 负相关轮动', position: 'end', fontSize: 10, color: '#f43f5e' } }
+        ]
+      }
+    });
+  }
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', lineStyle: { color: 'rgba(255,255,255,0.2)' } },
+      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'monospace' },
+      formatter: function (params) {
+        if (!params || !params.length) return '';
+        let dateStr = params[0].axisValue || '';
+        let html = `<div style="font-weight:700; margin-bottom:4px; color:#e2e8f0;">${dateStr}</div>`;
+        params.forEach(p => {
+          let val = p.value;
+          let label = p.seriesName;
+          if (val === null || val === undefined) return;
+          if (label.includes('比率')) val = `${val.toFixed(2)} oz/BTC`;
+          else if (label.includes('相关性')) val = `${val >= 0 ? '+' : ''}${val.toFixed(3)}`;
+          else if (label.includes('$')) val = `$${Math.round(val).toLocaleString()}`;
+          html += `<div style="display:flex; justify-content:space-between; gap:12px; font-size:11px;">
+            <span style="color:${p.color};">${label}:</span>
+            <span style="font-weight:700;">${val}</span>
+          </div>`;
+        });
+        return html;
+      }
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    grid: [
+      { left: '4%', right: '4%', top: '5%', height: '54%' },
+      { left: '4%', right: '4%', top: '69%', height: '24%' }
+    ],
+    xAxis: [
+      {
+        type: 'category',
+        data: dates,
+        gridIndex: 0,
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        axisLabel: { show: false },
+        axisTick: { show: false }
+      },
+      {
+        type: 'category',
+        data: dates,
+        gridIndex: 1,
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.15)' } },
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 10,
+          fontFamily: 'monospace',
+          formatter: v => v.slice(5)
+        }
+      }
+    ],
+    yAxis: [
+      // Y0: Top Grid, Left - BTC/Gold Ratio
+      {
+        type: 'value',
+        gridIndex: 0,
+        name: 'BTC/Gold Ratio (oz)',
+        nameTextStyle: { color: '#eab308', fontSize: 10, fontFamily: 'monospace' },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } },
+        axisLabel: { color: '#eab308', fontSize: 10, fontFamily: 'monospace', formatter: v => `${v.toFixed(1)} oz` }
+      },
+      // Y1: Top Grid, Right - USD Price
+      {
+        type: 'value',
+        gridIndex: 0,
+        name: 'USD Price',
+        nameTextStyle: { color: '#94a3b8', fontSize: 10, fontFamily: 'monospace' },
+        splitLine: { show: false },
+        axisLabel: { color: '#94a3b8', fontSize: 10, fontFamily: 'monospace', formatter: v => `$${Math.round(v)}` }
+      },
+      // Y2: Bottom Grid - Correlation r
+      {
+        type: 'value',
+        gridIndex: 1,
+        name: '30D Correlation (r)',
+        min: -1.0,
+        max: 1.0,
+        interval: 0.5,
+        nameTextStyle: { color: '#10b981', fontSize: 10, fontFamily: 'monospace' },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } },
+        axisLabel: { color: '#10b981', fontSize: 10, fontFamily: 'monospace', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` }
+      }
+    ],
+    series: chartSeries
+  };
+
+  goldChartInstance.setOption(option, true);
+}
+
+function initGoldCorrelationEvents() {
+  window.addEventListener('resize', () => {
+    if (goldChartInstance) goldChartInstance.resize();
+  });
+
+  // Timeframe selector buttons
+  if (goldTimeframeSelector) {
+    goldTimeframeSelector.addEventListener('click', e => {
+      const btn = e.target.closest('.timeframe-btn');
+      if (!btn) return;
+      goldTimeframeSelector.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentGoldTimeframe = btn.dataset.days;
+      renderGoldChart();
+    });
+  }
+
+  // Legend toggle pills
+  const setupToggle = (btn, key) => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      goldVisibleSeries[key] = !goldVisibleSeries[key];
+      btn.classList.toggle('active', goldVisibleSeries[key]);
+      renderGoldChart();
+    });
+  };
+
+  setupToggle(btnGoldToggleRatio, 'ratio');
+  setupToggle(btnGoldToggleCorr, 'corr');
+  setupToggle(btnGoldToggleBtc, 'btcPrice');
+  setupToggle(btnGoldToggleGold, 'goldPrice');
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initMacroChartEvents();
@@ -3437,9 +3844,12 @@ initCdriEvents();
 initTermPremiumEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
+initGoldCorrelationEvents();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
+loadGoldCorrelationData(false);
+
 
 

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { getXSign } = require('./crypto_signer');
 const { recordAndMergeTrades, getCachedTrades } = require('./trade_store');
 const { analyzeTermPremium } = require('./term_premium_engine');
+const { getGoldCorrelationData } = require('./gold_fetcher');
 const { fetchWithTimeout } = require('./http_client');
 
 const GREEKS_BASE_URL = 'https://api.greeks.live/api/v1';
@@ -22,6 +23,7 @@ let dataCache = {
   ivSkewMonth: null,
   dvolStats: null,
   termPremium: null,
+  goldCorrelation: null,
   lastFingerprints: {},
   lastChanges: {
     hasAnyUpdate: false,
@@ -248,7 +250,8 @@ async function refreshAllMarketData(currency = 'BTC') {
     skewChartRes,
     ivSkewMonthRes,
     dvolStatsRes,
-    futuresRes
+    futuresRes,
+    goldRes
   ] = await Promise.allSettled([
     fetchBlockTrades(currency),
     fetchGreeksDataLab('atm_data', { currency }),
@@ -257,7 +260,8 @@ async function refreshAllMarketData(currency = 'BTC') {
     fetchGreeksDataLab('skew_chart', { currency, gap: '1d' }),
     fetchGreeksDataLab('iv_skew_month', { currency }),
     fetchDvolHistoricalStats(currency),
-    fetchDeribitFutures(currency)
+    fetchDeribitFutures(currency),
+    getGoldCorrelationData()
   ]);
 
   let accumulatedTrades = dataCache.blockTrades;
@@ -285,6 +289,11 @@ async function refreshAllMarketData(currency = 'BTC') {
     dataCache.termPremium = await analyzeTermPremium(futuresList, spotPrice);
   } catch (err) {
     console.warn('[DataFetcher] Term Premium analysis error:', err.message);
+  }
+
+  // Update Gold Correlation Cache
+  if (goldRes.status === 'fulfilled' && goldRes.value) {
+    dataCache.goldCorrelation = goldRes.value;
   }
 
   // Run change detection with persistent trade store additions

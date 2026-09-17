@@ -417,3 +417,106 @@ describe('Phase 2: ECDF Mid-Rank Percentile & Order Book Walk', () => {
   });
 });
 
+describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const {
+    calculatePearsonCorrelation,
+    calculateRollingPearsonCorrelation,
+    classifyCorrelationRegime,
+    getGoldCorrelationData
+  } = require('../server/gold_fetcher');
+
+  test('calculatePearsonCorrelation computes mathematically exact correlations', () => {
+    // 1. Perfect positive correlation (r = 1.0)
+    const x1 = [1, 2, 3, 4, 5];
+    const y1 = [2, 4, 6, 8, 10];
+    assert.equal(calculatePearsonCorrelation(x1, y1), 1.0);
+
+    // 2. Perfect negative correlation (r = -1.0)
+    const x2 = [1, 2, 3, 4, 5];
+    const y2 = [10, 8, 6, 4, 2];
+    assert.equal(calculatePearsonCorrelation(x2, y2), -1.0);
+
+    // 3. Flat / zero variance returns 0
+    const x3 = [5, 5, 5, 5];
+    const y3 = [1, 2, 3, 4];
+    assert.equal(calculatePearsonCorrelation(x3, y3), 0);
+
+    // 4. Invalid or mismatched array length returns 0
+    assert.equal(calculatePearsonCorrelation([], []), 0);
+    assert.equal(calculatePearsonCorrelation([1, 2], [1]), 0);
+  });
+
+  test('classifyCorrelationRegime accurately classifies all four market regimes', () => {
+    const r1 = classifyCorrelationRegime(0.72, 18.5, 8.2);
+    assert.equal(r1.regimeCode, 'DEBASEMENT_HEDGE');
+    assert.equal(r1.badgeClass, 'badge-pos');
+
+    const r2 = classifyCorrelationRegime(0.28, 18.5, 8.2);
+    assert.equal(r2.regimeCode, 'MODERATE_LINKAGE');
+    assert.equal(r2.badgeClass, 'badge-cyan');
+
+    const r3 = classifyCorrelationRegime(-0.05, 18.5, 8.2);
+    assert.equal(r3.regimeCode, 'DECOUPLED_REGIME');
+    assert.equal(r3.badgeClass, 'badge-warning');
+
+    const r4 = classifyCorrelationRegime(-0.45, 18.5, 8.2);
+    assert.equal(r4.regimeCode, 'ASSET_ROTATION');
+    assert.equal(r4.badgeClass, 'badge-neg');
+  });
+
+  test('Verified real Gold & BTC historical dataset exists and is clean', () => {
+    const filePath = path.join(__dirname, '..', 'data', 'gold_correlation.json');
+    assert.ok(fs.existsSync(filePath), 'data/gold_correlation.json must exist');
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+    assert.ok(data.metadata);
+    assert.equal(data.metadata.isRealHistorical, true);
+    assert.ok(data.metadata.dataSource.includes('Binance'));
+    assert.ok(data.current);
+    assert.ok(data.current.btcGoldRatio > 0);
+    assert.ok(data.current.goldBtcRatio > 0);
+    assert.ok(typeof data.current.rollingCorr30d === 'number');
+
+    assert.ok(Array.isArray(data.series));
+    assert.ok(data.series.length >= 500, `Must have >= 500 daily records, got ${data.series.length}`);
+
+    // Verify chronological ordering and clean numbers
+    for (let i = 0; i < data.series.length; i++) {
+      const row = data.series[i];
+      assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(row.date), `Row ${i} date format`);
+      if (i > 0) {
+        assert.ok(row.date >= data.series[i - 1].date, `Row ${i} date ascending`);
+      }
+      assert.ok(typeof row.btcPrice === 'number' && !isNaN(row.btcPrice));
+      assert.ok(typeof row.goldPrice === 'number' && !isNaN(row.goldPrice));
+      assert.ok(typeof row.btcGoldRatio === 'number' && !isNaN(row.btcGoldRatio));
+      assert.ok(typeof row.goldBtcRatio === 'number' && !isNaN(row.goldBtcRatio));
+      assert.ok(typeof row.marketCapShare === 'number' && !isNaN(row.marketCapShare));
+    }
+  });
+
+  test('GET /api/gold-correlation returns 200 and complete payload', async () => {
+    const { server } = require('../server/index');
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', async () => {
+        const port = server.address().port;
+        try {
+          const resp = await fetch(`http://127.0.0.1:${port}/api/gold-correlation`);
+          assert.equal(resp.status, 200);
+          const json = await resp.json();
+          assert.equal(json.code, 0);
+          assert.ok(json.current);
+          assert.ok(json.regime);
+          assert.ok(json.series.length >= 500);
+          assert.ok(json.metadata);
+        } finally {
+          server.close(resolve);
+        }
+      });
+    });
+  });
+});
+
+
