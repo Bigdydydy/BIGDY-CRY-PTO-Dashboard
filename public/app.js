@@ -282,7 +282,8 @@ function renderAll() {
   render25DeltaSkew(currentMarketData.delta25Skew);
   renderBlockTrades(currentMarketData.blockTrades);
   if (currentMarketData.termPremium) {
-    renderTermPremium(currentMarketData.termPremium);
+    const shouldForce = !termPremiumChartInstance || !!(currentMarketData.syncStatus && currentMarketData.syncStatus.hasAnyUpdate);
+    renderTermPremium(currentMarketData.termPremium, shouldForce);
   } else {
     loadTermPremiumData();
   }
@@ -1916,6 +1917,8 @@ const elTpHeaderRegimePill = document.getElementById('tp-header-regime-pill');
 const elTpHeaderScorePill = document.getElementById('tp-header-score-pill');
 const elTpHeaderExcessPill = document.getElementById('tp-header-excess-pill');
 const elTpUpdateTime = document.getElementById('tp-update-time');
+const elTpDataSourceBadge = document.getElementById('tp-data-source-badge');
+const elTpHistoryPointsBadge = document.getElementById('tp-history-points-badge');
 
 const elTpVal7d = document.getElementById('tp-val-7d');
 const elTpVal30d = document.getElementById('tp-val-30d');
@@ -1963,14 +1966,23 @@ async function loadTermPremiumData() {
 /**
  * Render all Term Premium metrics and chart
  */
-function renderTermPremium(data) {
+function renderTermPremium(data, forceRedraw = false) {
   if (!data) return;
+  const prevLatestTime = currentTermPremiumData?.current?.timestamp;
+  const prevSeriesLen = currentTermPremiumData?.series?.length;
   currentTermPremiumData = data;
 
   const c = data.current;
   const reg = data.regime || {};
 
-  // Header pills
+  // Header pills & provenance badges
+  if (elTpDataSourceBadge && data.metadata?.dataSource) {
+    elTpDataSourceBadge.title = `数据认证：${data.metadata.dataSource} | 跨度: ${data.metadata.timeRange || ''} | 缺失处理: ${data.metadata.missingHandling || ''}`;
+  }
+  if (elTpHistoryPointsBadge && data.series) {
+    elTpHistoryPointsBadge.textContent = `${data.series.length} 条真实历史日线 (2025.01~至今)`;
+  }
+
   if (elTpHeaderRegimePill && reg.regimeName) {
     elTpHeaderRegimePill.textContent = reg.regimeName.split(' ')[0] || '升水结构';
     if (reg.regimeBadgeClass) {
@@ -2048,8 +2060,14 @@ function renderTermPremium(data) {
     elTpInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
   }
 
-  // Render Dual-Grid Chart
-  renderTermPremiumChart();
+  // Render Dual-Grid Chart only when required to prevent costly re-rendering
+  const shouldRedraw = forceRedraw ||
+                       !termPremiumChartInstance ||
+                       prevLatestTime !== data.current?.timestamp ||
+                       prevSeriesLen !== data.series?.length;
+  if (shouldRedraw) {
+    renderTermPremiumChart();
+  }
 }
 
 /**

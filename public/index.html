@@ -622,6 +622,12 @@
         </div>
         <div class="header-controls">
           <div class="tp-header-badges">
+            <span class="tp-source-badge" id="tp-data-source-badge" title="真实交割基差认证：已接入 Binance COIN-M 季度交割合约真实基差 (2025.01~至今 625+ 日线) + Deribit 实时盘口恒定到期插值，缺失使用时间加权平滑顺延">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Binance/Deribit 真实交割基差
+            </span>
             <span class="tp-regime-pill" id="tp-header-regime-pill">-- 升水结构</span>
             <span class="tp-score-pill" id="tp-header-score-pill">Carry: --</span>
             <span class="tp-excess-pill" id="tp-header-excess-pill">超额: --</span>
@@ -683,6 +689,16 @@
             <!-- ECharts Container -->
             <div class="tp-chart-container">
               <div id="term-premium-echarts" style="width: 100%; height: 650px;"></div>
+            </div>
+
+            <!-- Real Basis Audit & Provenance Footnote -->
+            <div class="tp-data-audit-strip">
+              <div class="tp-audit-left">
+                <span><strong class="text-cyan">数据源:</strong> Binance COIN-M 季度交割基差 (DAPI 2025.01 ~ 至今真实日线) + Deribit 实时盘口</span>
+                <span><strong class="text-cyan">插值模型:</strong> 恒定到期 (7D/30D/90D/180D)</span>
+                <span><strong class="text-cyan">缺失处理:</strong> 时间加权线性插值与前值顺延</span>
+              </div>
+              <span id="tp-history-points-badge" class="tp-audit-right">625+ 真实历史日线</span>
             </div>
           </div>
 

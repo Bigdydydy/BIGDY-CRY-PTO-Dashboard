@@ -75,14 +75,26 @@ async function fetchCoinbaseTickerAndStats() {
 }
 
 /**
- * Calculate rolling percentile of value in an array
+ * Calculate rolling empirical cumulative distribution function (ECDF) percentile of value in an array
+ * Uses mid-rank weighting: (below + 0.5 * equal) / N * 100
+ * Eliminates boundary step bias and guarantees unbiased rank representation
  */
 function calcPercentile(arr, val) {
   if (!arr || arr.length === 0) return 50.0;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const count = sorted.filter(x => x <= val).length;
-  return parseFloat(((count / sorted.length) * 100).toFixed(1));
+  let below = 0;
+  let equal = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (v < val) {
+      below++;
+    } else if (v === val) {
+      equal++;
+    }
+  }
+  const ecdf = ((below + 0.5 * equal) / arr.length) * 100;
+  return parseFloat(Math.min(100.0, Math.max(0.0, ecdf)).toFixed(1));
 }
+
 
 /**
  * Simulate walking the order book for an institutional market order of targetUsd
@@ -395,5 +407,8 @@ async function getCoinbaseLiquidityData(forceRefresh = false) {
 }
 
 module.exports = {
-  getCoinbaseLiquidityData
+  getCoinbaseLiquidityData,
+  calcPercentile,
+  walkOrderBook
 };
+

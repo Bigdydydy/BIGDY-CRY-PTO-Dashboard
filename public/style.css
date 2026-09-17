@@ -2165,6 +2165,58 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.tp-source-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.tp-data-audit-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-xs);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tp-audit-left {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tp-audit-left span strong {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.tp-audit-right {
+  font-family: var(--font-mono);
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+
 .tp-main-layout {
   display: grid;
   grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
