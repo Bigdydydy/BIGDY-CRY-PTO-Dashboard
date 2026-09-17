@@ -35810,7 +35810,7 @@
     },
     {
       "date": "2026-09-17",
-      "btcPrice": 76628.25,
+      "btcPrice": 76684.5,
       "mstrCost": 75415.66,
       "mstrHoldings": 845050,
       "mstrBuyVelocity30d": 153.4,
@@ -35826,7 +35826,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 76628.25,
+    "currentBtc": 76684.5,
     "currentMstrCost": 75415.66,
     "currentMstrHoldings": 845050,
     "currentMstrVelocity30d": 153.4,
@@ -35852,7 +35852,7 @@
       "start": "2020-08-01",
       "end": "2026-09-17"
     },
-    "updatedAt": "2026-09-17T16:39:48.863Z"
+    "updatedAt": "2026-09-17T16:44:16.693Z"
   },
   "rawMstr": [
     {
