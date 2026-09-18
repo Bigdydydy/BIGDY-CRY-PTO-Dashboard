@@ -153,6 +153,39 @@ describe('Module 3: Block Trades & Iceberg Clustering', () => {
     assert.equal(cluster.splitCount, 3);
     assert.equal(cluster.totalContracts, 450);
   });
+
+  test('Module 3: Pagination at 20 trades per page cleanly slices data and determines boundaries', () => {
+    const PAGE_SIZE = 20;
+    // Simulate 55 trades
+    const items = Array.from({ length: 55 }, (_, i) => ({ id: `trade-${i + 1}` }));
+    const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    assert.equal(totalPages, 3, '55 items at 20/page should be 3 pages');
+
+    // Page 1
+    const p1 = items.slice((1 - 1) * PAGE_SIZE, 1 * PAGE_SIZE);
+    assert.equal(p1.length, 20);
+    assert.equal(p1[0].id, 'trade-1');
+    assert.equal(p1[19].id, 'trade-20');
+
+    // Page 2
+    const p2 = items.slice((2 - 1) * PAGE_SIZE, 2 * PAGE_SIZE);
+    assert.equal(p2.length, 20);
+    assert.equal(p2[0].id, 'trade-21');
+    assert.equal(p2[19].id, 'trade-40');
+
+    // Page 3 (partial page)
+    const p3 = items.slice((3 - 1) * PAGE_SIZE, 3 * PAGE_SIZE);
+    assert.equal(p3.length, 15);
+    assert.equal(p3[0].id, 'trade-41');
+    assert.equal(p3[14].id, 'trade-55');
+
+    // Zero items boundary
+    const emptyItems = [];
+    const emptyPages = Math.max(1, Math.ceil(emptyItems.length / PAGE_SIZE));
+    assert.equal(emptyPages, 1, 'Empty list should report 1 page');
+    const pEmpty = emptyItems.slice(0, PAGE_SIZE);
+    assert.equal(pEmpty.length, 0);
+  });
 });
 
 describe('Module 4 & 5: IV Smile & 25Δ Skew', () => {

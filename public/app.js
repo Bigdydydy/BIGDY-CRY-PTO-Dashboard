@@ -95,6 +95,19 @@ const badgeSingles = document.getElementById('badge-singles');
 const elClusterCardsContainer = document.getElementById('cluster-cards-container');
 const elWhaleTableBody = document.getElementById('whale-table-body');
 
+// Module 3: Block Trades Pagination State & DOM Elements
+const BLOCK_PAGE_SIZE = 20;
+let icebergCurrentPage = 1;
+let whaleCurrentPage = 1;
+
+const btnIcebergsPrev = document.getElementById('btn-icebergs-prev');
+const btnIcebergsNext = document.getElementById('btn-icebergs-next');
+const elIcebergsPageIndicator = document.getElementById('icebergs-page-indicator');
+
+const btnSinglesPrev = document.getElementById('btn-singles-prev');
+const btnSinglesNext = document.getElementById('btn-singles-next');
+const elSinglesPageIndicator = document.getElementById('singles-page-indicator');
+
 // Modal Elements
 const tradeModalBackdrop = document.getElementById('trade-modal-backdrop');
 const btnCloseModal = document.getElementById('btn-close-modal');
@@ -515,117 +528,175 @@ function renderBlockTrades(data) {
     }
   }
 
-  // 1. Render Iceberg Clusters
-  const clusters = data.icebergClusters || [];
-  if (!clusters.length) {
-    elClusterCardsContainer.innerHTML = '<div class="loading-placeholder">在当前门槛下未发现明显拆单聚合模式</div>';
-  } else {
-    let clusterHtml = '';
-    clusters.forEach((c, idx) => {
-      const isBuy = c.direction === 'buy';
-      const dirClass = isBuy ? 'dir-buy' : 'dir-sell';
-      const dirText = c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单');
+  // 1. Render Iceberg Clusters with pagination (20 per page)
+  renderIcebergsList(data.icebergClusters || []);
 
-      clusterHtml += `
-        <div class="cluster-card" onclick="openIcebergDetail(${Number(idx)})">
-          <div class="cluster-info">
-            <span class="cluster-dir-badge ${dirClass}">${dirText}</span>
-            <div>
-              <div class="cluster-inst">${escapeHtml(c.instrument)}</div>
-              <div class="cluster-meta">时间窗: ${escapeHtml(formatTimeWindowUTC8(c.startTimeUTC8 || c.startTime, c.endTimeUTC8 || c.endTime, c.durationMin))}</div>
-            </div>
-          </div>
-          <div>
-            <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
-            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
-          </div>
-          <div class="cluster-stats">
-            <div class="cluster-stat-item">
-              <span class="stat-label">拆单笔数 / 块数</span>
-              <span class="c-val">${Number(c.splitCount) || 0} 笔 (${Number(c.blockCount) || 0} 个 Block)</span>
-            </div>
-            <div class="cluster-stat-item">
-              <span class="stat-label">累计张数</span>
-              <span class="c-val text-accent">${Number(c.totalContracts || 0).toLocaleString()} BTC</span>
-            </div>
-            <div class="cluster-stat-item">
-              <span class="stat-label">累计名义价值</span>
-              <span class="c-val text-highlight">$${(Number(c.clusterNotionalM) || 0).toFixed(2)}M</span>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    elClusterCardsContainer.innerHTML = clusterHtml;
+  // 2. Render Single Whale Blocks with pagination (20 per page)
+  renderWhaleSinglesList(data.whaleBlocks || []);
+}
+
+/**
+ * Paginated Render for Iceberg Clusters (20 items / page)
+ */
+function renderIcebergsList(clusters) {
+  if (!elClusterCardsContainer) return;
+  const totalCount = clusters.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / BLOCK_PAGE_SIZE));
+  if (icebergCurrentPage > totalPages) icebergCurrentPage = totalPages;
+  if (icebergCurrentPage < 1) icebergCurrentPage = 1;
+
+  if (!totalCount) {
+    elClusterCardsContainer.innerHTML = '<div class="loading-placeholder">在当前门槛下未发现明显拆单聚合模式</div>';
+    if (elIcebergsPageIndicator) {
+      elIcebergsPageIndicator.innerHTML = '第 <span class="page-num-highlight">1</span> / 1 页 <span class="page-total-badge">共 0 组拆单</span>';
+    }
+    if (btnIcebergsPrev) btnIcebergsPrev.disabled = true;
+    if (btnIcebergsNext) btnIcebergsNext.disabled = true;
+    return;
   }
 
-  // 2. Render Single Whale Blocks Table & Mobile Cards
-  const blocks = data.whaleBlocks || [];
+  const startIdx = (icebergCurrentPage - 1) * BLOCK_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + BLOCK_PAGE_SIZE, totalCount);
+  const pageClusters = clusters.slice(startIdx, endIdx);
+
+  let clusterHtml = '';
+  pageClusters.forEach((c, idx) => {
+    const globalIdx = startIdx + idx;
+    const isBuy = c.direction === 'buy';
+    const dirClass = isBuy ? 'dir-buy' : 'dir-sell';
+    const dirText = c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单');
+
+    clusterHtml += `
+      <div class="cluster-card" onclick="openIcebergDetail(${Number(globalIdx)})">
+        <div class="cluster-info">
+          <span class="cluster-dir-badge ${dirClass}">${dirText}</span>
+          <div>
+            <div class="cluster-inst">${escapeHtml(c.instrument)}</div>
+            <div class="cluster-meta">时间窗: ${escapeHtml(formatTimeWindowUTC8(c.startTimeUTC8 || c.startTime, c.endTimeUTC8 || c.endTime, c.durationMin))}</div>
+          </div>
+        </div>
+        <div>
+          <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
+          ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
+        </div>
+        <div class="cluster-stats">
+          <div class="cluster-stat-item">
+            <span class="stat-label">拆单笔数 / 块数</span>
+            <span class="c-val">${Number(c.splitCount) || 0} 笔 (${Number(c.blockCount) || 0} 个 Block)</span>
+          </div>
+          <div class="cluster-stat-item">
+            <span class="stat-label">累计张数</span>
+            <span class="c-val text-accent">${Number(c.totalContracts || 0).toLocaleString()} BTC</span>
+          </div>
+          <div class="cluster-stat-item">
+            <span class="stat-label">累计名义价值</span>
+            <span class="c-val text-highlight">$${(Number(c.clusterNotionalM) || 0).toFixed(2)}M</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  elClusterCardsContainer.innerHTML = clusterHtml;
+
+  if (elIcebergsPageIndicator) {
+    elIcebergsPageIndicator.innerHTML = `第 <span class="page-num-highlight">${icebergCurrentPage}</span> / ${totalPages} 页 <span class="page-total-badge">共 ${totalCount} 组拆单</span>`;
+  }
+  if (btnIcebergsPrev) btnIcebergsPrev.disabled = icebergCurrentPage <= 1;
+  if (btnIcebergsNext) btnIcebergsNext.disabled = icebergCurrentPage >= totalPages;
+}
+
+/**
+ * Paginated Render for Single Whale Blocks (20 items / page)
+ */
+function renderWhaleSinglesList(blocks) {
+  if (!elWhaleTableBody) return;
   const elWhaleMobileCards = document.getElementById('whale-mobile-cards');
-  if (!blocks.length) {
+  const totalCount = blocks.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / BLOCK_PAGE_SIZE));
+  if (whaleCurrentPage > totalPages) whaleCurrentPage = totalPages;
+  if (whaleCurrentPage < 1) whaleCurrentPage = 1;
+
+  if (!totalCount) {
     elWhaleTableBody.innerHTML = '<tr><td colspan="8" class="text-center">在当前门槛下未检测到单笔巨鲸大单</td></tr>';
     if (elWhaleMobileCards) {
       elWhaleMobileCards.innerHTML = '<div style="text-align:center;padding:24px;color:#71717a;font-size:0.75rem;">在当前门槛下未检测到单笔巨鲸大单</div>';
     }
-  } else {
-    let tableHtml = '';
-    let cardsHtml = '';
-    blocks.forEach((b, idx) => {
-      tableHtml += `
-        <tr onclick="openWhaleDetail(${Number(idx)})">
-          <td>${escapeHtml(b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp))}</td>
-          <td><span class="text-accent">${escapeHtml(b.blockId)}</span></td>
-          <td>
-            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
-            ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
-          </td>
-          <td><strong>$${(Number(b.notionalUSDM) || 0).toFixed(2)}M</strong></td>
-          <td>${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</td>
-          <td>${(Number(b.netVegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(b.netVegaUSD) || 0).toLocaleString()}</td>
-          <td>${Number(b.legCount) || 0} 腿</td>
-          <td><button class="action-btn" onclick="event.stopPropagation(); openWhaleDetail(${Number(idx)})">穿透解析</button></td>
-        </tr>
-      `;
+    if (elSinglesPageIndicator) {
+      elSinglesPageIndicator.innerHTML = '第 <span class="page-num-highlight">1</span> / 1 页 <span class="page-total-badge">共 0 笔大单</span>';
+    }
+    if (btnSinglesPrev) btnSinglesPrev.disabled = true;
+    if (btnSinglesNext) btnSinglesNext.disabled = true;
+    return;
+  }
 
-      cardsHtml += `
-        <div class="whale-mobile-card" onclick="openWhaleDetail(${Number(idx)})">
-          <div class="wmc-header">
-            <div class="wmc-id-group">
-              <span class="wmc-id">${escapeHtml(b.blockId)}</span>
-              <span class="wmc-time">${escapeHtml((b.dateTimeUTC8 || b.dateTime || '').slice(5, 16))}</span>
-            </div>
-            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+  const startIdx = (whaleCurrentPage - 1) * BLOCK_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + BLOCK_PAGE_SIZE, totalCount);
+  const pageBlocks = blocks.slice(startIdx, endIdx);
+
+  let tableHtml = '';
+  let cardsHtml = '';
+  pageBlocks.forEach((b, idx) => {
+    const globalIdx = startIdx + idx;
+    tableHtml += `
+      <tr onclick="openWhaleDetail(${Number(globalIdx)})">
+        <td>${escapeHtml(b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp))}</td>
+        <td><span class="text-accent">${escapeHtml(b.blockId)}</span></td>
+        <td>
+          <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+          ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
+        </td>
+        <td><strong>$${(Number(b.notionalUSDM) || 0).toFixed(2)}M</strong></td>
+        <td>${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</td>
+        <td>${(Number(b.netVegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(b.netVegaUSD) || 0).toLocaleString()}</td>
+        <td>${Number(b.legCount) || 0} 腿</td>
+        <td><button class="action-btn" onclick="event.stopPropagation(); openWhaleDetail(${Number(globalIdx)})">穿透解析</button></td>
+      </tr>
+    `;
+
+    cardsHtml += `
+      <div class="whale-mobile-card" onclick="openWhaleDetail(${Number(globalIdx)})">
+        <div class="wmc-header">
+          <div class="wmc-id-group">
+            <span class="wmc-id">${escapeHtml(b.blockId)}</span>
+            <span class="wmc-time">${escapeHtml((b.dateTimeUTC8 || b.dateTime || '').slice(5, 16))}</span>
           </div>
-          <div class="wmc-strategy">${escapeHtml(b.strategyNameZh || '机构定制结构')}</div>
-          <div class="wmc-grid">
-            <div class="wmc-stat">
-              <span class="wmc-lbl">名义价值</span>
-              <span class="wmc-val text-highlight">$${(Number(b.notionalUSDM) || 0).toFixed(1)}M</span>
-            </div>
-            <div class="wmc-stat">
-              <span class="wmc-lbl">最大理论盈利</span>
-              <span class="wmc-val text-accent">${escapeHtml(b.riskProfile?.maxProfit || '--')}</span>
-            </div>
-            <div class="wmc-stat">
-              <span class="wmc-lbl">净 Delta</span>
-              <span class="wmc-val">${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</span>
-            </div>
-            <div class="wmc-stat">
-              <span class="wmc-lbl">结构腿数</span>
-              <span class="wmc-val">${Number(b.legCount) || 0} 腿</span>
-            </div>
+          <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+        </div>
+        <div class="wmc-strategy">${escapeHtml(b.strategyNameZh || '机构定制结构')}</div>
+        <div class="wmc-grid">
+          <div class="wmc-stat">
+            <span class="wmc-lbl">名义价值</span>
+            <span class="wmc-val text-highlight">$${(Number(b.notionalUSDM) || 0).toFixed(1)}M</span>
           </div>
-          <div class="wmc-footer">
-            <span class="wmc-tap-hint">点击穿透希腊字母与战略意图 →</span>
+          <div class="wmc-stat">
+            <span class="wmc-lbl">最大理论盈利</span>
+            <span class="wmc-val text-accent">${escapeHtml(b.riskProfile?.maxProfit || '--')}</span>
+          </div>
+          <div class="wmc-stat">
+            <span class="wmc-lbl">净 Delta</span>
+            <span class="wmc-val">${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</span>
+          </div>
+          <div class="wmc-stat">
+            <span class="wmc-lbl">结构腿数</span>
+            <span class="wmc-val">${Number(b.legCount) || 0} 腿</span>
           </div>
         </div>
-      `;
-    });
-    elWhaleTableBody.innerHTML = tableHtml;
-    if (elWhaleMobileCards) {
-      elWhaleMobileCards.innerHTML = cardsHtml;
-    }
+        <div class="wmc-footer">
+          <span class="wmc-tap-hint">点击穿透希腊字母与战略意图 →</span>
+        </div>
+      </div>
+    `;
+  });
+  elWhaleTableBody.innerHTML = tableHtml;
+  if (elWhaleMobileCards) {
+    elWhaleMobileCards.innerHTML = cardsHtml;
   }
+
+  if (elSinglesPageIndicator) {
+    elSinglesPageIndicator.innerHTML = `第 <span class="page-num-highlight">${whaleCurrentPage}</span> / ${totalPages} 页 <span class="page-total-badge">共 ${totalCount} 笔大单</span>`;
+  }
+  if (btnSinglesPrev) btnSinglesPrev.disabled = whaleCurrentPage <= 1;
+  if (btnSinglesNext) btnSinglesNext.disabled = whaleCurrentPage >= totalPages;
 }
 
 /**
@@ -799,12 +870,57 @@ btnRefresh.addEventListener('click', () => {
 });
 
 thresholdSelect.addEventListener('change', () => {
+  icebergCurrentPage = 1;
+  whaleCurrentPage = 1;
   loadMarketData(false);
 });
 
 if (timeRangeSelect) {
   timeRangeSelect.addEventListener('change', () => {
+    icebergCurrentPage = 1;
+    whaleCurrentPage = 1;
     loadMarketData(false);
+  });
+}
+
+// Module 3: Block Trades Pagination Button Listeners
+if (btnIcebergsPrev) {
+  btnIcebergsPrev.addEventListener('click', () => {
+    if (icebergCurrentPage > 1) {
+      icebergCurrentPage--;
+      renderIcebergsList(currentMarketData?.blockTrades?.icebergClusters || []);
+    }
+  });
+}
+
+if (btnIcebergsNext) {
+  btnIcebergsNext.addEventListener('click', () => {
+    const clusters = currentMarketData?.blockTrades?.icebergClusters || [];
+    const totalPages = Math.max(1, Math.ceil(clusters.length / BLOCK_PAGE_SIZE));
+    if (icebergCurrentPage < totalPages) {
+      icebergCurrentPage++;
+      renderIcebergsList(clusters);
+    }
+  });
+}
+
+if (btnSinglesPrev) {
+  btnSinglesPrev.addEventListener('click', () => {
+    if (whaleCurrentPage > 1) {
+      whaleCurrentPage--;
+      renderWhaleSinglesList(currentMarketData?.blockTrades?.whaleBlocks || []);
+    }
+  });
+}
+
+if (btnSinglesNext) {
+  btnSinglesNext.addEventListener('click', () => {
+    const blocks = currentMarketData?.blockTrades?.whaleBlocks || [];
+    const totalPages = Math.max(1, Math.ceil(blocks.length / BLOCK_PAGE_SIZE));
+    if (whaleCurrentPage < totalPages) {
+      whaleCurrentPage++;
+      renderWhaleSinglesList(blocks);
+    }
   });
 }
 
