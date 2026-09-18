@@ -3,29 +3,29 @@
     "dataSource": "Binance PAXG/USDT (1:1 实物黄金锚定) + BTC/USDT 官方现货 24/7 连续日线",
     "targetReference": "Newhedge.io (Bitcoin vs. Gold Correlation & Ratio)",
     "externalUrl": "https://newhedge.io/bitcoin/gold-correlation",
-    "timeRange": "2023-12-23 至 2026-09-17",
+    "timeRange": "2023-12-24 至 2026-09-18",
     "totalDays": 1000,
     "correlationWindowDays": 30,
     "goldBenchmarkMarketCap": "$18.50T (全球存量地上黄金估算)",
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 76632,
-    "goldPrice": 4355.84,
-    "btcGoldRatio": 17.59,
-    "goldBtcRatio": 0.05684,
-    "ratioChange24h": -1.29,
-    "marketCapShare": 8.2,
-    "rollingCorr30d": 0.716,
-    "timestamp": 1789603200000,
-    "date": "2026-09-17"
+    "btcPrice": 77377,
+    "goldPrice": 4356.19,
+    "btcGoldRatio": 17.76,
+    "goldBtcRatio": 0.0563,
+    "ratioChange24h": 1.02,
+    "marketCapShare": 8.28,
+    "rollingCorr30d": 0.627,
+    "timestamp": 1789689600000,
+    "date": "2026-09-18"
   },
   "regime": {
     "regimeCode": "DEBASEMENT_HEDGE",
     "regimeName": "高抗通胀共振 (Debasement Hedge)",
     "badgeClass": "badge-pos",
     "color": "#10b981",
-    "summary": "BTC 与黄金呈现强正向共振联动 (30D r = +0.72)。两者作为“抗法币贬值硬资产”的宏观定位高度共鸣，全球流动性扩张推动两者同步上涨。",
+    "summary": "BTC 与黄金呈现强正向共振联动 (30D r = +0.63)。两者作为“抗法币贬值硬资产”的宏观定位高度共鸣，全球流动性扩张推动两者同步上涨。",
     "keyPointers": [
       "硬资产溢价同频：机构资金将两者共同纳入去中心化储备对冲篮子，对冲美元信用扩张与主权债务压力。",
       "高贝塔弹性释放：在法币贬值主升浪中，BTC 表现为黄金的“杠杆高贝塔版本”，兑黄金比价持续扩张。",
@@ -33,16 +33,6 @@
     ]
   },
   "series": [
-    {
-      "date": "2023-12-23",
-      "timestamp": 1703289600000,
-      "btcPrice": 43702,
-      "goldPrice": 2026,
-      "btcGoldRatio": 21.57,
-      "goldBtcRatio": 0.04636,
-      "marketCapShare": 4.68,
-      "rollingCorr30d": null
-    },
     {
       "date": "2023-12-24",
       "timestamp": 1703376000000,
@@ -341,7 +331,7 @@
       "btcGoldRatio": 19.77,
       "goldBtcRatio": 0.05057,
       "marketCapShare": 4.23,
-      "rollingCorr30d": -0.042
+      "rollingCorr30d": null
     },
     {
       "date": "2024-01-23",
@@ -10026,12 +10016,22 @@
     {
       "date": "2026-09-17",
       "timestamp": 1789603200000,
-      "btcPrice": 76632,
-      "goldPrice": 4355.84,
-      "btcGoldRatio": 17.59,
-      "goldBtcRatio": 0.05684,
-      "marketCapShare": 8.2,
-      "rollingCorr30d": 0.716
+      "btcPrice": 76417,
+      "goldPrice": 4345.87,
+      "btcGoldRatio": 17.58,
+      "goldBtcRatio": 0.05687,
+      "marketCapShare": 8.18,
+      "rollingCorr30d": 0.717
+    },
+    {
+      "date": "2026-09-18",
+      "timestamp": 1789689600000,
+      "btcPrice": 77377,
+      "goldPrice": 4356.19,
+      "btcGoldRatio": 17.76,
+      "goldBtcRatio": 0.0563,
+      "marketCapShare": 8.28,
+      "rollingCorr30d": 0.627
     }
   ]
 }

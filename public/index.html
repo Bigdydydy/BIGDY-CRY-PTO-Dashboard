@@ -183,15 +183,17 @@
             </div>
           </button>
 
-          <button class="sidebar-nav-item" data-view="view-x-pulse" id="nav-item-x-pulse">
+          <button class="sidebar-nav-item" data-view="view-esther-agent" id="nav-item-esther-agent">
             <div class="nav-icon-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">社群情报与 Gemini 智囊</span>
-              <span class="nav-desc">11位顶流博主 &amp; AI 穿透研判</span>
+              <span class="nav-title">扬缨 (Esther Yang) 宏观智囊</span>
+              <span class="nav-desc">全球宏观对冲与大类资产配置</span>
             </div>
           </button>
         </nav>
@@ -1615,174 +1617,149 @@
       </div>
   </div> <!-- /#view-gold-correlation -->
 
-      <!-- View 8: 宏观与加密社交情报流 & Gemini 智囊联动 (Module 8) -->
-      <div class="view-panel" id="view-x-pulse">
-        <section class="bento-card" id="module-x-pulse">
-          <div class="card-header x-pulse-header">
+      <!-- View 8: 扬缨 (Esther Yang) 宏观智囊终端 (Module 8) -->
+      <div class="view-panel" id="view-esther-agent" style="display: none;">
+        <section class="bento-card esther-terminal-card" id="module-esther-agent">
+          <div class="card-header esther-terminal-header">
             <div class="card-title-group">
-              <span class="card-module-tag">08 MACRO &amp; CRYPTO X-PULSE FEED &amp; GEMINI COPILOT</span>
-              <h2>宏观与加密社群脉搏情报流 &amp; 嵌入式 Gemini 穿透研判工作台</h2>
+              <span class="card-module-tag">08 GLOBAL MACRO HEDGE FUND STRATEGIST AGENT</span>
+              <h2>扬缨 (Esther Yang) 宏观智囊终端</h2>
             </div>
-            <div class="x-header-actions">
-              <div class="x-badge-pill" title="严格限定：仅收录用户提供的 11 位宏观与加密核心博主">
-                <span class="live-dot-green"></span>
-                <span>白名单 11 位博主</span>
-              </div>
-              <div class="x-badge-pill" title="时效性：严格仅保留最近 7 天以内的最新推文">
-                <span class="badge-icon">⏱</span>
-                <span>7天内推文: <strong id="x-pulse-count">--</strong> 条</span>
-              </div>
-              <div class="x-badge-pill filter-pure" title="纯度机制：严格过滤掉任何日常生活杂谈与非金融娱乐政治内容">
-                <span class="badge-icon">🛡</span>
-                <span>金融/Crypto 过滤纯度 100%</span>
+            <div class="esther-header-actions">
+              <div class="esther-model-selector-wrap">
+                <select id="esther-model-select" class="esther-model-select" aria-label="选择推理模型">
+                  <option value="gemini-2.5-flash" selected>⚡ Gemini 2.5 Flash (极速)</option>
+                  <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (深度推理)</option>
+                </select>
               </div>
               <button class="btn-gemini-key-config" id="btn-open-gemini-modal" title="配置您的 Google Gemini API Key 以启用官方大模型">
                 <span class="sparkle-icon">✦</span>
-                <span>Gemini Key 配置</span>
+                <span>API Key 配置</span>
               </button>
-              <button class="btn-sm-action" id="btn-refresh-x-pulse" title="刷新推文流与量化过滤状态">
+              <button class="btn-sm-action" id="btn-clear-esther-chat" title="清空对话并重新开启新议题">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 4v6h-6M1 20v-6h6"/>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-                <span>刷新情报流</span>
+                <span>清空对话</span>
               </button>
             </div>
           </div>
 
-          <div class="card-body x-pulse-body">
-            <!-- Split Workspace: 58% Feed Stream + 42% Embedded Gemini Copilot -->
-            <div class="x-split-workspace">
-              <!-- Left Column: Posts Stream -->
-              <div class="x-feed-column">
-                <!-- Toolbar: Author selector, Search input, Tag pills -->
-                <div class="x-feed-toolbar">
-                  <div class="x-filter-row">
-                    <div class="x-select-wrap">
-                      <select id="x-author-select" class="x-select-control" aria-label="筛选博主">
-                        <option value="all">全部 11 位博主</option>
-                      </select>
-                    </div>
-                    <div class="x-search-wrap">
-                      <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                      </svg>
-                      <input type="text" id="x-feed-search" class="x-search-input" placeholder="搜索关键词（如 CPI、基差、付鹏、流动性...）" />
-                    </div>
-                  </div>
-
-                  <!-- Tag Pills -->
-                  <div class="x-tag-strip" id="x-tag-strip">
-                    <button class="x-tag-pill active" data-tag="all">全部领域</button>
-                    <button class="x-tag-pill" data-tag="#Macro">#Macro 宏观</button>
-                    <button class="x-tag-pill" data-tag="#Crypto">#Crypto 加密</button>
-                    <button class="x-tag-pill" data-tag="#FedRates">#FedRates 联储与利率</button>
-                    <button class="x-tag-pill" data-tag="#Derivatives">#Derivatives 衍生品</button>
-                    <button class="x-tag-pill" data-tag="#CrudeOil">#CrudeOil 原油大宗</button>
-                    <button class="x-tag-pill" data-tag="#US_Equities">#US_Equities 美股</button>
-                  </div>
+          <div class="card-body esther-terminal-body">
+            <!-- Profile Banner -->
+            <div class="esther-profile-banner">
+              <div class="esther-profile-left">
+                <div class="esther-avatar-wrap">
+                  <div class="esther-avatar-letter">EY</div>
+                  <span class="esther-verified-dot" title="资深买方策略师认证">✓</span>
                 </div>
-
-                <!-- Feed Stream Container -->
-                <div class="x-posts-stream" id="x-posts-stream">
-                  <div class="x-feed-loading">
-                    <span class="spinner-dot"></span>
-                    <span>正在加载 7 天内金融/加密脉搏流...</span>
+                <div class="esther-profile-meta">
+                  <div class="esther-profile-name-row">
+                    <span class="esther-name">扬缨 (Esther Yang)</span>
+                    <span class="esther-badge">资深全球宏观对冲基金策略师</span>
+                    <span class="esther-badge-gold">高级金融顾问</span>
+                  </div>
+                  <div class="esther-profile-sub">
+                    以资产负债表穿透、流动性微观管道、可证伪量化边界见长，擅长大类资产择时与跨周期宏观配置
                   </div>
                 </div>
               </div>
+              <div class="esther-status-indicator" id="esther-status-indicator">
+                <span class="esther-pulse-dot"></span>
+                <span id="esther-status-text">在线就绪</span>
+              </div>
+            </div>
 
-              <!-- Right Column: Embedded Gemini Copilot -->
-              <div class="x-copilot-column">
-                <div class="gemini-copilot-card">
-                  <!-- Copilot Header -->
-                  <div class="copilot-header">
-                    <div class="copilot-brand">
-                      <span class="copilot-sparkle">✦</span>
-                      <div class="copilot-title-wrap">
-                        <div class="copilot-name">Gemini 2.5 Quantitative Copilot</div>
-                        <div class="copilot-sub">同屏宏观逻辑穿透 &amp; 加密微观传导分析</div>
-                      </div>
-                    </div>
-                    <div class="copilot-header-controls">
-                      <select id="copilot-model-select" class="copilot-model-select" aria-label="选择推理模型">
-                        <option value="gemini-2.5-flash" selected>⚡ Gemini 2.5 Flash (极速)</option>
-                        <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (深度推理)</option>
-                      </select>
-                      <div class="copilot-status-badge" id="copilot-status-badge">
-                        <span class="copilot-status-dot"></span>
-                        <span id="copilot-status-label">就绪</span>
-                      </div>
-                    </div>
-                  </div>
+            <!-- Chat Container with Scrollable Message Stream -->
+            <div class="esther-chat-stream" id="esther-chat-stream">
+              <!-- Welcome & Philosophy Box -->
+              <div class="esther-welcome-box">
+                <div class="esther-welcome-header">
+                  <span class="esther-welcome-sparkle">✦</span>
+                  <span class="esther-welcome-title">欢迎进入扬缨宏观量化研判视窗</span>
+                </div>
+                <div class="esther-welcome-body">
+                  “你好，我是扬缨。在宏观与金融交易中，我习惯跳过表面的喧嚣与情绪，穿透到央行资产负债表、久期错配与微观流动性管道中探寻真相。关于全球利率、货币博弈、主权债务或科技资本开支，今天你想探讨哪个维度的底层逻辑？”
+                </div>
+              </div>
 
-                  <!-- Active Post Context Preview -->
-                  <div class="copilot-context-box" id="copilot-context-box">
-                    <div class="context-header">
-                      <span class="context-label">📌 当前聚焦推文上下文</span>
-                      <span class="context-author" id="copilot-ctx-author">请选择推文</span>
-                      <span class="context-time" id="copilot-ctx-time">--</span>
+              <!-- Quick Prompt Starters Section -->
+              <div class="esther-starters-section" id="esther-starters-section">
+                <div class="esther-starters-label">
+                  <span>💡 预置高转化研判议题（点击一键穿透）：</span>
+                </div>
+                <div class="esther-starters-grid" id="esther-starters-grid">
+                  <button class="esther-starter-pill" data-question="30年期美债冲上5.3%，财政部回购为什么压不住长端收益率？">
+                    <span class="starter-icon">📉</span>
+                    <div class="starter-content">
+                      <span class="starter-tag">美债长端与赤字</span>
+                      <span class="starter-text">30年期美债冲上5.3%，财政部回购为何压不住长端？</span>
                     </div>
-                    <div class="context-snippet" id="copilot-ctx-snippet">
-                      请点击左侧任意推文的「⚡ 问问 Gemini」按钮，或直接点击推文卡片以将其锁定为当前分析上下文。
+                  </button>
+                  <button class="esther-starter-pill" data-question="高实际利率下黄金如何实现「利率逃逸」？与比特币本质区别在哪？">
+                    <span class="starter-icon">🪙</span>
+                    <div class="starter-content">
+                      <span class="starter-tag">黄金与流动性</span>
+                      <span class="starter-text">高实际利率下黄金如何「利率逃逸」？与比特币本质区别？</span>
                     </div>
-                  </div>
+                  </button>
+                  <button class="esther-starter-pill" data-question="科技巨头宣称的 1.8 万亿表外负债与折旧年限拉长究竟怎么算账？">
+                    <span class="starter-icon">🤖</span>
+                    <div class="starter-content">
+                      <span class="starter-tag">AI 资本开支暗管</span>
+                      <span class="starter-text">科技巨头 1.8 万亿表外负债与折旧年限拉长究竟怎么算账？</span>
+                    </div>
+                  </button>
+                  <button class="esther-starter-pill" data-question="美日联合干预日元到底动了谁的资产负债表？后续套息拆仓风险多大？">
+                    <span class="starter-icon">💴</span>
+                    <div class="starter-content">
+                      <span class="starter-tag">日元套息与干预</span>
+                      <span class="starter-text">美日联合干预到底动了谁的资产负债表？套息拆仓风险多大？</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
-                  <!-- Quick Action Prompts -->
-                  <div class="copilot-prompts-strip">
-                    <span class="prompts-label">一键量化预设:</span>
-                    <div class="prompts-buttons" id="copilot-prompts-buttons">
-                      <button class="copilot-pbtn active" data-prompt="macro_logic" title="拆解宏观经济底层假设与资产负债表传导机制">
-                        <span>📊 宏观逻辑穿透</span>
-                      </button>
-                      <button class="copilot-pbtn" data-prompt="crypto_impact" title="分析对 BTC 现货、期现基差与波动率曲面的具体影响">
-                        <span>🪙 对 BTC/加密走势影响</span>
-                      </button>
-                      <button class="copilot-pbtn" data-prompt="trading_implication" title="评估多空风险收益比与跨资产套利/对冲策略">
-                        <span>⚖️ 多空交易蕴涵</span>
-                      </button>
-                      <button class="copilot-pbtn" data-prompt="falsification_risk" title="识别潜在认知盲区、反向黑天鹅与论点证伪阈值">
-                        <span>🔍 逻辑证伪与反向风险</span>
-                      </button>
-                    </div>
-                  </div>
+              <!-- Dynamic Messages List -->
+              <div class="esther-messages-list" id="esther-messages-list"></div>
 
-                  <!-- Analysis Report Area -->
-                  <div class="copilot-report-scroll" id="copilot-report-scroll">
-                    <div class="copilot-report-content markdown-body" id="copilot-report-content">
-                      <div class="copilot-empty-state">
-                        <div class="empty-sparkle">✦</div>
-                        <h4>欢迎使用 Gemini 量化研判工作台</h4>
-                        <p>左侧推文已按 <strong>用户指定的 11 位博主白名单</strong> 严格采集，全部限定在 <strong>7 天之内</strong>，且 <strong>100% 过滤非金融娱乐杂谈</strong>。</p>
-                        <p>点击推文上的 <strong>「⚡ 问问 Gemini」</strong> 即可在此视窗就地生成机构级穿透报告，支持深度追问与多轮推演，无需跳转任何外部网页！</p>
-                      </div>
-                    </div>
+              <!-- Thinking Indicator -->
+              <div class="esther-thinking-box" id="esther-thinking-box" style="display: none;">
+                <div class="esther-thinking-avatar">EY</div>
+                <div class="esther-thinking-bubble">
+                  <div class="thinking-dots">
+                    <span></span><span></span><span></span>
                   </div>
+                  <span class="thinking-text">扬缨正在穿透微观流动性管道与资产负债表...</span>
+                </div>
+              </div>
+            </div>
 
-                  <!-- Interactive Follow-up Bar -->
-                  <div class="copilot-input-area">
-                    <div class="copilot-input-box">
-                      <input type="text" id="copilot-custom-input" class="copilot-text-input" placeholder="针对当前推文向 Gemini 追问（如：若非农超预期该观点如何修正？）..." />
-                      <button id="btn-copilot-submit" class="btn-copilot-send" title="发送提问">
-                        <span>发送</span>
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="22" y1="2" x2="11" y2="13"/>
-                          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                        </svg>
-                      </button>
-                    </div>
-                    <div class="copilot-engine-meta">
-                      <span id="copilot-engine-source">⚡ 模式: Gemini 2.5 Flash / 启发式双模保障</span>
-                      <span id="copilot-latency-badge"></span>
-                    </div>
-                  </div>
+            <!-- Interactive Input Dock -->
+            <div class="esther-input-dock">
+              <div class="esther-input-box">
+                <textarea id="esther-chat-input" class="esther-textarea" placeholder="向扬缨提问关于全球宏观、央行流动性、资产负债表或大类资产配置... (Enter 发送，Shift+Enter 换行)" rows="1"></textarea>
+                <button id="btn-esther-send" class="btn-esther-send" title="发送提问">
+                  <span>发送</span>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="esther-footer-bar">
+                <div class="esther-model-status" id="esther-model-status">
+                  <span>✦ 模式: 扬缨买方智囊 (双模自适应)</span>
+                </div>
+                <div class="esther-philosophy-pill">
+                  资产负债表穿透 · 久期折现约束 · 不对称赔率与量化可证伪底线
                 </div>
               </div>
             </div>
           </div>
         </section>
-      </div> <!-- /#view-x-pulse -->
+      </div> <!-- /#view-esther-agent -->
 
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
@@ -1913,8 +1890,8 @@
             <span>可随时在 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a> 免费生成个人 API Key。</span>
           </div>
           <div class="tip-item">
-            <strong>🛡️ 零依赖启发式回退：</strong>
-            <span>若未配置 Key，系统将自动启用内置的高精度机构量化启发式研判引擎，所有推文分析功能依然 100% 正常可用！</span>
+            <strong>🛡️ 零依赖启发式研判回退：</strong>
+            <span>若未配置 Key，系统将自动启用内置的高精度买方机构启发式研判引擎，扬缨全套宏观推演与对话功能依然 100% 完整可用！</span>
           </div>
         </div>
 
@@ -1992,11 +1969,12 @@
       </svg>
       <span>金/BTC</span>
     </button>
-    <button class="mob-nav-item" data-view="view-x-pulse" id="mob-nav-x-pulse">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    <button class="mob-nav-item" data-view="view-esther-agent" id="mob-nav-esther-agent">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        <path d="M8 10h.01M12 10h.01M16 10h.01"/>
       </svg>
-      <span>X脉搏</span>
+      <span>扬缨智囊</span>
     </button>
   </nav>
 

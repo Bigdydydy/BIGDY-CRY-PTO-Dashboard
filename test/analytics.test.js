@@ -519,202 +519,163 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
   });
 });
 
-describe('Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Engine', () => {
+describe('Module 8: 扬缨 (Esther Yang) 宏观智囊终端 (Global Macro Hedge Fund Strategist Agent)', () => {
   const {
-    WHITELIST_HANDLES,
-    evaluateFinancialRelevance,
-    filterWithin7Days,
-    filterAndSanitizePosts,
-    getXPulseData
-  } = require('../server/x_pulse_fetcher');
+    getEstherAgentInfo,
+    chatWithEsther,
+    ESTHER_STARTERS,
+    ESTHER_DISCLAIMER
+  } = require('../server/esther_agent_service');
 
-  const { askGeminiCopilot } = require('../server/gemini_service');
+  test('getEstherAgentInfo returns complete agent profile, mental models and 4 starters', () => {
+    const info = getEstherAgentInfo();
+    assert.ok(info);
+    assert.equal(info.name, '扬缨 (Esther Yang)');
+    assert.ok(info.role.includes('资深全球宏观对冲基金策略师'));
+    assert.ok(info.welcomeMessage.includes('我是扬缨'));
+    assert.equal(info.starters.length, 4);
+    assert.equal(info.mentalModels.length, 6);
+    assert.ok(info.models.includes('gemini-2.5-flash'));
+    assert.ok(info.models.includes('gemini-2.5-pro'));
+  });
 
-  const EXPECTED_11_HANDLES = [
-    'JobberTheGuru',
-    'HUd7iC57fj04GLi',
-    'oyoovi',
-    'TruthGundlach',
-    'robin_j_brooks',
-    'riversidepark01',
-    'KobeissiLetter',
-    'CRUDEOIL231',
-    'fupenglondon',
-    'laevitas1',
-    '_D_Y_A_N'
-  ];
-
-  test('Whitelist strictly contains all 11 user-specified accounts', () => {
-    assert.equal(WHITELIST_HANDLES.length, 11);
-    EXPECTED_11_HANDLES.forEach(handle => {
-      assert.ok(WHITELIST_HANDLES.includes(handle), `Whitelist must include ${handle}`);
+  test('First turn strictly maintains "我" persona and includes mandatory first-turn disclaimer', async () => {
+    const res = await chatWithEsther({
+      message: '你好扬缨，请问你怎么看当前美联储资产负债表收缩对长端美债的影响？',
+      history: [],
+      model: 'gemini-2.5-flash'
     });
+
+    assert.ok(res.ok);
+    assert.ok(res.reply);
+    assert.equal(res.persona, 'Esther Yang');
+    assert.ok(res.reply.includes('我'), 'Esther must strictly use first person "我"');
+    assert.ok(!res.reply.includes('我是 AI'), 'Must never refer to self as AI');
+    assert.ok(!res.reply.includes('本助手'), 'Must never refer to self as 助手');
+    assert.ok(!res.reply.includes('笔者'), 'Must never refer to self as 笔者');
+    assert.ok(res.reply.includes(ESTHER_DISCLAIMER), 'First turn must contain mandatory first-turn disclaimer');
   });
 
-  test('Financial & Crypto Classifier accurately identifies financial content', () => {
-    // 1. Chinese Macro & Rates
-    const p1 = evaluateFinancialRelevance('近期中东局势推升布伦特原油突破 85 美元，但美债收益率并没有同步走强，流动性管道分化。');
-    assert.equal(p1.isFinancial, true);
-    assert.ok(p1.relevanceScore >= 35);
-    assert.ok(p1.tags.includes('#Macro'));
-
-    // 2. English Fed & CPI
-    const p2 = evaluateFinancialRelevance('US Headline CPI rises +2.5% YoY. FOMC rate cut probability is now 100% with high chance of 50 bps.');
-    assert.equal(p2.isFinancial, true);
-    assert.ok(p2.relevanceScore >= 35);
-    assert.ok(p2.tags.includes('#FedRates'));
-
-    // 3. Crypto & Derivatives
-    const p3 = evaluateFinancialRelevance('Deribit BTC options 25-Delta skew moved higher to +3.8%, DVOL holds at 54% and spot basis is 8.5%.');
-    assert.equal(p3.isFinancial, true);
-    assert.ok(p3.tags.includes('#Crypto'));
-    assert.ok(p3.tags.includes('#Derivatives'));
-  });
-
-  test('Financial & Crypto Classifier strictly rejects non-financial casual noise', () => {
-    // Casual dinner / birthday / pets / movie
-    const noise1 = evaluateFinancialRelevance('Had a delicious dinner with friends tonight! Happy birthday to my lovely sister.');
-    assert.equal(noise1.isFinancial, false);
-    assert.equal(noise1.relevanceScore, 0);
-
-    const noise2 = evaluateFinancialRelevance('Check out my cute puppy playing in the sunshine during this weekend trip!');
-    assert.equal(noise2.isFinancial, false);
-
-    const noise3 = evaluateFinancialRelevance('今天和朋友去电影院看了新上映的科幻大片，剧情非常精彩，打卡一家新咖啡！');
-    assert.equal(noise3.isFinancial, false);
-
-    const noise4 = evaluateFinancialRelevance('');
-    assert.equal(noise4.isFinancial, false);
-  });
-
-  test('filterWithin7Days strictly enforces the <= 7 days time constraint', () => {
-    const now = Date.now();
-    const mockPosts = [
-      { id: 'p1', timestamp: now - 1 * 3600 * 1000 }, // 1 hour ago
-      { id: 'p2', timestamp: now - 3 * 86400 * 1000 }, // 3 days ago
-      { id: 'p3', timestamp: now - 6.9 * 86400 * 1000 }, // 6.9 days ago (valid)
-      { id: 'p4', timestamp: now - 7.5 * 86400 * 1000 }, // 7.5 days ago (expired)
-      { id: 'p5', timestamp: now - 15 * 86400 * 1000 } // 15 days ago (expired)
+  test('Second turn (with history) maintains multi-turn context and does NOT duplicate disclaimer', async () => {
+    const history = [
+      { role: 'user', content: '你好扬缨，请问你怎么看当前美联储资产负债表收缩对长端美债的影响？' },
+      { role: 'assistant', content: '从资产负债表穿透来看，美联储的 QT 正在改变银行体系准备金结构...' + ESTHER_DISCLAIMER }
     ];
 
-    const validPosts = filterWithin7Days(mockPosts, now);
-    assert.equal(validPosts.length, 3);
-    const validIds = validPosts.map(p => p.id);
-    assert.deepEqual(validIds, ['p1', 'p2', 'p3']);
-  });
-
-  test('getXPulseData returns sanitized 7-day feed with 100% whitelist integrity', () => {
-    const data = getXPulseData();
-    assert.ok(data);
-    assert.ok(Array.isArray(data.posts));
-    assert.ok(data.posts.length >= 10, 'Feed should have sufficient seed posts');
-
-    const now = Date.now();
-    data.posts.forEach(post => {
-      // Whitelist assertion
-      assert.ok(WHITELIST_HANDLES.includes(post.authorHandle), `Post author ${post.authorHandle} must be in whitelist`);
-      // 7-day assertion
-      const ageMs = now - post.timestamp;
-      assert.ok(ageMs >= 0 && ageMs <= 7 * 86400 * 1000, `Post ${post.id} must be within 7 days`);
-      // Financial assertion
-      assert.equal(post.isFinancial, true, `Post ${post.id} must be strictly financial`);
-      assert.ok(post.relevanceScore >= 35);
-      assert.ok(post.tags && post.tags.length > 0);
+    const res = await chatWithEsther({
+      message: '那如果财政部继续发行短期国债（T-bills），长端溢价还会走阔吗？',
+      history,
+      model: 'gemini-2.5-flash'
     });
+
+    assert.ok(res.ok);
+    assert.ok(res.reply);
+    assert.ok(res.reply.includes('我'));
+    assert.ok(!res.reply.includes(ESTHER_DISCLAIMER), 'Subsequent turns must not repeat the first-turn disclaimer');
   });
 
-  test('Gemini Copilot generates institutional analysis across all prompt presets', async () => {
-    const samplePost = {
-      id: 'test_p1',
-      authorName: '付鹏',
-      authorHandle: 'fupenglondon',
-      text: '从大类资产定价模型来看，近期中东局势推升布伦特原油突破 85 美元，但 10 年期美债收益率与美元指数并没有同步走强。',
-      tags: ['#Macro', '#CrudeOil']
-    };
+  test('All 4 prompt starters trigger high-precision buy-side heuristic analysis with 4-part structure', async () => {
+    for (const starter of ESTHER_STARTERS) {
+      const res = await chatWithEsther({
+        message: starter.question,
+        history: [],
+        model: 'gemini-2.5-flash'
+      });
 
-    // 1. Macro logic
-    const res1 = await askGeminiCopilot({ post: samplePost, promptType: 'macro_logic' });
-    assert.ok(res1.ok);
-    assert.ok(res1.analysis.includes('宏观逻辑穿透'));
-    assert.ok(res1.analysis.includes('付鹏'));
+      assert.ok(res.ok, `Starter "${starter.tag}" should execute successfully`);
+      const reply = res.reply;
 
-    // 2. Crypto impact
-    const res2 = await askGeminiCopilot({ post: samplePost, promptType: 'crypto_impact' });
-    assert.ok(res2.ok);
-    assert.ok(res2.analysis.includes('BTC'));
-
-    // 3. Trading implication
-    const res3 = await askGeminiCopilot({ post: samplePost, promptType: 'trading_implication' });
-    assert.ok(res3.ok);
-    assert.ok(res3.analysis.includes('多空'));
-
-    // 4. Falsification risk
-    const res4 = await askGeminiCopilot({ post: samplePost, promptType: 'falsification_risk' });
-    assert.ok(res4.ok);
-    assert.ok(res4.analysis.includes('证伪'));
-
-    // 5. Custom follow-up question
-    const res5 = await askGeminiCopilot({ post: samplePost, promptType: 'custom', customQuestion: '这会对纳斯达克开盘产生多大冲击？' });
-    assert.ok(res5.ok);
-    assert.ok(res5.analysis.includes('纳斯达克'));
+      // 4-part analytical structure checks
+      assert.ok(
+        reply.includes('穿透') || reply.includes('反常识') || reply.includes('表象'),
+        `Starter "${starter.tag}" must include part 1: 穿透表象与反常识剖析`
+      );
+      assert.ok(
+        reply.includes('管道') || reply.includes('机理') || reply.includes('解构') || reply.includes('资产负债表'),
+        `Starter "${starter.tag}" must include part 2: 底层管道与机理解构`
+      );
+      assert.ok(
+        reply.includes('推演') || reply.includes('决策树') || reply.includes('情景') || reply.includes('路径'),
+        `Starter "${starter.tag}" must include part 3: 结构化推演`
+      );
+      assert.ok(
+        reply.includes('证伪') || reply.includes('阈值') || reply.includes('判断'),
+        `Starter "${starter.tag}" must include part 4: 我的判断与证伪条件`
+      );
+    }
   });
 
-  test('HTTP endpoints: GET /api/x-pulse and POST /api/ask-gemini work as expected', async () => {
+  test('Model selection supports both Gemini 2.5 Flash and Pro modes', async () => {
+    const resFlash = await chatWithEsther({
+      message: '如何评估近期大类资产的跨周期配置机会？',
+      history: [],
+      model: 'gemini-2.5-flash'
+    });
+    assert.ok(resFlash.ok);
+    assert.equal(resFlash.model, 'gemini-2.5-flash');
+
+    const resPro = await chatWithEsther({
+      message: '如何评估近期大类资产的跨周期配置机会？',
+      history: [],
+      model: 'gemini-2.5-pro'
+    });
+    assert.ok(resPro.ok);
+    assert.equal(resPro.model, 'gemini-2.5-pro');
+  });
+
+  test('HTTP endpoints: GET /api/esther/info and POST /api/esther/chat work seamlessly', async () => {
     const { server } = require('../server/index');
     await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', async () => {
         const port = server.address().port;
         try {
-          // 1. GET /api/x-pulse
-          const feedResp = await fetch(`http://127.0.0.1:${port}/api/x-pulse`);
-          assert.equal(feedResp.status, 200);
-          const feedJson = await feedResp.json();
-          assert.equal(feedJson.code, 0);
-          assert.ok(Array.isArray(feedJson.posts));
-          assert.ok(feedJson.posts.length > 0);
-          assert.ok(feedJson.authors);
+          // 1. GET /api/esther/info
+          const infoResp = await fetch(`http://127.0.0.1:${port}/api/esther/info`);
+          assert.equal(infoResp.status, 200);
+          const infoJson = await infoResp.json();
+          assert.equal(infoJson.code, 0);
+          assert.equal(infoJson.data.name, '扬缨 (Esther Yang)');
+          assert.equal(infoJson.data.starters.length, 4);
 
-          const firstPost = feedJson.posts[0];
-
-          // 2. POST /api/ask-gemini with Gemini 2.5 Flash
-          const geminiResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
+          // 2. POST /api/esther/chat with starter question
+          const chatResp = await fetch(`http://127.0.0.1:${port}/api/esther/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              postId: firstPost.id,
-              promptType: 'macro_logic',
+              message: '30年期美债冲上5.3%，财政部回购为什么压不住长端收益率？',
+              history: [],
               model: 'gemini-2.5-flash'
             })
           });
 
-          assert.equal(geminiResp.status, 200);
-          const geminiJson = await geminiResp.json();
-          assert.equal(geminiJson.code, 0);
-          assert.ok(geminiJson.analysis);
-          assert.ok(geminiJson.model);
+          assert.equal(chatResp.status, 200);
+          const chatJson = await chatResp.json();
+          assert.equal(chatJson.code, 0);
+          assert.ok(chatJson.reply);
+          assert.ok(chatJson.reply.includes('我'));
+          assert.ok(chatJson.reply.includes(ESTHER_DISCLAIMER));
 
-          // 3. POST /api/ask-gemini with Gemini 2.5 Pro
-          const geminiProResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
+          // 3. POST /api/esther/chat empty message returns 400
+          const badResp = await fetch(`http://127.0.0.1:${port}/api/esther/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: '' })
+          });
+          assert.equal(badResp.status, 400);
+
+          // 4. Backward compatibility check: POST /api/ask-gemini returns valid analysis
+          const askResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              postId: firstPost.id,
-              promptType: 'macro_logic',
-              model: 'gemini-2.5-pro'
+              post: { text: '测试宏观数据', authorName: '扬缨' },
+              promptType: 'macro_logic'
             })
           });
-
-          assert.equal(geminiProResp.status, 200);
-          const geminiProJson = await geminiProResp.json();
-          assert.equal(geminiProJson.code, 0);
-          assert.ok(geminiProJson.analysis.includes('Pro') || geminiProJson.model.includes('Pro'));
-
-          // 4. GET /api/x-pulse?force=1 triggers syncLivePostsFromUpstream
-          const syncResp = await fetch(`http://127.0.0.1:${port}/api/x-pulse?force=1`);
-          assert.equal(syncResp.status, 200);
-          const syncJson = await syncResp.json();
-          assert.equal(syncJson.code, 0);
-          assert.ok(syncJson.posts.length >= 15);
+          assert.equal(askResp.status, 200);
+          const askJson = await askResp.json();
+          assert.equal(askJson.code, 0);
+          assert.ok(askJson.analysis);
         } finally {
           server.close(resolve);
         }

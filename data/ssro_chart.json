@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-09-17T16:51:46.668Z",
+  "updatedAt": "2026-09-18T03:59:11.380Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
-    "date": "2026-09-17",
-    "btcPrice": 76666.51,
-    "stableCap": 308546599514,
-    "stableCapBillions": "308.55",
-    "ssr": 4.986,
-    "ssro200": 1.236,
-    "ssro50": 0.663,
+    "date": "2026-09-18",
+    "btcPrice": 77394.15,
+    "stableCap": 308890174358,
+    "stableCapBillions": "308.89",
+    "ssr": 5.028,
+    "ssro200": 1.332,
+    "ssro50": 0.731,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.030018315769948133,
-      "priceUsd": 308546599514
+      "change24h": -0.009167058830309742,
+      "priceUsd": 308890174358
     },
     "quantEvaluation": {
-      "zScore": 1.236,
+      "zScore": 1.332,
       "zone": "moderately_overbought",
       "label": "偏热警戒 (买力消耗)",
       "colorClass": "text-amber",
@@ -25,9 +25,9 @@
     }
   },
   "summary": {
-    "totalDays": 2086,
+    "totalDays": 2087,
     "startDate": "2021-01-01",
-    "endDate": "2026-09-17",
+    "endDate": "2026-09-18",
     "minSsro200": -3.193,
     "maxSsro200": 4.111
   },
@@ -29224,17 +29224,31 @@
     },
     {
       "date": "2026-09-17",
-      "btcPrice": 76666.51,
-      "stableCap": 308546599514,
-      "ssr": 4.986,
-      "ssro200": 1.236,
+      "btcPrice": 76417.01,
+      "stableCap": 309496704448,
+      "ssr": 4.955,
+      "ssro200": 1.156,
       "sma200": 4.506,
-      "stdev200": 0.389,
+      "stdev200": 0.388,
       "upper2_200": 5.283,
       "lower2_200": 3.729,
-      "ssro50": 0.663,
+      "ssro50": 0.592,
       "sma50": 4.7,
-      "stdev50": 0.431
+      "stdev50": 0.43
+    },
+    {
+      "date": "2026-09-18",
+      "btcPrice": 77394.15,
+      "stableCap": 308890174358,
+      "ssr": 5.028,
+      "ssro200": 1.332,
+      "sma200": 4.509,
+      "stdev200": 0.39,
+      "upper2_200": 5.289,
+      "lower2_200": 3.728,
+      "ssro50": 0.731,
+      "sma50": 4.716,
+      "stdev50": 0.428
     }
   ]
 }

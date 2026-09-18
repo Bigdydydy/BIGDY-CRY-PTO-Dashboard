@@ -3272,7 +3272,8 @@ const VIEW_TITLES = {
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
-  'view-x-pulse': '社群情报与 Gemini 智囊',
+  'view-esther-agent': '扬缨 (Esther Yang) 宏观智囊',
+  'view-x-pulse': '扬缨 (Esther Yang) 宏观智囊',
   'view-all': '全模块平铺画卷'
 };
 
@@ -3371,8 +3372,8 @@ function switchView(viewId, updateHash = true) {
       renderGoldChart();
     }
 
-    if (viewId === 'view-x-pulse' || viewId === 'view-all') {
-      if (!rawXPulseData) fetchXPulseData(false);
+    if (viewId === 'view-esther-agent' || viewId === 'view-x-pulse' || viewId === 'view-all') {
+      scrollEstherChatToBottom();
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -3842,38 +3843,27 @@ function initGoldCorrelationEvents() {
 }
 
 // ============================================================================
-// Module 8: Macro & Crypto X-Pulse Feed & Gemini Copilot Controller
+// Module 8: Esther Yang (扬缨) Global Macro Hedge Fund Strategist Agent Controller
 // ============================================================================
 
-let rawXPulseData = null;
-let currentActivePostId = null;
-let currentAuthorFilter = 'all';
-let currentTagFilter = 'all';
-let currentSearchQuery = '';
-let currentCopilotPrompt = 'macro_logic';
-let isCopilotThinking = false;
-let xPulseEtag = null;
+let estherMessages = [];
+let estherIsThinking = false;
+let estherModel = 'gemini-2.5-flash';
 
-// DOM Elements for Module 8
-const elXPulseCount = document.getElementById('x-pulse-count');
-const elXAuthorSelect = document.getElementById('x-author-select');
-const elXFeedSearch = document.getElementById('x-feed-search');
-const elXTagStrip = document.getElementById('x-tag-strip');
-const elXPostsStream = document.getElementById('x-posts-stream');
-const btnRefreshXPulse = document.getElementById('btn-refresh-x-pulse');
+// DOM Elements
+const elEstherChatStream = document.getElementById('esther-chat-stream');
+const elEstherMessagesList = document.getElementById('esther-messages-list');
+const elEstherThinkingBox = document.getElementById('esther-thinking-box');
+const elEstherChatInput = document.getElementById('esther-chat-input');
+const btnEstherSend = document.getElementById('btn-esther-send');
+const elEstherModelSelect = document.getElementById('esther-model-select');
+const btnClearEstherChat = document.getElementById('btn-clear-esther-chat');
+const elEstherModelStatus = document.getElementById('esther-model-status');
+const elEstherStatusIndicator = document.getElementById('esther-status-indicator');
+const elEstherStatusText = document.getElementById('esther-status-text');
+const elEstherStartersGrid = document.getElementById('esther-starters-grid');
 
-const elCopilotStatusBadge = document.getElementById('copilot-status-badge');
-const elCopilotStatusLabel = document.getElementById('copilot-status-label');
-const elCopilotCtxAuthor = document.getElementById('copilot-ctx-author');
-const elCopilotCtxTime = document.getElementById('copilot-ctx-time');
-const elCopilotCtxSnippet = document.getElementById('copilot-ctx-snippet');
-const elCopilotPromptsButtons = document.getElementById('copilot-prompts-buttons');
-const elCopilotReportContent = document.getElementById('copilot-report-content');
-const elCopilotCustomInput = document.getElementById('copilot-custom-input');
-const btnCopilotSubmit = document.getElementById('btn-copilot-submit');
-const elCopilotEngineSource = document.getElementById('copilot-engine-source');
-const elCopilotLatencyBadge = document.getElementById('copilot-latency-badge');
-
+// API Key Modal elements
 const geminiKeyModal = document.getElementById('gemini-key-modal-backdrop');
 const btnOpenGeminiModal = document.getElementById('btn-open-gemini-modal');
 const btnCloseGeminiModal = document.getElementById('btn-close-gemini-modal');
@@ -3882,24 +3872,7 @@ const btnSaveGeminiKey = document.getElementById('btn-save-gemini-key');
 const btnClearGeminiKey = document.getElementById('btn-clear-gemini-key');
 
 /**
- * Format relative time in Chinese
- */
-function formatRelativeTime(timestamp) {
-  if (!timestamp) return '--';
-  const diffMs = Date.now() - timestamp;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  if (diffHours < 24) return `${diffHours}小时前`;
-  if (diffDays === 1) return '昨天';
-  return `${diffDays}天前`;
-}
-
-/**
- * Safe client-side markdown renderer for Gemini reports
+ * Safe client-side markdown renderer for Esther Yang analyses
  */
 function renderMarkdownText(mdText) {
   if (!mdText) return '';
@@ -3908,6 +3881,7 @@ function renderMarkdownText(mdText) {
   // Headers (### Header -> <h3>Header</h3>)
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
   html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
 
   // Bold (**text** -> <strong>text</strong>)
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -3918,387 +3892,219 @@ function renderMarkdownText(mdText) {
   // Blockquotes (> text -> <blockquote>text</blockquote>)
   html = html.replace(/^\&gt; (.*$)/gim, '<blockquote>$1</blockquote>');
 
-  // Unordered Lists (- item -> <li>item</li>)
-  html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  // Unordered list items (- item -> <li>item</li>)
+  html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>(\n|.)*?)(?=(<h3>|<h4>|<h2>|<p>|<blockquote>|<div|$))/gim, '<ul>$1</ul>');
 
-  // Code snippets (`code` -> <code>code</code>)
-  html = html.replace(/`(.*?)`/g, '<code>$1</code>');
-
-  // Line breaks
-  html = html.replace(/\n\n/g, '<br/><br/>');
+  // Paragraph breaks
+  html = html.replace(/\n\n+/g, '</p><p>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p><\/p>/g, '');
+  html = html.replace(/<p>(<h[234]>)/g, '$1');
+  html = html.replace(/(<\/h[234]>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<blockquote>)/g, '$1');
+  html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<ul>)/g, '$1');
+  html = html.replace(/(<\/ul>)<\/p>/g, '$1');
 
   return html;
 }
 
 /**
- * Fetch 7-day filtered X-Pulse feed
+ * Scroll chat message stream to bottom
  */
-async function fetchXPulseData(force = false) {
-  try {
-    const headers = {};
-    if (!force && xPulseEtag) {
-      headers['If-None-Match'] = xPulseEtag;
-    }
-
-    const resp = await fetch('/api/x-pulse', { headers });
-    if (resp.status === 304 && rawXPulseData) {
-      renderXPulseFeed();
-      return;
-    }
-
-    if (resp.ok) {
-      const etag = resp.headers.get('ETag');
-      if (etag) xPulseEtag = etag;
-
-      const data = await resp.json();
-      if (data && data.code === 0) {
-        rawXPulseData = data;
-        populateAuthorSelect(data.authors);
-        if (elXPulseCount) {
-          elXPulseCount.textContent = data.posts ? data.posts.length : 0;
-        }
-        renderXPulseFeed();
-      }
-    }
-  } catch (err) {
-    console.error('[XPulse] Error fetching feed:', err);
+function scrollEstherChatToBottom() {
+  if (elEstherChatStream) {
+    elEstherChatStream.scrollTop = elEstherChatStream.scrollHeight;
   }
 }
 
 /**
- * Populate author dropdown
+ * Render all messages in chat history
  */
-function populateAuthorSelect(authors) {
-  if (!elXAuthorSelect || !authors || elXAuthorSelect.options.length > 1) return;
-  Object.values(authors).forEach(author => {
-    const opt = document.createElement('option');
-    opt.value = author.handle;
-    opt.textContent = `${author.name} (@${author.handle})`;
-    elXAuthorSelect.appendChild(opt);
-  });
-}
-
-/**
- * Render Post stream based on current filters
- */
-function renderXPulseFeed() {
-  if (!elXPostsStream || !rawXPulseData || !rawXPulseData.posts) return;
-
-  const posts = rawXPulseData.posts;
-  let filtered = posts.filter(post => {
-    if (currentAuthorFilter !== 'all' && post.authorHandle !== currentAuthorFilter) {
-      return false;
-    }
-    if (currentTagFilter !== 'all' && (!post.tags || !post.tags.includes(currentTagFilter))) {
-      return false;
-    }
-    if (currentSearchQuery) {
-      const query = currentSearchQuery.toLowerCase();
-      const matchText = (post.text || '').toLowerCase().includes(query);
-      const matchAuthor = (post.authorName || '').toLowerCase().includes(query) || (post.authorHandle || '').toLowerCase().includes(query);
-      if (!matchText && !matchAuthor) return false;
-    }
-    return true;
-  });
-
-  if (filtered.length === 0) {
-    elXPostsStream.innerHTML = `
-      <div class="x-feed-empty" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
-        <p style="font-size: 0.85rem;">未找到匹配条件的 7 天内金融/加密推文</p>
-        <p style="font-size: 0.72rem; margin-top: 4px;">当前已过滤非金融讨论，请尝试调整筛选标签或博主</p>
-      </div>
-    `;
+function renderEstherMessages() {
+  if (!elEstherMessagesList) return;
+  
+  if (estherMessages.length === 0) {
+    elEstherMessagesList.innerHTML = '';
     return;
   }
 
-  // If no post is active yet, activate first one
-  if (!currentActivePostId && filtered.length > 0) {
-    selectPostForCopilot(filtered[0].id, false);
-  }
-
-  const html = filtered.map(post => {
-    const isActive = post.id === currentActivePostId;
-    const relTime = formatRelativeTime(post.timestamp);
-
-    // Clean text rendering without active yellow highlighting
-    const renderedText = escapeHtml(post.text);
-
-    // Build tags badges
-    const tagsHtml = (post.tags || []).map(t => {
-      let tagClass = 'x-ftag';
-      if (t === '#Macro') tagClass += ' tag-macro';
-      else if (t === '#Crypto') tagClass += ' tag-crypto';
-      else if (t === '#FedRates') tagClass += ' tag-fedrates';
-      else if (t === '#Derivatives') tagClass += ' tag-derivatives';
-      else if (t === '#CrudeOil') tagClass += ' tag-crudeoil';
-      return `<span class="${tagClass}">${escapeHtml(t)}</span>`;
-    }).join(' ');
+  elEstherMessagesList.innerHTML = estherMessages.map((msg, index) => {
+    const isUser = msg.role === 'user';
+    const avatar = isUser ? '访客' : 'EY';
+    const name = isUser ? '您 (投资者)' : '扬缨 (Esther Yang)';
+    const renderedContent = isUser ? escapeHtml(msg.content) : renderMarkdownText(msg.content);
 
     return `
-      <div class="x-post-card ${isActive ? 'active' : ''}" data-post-id="${escapeHtml(post.id)}">
-        <div class="x-post-header">
-          <img class="x-author-avatar" src="${escapeHtml(post.authorAvatar)}" alt="${escapeHtml(post.authorName)}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'36\\' height=\\'36\\' viewBox=\\'0 0 24 24\\'><circle cx=\\'12\\' cy=\\'12\\' r=\\'12\\' fill=\\'%23334155\\'/><text x=\\'12\\' y=\\'16\\' font-size=\\'12\\' text-anchor=\\'middle\\' fill=\\'%23cbd5e1\\'>X</text></svg>'" />
-          <div class="x-post-author-meta">
-            <div class="x-author-line">
-              <span class="x-author-name">${escapeHtml(post.authorName)}</span>
-              <span class="x-verified-badge" title="已验证认证博主">✓</span>
-              <span class="x-author-handle">@${escapeHtml(post.authorHandle)}</span>
-            </div>
-            <span class="x-author-role-tag">${escapeHtml(post.authorBio || post.authorCategory || '')}</span>
+      <div class="esther-msg-row ${isUser ? 'user-row' : 'assistant-row'}" data-index="${index}">
+        <div class="esther-msg-avatar ${isUser ? 'user-avatar' : 'assistant-avatar'}">${avatar}</div>
+        <div class="esther-msg-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}">
+          <div class="esther-msg-header">
+            <span class="esther-msg-sender">${name}</span>
+            <span class="esther-msg-time">${msg.timeStr || ''}</span>
           </div>
-          <div class="x-post-time">⏱ ${relTime}</div>
-        </div>
-
-        <div class="x-post-text">${renderedText}</div>
-
-        <div class="x-post-footer">
-          <div class="x-post-tags">
-            ${tagsHtml}
-            <span class="x-ftag" style="color: #34d399; background: rgba(16, 185, 129, 0.1);" title="金融/加密相关性置信度得分">
-              相关度: ${post.relevanceScore || 90}%
-            </span>
-          </div>
-          <div class="x-post-actions">
-            <button class="btn-ask-gemini" data-post-id="${escapeHtml(post.id)}" title="在右侧 Gemini 视窗就地穿透解析此推文">
-              <span>⚡ 问问 Gemini</span>
-            </button>
-            <a href="${escapeHtml(post.sourceUrl || '#')}" target="_blank" rel="noopener noreferrer" class="btn-x-source" title="查看原始 X 推文">
-              <span>↗ 原推</span>
-            </a>
+          <div class="esther-msg-body markdown-body">
+            ${renderedContent}
           </div>
         </div>
       </div>
     `;
   }).join('');
 
-  elXPostsStream.innerHTML = html;
+  scrollEstherChatToBottom();
 }
 
 /**
- * Select a post as active context for Gemini Copilot
+ * Send user message to Esther Yang Agent
  */
-function selectPostForCopilot(postId, autoTrigger = true) {
-  currentActivePostId = postId;
-  if (!rawXPulseData || !rawXPulseData.posts) return;
+async function sendEstherMessage(userInput) {
+  const text = (userInput || (elEstherChatInput ? elEstherChatInput.value : '')).trim();
+  if (!text || estherIsThinking) return;
 
-  const post = rawXPulseData.posts.find(p => p.id === postId);
-  if (!post) return;
-
-  // Update active class in DOM
-  if (elXPostsStream) {
-    elXPostsStream.querySelectorAll('.x-post-card').forEach(card => {
-      card.classList.toggle('active', card.dataset.postId === postId);
-    });
+  if (elEstherChatInput) {
+    elEstherChatInput.value = '';
+    elEstherChatInput.style.height = 'auto';
   }
 
-  // Update context strip
-  if (elCopilotCtxAuthor) elCopilotCtxAuthor.textContent = `${post.authorName} (@${post.authorHandle})`;
-  if (elCopilotCtxTime) elCopilotCtxTime.textContent = formatRelativeTime(post.timestamp);
-  if (elCopilotCtxSnippet) elCopilotCtxSnippet.textContent = post.text;
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  if (autoTrigger) {
-    runGeminiAnalysis(currentCopilotPrompt);
-  }
-}
+  // Append user message
+  estherMessages.push({
+    role: 'user',
+    content: text,
+    timeStr
+  });
+  renderEstherMessages();
 
-/**
- * Run Gemini Quantitative Analysis
- */
-async function runGeminiAnalysis(promptType = 'macro_logic', customQuestion = '') {
-  if (isCopilotThinking) return;
-
-  if (!rawXPulseData || !rawXPulseData.posts || rawXPulseData.posts.length === 0) {
-    return;
-  }
-
-  let post = rawXPulseData.posts.find(p => p.id === currentActivePostId);
-  if (!post) {
-    post = rawXPulseData.posts[0];
-    currentActivePostId = post.id;
-  }
-
-  isCopilotThinking = true;
-  if (elCopilotStatusBadge) elCopilotStatusBadge.classList.add('thinking');
-  if (elCopilotStatusLabel) elCopilotStatusLabel.textContent = '思考穿透中...';
-
-  // Show skeleton loading in report container
-  if (elCopilotReportContent) {
-    elCopilotReportContent.innerHTML = `
-      <div style="padding: 24px 8px; text-align: center;">
-        <span class="sync-pulse-dot" style="display: inline-block; width: 10px; height: 10px; margin-bottom: 12px;"></span>
-        <div style="font-size: 0.82rem; color: #c7d2fe; margin-bottom: 6px;">
-          Gemini 正在针对 <strong>${escapeHtml(post.authorName)}</strong> 的观点进行宏观量化穿透...
-        </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted);">
-          正在对齐美债收益率、Deribit IV 波动率曲面与流动性传导微观管道...
-        </div>
-      </div>
-    `;
-  }
+  // Set thinking state
+  estherIsThinking = true;
+  if (elEstherThinkingBox) elEstherThinkingBox.style.display = 'flex';
+  if (btnEstherSend) btnEstherSend.disabled = true;
+  if (elEstherStatusText) elEstherStatusText.textContent = '正在穿透研判...';
+  if (elEstherStatusIndicator) elEstherStatusIndicator.classList.add('thinking');
+  scrollEstherChatToBottom();
 
   try {
     const savedApiKey = localStorage.getItem('gemini_api_key') || null;
-    const modelSelect = document.getElementById('copilot-model-select');
-    const selectedModel = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
+    const model = elEstherModelSelect ? elEstherModelSelect.value : estherModel;
 
-    const resp = await fetch('/api/ask-gemini', {
+    const resp = await fetch('/api/esther/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        postId: post.id,
-        post,
-        promptType,
-        customQuestion,
-        apiKey: savedApiKey,
-        model: selectedModel
+        messages: estherMessages.map(m => ({ role: m.role, content: m.content })),
+        model,
+        apiKey: savedApiKey
       })
     });
 
     const result = await resp.json();
-    if (result && result.code === 0 && result.analysis) {
-      if (elCopilotReportContent) {
-        elCopilotReportContent.innerHTML = renderMarkdownText(result.analysis);
-      }
-      if (elCopilotEngineSource) {
-        elCopilotEngineSource.textContent = result.source === 'gemini-api'
-          ? `✦ 模式: ${result.model} (API 实时接入)`
-          : `⚡ 模式: ${result.model} (高精度量化引擎)`;
-      }
-      if (elCopilotLatencyBadge) {
-        elCopilotLatencyBadge.textContent = `耗时: ${result.latencyMs || 120}ms`;
+    if (result && result.code === 0 && result.reply) {
+      const respTime = new Date();
+      const respTimeStr = `${String(respTime.getHours()).padStart(2, '0')}:${String(respTime.getMinutes()).padStart(2, '0')}`;
+
+      estherMessages.push({
+        role: 'assistant',
+        content: result.reply,
+        timeStr: respTimeStr,
+        source: result.source,
+        model: result.model
+      });
+
+      if (elEstherModelStatus) {
+        elEstherModelStatus.innerHTML = result.source === 'gemini-api'
+          ? `<span>✦ 模式: ${escapeHtml(result.model)} (Google 官方 API 直连)</span>`
+          : `<span>⚡ 模式: ${escapeHtml(result.model)} (本地高精度买方量化引擎)</span>`;
       }
     } else {
-      if (elCopilotReportContent) {
-        elCopilotReportContent.innerHTML = `
-          <div style="color: #f87171; padding: 16px;">
-            分析生成受阻: ${escapeHtml(result.error || '未知错误')}
-          </div>
-        `;
-      }
+      estherMessages.push({
+        role: 'assistant',
+        content: `**研判生成受阻**：${escapeHtml(result?.error || '服务器未能正常返回研判结果，请重试。')}`,
+        timeStr
+      });
     }
   } catch (err) {
-    console.error('[Gemini] Request failed:', err);
-    if (elCopilotReportContent) {
-      elCopilotReportContent.innerHTML = `
-        <div style="color: #f87171; padding: 16px;">
-          请求发生网络异常: ${escapeHtml(err.message)}
-        </div>
-      `;
-    }
+    console.error('[EstherAgent] Chat request error:', err);
+    estherMessages.push({
+      role: 'assistant',
+      content: `**网络通信异常**：${escapeHtml(err.message)}。请检查网络连接或稍后重试。`,
+      timeStr
+    });
   } finally {
-    isCopilotThinking = false;
-    if (elCopilotStatusBadge) elCopilotStatusBadge.classList.remove('thinking');
-    if (elCopilotStatusLabel) elCopilotStatusLabel.textContent = '就绪';
+    estherIsThinking = false;
+    if (elEstherThinkingBox) elEstherThinkingBox.style.display = 'none';
+    if (btnEstherSend) btnEstherSend.disabled = false;
+    if (elEstherStatusText) elEstherStatusText.textContent = '在线就绪';
+    if (elEstherStatusIndicator) elEstherStatusIndicator.classList.remove('thinking');
+    renderEstherMessages();
   }
 }
 
 /**
- * Initialize Module 8 Event Listeners
+ * Clear chat history and restart conversation
  */
-function initXPulseEvents() {
-  // Author filter select
-  if (elXAuthorSelect) {
-    elXAuthorSelect.addEventListener('change', () => {
-      currentAuthorFilter = elXAuthorSelect.value;
-      renderXPulseFeed();
-    });
-  }
+function clearEstherChat() {
+  estherMessages = [];
+  renderEstherMessages();
+  showToast('已清空对话记录，重新开启宏观研判探讨');
+}
 
-  // Tag filter pills
-  if (elXTagStrip) {
-    elXTagStrip.addEventListener('click', e => {
-      const btn = e.target.closest('.x-tag-pill');
-      if (!btn) return;
-      elXTagStrip.querySelectorAll('.x-tag-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentTagFilter = btn.dataset.tag;
-      renderXPulseFeed();
-    });
-  }
-
-  // Search input with debounce
-  if (elXFeedSearch) {
-    let debounceTimer = null;
-    elXFeedSearch.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        currentSearchQuery = elXFeedSearch.value.trim();
-        renderXPulseFeed();
-      }, 200);
-    });
-  }
-
-  // Refresh feed button
-  if (btnRefreshXPulse) {
-    btnRefreshXPulse.addEventListener('click', () => {
-      fetchXPulseData(true);
-      showToast('正在更新 7 天内金融推文流...');
-    });
-  }
-
-  // Post Card Click & Ask Gemini button delegate
-  if (elXPostsStream) {
-    elXPostsStream.addEventListener('click', e => {
-      const askBtn = e.target.closest('.btn-ask-gemini');
-      const card = e.target.closest('.x-post-card');
-
-      if (askBtn) {
-        e.stopPropagation();
-        const postId = askBtn.dataset.postId;
-        selectPostForCopilot(postId, true);
-        return;
-      }
-
-      if (card) {
-        const postId = card.dataset.postId;
-        selectPostForCopilot(postId, true);
+/**
+ * Initialize Esther Agent Event Listeners
+ */
+function initEstherAgent() {
+  // 1. Starter prompt pill clicks
+  if (elEstherStartersGrid) {
+    elEstherStartersGrid.addEventListener('click', e => {
+      const pill = e.target.closest('.esther-starter-pill');
+      if (!pill) return;
+      const question = pill.dataset.question;
+      if (question) {
+        sendEstherMessage(question);
       }
     });
   }
 
-  // Copilot preset prompt buttons
-  if (elCopilotPromptsButtons) {
-    elCopilotPromptsButtons.addEventListener('click', e => {
-      const btn = e.target.closest('.copilot-pbtn');
-      if (!btn) return;
-      elCopilotPromptsButtons.querySelectorAll('.copilot-pbtn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentCopilotPrompt = btn.dataset.prompt;
-      runGeminiAnalysis(currentCopilotPrompt);
-    });
+  // 2. Send button click
+  if (btnEstherSend) {
+    btnEstherSend.addEventListener('click', () => sendEstherMessage());
   }
 
-  // Gemini model switch (Flash vs Pro)
-  const elCopilotModelSelect = document.getElementById('copilot-model-select');
-  if (elCopilotModelSelect) {
-    elCopilotModelSelect.addEventListener('change', () => {
-      runGeminiAnalysis(currentCopilotPrompt);
-    });
-  }
-
-  // Custom question follow-up submit
-  const submitCustomQuestion = () => {
-    if (!elCopilotCustomInput) return;
-    const q = elCopilotCustomInput.value.trim();
-    if (!q) return;
-    elCopilotCustomInput.value = '';
-    runGeminiAnalysis('custom', q);
-  };
-
-  if (btnCopilotSubmit) {
-    btnCopilotSubmit.addEventListener('click', submitCustomQuestion);
-  }
-  if (elCopilotCustomInput) {
-    elCopilotCustomInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
+  // 3. Textarea Enter to send (Shift+Enter for newline)
+  if (elEstherChatInput) {
+    elEstherChatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        submitCustomQuestion();
+        sendEstherMessage();
       }
+    });
+
+    // Auto-expand textarea
+    elEstherChatInput.addEventListener('input', () => {
+      elEstherChatInput.style.height = 'auto';
+      elEstherChatInput.style.height = `${Math.min(elEstherChatInput.scrollHeight, 120)}px`;
     });
   }
 
-  // Gemini API Key Modal
+  // 4. Clear chat button
+  if (btnClearEstherChat) {
+    btnClearEstherChat.addEventListener('click', clearEstherChat);
+  }
+
+  // 5. Model select change
+  if (elEstherModelSelect) {
+    elEstherModelSelect.addEventListener('change', () => {
+      estherModel = elEstherModelSelect.value;
+      if (elEstherModelStatus) {
+        elEstherModelStatus.innerHTML = `<span>✦ 当前推理模型: ${escapeHtml(elEstherModelSelect.options[elEstherModelSelect.selectedIndex].text)}</span>`;
+      }
+      showToast(`已切换推理引擎为: ${elEstherModelSelect.options[elEstherModelSelect.selectedIndex].text}`);
+    });
+  }
+
+  // 6. Gemini API Key Modal
   if (btnOpenGeminiModal && geminiKeyModal) {
     btnOpenGeminiModal.addEventListener('click', () => {
       if (inputGeminiApiKey) {
@@ -4333,7 +4139,6 @@ function initXPulseEvents() {
         showToast('未输入有效 Key，已恢复内置量化启发式模式');
       }
       if (geminiKeyModal) geminiKeyModal.style.display = 'none';
-      runGeminiAnalysis(currentCopilotPrompt);
     });
   }
 
@@ -4343,7 +4148,6 @@ function initXPulseEvents() {
       if (inputGeminiApiKey) inputGeminiApiKey.value = '';
       showToast('已清除本地 API Key，使用内置高精度量化引擎');
       if (geminiKeyModal) geminiKeyModal.style.display = 'none';
-      runGeminiAnalysis(currentCopilotPrompt);
     });
   }
 }
@@ -4357,13 +4161,9 @@ initTermPremiumEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
-initXPulseEvents();
+initEstherAgent();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 loadGoldCorrelationData(false);
-fetchXPulseData(false);
-
-
-
