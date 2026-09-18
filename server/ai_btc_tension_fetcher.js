@@ -56,7 +56,20 @@ async function getAiBtcTensionData(forceRefresh = false) {
     return cachedData;
   }
 
-  // Attempt to read from disk first
+  // If forceRefresh is requested, execute the Python calculation pipeline
+  if (forceRefresh) {
+    try {
+      console.log('[AiBtcTensionFetcher] forceRefresh requested: executing Python calculation pipeline...');
+      const success = await triggerPythonPipelineRefresh();
+      if (success) {
+        return cachedData || loadFromDisk();
+      }
+    } catch (pipelineErr) {
+      console.warn('[AiBtcTensionFetcher] Python pipeline trigger encountered error, falling back to disk cache:', pipelineErr.message);
+    }
+  }
+
+  // Attempt to read from disk
   try {
     return loadFromDisk();
   } catch (err) {

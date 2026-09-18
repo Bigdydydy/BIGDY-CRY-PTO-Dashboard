@@ -1697,14 +1697,14 @@
           <!-- Card 3: Layer 2 P_BTC -->
           <div class="bento-card tension-kpi-card">
             <div class="kpi-card-header">
-              <span class="kpi-label">Layer 2: BTC 变现压力 (P_BTC)</span>
-              <span class="kpi-badge">Z-Score</span>
+              <span class="kpi-label">Layer 2: 衍生流动性压力 (P_BTC)</span>
+              <span class="kpi-badge">外生流动性</span>
             </div>
             <div class="kpi-main-val" id="kpi-p-btc">-0.19 σ</div>
             <div class="kpi-meter-bar">
               <div class="kpi-meter-fill" id="kpi-p-btc-bar" style="width: 45%;"></div>
             </div>
-            <div class="kpi-sub-meta">ETF 净流出 &amp; 期现基差倒挂承压</div>
+            <div class="kpi-sub-meta">CME基差贴水 &amp; 矿企股权/VIX冲击</div>
           </div>
 
           <!-- Card 4: Tension Intensity r -->
@@ -1721,10 +1721,10 @@
           <div class="bento-card tension-kpi-card">
             <div class="kpi-card-header">
               <span class="kpi-label">宏观因子解释度 (R²)</span>
-              <span class="kpi-badge">OLS 正交剥离</span>
+              <span class="kpi-badge">HAC 稳健回归</span>
             </div>
             <div class="kpi-main-val text-highlight" id="kpi-macro-r2">16.71%</div>
-            <div class="kpi-sub-desc">特异非宏观残差占比: <strong id="kpi-macro-residual-pct">83.29%</strong></div>
+            <div class="kpi-sub-desc">未建模特异方差与噪声: <strong id="kpi-macro-residual-pct">83.29%</strong></div>
           </div>
         </div>
 
@@ -1879,25 +1879,25 @@
               <!-- Hypothesis & Granger Causality Result Boxes -->
               <div class="hypothesis-results-grid">
                 <div class="hypo-box">
-                  <div class="hypo-title">🎯 Q2 负残差假说检验 (H1)</div>
+                  <div class="hypo-title">🎯 Q2 负残差单侧假说检验 (H1: Q2 &lt; Non-Q2)</div>
                   <div class="hypo-stat">
-                    <span>t-Stat: <strong id="hypo-t-stat">0.00</strong></span>
-                    <span>p-Value: <strong id="hypo-p-val">0.3212</strong></span>
-                    <span class="hypo-badge" id="hypo-status">未显著支持变现踩踏</span>
+                    <span>Welch t: <strong id="hypo-t-stat">4.63</strong></span>
+                    <span>单侧 p: <strong id="hypo-p-val">1.0000</strong></span>
+                    <span class="hypo-badge" id="hypo-status">未显著支持单边挤压</span>
                   </div>
                   <p class="hypo-text" id="hypo-conclusion">
-                    在剔除 QQQ、DXY、TIPS、VIX 与联储表后，Q2 状态下 BTC 正交残差未出现统计显著单边负向崩溃。
+                    在样本外滚窗 OLS 残差下，Q2 状态 BTC 残差未见统计显著负向崩溃，流动性抽水假说未获单边证实。
                   </p>
                 </div>
 
                 <div class="hypo-box">
-                  <div class="hypo-title">⚡ Granger 因果检验 (5~10D 传导窗口)</div>
+                  <div class="hypo-title">⚡ 平稳化 Granger 因果检验 (ΔP_AI ↔ ε_BTC)</div>
                   <div class="hypo-stat">
-                    <span>P_AI → ε_BTC: <strong id="granger-pai-res">F=2.10 (p=0.15)</strong></span>
-                    <span>ε_BTC → P_AI: <strong id="granger-res-pai" class="text-highlight">F=2.66 (p=0.02*)</strong></span>
+                    <span>ΔP_AI → ε_BTC: <strong id="granger-pai-res">L1: F=2.94(p=0.09)</strong></span>
+                    <span>ε_BTC → ΔP_AI: <strong id="granger-res-pai" class="text-highlight">L5: F=3.26(p=0.01*)</strong></span>
                   </div>
                   <p class="hypo-text" id="granger-finding-text">
-                    BTC 出现极端异动后 5 日窗口内反向推升 AI 算力资产的流动性关注度，呈现跨市场高度耦合。
+                    经 ADF 检验差分平稳化后，未见 ΔP_AI 对 BTC 的单向 Granger 领先，但 BTC 残差异动对 AI 资产存在 5 日滞后反馈。
                   </p>
                 </div>
               </div>

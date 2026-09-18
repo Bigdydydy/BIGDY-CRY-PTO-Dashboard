@@ -10,13 +10,13 @@
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 77454,
-    "goldPrice": 4365.37,
-    "btcGoldRatio": 17.74,
-    "goldBtcRatio": 0.05636,
-    "ratioChange24h": 0.91,
-    "marketCapShare": 8.29,
-    "rollingCorr30d": 0.628,
+    "btcPrice": 80914,
+    "goldPrice": 4365.71,
+    "btcGoldRatio": 18.53,
+    "goldBtcRatio": 0.05396,
+    "ratioChange24h": 5.4,
+    "marketCapShare": 8.66,
+    "rollingCorr30d": 0.607,
     "timestamp": 1789689600000,
     "date": "2026-09-18"
   },
@@ -25,7 +25,7 @@
     "regimeName": "高抗通胀共振 (Debasement Hedge)",
     "badgeClass": "badge-pos",
     "color": "#10b981",
-    "summary": "BTC 与黄金呈现强正向共振联动 (30D r = +0.63)。两者作为“抗法币贬值硬资产”的宏观定位高度共鸣，全球流动性扩张推动两者同步上涨。",
+    "summary": "BTC 与黄金呈现强正向共振联动 (30D r = +0.61)。两者作为“抗法币贬值硬资产”的宏观定位高度共鸣，全球流动性扩张推动两者同步上涨。",
     "keyPointers": [
       "硬资产溢价同频：机构资金将两者共同纳入去中心化储备对冲篮子，对冲美元信用扩张与主权债务压力。",
       "高贝塔弹性释放：在法币贬值主升浪中，BTC 表现为黄金的“杠杆高贝塔版本”，兑黄金比价持续扩张。",
@@ -10026,12 +10026,12 @@
     {
       "date": "2026-09-18",
       "timestamp": 1789689600000,
-      "btcPrice": 77454,
-      "goldPrice": 4365.37,
-      "btcGoldRatio": 17.74,
-      "goldBtcRatio": 0.05636,
-      "marketCapShare": 8.29,
-      "rollingCorr30d": 0.628
+      "btcPrice": 80914,
+      "goldPrice": 4365.71,
+      "btcGoldRatio": 18.53,
+      "goldBtcRatio": 0.05396,
+      "marketCapShare": 8.66,
+      "rollingCorr30d": 0.607
     }
   ]
 }

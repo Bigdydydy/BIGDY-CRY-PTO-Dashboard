@@ -35826,7 +35826,7 @@
     },
     {
       "date": "2026-09-18",
-      "btcPrice": 77448.56,
+      "btcPrice": 80914.01,
       "mstrCost": 75415.66,
       "mstrHoldings": 845050,
       "mstrBuyVelocity30d": 153.4,
@@ -35842,7 +35842,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 77448.56,
+    "currentBtc": 80914.01,
     "currentMstrCost": 75415.66,
     "currentMstrHoldings": 845050,
     "currentMstrVelocity30d": 153.4,
@@ -35855,7 +35855,7 @@
     "current10y": 5.01,
     "currentSpread": 0.56,
     "isCurveInverted": false,
-    "mstrProfitMultiplier": 1.03,
+    "mstrProfitMultiplier": 1.07,
     "currentFedNetLiquidity": 5.8692,
     "currentFedNetLiqSma20": 5.8147,
     "currentFedWalcl": 6.747,
@@ -35868,7 +35868,7 @@
       "start": "2020-08-01",
       "end": "2026-09-18"
     },
-    "updatedAt": "2026-09-18T05:26:48.645Z"
+    "updatedAt": "2026-09-18T16:23:54.228Z"
   },
   "rawMstr": [
     {

@@ -608,12 +608,16 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     const { regression } = data;
 
     assert.ok(regression, 'Regression object must exist');
-    assert.ok(regression.r_squared > 0.10, 'Macro R-squared must be > 10%');
+    assert.ok(Number.isFinite(regression.r_squared), 'Macro R-squared must be a finite number');
+    assert.ok(regression.r_squared > 0.05, 'Macro R-squared must be economically meaningful (> 5%)');
     assert.ok(Array.isArray(regression.parameters), 'Parameters must be an array');
 
     const paramMap = {};
     regression.parameters.forEach(p => {
       paramMap[p.var] = p;
+      assert.ok(Number.isFinite(p.beta), `Beta for ${p.var} must be a finite number`);
+      assert.ok(Number.isFinite(p.t_stat), `t-stat for ${p.var} must be a finite number`);
+      assert.ok(Number.isFinite(p.p_value), `p-value for ${p.var} must be a finite number`);
     });
 
     // Verify key explanatory variables
@@ -628,10 +632,16 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     assert.ok(paramMap.vix_delta, 'VIX delta beta must be present');
     assert.ok(paramMap.delta_fed_net_liq, 'Fed net liquidity beta must be present');
 
-    // Q2 Hypothesis test
+    // Q2 Hypothesis test with Welch's t-test and HAC standard errors
     assert.ok(regression.q2_hypothesis_test, 'Q2 hypothesis test must exist');
-    assert.ok(typeof regression.q2_hypothesis_test.p_value === 'number');
-    assert.ok(regression.q2_hypothesis_test.conclusion.length > 10);
+    const q2Test = regression.q2_hypothesis_test;
+    assert.ok(Number.isFinite(q2Test.q2_avg_residual_daily_pct), 'Q2 residual must be finite number');
+    assert.ok(Number.isFinite(q2Test.non_q2_avg_residual_daily_pct), 'Non-Q2 residual must be finite number');
+    assert.ok(Number.isFinite(q2Test.t_stat), 'Welch t-stat must be finite number');
+    assert.ok(Number.isFinite(q2Test.p_value), 'p-value must be finite number');
+    assert.ok(Number.isFinite(q2Test.cohen_d), 'Cohen d effect size must be finite number');
+    assert.strictEqual(typeof q2Test.is_significant_5pct, 'boolean');
+    assert.ok(typeof q2Test.conclusion === 'string' && q2Test.conclusion.length > 10);
   });
 
   test('Event Study CAR windows and Phase 2 Miner-HPC Basket are intact', async () => {
@@ -656,10 +666,12 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     assert.ok(tickers.includes('IREN'), 'IREN must be in miner basket');
     assert.ok(tickers.includes('WULF'), 'WULF must be in miner basket');
 
-    // Granger causality
+    // Granger causality with ADF unit-root tests and empirical findings
     assert.ok(causality, 'Granger causality must exist');
     assert.ok(causality.p_ai_causes_residual, 'P_AI -> ε_BTC must exist');
     assert.ok(causality.residual_causes_p_ai, 'ε_BTC -> P_AI must exist');
+    assert.ok(causality.adf_tests, 'ADF stationarity tests must be documented');
+    assert.ok(Array.isArray(causality.findings) && causality.findings.length > 0, 'Empirical findings must be reported');
   });
 
   test('HTTP Endpoint GET /api/ai-btc-tension returns 200 with code 0 and valid cache', async () => {

@@ -4165,15 +4165,25 @@ function renderAiBtcTensionDashboard(data) {
     const elGrangerRes = document.getElementById('granger-res-pai');
     const elFinding = document.getElementById('granger-finding-text');
 
-    if (elGrangerPai && causality.p_ai_causes_residual?.lag_1) {
-      const f = Number(causality.p_ai_causes_residual.lag_1.f_stat).toFixed(2);
-      const p = Number(causality.p_ai_causes_residual.lag_1.p_value).toFixed(2);
-      elGrangerPai.textContent = `F=${f} (p=${p})`;
+    if (elGrangerPai) {
+      const pAiLags = causality.p_ai_causes_residual || {};
+      const l1 = pAiLags.lag_1;
+      const l2 = pAiLags.lag_2;
+      const star1 = l1 && l1.p_value < 0.05 ? '*' : '';
+      const star2 = l2 && l2.p_value < 0.05 ? '*' : '';
+      const s1 = l1 ? `L1: F=${Number(l1.f_stat).toFixed(2)}(p=${Number(l1.p_value).toFixed(2)}${star1})` : '';
+      const s2 = l2 ? `L2: F=${Number(l2.f_stat).toFixed(2)}(p=${Number(l2.p_value).toFixed(2)}${star2})` : '';
+      elGrangerPai.textContent = `${s1} • ${s2}`;
     }
-    if (elGrangerRes && causality.residual_causes_p_ai?.lag_5) {
-      const f = Number(causality.residual_causes_p_ai.lag_5.f_stat).toFixed(2);
-      const p = Number(causality.residual_causes_p_ai.lag_5.p_value).toFixed(2);
-      elGrangerRes.textContent = `F=${f} (p=${p}*)`;
+    if (elGrangerRes) {
+      const resLags = causality.residual_causes_p_ai || {};
+      const l5 = resLags.lag_5;
+      const l10 = resLags.lag_10;
+      const star5 = l5 && l5.p_value < 0.05 ? '*' : '';
+      const star10 = l10 && l10.p_value < 0.05 ? '*' : '';
+      const s5 = l5 ? `L5: F=${Number(l5.f_stat).toFixed(2)}(p=${Number(l5.p_value).toFixed(2)}${star5})` : '';
+      const s10 = l10 ? `L10: F=${Number(l10.f_stat).toFixed(2)}(p=${Number(l10.p_value).toFixed(2)}${star10})` : '';
+      elGrangerRes.textContent = `${s5} • ${s10}`;
     }
     if (elFinding && causality.findings && causality.findings.length > 0) {
       elFinding.textContent = causality.findings.join(' ');
