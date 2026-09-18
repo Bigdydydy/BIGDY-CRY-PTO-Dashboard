@@ -4062,23 +4062,17 @@ function renderAiBtcTensionDashboard(data) {
     }
   }
 
-  // Tension Intensity r
+  // Macro Plumbing Indicators (Repo Spread & Term Premium)
   const elTensionR = document.getElementById('kpi-tension-r');
-  const elTensionStatus = document.getElementById('kpi-tension-status');
+  const elRepoSpread = document.getElementById('kpi-repo-spread');
+  const elTermPremium = document.getElementById('kpi-term-premium');
   if (elTensionR) {
-    const rVal = Number(current.tension_intensity || 0);
-    elTensionR.textContent = rVal.toFixed(2);
-    if (elTensionStatus) {
-      if (rVal < 0.8) {
-        elTensionStatus.textContent = '中性平衡区';
-        elTensionStatus.className = 'text-pos';
-      } else if (rVal < 1.4) {
-        elTensionStatus.textContent = '温和张力传导';
-        elTensionStatus.className = 'text-highlight';
-      } else {
-        elTensionStatus.textContent = '极端引力撕裂⚠️';
-        elTensionStatus.className = 'text-neg';
-      }
+    const repoVal = Number(current.repo_spread !== undefined ? current.repo_spread : 0.0);
+    const sign = repoVal >= 0 ? '+' : '';
+    elTensionR.textContent = `${sign}${repoVal.toFixed(2)}%`;
+    if (elRepoSpread) elRepoSpread.textContent = `${sign}${repoVal.toFixed(2)}%`;
+    if (elTermPremium && current.term_premium !== undefined) {
+      elTermPremium.textContent = `${Number(current.term_premium).toFixed(2)}%`;
     }
   }
 
@@ -4198,6 +4192,7 @@ function renderAiBtcTensionDashboard(data) {
         <td><strong class="text-highlight">${escapeHtml(m.ticker)}</strong></td>
         <td><strong>${escapeHtml(m.name)}</strong></td>
         <td><span class="meta-pill" style="padding:2px 6px;">${escapeHtml(m.power_mw)}</span></td>
+        <td><span class="meta-pill ${m.category && m.category.includes('HPC') ? 'text-pos' : 'text-secondary'}" style="padding:2px 6px;">${escapeHtml(m.category || 'Miner')}</span></td>
         <td class="text-secondary">${escapeHtml(m.partner_mode)}</td>
         <td class="text-muted">${escapeHtml(m.financing_channel)}</td>
       </tr>

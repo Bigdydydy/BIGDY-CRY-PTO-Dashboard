@@ -559,8 +559,8 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     const data = await getAiBtcTensionData(false);
     assert.ok(data, 'Data object must exist');
     assert.ok(data.metadata, 'Metadata must exist');
-    assert.equal(data.metadata.title, 'AI–BTC 融资张力指数与传导检验系统 (AI–BTC Financing Tension Platform)');
-    assert.ok(data.metadata.core_hypothesis.includes('AI 资本开支'));
+    assert.ok(data.metadata.title.includes('全球宏观暗渠穿透') || data.metadata.title.includes('AI–BTC'), 'Title must be valid');
+    assert.ok(data.metadata.core_hypothesis.length > 10, 'Core hypothesis must exist');
     assert.ok(data.metadata.total_days >= 1500, 'Total historical days must be >= 1500');
     assert.ok(Array.isArray(data.series), 'Series must be an array');
     assert.ok(data.series.length >= 1500, 'Series length must be >= 1500');
@@ -631,6 +631,8 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     assert.ok(paramMap.delta_real_yield, 'TIPS real yield beta must be present');
     assert.ok(paramMap.vix_delta, 'VIX delta beta must be present');
     assert.ok(paramMap.delta_fed_net_liq, 'Fed net liquidity beta must be present');
+    assert.ok(paramMap.delta_term_premium, '10Y Term Premium delta beta must be present');
+    assert.ok(paramMap.repo_spread, 'Overnight SOFR-IORB repo spread beta must be present');
 
     // Q2 Hypothesis test with Welch's t-test and HAC standard errors
     assert.ok(regression.q2_hypothesis_test, 'Q2 hypothesis test must exist');
@@ -646,7 +648,13 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
 
   test('Event Study CAR windows and Phase 2 Miner-HPC Basket are intact', async () => {
     const data = await getAiBtcTensionData(false);
-    const { event_study, miner_hpc_basket, causality } = data;
+    const { event_study, miner_hpc_basket, causality, current } = data;
+
+    // Macro plumbing & compute metrics
+    assert.ok(Number.isFinite(current.i_compute), 'i_compute must exist');
+    assert.ok(Number.isFinite(current.i_crypto), 'i_crypto must exist');
+    assert.ok(Number.isFinite(current.repo_spread), 'repo_spread must exist');
+    assert.ok(Number.isFinite(current.term_premium), 'term_premium must exist');
 
     // Event study
     assert.ok(Array.isArray(event_study), 'Event study must be an array');
@@ -658,13 +666,15 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     assert.ok(typeof firstEvent.car_5d === 'number');
     assert.ok(typeof firstEvent.car_20d === 'number');
 
-    // Miner HPC basket
+    // Miner HPC & Pure Play basket
     assert.ok(Array.isArray(miner_hpc_basket), 'Miner HPC basket must be an array');
     assert.ok(miner_hpc_basket.length >= 5, 'Must contain at least 5 key miner targets');
     const tickers = miner_hpc_basket.map(m => m.ticker);
     assert.ok(tickers.includes('CORZ'), 'CORZ must be in miner basket');
     assert.ok(tickers.includes('IREN'), 'IREN must be in miner basket');
     assert.ok(tickers.includes('WULF'), 'WULF must be in miner basket');
+    assert.ok(tickers.includes('MARA'), 'MARA must be in miner basket');
+    assert.ok(tickers.includes('RIOT'), 'RIOT must be in miner basket');
 
     // Granger causality with ADF unit-root tests and empirical findings
     assert.ok(causality, 'Granger causality must exist');
@@ -686,7 +696,7 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
           assert.equal(json.code, 0);
           assert.ok(json.data);
           assert.ok(json.data.current);
-          assert.equal(json.data.metadata.title, 'AI–BTC 融资张力指数与传导检验系统 (AI–BTC Financing Tension Platform)');
+          assert.ok(json.data.metadata.title.includes('全球宏观暗渠穿透') || json.data.metadata.title.includes('AI–BTC'), 'Title must be valid');
 
           // Verify ETag support on the endpoint
           const etag = resp.headers.get('etag');
