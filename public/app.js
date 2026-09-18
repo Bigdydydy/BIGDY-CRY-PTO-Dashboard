@@ -3993,7 +3993,16 @@ async function loadAiBtcTensionData(force = false) {
       rawAiBtcTensionData = resJson.data || resJson;
       renderAiBtcTensionDashboard(rawAiBtcTensionData);
       if (force) {
-        showToast('AI–BTC 融资张力模型与正交残差已成功重新解算！');
+        const rStatus = resJson.refreshStatus || rawAiBtcTensionData.refresh_status;
+        if (rStatus?.status === 'refreshed') {
+          showToast('AI–BTC 融资张力模型与正交残差已由 Python 管线全量重新解算并更新！');
+        } else if (rStatus?.status === 'pipelineUnavailable') {
+          showToast('当前环境未检测到 Python 运行时，已载入已核验的最新快照数据');
+        } else if (rStatus?.status === 'stale') {
+          showToast('Python 管线运行异常，已回退至已验证的快照数据');
+        } else {
+          showToast('已更新 AI–BTC 张力基准快照数据');
+        }
       }
     } else {
       throw new Error(resJson?.error || '返回数据格式不符合预期');
@@ -4251,7 +4260,7 @@ function renderAiBtcTensionCharts() {
             order: 4
           },
           {
-            label: 'Q2 变现警报⚠️',
+            label: 'Q2 算力分化·配对套利',
             data: q2Points,
             backgroundColor: 'rgba(239, 68, 68, 0.75)',
             borderColor: '#ef4444',
@@ -4294,7 +4303,7 @@ function renderAiBtcTensionCharts() {
           x: {
             title: {
               display: true,
-              text: 'P_AI: AI 资本开支融资压力 Z-Score (0 为中性, >0 为饥渴承压)',
+              text: 'I_Compute / P_AI: 算力重估溢价指数 Z-Score (0 为中性, >0 为资本重估扩张)',
               color: '#94a3b8',
               font: { size: 11 }
             },
@@ -4309,7 +4318,7 @@ function renderAiBtcTensionCharts() {
           y: {
             title: {
               display: true,
-              text: 'P_BTC: BTC 变现贴现压力 Z-Score (0 为中性, >0 为流动性流出)',
+              text: 'I_Crypto / P_BTC: 加密外生流动性压力指数 Z-Score (0 为中性, >0 为流动性承压)',
               color: '#94a3b8',
               font: { size: 11 }
             },
@@ -4364,7 +4373,7 @@ function renderAiBtcTensionCharts() {
         labels,
         datasets: [
           {
-            label: 'AI 融资压力 (P_AI)',
+            label: '算力重估指数 (I_Compute)',
             data: dataPAi,
             borderColor: '#38bdf8',
             borderWidth: 2,
@@ -4373,7 +4382,7 @@ function renderAiBtcTensionCharts() {
             tension: 0.2
           },
           {
-            label: 'BTC 变现压力 (P_BTC)',
+            label: '加密流动性压力 (I_Crypto)',
             data: dataPBtc,
             borderColor: '#f87171',
             borderWidth: 2,

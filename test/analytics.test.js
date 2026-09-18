@@ -684,6 +684,59 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
     assert.ok(Array.isArray(causality.findings) && causality.findings.length > 0, 'Empirical findings must be reported');
   });
 
+  test('Module 8 Auditability: HPC spread variance, granular factor breakdowns, econometric metadata, and honest refresh status', async () => {
+    const data = await getAiBtcTensionData(false);
+
+    // 1. Verify hpc_spread is non-zero and has empirical variance (resolves zero-variance bug)
+    const hpcValues = data.series.map(s => s.hpc_spread).filter(v => typeof v === 'number');
+    const nonZeroHpc = hpcValues.filter(v => v !== 0);
+    assert.ok(nonZeroHpc.length > 1000, `hpc_spread must have over 1000 non-zero observations, found: ${nonZeroHpc.length}`);
+
+    const hpcMean = hpcValues.reduce((a, b) => a + b, 0) / hpcValues.length;
+    const hpcVariance = hpcValues.reduce((a, b) => a + Math.pow(b - hpcMean, 2), 0) / hpcValues.length;
+    const hpcStd = Math.sqrt(hpcVariance);
+    assert.ok(hpcStd > 0.5, `hpc_spread standard deviation must be > 0.5, found: ${hpcStd.toFixed(4)}`);
+
+    // 2. Granular breakdown auditability for Layer 1 and Layer 2
+    const latestItem = data.series[data.series.length - 1];
+    assert.ok(latestItem.compute_breakdown, 'Latest series point must have compute_breakdown');
+    assert.ok(latestItem.crypto_breakdown, 'Latest series point must have crypto_breakdown');
+
+    // Layer 1 compute breakdown components
+    const cb = latestItem.compute_breakdown;
+    assert.equal(cb.hpc_spread.weight, 0.4, 'HPC spread weight must be 40% (0.4)');
+    assert.equal(cb.capex_to_ocf.weight, 0.25, 'Capex to OCF weight must be 25% (0.25)');
+    assert.equal(cb.capex_growth.weight, 0.20, 'Capex growth weight must be 20% (0.20)');
+    assert.equal(cb.credit_cost.weight, 0.15, 'Credit cost weight must be 15% (0.15)');
+    assert.ok(Number.isFinite(cb.hpc_spread.raw_ratio), 'HPC spread must have raw_ratio');
+    assert.ok(Number.isFinite(cb.hpc_spread.contribution), 'HPC spread must have contribution');
+
+    // Layer 2 crypto breakdown components
+    const crb = latestItem.crypto_breakdown;
+    assert.equal(crb.basis_inversion.weight, 0.35, 'Basis inversion weight must be 35% (0.35)');
+    assert.equal(crb.basis_momentum.weight, 0.25, 'Basis momentum weight must be 25% (0.25)');
+    assert.equal(crb.volatility_shock.weight, 0.20, 'Volatility shock weight must be 20% (0.20)');
+    assert.equal(crb.miner_squeeze.weight, 0.20, 'Miner squeeze weight must be 20% (0.20)');
+    assert.ok(Number.isFinite(crb.basis_inversion.raw_basis), 'Basis inversion must have raw_basis');
+
+    // 3. Econometric metadata
+    assert.ok(data.regression.hac_metadata, 'HAC robust covariance metadata must exist');
+    assert.equal(data.regression.hac_metadata.maxlags, 5, 'HAC must use 5 lags');
+    assert.ok(data.regression.hac_metadata.kernel.includes('Newey-West') || data.regression.hac_metadata.kernel.includes('Bartlett'));
+
+    assert.ok(data.regression.oos_metadata, 'Out-Of-Sample rolling metadata must exist');
+    assert.equal(data.regression.oos_metadata.rolling_window, 120, 'OOS rolling window must be 120 days');
+    assert.equal(data.regression.oos_metadata.min_burnin, 60, 'OOS burn-in must be 60 days');
+
+    assert.ok(data.event_study_metadata, 'Event study benchmark metadata must exist');
+    assert.ok(data.event_study_metadata.windows.includes('[-1, +1]'));
+
+    // 4. Structured honest refresh status
+    assert.ok(data.refresh_status, 'refresh_status object must exist on returned data');
+    assert.ok(['refreshed', 'pipelineUnavailable', 'stale', 'cached'].includes(data.refresh_status.status));
+    assert.ok(typeof data.refresh_status.message === 'string' && data.refresh_status.message.length > 0);
+  });
+
   test('HTTP Endpoint GET /api/ai-btc-tension returns 200 with code 0 and valid cache', async () => {
     const { server } = require('../server/index');
     await new Promise((resolve) => {

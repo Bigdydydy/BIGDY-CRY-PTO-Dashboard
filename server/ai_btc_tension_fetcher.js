@@ -4,14 +4,20 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'ai_btc_tension.json');
-const PYTHON_PIPELINE_DIR = path.join('C:', 'Users', 'HZX', '.gemini', 'antigravity', 'scratch', 'ai_btc_tension_index');
+const PYTHON_PIPELINE_DIR = path.join(__dirname, '..', 'scripts', 'ai_btc_tension');
 
 let cachedData = null;
 let lastLoadedTime = 0;
 const CACHE_TTL_MS = 60 * 1000; // 1 minute in-memory cache
+
+let lastRefreshStatus = {
+  status: 'cached',
+  message: '使用已验证的基准预计算数据',
+  timestamp: new Date().toISOString()
+};
 
 /**
  * Validates the core schema of the AI-BTC Tension payload
@@ -33,6 +39,36 @@ function validateAiBtcTensionData(data) {
 }
 
 /**
+ * Detect available Python executable
+ */
+function detectPython() {
+  const candidates = [
+    path.join(PYTHON_PIPELINE_DIR, '.venv', 'Scripts', 'python.exe'),
+    path.join(PYTHON_PIPELINE_DIR, '.venv', 'bin', 'python'),
+    path.join(process.env.USERPROFILE || 'C:\\Users\\HZX', '.gemini', 'antigravity', 'scratch', 'ai_btc_tension_index', '.venv', 'Scripts', 'python.exe'),
+    'python3',
+    'python'
+  ];
+
+  for (const cand of candidates) {
+    if (path.isAbsolute(cand) && fs.existsSync(cand)) {
+      return cand;
+    }
+  }
+
+  // Probe system PATH
+  for (const cmd of ['python3', 'python']) {
+    try {
+      execSync(`${cmd} --version`, { stdio: 'ignore' });
+      return cmd;
+    } catch (e) {
+      // not in path
+    }
+  }
+  return null;
+}
+
+/**
  * Loads AI-BTC tension dataset from disk cache
  */
 function loadFromDisk() {
@@ -48,68 +84,109 @@ function loadFromDisk() {
 }
 
 /**
- * Gets AI-BTC tension data, respecting cache unless forceRefresh is true
- */
-async function getAiBtcTensionData(forceRefresh = false) {
-  const now = Date.now();
-  if (!forceRefresh && cachedData && (now - lastLoadedTime < CACHE_TTL_MS)) {
-    return cachedData;
-  }
-
-  // If forceRefresh is requested, execute the Python calculation pipeline
-  if (forceRefresh) {
-    try {
-      console.log('[AiBtcTensionFetcher] forceRefresh requested: executing Python calculation pipeline...');
-      const success = await triggerPythonPipelineRefresh();
-      if (success) {
-        return cachedData || loadFromDisk();
-      }
-    } catch (pipelineErr) {
-      console.warn('[AiBtcTensionFetcher] Python pipeline trigger encountered error, falling back to disk cache:', pipelineErr.message);
-    }
-  }
-
-  // Attempt to read from disk
-  try {
-    return loadFromDisk();
-  } catch (err) {
-    console.warn('[AiBtcTensionFetcher] Initial disk load warning:', err.message);
-    if (cachedData) return cachedData;
-    throw err;
-  }
-}
-
-/**
- * Optional background sync with Python pipeline if available
+ * Triggers Python pipeline refresh if available
  */
 function triggerPythonPipelineRefresh() {
   return new Promise((resolve) => {
-    const pythonExe = path.join(PYTHON_PIPELINE_DIR, '.venv', 'Scripts', 'python.exe');
+    const pythonBin = detectPython();
     const exportScript = path.join(PYTHON_PIPELINE_DIR, 'export_to_json.py');
 
-    if (!fs.existsSync(pythonExe) || !fs.existsSync(exportScript)) {
-      console.log('[AiBtcTensionFetcher] Python venv or export script not present, skipping execution.');
-      return resolve(false);
+    if (!pythonBin || !fs.existsSync(exportScript)) {
+      console.log('[AiBtcTensionFetcher] Python runtime or export script not found in environment.');
+      return resolve({
+        success: false,
+        status: 'pipelineUnavailable',
+        reason: 'Python runtime or export script not found'
+      });
     }
 
-    exec(`"${pythonExe}" "${exportScript}"`, { cwd: PYTHON_PIPELINE_DIR }, (error, stdout, stderr) => {
+    const cmd = `"${pythonBin}" "${exportScript}"`;
+    exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 60000 }, (error, stdout, stderr) => {
       if (error) {
         console.warn('[AiBtcTensionFetcher] Python pipeline execution error:', error.message);
-        return resolve(false);
+        return resolve({
+          success: false,
+          status: 'stale',
+          reason: error.message
+        });
       }
       console.log('[AiBtcTensionFetcher] Python pipeline successfully updated ai_btc_tension.json');
       try {
         loadFromDisk();
-        resolve(true);
+        resolve({
+          success: true,
+          status: 'refreshed'
+        });
       } catch (e) {
-        resolve(false);
+        resolve({
+          success: false,
+          status: 'stale',
+          reason: e.message
+        });
       }
     });
   });
 }
 
+/**
+ * Gets AI-BTC tension data, respecting cache unless forceRefresh is true
+ */
+async function getAiBtcTensionData(forceRefresh = false) {
+  const now = Date.now();
+
+  // If forceRefresh is requested, execute the Python calculation pipeline
+  if (forceRefresh) {
+    try {
+      console.log('[AiBtcTensionFetcher] forceRefresh requested: executing Python calculation pipeline...');
+      const result = await triggerPythonPipelineRefresh();
+      if (result.success) {
+        lastRefreshStatus = {
+          status: 'refreshed',
+          message: 'Python 计量分析全量管线已成功重新解算，全部因子及 OOS 残差已刷新',
+          timestamp: new Date().toISOString()
+        };
+      } else {
+        lastRefreshStatus = {
+          status: result.status,
+          message: result.status === 'pipelineUnavailable'
+            ? '当前运行环境未配置 Python 科学计算栈或依赖，已提供经过预计算与计量核验的完整最新快照数据'
+            : `Python 管线运行异常 (${result.reason})，已回退至已验证的快照数据`,
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (pipelineErr) {
+      console.warn('[AiBtcTensionFetcher] Python pipeline trigger error, falling back:', pipelineErr.message);
+      lastRefreshStatus = {
+        status: 'stale',
+        message: `Python 管线执行出错: ${pipelineErr.message}`,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  if (!forceRefresh && cachedData && (now - lastLoadedTime < CACHE_TTL_MS)) {
+    return { ...cachedData, refresh_status: lastRefreshStatus };
+  }
+
+  // Attempt to read from disk
+  try {
+    const data = loadFromDisk();
+    return { ...data, refresh_status: lastRefreshStatus };
+  } catch (err) {
+    console.warn('[AiBtcTensionFetcher] Initial disk load warning:', err.message);
+    if (cachedData) return { ...cachedData, refresh_status: lastRefreshStatus };
+    throw err;
+  }
+}
+
+function getLastRefreshStatus() {
+  return lastRefreshStatus;
+}
+
 module.exports = {
   getAiBtcTensionData,
   validateAiBtcTensionData,
-  triggerPythonPipelineRefresh
+  triggerPythonPipelineRefresh,
+  detectPython,
+  getLastRefreshStatus
 };

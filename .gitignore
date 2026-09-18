@@ -1,5 +1,8 @@
-﻿node_modules/
+node_modules/
 scratch/
 *.log
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
+.venv/

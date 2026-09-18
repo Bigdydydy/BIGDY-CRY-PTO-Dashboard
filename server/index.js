@@ -294,6 +294,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const data = await getAiBtcTensionData(forceRefresh);
       sendJsonResponse(req, res, 200, {
         code: 0,
+        refreshStatus: data.refresh_status,
         data,
         ...data
       });

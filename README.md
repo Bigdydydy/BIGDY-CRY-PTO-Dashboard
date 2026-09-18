@@ -58,6 +58,24 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
   - **机构吃单滑点仿真 (Order Book Walking Simulation)**：模拟 \$250K ~ \$20M 瞬间市价吃单穿透的真实冲击滑点（bps）。
   - **虚假繁荣与微观背离诊断**：结合 90 天滚动价格与成交量百分位数，识别高位缩量价差走阔、流动性断层危机。
 
+### Module 7: 黄金与比特币跨资产联动与宏观比价 (Gold & BTC Correlation)
+- **Pearson 滚动相关性曲面**：追踪 BTC 与黄金（PAXG/XAU）的 30D / 90D / 180D 滚动相关系数。
+- **跨资产四象限机制判定**：量化识别“抗通胀避险共振”、“流动性分化背离”、“美元主导无差别挤压”与“独立加密 Alpha 周期”。
+
+### Module 8: 全球宏观暗渠穿透与算力基建重估终端 (AI–BTC Tension & Arbitrage)
+- **资产负债表穿透与隔夜暗渠利差**：
+  - 引入隔夜融资利差（\(\text{SOFR} - \text{IORB}\)）与纽约联储 10 年期美债期限溢价（ACM Term Premium），实时监测一级交易商资产负债表摩擦。
+- **Layer 1: 算力与能源重估指数 (\(I_{\text{Compute}}\))**：
+  - 40% 物理电力与 HPC 转型矿企溢价（CORZ/IREN/WULF 相对 MARA/RIOT/CLSK 比价）、25% AI 巨头 Capex/OCF 强度、20% Capex 同比增速、15% 投资级与高收益债信用利差。
+- **Layer 2: 加密外生流动性压力指数 (\(I_{\text{Crypto}}\))**：
+  - 35% CME 近月基差倒挂风险、25% 基差动量衰减、20% 跨资产波动率冲击（VIX 脉冲）、20% 纯矿企权益挤压（纯矿企相对 BTC 超额回撤）。杜绝循环论证，实现与 BTC 自身价格收益的严格外生解耦。
+- **四象限相空间引力与实战配对**：
+  - **Q1 共振繁荣**、**Q2 算力分化·配对套利 (Long HPC Miners / Short BTC)**、**Q3 加密内生去杠杆**、**Q4 宏观扩张**。
+- **计量经济学检验与可证伪边界**：
+  - **HAC 稳健协方差**：Newey-West 5 阶滞后自相关与异方差修正。
+  - **严格样本外残差 (OOS Residuals)**：120 日向前一步滚窗无前瞻偏误残差 \(\varepsilon_{\text{BTC},t}\)。
+  - **因果与事件窗口**：ADF 差分平稳化后跨期因果检验，以及重大 AI Capex 指引发布前后的 CAR 累计异常收益率分析。
+
 ---
 
 ## 关键工程架构与安全特性
@@ -151,8 +169,22 @@ PORT=8080 npm start
 | `/api/macro-chart` | `GET` | Gzip + ETag (304) | 获取美债收益率、FED 净流动性与 MSTR 链上持仓成本数据 |
 | `/api/cdri` | `GET` | Gzip + ETag (304) | 获取加密衍生品综合风险指数 (CDRI) 及历史分位 |
 | `/api/ssro` | `GET` | Gzip + ETag (304) | 获取稳定币供给比率振荡器 (SSRO) 宏观流动性指标 |
+| `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
+| `/api/ai-btc-tension` | `GET` | Gzip + ETag (304) | 获取全球宏观暗渠、算力基建重估指数、相空间及计量检验全量数据 |
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
+
+### Python 计量科学计算管线 (Module 8 Pipeline)
+系统内置完备的 Python 计量经济学管线（位于 `scripts/ai_btc_tension/`），包含 FRED 宏观暗渠、SEC EDGAR 财报解析、矿企算力篮子、HAC 稳健回归与 OOS 滚窗残差模型：
+
+```bash
+# 1. 安装科学计算依赖
+pip install -r scripts/ai_btc_tension/requirements.txt
+
+# 2. 全量执行数据拉取、计量拟合与 JSON 导出
+python scripts/ai_btc_tension/export_to_json.py
+```
+> **注**：在无 Python 运行时环境（如轻量级 Node.js 容器）中，服务端将自动以 `pipelineUnavailable` 机制诚实响应，无缝载入经过核验的基准全量快照，不产生虚假解算反馈。
 
 ---
 

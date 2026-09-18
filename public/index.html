@@ -1739,7 +1739,7 @@
               </div>
               <div class="phase-space-legend">
                 <span class="legend-item"><span class="legend-dot dot-q1"></span>Q1 共振繁荣</span>
-                <span class="legend-item"><span class="legend-dot dot-q2"></span>Q2 变现警报⚠️</span>
+                <span class="legend-item"><span class="legend-dot dot-q2"></span>Q2 算力分化·配对套利</span>
                 <span class="legend-item"><span class="legend-dot dot-q3"></span>Q3 去杠杆</span>
                 <span class="legend-item"><span class="legend-dot dot-q4"></span>Q4 宏观扩张</span>
               </div>
@@ -1749,9 +1749,9 @@
                 <canvas id="chart-phase-space"></canvas>
               </div>
               <div class="phase-space-axis-caption">
-                <span>← 宽松 / 储备充沛 (P_AI &lt; 0)</span>
-                <strong>X 轴: AI 资本开支融资压力 (P_AI)</strong>
-                <span>承压 / 融资饥渴 (P_AI &gt; 0) →</span>
+                <span>← 算力基建低估 / 储备充沛 (I_Compute &lt; 0)</span>
+                <strong>X 轴: AI 算力资产重估溢价指数 (I_Compute)</strong>
+                <span>重组溢价 / 融资扩张 (I_Compute &gt; 0) →</span>
               </div>
             </div>
           </section>
@@ -1775,7 +1775,7 @@
                 </div>
                 <div class="regime-bar-item">
                   <div class="regime-bar-head">
-                    <span class="r-name"><span class="regime-tag tag-q2">Q2</span> 流动性虹吸·变现警报⚠️</span>
+                    <span class="r-name"><span class="regime-tag tag-q2">Q2</span> 算力分化·宏观挤压 (Divergent Arbitrage)</span>
                     <span class="r-pct" id="pct-q2">23.3% (402天)</span>
                   </div>
                   <div class="regime-progress"><div class="regime-progress-fill fill-q2" id="bar-fill-q2" style="width: 23.3%;"></div></div>
@@ -1803,9 +1803,9 @@
                   <span>当前机制微观传导与量化指引</span>
                 </div>
                 <div class="regime-narrative-content" id="tension-regime-narrative">
-                  <p><strong>宏观流动性格局：</strong>外部流动性尚处健康扩张区，AI 巨头超额 Capex 尚未形成对非美资产及主流流动性的恶性抽水。</p>
-                  <p><strong>BTC 传导路径：</strong>BTC 现货基差与 ETF 申购维持韧性，矿企与对冲基金无需被迫贴现变现 BTC 储备。</p>
-                  <p><strong>对冲配置策略：</strong>保持中高 Beta 敞口，重点追踪 <strong>P_BTC</strong> 穿越零轴向 Q2 移动的异动警戒线。</p>
+                  <p><strong>宏观流动性格局：</strong>外部流动性处于健康再平衡区，AI 巨头超额 Capex 未形成对加密市场的系统性抽水。</p>
+                  <p><strong>BTC 与算力传导：</strong>BTC 现货基差维持健康贴水/升水区间，具备 HPC 转型的矿企估值持续相对纯矿企走强。</p>
+                  <p><strong>对冲配置策略：</strong>推荐 Long HPC Miners / Short BTC 跨资产配对对冲，捕捉物理算力资产重估溢价。</p>
                 </div>
               </div>
             </div>
@@ -1819,7 +1819,7 @@
             <div class="card-header">
               <div class="card-title-group">
                 <span class="card-module-tag">LAYER 1 &amp; 2 DYNAMICS</span>
-                <h3>AI 融资压力 (P_AI) 与 BTC 变现压力 (P_BTC) 时序</h3>
+                <h3>AI 算力资本重估指数 (I_Compute) 与 加密流动性外生压力 (I_Crypto) 动态时序</h3>
               </div>
             </div>
             <div class="card-body">
@@ -1857,7 +1857,7 @@
             </div>
             <div class="card-body">
               <div class="formula-banner">
-                <code>R_BTC = α + β_QQQ·R_QQQ + β_DXY·ΔDXY + β_TIPS·ΔTIPS + β_VIX·ΔVIX + β_Fed·ΔFedNetLiq + ε_BTC</code>
+                <code>R_BTC = α + β_QQQ·R_QQQ + β_DXY·ΔDXY + β_TIPS·ΔRealRate + β_VIX·ΔVIX + β_Fed·ΔFedNetLiq + β_TP·ΔTermPrem + β_Repo·RepoSpread + ε_BTC</code>
               </div>
               <div class="table-responsive">
                 <table class="quant-table" id="table-ols-params">
