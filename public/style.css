@@ -2802,8 +2802,8 @@ body {
 }
 
 .view-panel.active {
-  display: block;
-  opacity: 1;
+  display: block !important;
+  opacity: 1 !important;
 }
 
 .main-viewport.view-mode-all .view-panel {

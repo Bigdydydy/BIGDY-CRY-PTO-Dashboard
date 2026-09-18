@@ -3374,10 +3374,7 @@ function switchView(viewId, updateHash = true) {
 
     if (viewId === 'view-ai-btc-tension' || viewId === 'view-all') {
       if (rawAiBtcTensionData) {
-        if (chartPhaseSpaceInstance) chartPhaseSpaceInstance.resize();
-        if (chartTensionSeriesInstance) chartTensionSeriesInstance.resize();
-        if (chartResidualSeriesInstance) chartResidualSeriesInstance.resize();
-        if (chartEventCarInstance) chartEventCarInstance.resize();
+        renderAiBtcTensionCharts();
       } else {
         loadAiBtcTensionData(false);
       }
@@ -3993,8 +3990,10 @@ function renderAiBtcTensionDashboard(data) {
     });
   }
 
-  // 4. Render All Charts
-  renderAiBtcTensionCharts();
+  // 4. Render All Charts if panel is currently active
+  if (currentActiveView === 'view-ai-btc-tension' || currentActiveView === 'view-all') {
+    renderAiBtcTensionCharts();
+  }
 
   // 5. Populate Econometric Parameters Table
   const tbodyOls = document.getElementById('tbody-ols-params');
