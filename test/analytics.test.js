@@ -519,163 +519,138 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
   });
 });
 
-describe('Module 8: 扬缨 (Esther Yang) 宏观智囊终端 (Global Macro Hedge Fund Strategist Agent)', () => {
-  const {
-    getEstherAgentInfo,
-    chatWithEsther,
-    ESTHER_STARTERS,
-    ESTHER_DISCLAIMER
-  } = require('../server/esther_agent_service');
+describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI–BTC Tension Platform)', () => {
+  const { getAiBtcTensionData } = require('../server/ai_btc_tension_fetcher');
 
-  test('getEstherAgentInfo returns complete agent profile, mental models and 4 starters', () => {
-    const info = getEstherAgentInfo();
-    assert.ok(info);
-    assert.equal(info.name, '扬缨 (Esther Yang)');
-    assert.ok(info.role.includes('资深全球宏观对冲基金策略师'));
-    assert.ok(info.welcomeMessage.includes('我是扬缨'));
-    assert.equal(info.starters.length, 4);
-    assert.equal(info.mentalModels.length, 6);
-    assert.ok(info.models.includes('gemini-2.5-flash'));
-    assert.ok(info.models.includes('gemini-2.5-pro'));
+  test('getAiBtcTensionData returns valid 3-layer decoupled quantitative dataset', async () => {
+    const data = await getAiBtcTensionData(false);
+    assert.ok(data, 'Data object must exist');
+    assert.ok(data.metadata, 'Metadata must exist');
+    assert.equal(data.metadata.title, 'AI–BTC 融资张力指数与传导检验系统 (AI–BTC Financing Tension Platform)');
+    assert.ok(data.metadata.core_hypothesis.includes('AI 资本开支'));
+    assert.ok(data.metadata.total_days >= 1500, 'Total historical days must be >= 1500');
+    assert.ok(Array.isArray(data.series), 'Series must be an array');
+    assert.ok(data.series.length >= 1500, 'Series length must be >= 1500');
+    assert.ok(Array.isArray(data.trajectory_180d), 'Trajectory 180d must be an array');
+    assert.equal(data.trajectory_180d.length, 180, 'Trajectory must contain exactly 180 days');
   });
 
-  test('First turn strictly maintains "我" persona and includes mandatory first-turn disclaimer', async () => {
-    const res = await chatWithEsther({
-      message: '你好扬缨，请问你怎么看当前美联储资产负债表收缩对长端美债的影响？',
-      history: [],
-      model: 'gemini-2.5-flash'
-    });
+  test('4-Quadrant Phase Space state machine classification rules are verified', async () => {
+    const data = await getAiBtcTensionData(false);
+    const { current, regime_stats } = data;
 
-    assert.ok(res.ok);
-    assert.ok(res.reply);
-    assert.equal(res.persona, 'Esther Yang');
-    assert.ok(res.reply.includes('我'), 'Esther must strictly use first person "我"');
-    assert.ok(!res.reply.includes('我是 AI'), 'Must never refer to self as AI');
-    assert.ok(!res.reply.includes('本助手'), 'Must never refer to self as 助手');
-    assert.ok(!res.reply.includes('笔者'), 'Must never refer to self as 笔者');
-    assert.ok(res.reply.includes(ESTHER_DISCLAIMER), 'First turn must contain mandatory first-turn disclaimer');
-  });
+    assert.ok(current, 'Current state object must exist');
+    assert.ok(['Q1', 'Q2', 'Q3', 'Q4'].includes(current.regime_code));
 
-  test('Second turn (with history) maintains multi-turn context and does NOT duplicate disclaimer', async () => {
-    const history = [
-      { role: 'user', content: '你好扬缨，请问你怎么看当前美联储资产负债表收缩对长端美债的影响？' },
-      { role: 'assistant', content: '从资产负债表穿透来看，美联储的 QT 正在改变银行体系准备金结构...' + ESTHER_DISCLAIMER }
-    ];
-
-    const res = await chatWithEsther({
-      message: '那如果财政部继续发行短期国债（T-bills），长端溢价还会走阔吗？',
-      history,
-      model: 'gemini-2.5-flash'
-    });
-
-    assert.ok(res.ok);
-    assert.ok(res.reply);
-    assert.ok(res.reply.includes('我'));
-    assert.ok(!res.reply.includes(ESTHER_DISCLAIMER), 'Subsequent turns must not repeat the first-turn disclaimer');
-  });
-
-  test('All 4 prompt starters trigger high-precision buy-side heuristic analysis with 4-part structure', async () => {
-    for (const starter of ESTHER_STARTERS) {
-      const res = await chatWithEsther({
-        message: starter.question,
-        history: [],
-        model: 'gemini-2.5-flash'
-      });
-
-      assert.ok(res.ok, `Starter "${starter.tag}" should execute successfully`);
-      const reply = res.reply;
-
-      // 4-part analytical structure checks
-      assert.ok(
-        reply.includes('穿透') || reply.includes('反常识') || reply.includes('表象'),
-        `Starter "${starter.tag}" must include part 1: 穿透表象与反常识剖析`
-      );
-      assert.ok(
-        reply.includes('管道') || reply.includes('机理') || reply.includes('解构') || reply.includes('资产负债表'),
-        `Starter "${starter.tag}" must include part 2: 底层管道与机理解构`
-      );
-      assert.ok(
-        reply.includes('推演') || reply.includes('决策树') || reply.includes('情景') || reply.includes('路径'),
-        `Starter "${starter.tag}" must include part 3: 结构化推演`
-      );
-      assert.ok(
-        reply.includes('证伪') || reply.includes('阈值') || reply.includes('判断'),
-        `Starter "${starter.tag}" must include part 4: 我的判断与证伪条件`
-      );
+    // Verify current quadrant logic
+    if (current.p_ai >= 0 && current.p_btc < 0) {
+      assert.equal(current.regime_code, 'Q1');
+    } else if (current.p_ai >= 0 && current.p_btc >= 0) {
+      assert.equal(current.regime_code, 'Q2');
+    } else if (current.p_ai < 0 && current.p_btc >= 0) {
+      assert.equal(current.regime_code, 'Q3');
+    } else {
+      assert.equal(current.regime_code, 'Q4');
     }
+
+    // Verify regime distribution sum ≈ 100%
+    assert.ok(regime_stats.Q1 && regime_stats.Q2 && regime_stats.Q3 && regime_stats.Q4);
+    const totalPct = regime_stats.Q1.pct + regime_stats.Q2.pct + regime_stats.Q3.pct + regime_stats.Q4.pct;
+    assert.ok(Math.abs(totalPct - 100.0) < 0.5, 'Regime percentages must sum to 100%');
   });
 
-  test('Model selection supports both Gemini 2.5 Flash and Pro modes', async () => {
-    const resFlash = await chatWithEsther({
-      message: '如何评估近期大类资产的跨周期配置机会？',
-      history: [],
-      model: 'gemini-2.5-flash'
-    });
-    assert.ok(resFlash.ok);
-    assert.equal(resFlash.model, 'gemini-2.5-flash');
+  test('Tension Intensity formula r = sqrt(P_AI^2 + P_BTC^2) is mathematically verified', async () => {
+    const data = await getAiBtcTensionData(false);
+    const { current } = data;
 
-    const resPro = await chatWithEsther({
-      message: '如何评估近期大类资产的跨周期配置机会？',
-      history: [],
-      model: 'gemini-2.5-pro'
-    });
-    assert.ok(resPro.ok);
-    assert.equal(resPro.model, 'gemini-2.5-pro');
+    const expectedR = Math.sqrt(Math.pow(current.p_ai, 2) + Math.pow(current.p_btc, 2));
+    assert.ok(
+      Math.abs(current.tension_intensity - expectedR) < 0.015,
+      `Calculated r (${current.tension_intensity}) must match sqrt(p_ai^2 + p_btc^2) (${expectedR})`
+    );
   });
 
-  test('HTTP endpoints: GET /api/esther/info and POST /api/esther/chat work seamlessly', async () => {
+  test('OLS Macro Orthogonal regression and Q2 hypothesis tests meet econometric criteria', async () => {
+    const data = await getAiBtcTensionData(false);
+    const { regression } = data;
+
+    assert.ok(regression, 'Regression object must exist');
+    assert.ok(regression.r_squared > 0.10, 'Macro R-squared must be > 10%');
+    assert.ok(Array.isArray(regression.parameters), 'Parameters must be an array');
+
+    const paramMap = {};
+    regression.parameters.forEach(p => {
+      paramMap[p.var] = p;
+    });
+
+    // Verify key explanatory variables
+    assert.ok(paramMap.qqq_ret, 'QQQ return beta must be present');
+    assert.ok(paramMap.qqq_ret.beta > 0, 'BTC has positive tech beta with QQQ');
+    assert.ok(paramMap.qqq_ret.p_value < 0.05, 'QQQ beta must be statistically significant');
+
+    assert.ok(paramMap.dxy_ret, 'DXY return beta must be present');
+    assert.ok(paramMap.dxy_ret.beta < 0, 'BTC has negative relationship with USD index DXY');
+
+    assert.ok(paramMap.delta_real_yield, 'TIPS real yield beta must be present');
+    assert.ok(paramMap.vix_delta, 'VIX delta beta must be present');
+    assert.ok(paramMap.delta_fed_net_liq, 'Fed net liquidity beta must be present');
+
+    // Q2 Hypothesis test
+    assert.ok(regression.q2_hypothesis_test, 'Q2 hypothesis test must exist');
+    assert.ok(typeof regression.q2_hypothesis_test.p_value === 'number');
+    assert.ok(regression.q2_hypothesis_test.conclusion.length > 10);
+  });
+
+  test('Event Study CAR windows and Phase 2 Miner-HPC Basket are intact', async () => {
+    const data = await getAiBtcTensionData(false);
+    const { event_study, miner_hpc_basket, causality } = data;
+
+    // Event study
+    assert.ok(Array.isArray(event_study), 'Event study must be an array');
+    assert.ok(event_study.length >= 8, 'Must have at least 8 landmark AI Capex events');
+    const firstEvent = event_study[0];
+    assert.ok(firstEvent.event_date);
+    assert.ok(firstEvent.ticker);
+    assert.ok(typeof firstEvent.car_1d === 'number');
+    assert.ok(typeof firstEvent.car_5d === 'number');
+    assert.ok(typeof firstEvent.car_20d === 'number');
+
+    // Miner HPC basket
+    assert.ok(Array.isArray(miner_hpc_basket), 'Miner HPC basket must be an array');
+    assert.ok(miner_hpc_basket.length >= 5, 'Must contain at least 5 key miner targets');
+    const tickers = miner_hpc_basket.map(m => m.ticker);
+    assert.ok(tickers.includes('CORZ'), 'CORZ must be in miner basket');
+    assert.ok(tickers.includes('IREN'), 'IREN must be in miner basket');
+    assert.ok(tickers.includes('WULF'), 'WULF must be in miner basket');
+
+    // Granger causality
+    assert.ok(causality, 'Granger causality must exist');
+    assert.ok(causality.p_ai_causes_residual, 'P_AI -> ε_BTC must exist');
+    assert.ok(causality.residual_causes_p_ai, 'ε_BTC -> P_AI must exist');
+  });
+
+  test('HTTP Endpoint GET /api/ai-btc-tension returns 200 with code 0 and valid cache', async () => {
     const { server } = require('../server/index');
     await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', async () => {
         const port = server.address().port;
         try {
-          // 1. GET /api/esther/info
-          const infoResp = await fetch(`http://127.0.0.1:${port}/api/esther/info`);
-          assert.equal(infoResp.status, 200);
-          const infoJson = await infoResp.json();
-          assert.equal(infoJson.code, 0);
-          assert.equal(infoJson.data.name, '扬缨 (Esther Yang)');
-          assert.equal(infoJson.data.starters.length, 4);
+          const resp = await fetch(`http://127.0.0.1:${port}/api/ai-btc-tension`);
+          assert.equal(resp.status, 200);
+          const json = await resp.json();
+          assert.equal(json.code, 0);
+          assert.ok(json.data);
+          assert.ok(json.data.current);
+          assert.equal(json.data.metadata.title, 'AI–BTC 融资张力指数与传导检验系统 (AI–BTC Financing Tension Platform)');
 
-          // 2. POST /api/esther/chat with starter question
-          const chatResp = await fetch(`http://127.0.0.1:${port}/api/esther/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: '30年期美债冲上5.3%，财政部回购为什么压不住长端收益率？',
-              history: [],
-              model: 'gemini-2.5-flash'
-            })
-          });
-
-          assert.equal(chatResp.status, 200);
-          const chatJson = await chatResp.json();
-          assert.equal(chatJson.code, 0);
-          assert.ok(chatJson.reply);
-          assert.ok(chatJson.reply.includes('我'));
-          assert.ok(chatJson.reply.includes(ESTHER_DISCLAIMER));
-
-          // 3. POST /api/esther/chat empty message returns 400
-          const badResp = await fetch(`http://127.0.0.1:${port}/api/esther/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '' })
-          });
-          assert.equal(badResp.status, 400);
-
-          // 4. Backward compatibility check: POST /api/ask-gemini returns valid analysis
-          const askResp = await fetch(`http://127.0.0.1:${port}/api/ask-gemini`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              post: { text: '测试宏观数据', authorName: '扬缨' },
-              promptType: 'macro_logic'
-            })
-          });
-          assert.equal(askResp.status, 200);
-          const askJson = await askResp.json();
-          assert.equal(askJson.code, 0);
-          assert.ok(askJson.analysis);
+          // Verify ETag support on the endpoint
+          const etag = resp.headers.get('etag');
+          if (etag) {
+            const cachedResp = await fetch(`http://127.0.0.1:${port}/api/ai-btc-tension`, {
+              headers: { 'if-none-match': etag }
+            });
+            assert.equal(cachedResp.status, 304);
+          }
         } finally {
           server.close(resolve);
         }

@@ -183,17 +183,18 @@
             </div>
           </button>
 
-          <button class="sidebar-nav-item" data-view="view-esther-agent" id="nav-item-esther-agent">
+          <button class="sidebar-nav-item" data-view="view-ai-btc-tension" id="nav-item-ai-btc-tension">
             <div class="nav-icon-wrap">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
+                <circle cx="12" cy="12" r="9"></circle>
+                <line x1="12" y1="3" x2="12" y2="21"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <circle cx="16" cy="8" r="2" fill="currentColor"></circle>
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">扬缨 (Esther Yang) 宏观智囊</span>
-              <span class="nav-desc">全球宏观对冲与大类资产配置</span>
+              <span class="nav-title">AI–BTC 融资张力</span>
+              <span class="nav-desc">四象限相空间 · 正交因果剥离</span>
             </div>
           </button>
         </nav>
@@ -1617,149 +1618,307 @@
       </div>
   </div> <!-- /#view-gold-correlation -->
 
-      <!-- View 8: 扬缨 (Esther Yang) 宏观智囊终端 (Module 8) -->
-      <div class="view-panel" id="view-esther-agent" style="display: none;">
-        <section class="bento-card esther-terminal-card" id="module-esther-agent">
-          <div class="card-header esther-terminal-header">
+      <!-- View 8: AI–BTC 融资张力指数与微观传导检验系统 (Module 8) -->
+      <div class="view-panel" id="view-ai-btc-tension" style="display: none;">
+        <!-- Header Banner Card -->
+        <section class="bento-card tension-header-card">
+          <div class="card-header">
             <div class="card-title-group">
-              <span class="card-module-tag">08 GLOBAL MACRO HEDGE FUND STRATEGIST AGENT</span>
-              <h2>扬缨 (Esther Yang) 宏观智囊终端</h2>
+              <span class="card-module-tag">08 AI–BTC FINANCING TENSION &amp; TRANSMISSION RADAR</span>
+              <h2>AI–BTC 融资张力指数与微观传导检验系统</h2>
+              <p class="section-desc">三层解耦架构 · 四象限相空间状态机 · 宏观正交残差因果剥离 · 矿企-HPC 算力微观传导</p>
             </div>
-            <div class="esther-header-actions">
-              <div class="esther-model-selector-wrap">
-                <select id="esther-model-select" class="esther-model-select" aria-label="选择推理模型">
-                  <option value="gemini-2.5-flash" selected>⚡ Gemini 2.5 Flash (极速)</option>
-                  <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (深度推理)</option>
-                </select>
+            <div class="header-action-group">
+              <div class="tension-meta-pill">
+                <span class="pulse-status-dot"></span>
+                <span>推演基准: <strong id="tension-calc-date">2026-09-18</strong></span>
               </div>
-              <button class="btn-gemini-key-config" id="btn-open-gemini-modal" title="配置您的 Google Gemini API Key 以启用官方大模型">
-                <span class="sparkle-icon">✦</span>
-                <span>API Key 配置</span>
-              </button>
-              <button class="btn-sm-action" id="btn-clear-esther-chat" title="清空对话并重新开启新议题">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <button class="btn-refresh-sm" id="btn-refresh-tension" title="重新从数据库与量化模型更新">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                 </svg>
-                <span>清空对话</span>
+                <span>重新解算</span>
               </button>
-            </div>
-          </div>
-
-          <div class="card-body esther-terminal-body">
-            <!-- Profile Banner -->
-            <div class="esther-profile-banner">
-              <div class="esther-profile-left">
-                <div class="esther-avatar-wrap">
-                  <div class="esther-avatar-letter">EY</div>
-                  <span class="esther-verified-dot" title="资深买方策略师认证">✓</span>
-                </div>
-                <div class="esther-profile-meta">
-                  <div class="esther-profile-name-row">
-                    <span class="esther-name">扬缨 (Esther Yang)</span>
-                    <span class="esther-badge">资深全球宏观对冲基金策略师</span>
-                    <span class="esther-badge-gold">高级金融顾问</span>
-                  </div>
-                  <div class="esther-profile-sub">
-                    以资产负债表穿透、流动性微观管道、可证伪量化边界见长，擅长大类资产择时与跨周期宏观配置
-                  </div>
-                </div>
-              </div>
-              <div class="esther-status-indicator" id="esther-status-indicator">
-                <span class="esther-pulse-dot"></span>
-                <span id="esther-status-text">在线就绪</span>
-              </div>
-            </div>
-
-            <!-- Chat Container with Scrollable Message Stream -->
-            <div class="esther-chat-stream" id="esther-chat-stream">
-              <!-- Welcome & Philosophy Box -->
-              <div class="esther-welcome-box">
-                <div class="esther-welcome-header">
-                  <span class="esther-welcome-sparkle">✦</span>
-                  <span class="esther-welcome-title">欢迎进入扬缨宏观量化研判视窗</span>
-                </div>
-                <div class="esther-welcome-body">
-                  “你好，我是扬缨。在宏观与金融交易中，我习惯跳过表面的喧嚣与情绪，穿透到央行资产负债表、久期错配与微观流动性管道中探寻真相。关于全球利率、货币博弈、主权债务或科技资本开支，今天你想探讨哪个维度的底层逻辑？”
-                </div>
-              </div>
-
-              <!-- Quick Prompt Starters Section -->
-              <div class="esther-starters-section" id="esther-starters-section">
-                <div class="esther-starters-label">
-                  <span>💡 预置高转化研判议题（点击一键穿透）：</span>
-                </div>
-                <div class="esther-starters-grid" id="esther-starters-grid">
-                  <button class="esther-starter-pill" data-question="30年期美债冲上5.3%，财政部回购为什么压不住长端收益率？">
-                    <span class="starter-icon">📉</span>
-                    <div class="starter-content">
-                      <span class="starter-tag">美债长端与赤字</span>
-                      <span class="starter-text">30年期美债冲上5.3%，财政部回购为何压不住长端？</span>
-                    </div>
-                  </button>
-                  <button class="esther-starter-pill" data-question="高实际利率下黄金如何实现「利率逃逸」？与比特币本质区别在哪？">
-                    <span class="starter-icon">🪙</span>
-                    <div class="starter-content">
-                      <span class="starter-tag">黄金与流动性</span>
-                      <span class="starter-text">高实际利率下黄金如何「利率逃逸」？与比特币本质区别？</span>
-                    </div>
-                  </button>
-                  <button class="esther-starter-pill" data-question="科技巨头宣称的 1.8 万亿表外负债与折旧年限拉长究竟怎么算账？">
-                    <span class="starter-icon">🤖</span>
-                    <div class="starter-content">
-                      <span class="starter-tag">AI 资本开支暗管</span>
-                      <span class="starter-text">科技巨头 1.8 万亿表外负债与折旧年限拉长究竟怎么算账？</span>
-                    </div>
-                  </button>
-                  <button class="esther-starter-pill" data-question="美日联合干预日元到底动了谁的资产负债表？后续套息拆仓风险多大？">
-                    <span class="starter-icon">💴</span>
-                    <div class="starter-content">
-                      <span class="starter-tag">日元套息与干预</span>
-                      <span class="starter-text">美日联合干预到底动了谁的资产负债表？套息拆仓风险多大？</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Dynamic Messages List -->
-              <div class="esther-messages-list" id="esther-messages-list"></div>
-
-              <!-- Thinking Indicator -->
-              <div class="esther-thinking-box" id="esther-thinking-box" style="display: none;">
-                <div class="esther-thinking-avatar">EY</div>
-                <div class="esther-thinking-bubble">
-                  <div class="thinking-dots">
-                    <span></span><span></span><span></span>
-                  </div>
-                  <span class="thinking-text">扬缨正在穿透微观流动性管道与资产负债表...</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Interactive Input Dock -->
-            <div class="esther-input-dock">
-              <div class="esther-input-box">
-                <textarea id="esther-chat-input" class="esther-textarea" placeholder="向扬缨提问关于全球宏观、央行流动性、资产负债表或大类资产配置... (Enter 发送，Shift+Enter 换行)" rows="1"></textarea>
-                <button id="btn-esther-send" class="btn-esther-send" title="发送提问">
-                  <span>发送</span>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <line x1="22" y1="2" x2="11" y2="13"/>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="esther-footer-bar">
-                <div class="esther-model-status" id="esther-model-status">
-                  <span>✦ 模式: 扬缨买方智囊 (双模自适应)</span>
-                </div>
-                <div class="esther-philosophy-pill">
-                  资产负债表穿透 · 久期折现约束 · 不对称赔率与量化可证伪底线
-                </div>
-              </div>
             </div>
           </div>
         </section>
-      </div> <!-- /#view-esther-agent -->
+
+        <!-- KPI 5 Cards Grid -->
+        <div class="tension-kpi-grid">
+          <!-- Card 1: Current Regime -->
+          <div class="bento-card tension-kpi-card kpi-regime-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">当前相空间机制</span>
+              <span class="kpi-sub-tag" id="kpi-regime-code">Q1</span>
+            </div>
+            <div class="kpi-main-val" id="kpi-regime-name">流动性充裕·共振繁荣</div>
+            <div class="kpi-sub-desc" id="kpi-regime-desc">AI 扩张激进但外部流动性充沛，BTC 与 AI 同涨</div>
+          </div>
+
+          <!-- Card 2: Layer 1 P_AI -->
+          <div class="bento-card tension-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">Layer 1: AI 融资压力 (P_AI)</span>
+              <span class="kpi-badge">Z-Score</span>
+            </div>
+            <div class="kpi-main-val" id="kpi-p-ai">+0.48 σ</div>
+            <div class="kpi-meter-bar">
+              <div class="kpi-meter-fill" id="kpi-p-ai-bar" style="width: 62%;"></div>
+            </div>
+            <div class="kpi-sub-meta">Capex/OCF 压力 &amp; 信用利差扩散</div>
+          </div>
+
+          <!-- Card 3: Layer 2 P_BTC -->
+          <div class="bento-card tension-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">Layer 2: BTC 变现压力 (P_BTC)</span>
+              <span class="kpi-badge">Z-Score</span>
+            </div>
+            <div class="kpi-main-val" id="kpi-p-btc">-0.19 σ</div>
+            <div class="kpi-meter-bar">
+              <div class="kpi-meter-fill" id="kpi-p-btc-bar" style="width: 45%;"></div>
+            </div>
+            <div class="kpi-sub-meta">ETF 净流出 &amp; 期现基差倒挂承压</div>
+          </div>
+
+          <!-- Card 4: Tension Intensity r -->
+          <div class="bento-card tension-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">张力综合模长强度 (r)</span>
+              <span class="kpi-badge">r = √(P_AI² + P_BTC²)</span>
+            </div>
+            <div class="kpi-main-val text-pos" id="kpi-tension-r">0.52</div>
+            <div class="kpi-sub-desc">跨市场融资引力: <strong id="kpi-tension-status">中性平衡</strong></div>
+          </div>
+
+          <!-- Card 5: Macro R^2 -->
+          <div class="bento-card tension-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">宏观因子解释度 (R²)</span>
+              <span class="kpi-badge">OLS 正交剥离</span>
+            </div>
+            <div class="kpi-main-val text-highlight" id="kpi-macro-r2">16.71%</div>
+            <div class="kpi-sub-desc">特异非宏观残差占比: <strong id="kpi-macro-residual-pct">83.29%</strong></div>
+          </div>
+        </div>
+
+        <!-- Bento Grid Row 1: 2D Phase Space + Regime Probability -->
+        <div class="tension-grid-row-2col">
+          <!-- 2D Phase Space Scatter & Trajectory Chart -->
+          <section class="bento-card phase-space-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">PHASE SPACE DYNAMICS</span>
+                <h3>四象限相空间引力分布与 180 日演化轨迹</h3>
+              </div>
+              <div class="phase-space-legend">
+                <span class="legend-item"><span class="legend-dot dot-q1"></span>Q1 共振繁荣</span>
+                <span class="legend-item"><span class="legend-dot dot-q2"></span>Q2 变现警报⚠️</span>
+                <span class="legend-item"><span class="legend-dot dot-q3"></span>Q3 去杠杆</span>
+                <span class="legend-item"><span class="legend-dot dot-q4"></span>Q4 宏观扩张</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="phase-space-chart-container">
+                <canvas id="chart-phase-space"></canvas>
+              </div>
+              <div class="phase-space-axis-caption">
+                <span>← 宽松 / 储备充沛 (P_AI &lt; 0)</span>
+                <strong>X 轴: AI 资本开支融资压力 (P_AI)</strong>
+                <span>承压 / 融资饥渴 (P_AI &gt; 0) →</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Regime Deep-Dive & Probability Breakdown -->
+          <section class="bento-card regime-stats-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">REGIME BREAKDOWN</span>
+                <h3>历史象限分布与当前机制深度研判</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="regime-bars-container">
+                <div class="regime-bar-item">
+                  <div class="regime-bar-head">
+                    <span class="r-name"><span class="regime-tag tag-q1">Q1</span> 流动性充裕·共振繁荣</span>
+                    <span class="r-pct" id="pct-q1">21.7% (373天)</span>
+                  </div>
+                  <div class="regime-progress"><div class="regime-progress-fill fill-q1" id="bar-fill-q1" style="width: 21.7%;"></div></div>
+                </div>
+                <div class="regime-bar-item">
+                  <div class="regime-bar-head">
+                    <span class="r-name"><span class="regime-tag tag-q2">Q2</span> 流动性虹吸·变现警报⚠️</span>
+                    <span class="r-pct" id="pct-q2">23.3% (402天)</span>
+                  </div>
+                  <div class="regime-progress"><div class="regime-progress-fill fill-q2" id="bar-fill-q2" style="width: 23.3%;"></div></div>
+                </div>
+                <div class="regime-bar-item">
+                  <div class="regime-bar-head">
+                    <span class="r-name"><span class="regime-tag tag-q3">Q3</span> 加密内生去杠杆</span>
+                    <span class="r-pct" id="pct-q3">24.6% (423天)</span>
+                  </div>
+                  <div class="regime-progress"><div class="regime-progress-fill fill-q3" id="bar-fill-q3" style="width: 24.6%;"></div></div>
+                </div>
+                <div class="regime-bar-item">
+                  <div class="regime-bar-head">
+                    <span class="r-name"><span class="regime-tag tag-q4">Q4</span> 宏观温和扩张 (Goldilocks)</span>
+                    <span class="r-pct" id="pct-q4">30.4% (524天)</span>
+                  </div>
+                  <div class="regime-progress"><div class="regime-progress-fill fill-q4" id="bar-fill-q4" style="width: 30.4%;"></div></div>
+                </div>
+              </div>
+
+              <!-- Current Regime Strategy Box -->
+              <div class="regime-narrative-box">
+                <div class="regime-narrative-title">
+                  <span class="status-indicator-dot dot-live"></span>
+                  <span>当前机制微观传导与量化指引</span>
+                </div>
+                <div class="regime-narrative-content" id="tension-regime-narrative">
+                  <p><strong>宏观流动性格局：</strong>外部流动性尚处健康扩张区，AI 巨头超额 Capex 尚未形成对非美资产及主流流动性的恶性抽水。</p>
+                  <p><strong>BTC 传导路径：</strong>BTC 现货基差与 ETF 申购维持韧性，矿企与对冲基金无需被迫贴现变现 BTC 储备。</p>
+                  <p><strong>对冲配置策略：</strong>保持中高 Beta 敞口，重点追踪 <strong>P_BTC</strong> 穿越零轴向 Q2 移动的异动警戒线。</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Bento Grid Row 2: Dual Time Series Charts -->
+        <div class="tension-grid-row-2col">
+          <!-- Time Series 1: P_AI vs P_BTC & Tension Intensity -->
+          <section class="bento-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">LAYER 1 &amp; 2 DYNAMICS</span>
+                <h3>AI 融资压力 (P_AI) 与 BTC 变现压力 (P_BTC) 时序</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="tension-chart-wrap">
+                <canvas id="chart-tension-series"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- Time Series 2: Macro Orthogonal Residual vs BTC Price -->
+          <section class="bento-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">ORTHOGONAL RESIDUAL ALPHA</span>
+                <h3>宏观正交累计残差 (Σε_BTC) 与 BTC 价格背离</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="tension-chart-wrap">
+                <canvas id="chart-residual-series"></canvas>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Bento Grid Row 3: Econometrics & Event Study -->
+        <div class="tension-grid-row-2col">
+          <!-- Econometric Panel: OLS Regression & Hypothesis Tests -->
+          <section class="bento-card econometric-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">ECONOMETRIC SPECIFICATION</span>
+                <h3>宏观正交 OLS 回归参数与 Q2 假说检验</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="formula-banner">
+                <code>R_BTC = α + β_QQQ·R_QQQ + β_DXY·ΔDXY + β_TIPS·ΔTIPS + β_VIX·ΔVIX + β_Fed·ΔFedNetLiq + ε_BTC</code>
+              </div>
+              <div class="table-responsive">
+                <table class="quant-table" id="table-ols-params">
+                  <thead>
+                    <tr>
+                      <th>解释变量</th>
+                      <th>系数 (Beta)</th>
+                      <th>t-Stat</th>
+                      <th>p-Value</th>
+                      <th>经济学角色</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-ols-params">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Hypothesis & Granger Causality Result Boxes -->
+              <div class="hypothesis-results-grid">
+                <div class="hypo-box">
+                  <div class="hypo-title">🎯 Q2 负残差假说检验 (H1)</div>
+                  <div class="hypo-stat">
+                    <span>t-Stat: <strong id="hypo-t-stat">0.00</strong></span>
+                    <span>p-Value: <strong id="hypo-p-val">0.3212</strong></span>
+                    <span class="hypo-badge" id="hypo-status">未显著支持变现踩踏</span>
+                  </div>
+                  <p class="hypo-text" id="hypo-conclusion">
+                    在剔除 QQQ、DXY、TIPS、VIX 与联储表后，Q2 状态下 BTC 正交残差未出现统计显著单边负向崩溃。
+                  </p>
+                </div>
+
+                <div class="hypo-box">
+                  <div class="hypo-title">⚡ Granger 因果检验 (5~10D 传导窗口)</div>
+                  <div class="hypo-stat">
+                    <span>P_AI → ε_BTC: <strong id="granger-pai-res">F=2.10 (p=0.15)</strong></span>
+                    <span>ε_BTC → P_AI: <strong id="granger-res-pai" class="text-highlight">F=2.66 (p=0.02*)</strong></span>
+                  </div>
+                  <p class="hypo-text" id="granger-finding-text">
+                    BTC 出现极端异动后 5 日窗口内反向推升 AI 算力资产的流动性关注度，呈现跨市场高度耦合。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Event Study CAR Chart & Miner-HPC Transmission Basket -->
+          <section class="bento-card event-study-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <span class="card-module-tag">EVENT STUDY &amp; MICRO TRANSMISSION</span>
+                <h3>重大 AI 资本开支事件累积异常收益 (CAR) 与矿企转型</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="event-chart-wrap">
+                <canvas id="chart-event-car"></canvas>
+              </div>
+
+              <div class="miner-basket-section">
+                <div class="miner-basket-title">
+                  <span>⛏️ Phase 2 矿企-HPC 微观传导篮子</span>
+                  <span class="subcard-tag">电力资产重估</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="quant-table" id="table-miner-hpc">
+                    <thead>
+                      <tr>
+                        <th>代码</th>
+                        <th>企业名称</th>
+                        <th>受控电力</th>
+                        <th>HPC / AI 合作模式</th>
+                        <th>融资与对冲渠道</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-miner-hpc">
+                      <!-- Populated dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div> <!-- /#view-ai-btc-tension -->
 
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
@@ -1860,49 +2019,6 @@
     </div>
   </div> <!-- /#trade-modal-backdrop -->
 
-  <!-- Gemini API Key Settings Modal -->
-  <div class="modal-backdrop" id="gemini-key-modal-backdrop" style="display: none;">
-    <div class="modal-card gemini-modal-card">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <div class="modal-title-top">
-            <span class="modal-tag" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border-color: rgba(99, 102, 241, 0.4);">AI ENGINE CONFIG</span>
-            <h3>配置 Google Gemini API Key</h3>
-          </div>
-          <div class="modal-time-meta">直连 Google 官方 Gemini 2.5 Flash 模型</div>
-        </div>
-        <button class="modal-close-btn" id="btn-close-gemini-modal">&times;</button>
-      </div>
-
-      <div class="modal-body">
-        <p class="gemini-modal-desc">
-          输入您的 Google Gemini API Key，即可在 Module 8 中直接调用最新的 <strong>Gemini 2.5 Flash</strong> 进行实时毫秒级宏观量化推演。Key 仅保存在您本地浏览器的 <code>localStorage</code> 中，绝不向未授权服务器泄露。
-        </p>
-
-        <div class="gemini-key-field">
-          <label for="input-gemini-api-key" class="gemini-input-label">Gemini API Key</label>
-          <input type="password" id="input-gemini-api-key" class="gemini-key-input" placeholder="AIzaSy..." autocomplete="off" />
-        </div>
-
-        <div class="gemini-modal-tips">
-          <div class="tip-item">
-            <strong>💡 免费获取 Key：</strong>
-            <span>可随时在 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a> 免费生成个人 API Key。</span>
-          </div>
-          <div class="tip-item">
-            <strong>🛡️ 零依赖启发式研判回退：</strong>
-            <span>若未配置 Key，系统将自动启用内置的高精度买方机构启发式研判引擎，扬缨全套宏观推演与对话功能依然 100% 完整可用！</span>
-          </div>
-        </div>
-
-        <div class="gemini-modal-actions">
-          <button class="btn-clear-key" id="btn-clear-gemini-key">清除本地 Key</button>
-          <button class="btn-save-key" id="btn-save-gemini-key">保存并启用</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Toast Notification -->
   <div class="toast-notification" id="toast-notification"></div>
 
@@ -1969,12 +2085,14 @@
       </svg>
       <span>金/BTC</span>
     </button>
-    <button class="mob-nav-item" data-view="view-esther-agent" id="mob-nav-esther-agent">
+    <button class="mob-nav-item" data-view="view-ai-btc-tension" id="mob-nav-ai-btc-tension">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        <path d="M8 10h.01M12 10h.01M16 10h.01"/>
+        <circle cx="12" cy="12" r="9"></circle>
+        <line x1="12" y1="3" x2="12" y2="21"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <circle cx="16" cy="8" r="2" fill="currentColor"></circle>
       </svg>
-      <span>扬缨智囊</span>
+      <span>AI-BTC张力</span>
     </button>
   </nav>
 

@@ -18,7 +18,7 @@ const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
-const { chatWithEsther, getEstherAgentInfo, WELCOME_MESSAGE, PROMPT_STARTERS } = require('./esther_agent_service');
+const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -287,75 +287,18 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // POST /api/esther/chat (Module 8: Esther Yang Conversational Macro Agent)
-  if (pathname === '/api/esther/chat' && req.method === 'POST') {
+  // GET /api/ai-btc-tension (Module 8: AI-BTC Financing Tension Index & Transmission Analysis)
+  if (pathname === '/api/ai-btc-tension' && req.method === 'GET') {
     try {
-      const body = await parseJsonBody(req);
-      const { messages, message, history, model = 'gemini-2.5-flash', apiKey = null } = body;
-
-      const hasMessages = Array.isArray(messages) && messages.length > 0;
-      const hasMessage = typeof message === 'string' && message.trim().length > 0;
-
-      if (!hasMessages && !hasMessage) {
-        sendJsonResponse(req, res, 400, { code: 400, error: '消息内容不可为空' });
-        return;
-      }
-
-      const result = await chatWithEsther({ messages, message, history, model, apiKey });
+      const forceRefresh = parsedUrl.query?.refresh === 'true' || parsedUrl.query?.force === '1';
+      const data = await getAiBtcTensionData(forceRefresh);
       sendJsonResponse(req, res, 200, {
         code: 0,
-        persona: 'Esther Yang',
-        ...result
+        data,
+        ...data
       });
     } catch (err) {
-      console.error('[API Error] esther/chat:', err);
-      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
-    }
-    return;
-  }
-
-  // GET /api/esther/info (Module 8: Welcome, Starters & Meta)
-  if (pathname === '/api/esther/info' && req.method === 'GET') {
-    try {
-      const info = getEstherAgentInfo();
-      sendJsonResponse(req, res, 200, {
-        code: 0,
-        data: info,
-        welcomeMessage: info.welcomeMessage,
-        promptStarters: info.starters,
-        starters: info.starters,
-        mentalModels: info.mentalModels,
-        models: info.models,
-        persona: {
-          name: info.name,
-          title: info.role,
-          philosophy: info.philosophy
-        }
-      });
-    } catch (err) {
-      console.error('[API Error] esther/info:', err);
-      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
-    }
-    return;
-  }
-
-  // POST /api/ask-gemini (Compatibility Fallback)
-  if (pathname === '/api/ask-gemini' && req.method === 'POST') {
-    try {
-      const body = await parseJsonBody(req);
-      const question = body.customQuestion || body.post?.text || '请从宏观买方视角展开穿透分析';
-      const result = await chatWithEsther({
-        messages: [{ role: 'user', content: question }],
-        model: body.model || 'gemini-2.5-flash',
-        apiKey: body.apiKey || null
-      });
-      sendJsonResponse(req, res, 200, {
-        code: 0,
-        analysis: result.reply,
-        model: result.model,
-        source: result.source
-      });
-    } catch (err) {
+      console.error('[API Error] ai-btc-tension:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
     }
     return;
@@ -397,7 +340,8 @@ async function handleApiRequest(req, res, parsedUrl) {
             getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
             fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
-            getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message))
+            getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
+            getAiBtcTensionData(true).catch(e => console.error('[AiBtcTensionFetcher] Sync refresh error:', e.message))
           ]);
           return syncResult;
         })().finally(() => {
@@ -507,7 +451,9 @@ function startServer() {
     .then(() => console.log('[Server] Initial Coinbase liquidity cache ready.'))
     .catch(e => console.warn('[Server] Initial Coinbase fetch warning:', e.message));
 
-  console.log('[Server] Initial Esther Yang Agent initialized.');
+  getAiBtcTensionData()
+    .then(() => console.log('[Server] Initial AI-BTC Tension data cache ready.'))
+    .catch(e => console.warn('[Server] Initial AI-BTC Tension fetch warning:', e.message));
 
   // Background auto-refresh every 30 seconds
   setInterval(async () => {

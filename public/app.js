@@ -214,7 +214,8 @@ async function loadMarketData(triggerRefresh = false) {
       fetch(`/api/market-data?threshold=${threshold}&timeRange=${timeRange}`),
       loadMacroData(triggerRefresh).catch(e => console.error('[App] Macro fetch error:', e.message)),
       loadCdriData(triggerRefresh).catch(e => console.error('[App] CDRI fetch error:', e.message)),
-      fetchSsroData(triggerRefresh).catch(e => console.error('[App] SSRO fetch error:', e.message))
+      fetchSsroData(triggerRefresh).catch(e => console.error('[App] SSRO fetch error:', e.message)),
+      loadAiBtcTensionData(triggerRefresh).catch(e => console.error('[App] AI-BTC Tension fetch error:', e.message))
     ]);
 
     if (!mResp.ok) throw new Error(`Server returned ${mResp.status}`);
@@ -3272,8 +3273,7 @@ const VIEW_TITLES = {
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
-  'view-esther-agent': '扬缨 (Esther Yang) 宏观智囊',
-  'view-x-pulse': '扬缨 (Esther Yang) 宏观智囊',
+  'view-ai-btc-tension': 'AI–BTC 融资张力指数与传导检验系统',
   'view-all': '全模块平铺画卷'
 };
 
@@ -3372,8 +3372,15 @@ function switchView(viewId, updateHash = true) {
       renderGoldChart();
     }
 
-    if (viewId === 'view-esther-agent' || viewId === 'view-x-pulse' || viewId === 'view-all') {
-      scrollEstherChatToBottom();
+    if (viewId === 'view-ai-btc-tension' || viewId === 'view-all') {
+      if (rawAiBtcTensionData) {
+        if (chartPhaseSpaceInstance) chartPhaseSpaceInstance.resize();
+        if (chartTensionSeriesInstance) chartTensionSeriesInstance.resize();
+        if (chartResidualSeriesInstance) chartResidualSeriesInstance.resize();
+        if (chartEventCarInstance) chartEventCarInstance.resize();
+      } else {
+        loadAiBtcTensionData(false);
+      }
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -3843,312 +3850,675 @@ function initGoldCorrelationEvents() {
 }
 
 // ============================================================================
-// Module 8: Esther Yang (扬缨) Global Macro Hedge Fund Strategist Agent Controller
+// Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI–BTC Tension Platform)
 // ============================================================================
 
-let estherMessages = [];
-let estherIsThinking = false;
-let estherModel = 'gemini-2.5-flash';
-
-// DOM Elements
-const elEstherChatStream = document.getElementById('esther-chat-stream');
-const elEstherMessagesList = document.getElementById('esther-messages-list');
-const elEstherThinkingBox = document.getElementById('esther-thinking-box');
-const elEstherChatInput = document.getElementById('esther-chat-input');
-const btnEstherSend = document.getElementById('btn-esther-send');
-const elEstherModelSelect = document.getElementById('esther-model-select');
-const btnClearEstherChat = document.getElementById('btn-clear-esther-chat');
-const elEstherModelStatus = document.getElementById('esther-model-status');
-const elEstherStatusIndicator = document.getElementById('esther-status-indicator');
-const elEstherStatusText = document.getElementById('esther-status-text');
-const elEstherStartersGrid = document.getElementById('esther-starters-grid');
-
-// API Key Modal elements
-const geminiKeyModal = document.getElementById('gemini-key-modal-backdrop');
-const btnOpenGeminiModal = document.getElementById('btn-open-gemini-modal');
-const btnCloseGeminiModal = document.getElementById('btn-close-gemini-modal');
-const inputGeminiApiKey = document.getElementById('input-gemini-api-key');
-const btnSaveGeminiKey = document.getElementById('btn-save-gemini-key');
-const btnClearGeminiKey = document.getElementById('btn-clear-gemini-key');
+let rawAiBtcTensionData = null;
+let chartPhaseSpaceInstance = null;
+let chartTensionSeriesInstance = null;
+let chartResidualSeriesInstance = null;
+let chartEventCarInstance = null;
+let isAiBtcTensionLoading = false;
 
 /**
- * Safe client-side markdown renderer for Esther Yang analyses
+ * Fetch AI-BTC Tension Platform data from server
  */
-function renderMarkdownText(mdText) {
-  if (!mdText) return '';
-  let html = escapeHtml(mdText);
+async function loadAiBtcTensionData(force = false) {
+  if (isAiBtcTensionLoading) return;
+  isAiBtcTensionLoading = true;
 
-  // Headers (### Header -> <h3>Header</h3>)
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-  html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-
-  // Bold (**text** -> <strong>text</strong>)
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // Italic (*text* -> <em>$1</em>)
-  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  // Blockquotes (> text -> <blockquote>text</blockquote>)
-  html = html.replace(/^\&gt; (.*$)/gim, '<blockquote>$1</blockquote>');
-
-  // Unordered list items (- item -> <li>item</li>)
-  html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>(\n|.)*?)(?=(<h3>|<h4>|<h2>|<p>|<blockquote>|<div|$))/gim, '<ul>$1</ul>');
-
-  // Paragraph breaks
-  html = html.replace(/\n\n+/g, '</p><p>');
-  html = `<p>${html}</p>`;
-  html = html.replace(/<p><\/p>/g, '');
-  html = html.replace(/<p>(<h[234]>)/g, '$1');
-  html = html.replace(/(<\/h[234]>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<blockquote>)/g, '$1');
-  html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<ul>)/g, '$1');
-  html = html.replace(/(<\/ul>)<\/p>/g, '$1');
-
-  return html;
-}
-
-/**
- * Scroll chat message stream to bottom
- */
-function scrollEstherChatToBottom() {
-  if (elEstherChatStream) {
-    elEstherChatStream.scrollTop = elEstherChatStream.scrollHeight;
-  }
-}
-
-/**
- * Render all messages in chat history
- */
-function renderEstherMessages() {
-  if (!elEstherMessagesList) return;
-  
-  if (estherMessages.length === 0) {
-    elEstherMessagesList.innerHTML = '';
-    return;
-  }
-
-  elEstherMessagesList.innerHTML = estherMessages.map((msg, index) => {
-    const isUser = msg.role === 'user';
-    const avatar = isUser ? '访客' : 'EY';
-    const name = isUser ? '您 (投资者)' : '扬缨 (Esther Yang)';
-    const renderedContent = isUser ? escapeHtml(msg.content) : renderMarkdownText(msg.content);
-
-    return `
-      <div class="esther-msg-row ${isUser ? 'user-row' : 'assistant-row'}" data-index="${index}">
-        <div class="esther-msg-avatar ${isUser ? 'user-avatar' : 'assistant-avatar'}">${avatar}</div>
-        <div class="esther-msg-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}">
-          <div class="esther-msg-header">
-            <span class="esther-msg-sender">${name}</span>
-            <span class="esther-msg-time">${msg.timeStr || ''}</span>
-          </div>
-          <div class="esther-msg-body markdown-body">
-            ${renderedContent}
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  scrollEstherChatToBottom();
-}
-
-/**
- * Send user message to Esther Yang Agent
- */
-async function sendEstherMessage(userInput) {
-  const text = (userInput || (elEstherChatInput ? elEstherChatInput.value : '')).trim();
-  if (!text || estherIsThinking) return;
-
-  if (elEstherChatInput) {
-    elEstherChatInput.value = '';
-    elEstherChatInput.style.height = 'auto';
-  }
-
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-  // Append user message
-  estherMessages.push({
-    role: 'user',
-    content: text,
-    timeStr
-  });
-  renderEstherMessages();
-
-  // Set thinking state
-  estherIsThinking = true;
-  if (elEstherThinkingBox) elEstherThinkingBox.style.display = 'flex';
-  if (btnEstherSend) btnEstherSend.disabled = true;
-  if (elEstherStatusText) elEstherStatusText.textContent = '正在穿透研判...';
-  if (elEstherStatusIndicator) elEstherStatusIndicator.classList.add('thinking');
-  scrollEstherChatToBottom();
+  const btnRefresh = document.getElementById('btn-refresh-tension');
+  if (btnRefresh) btnRefresh.classList.add('loading');
 
   try {
-    const savedApiKey = localStorage.getItem('gemini_api_key') || null;
-    const model = elEstherModelSelect ? elEstherModelSelect.value : estherModel;
+    const url = force ? '/api/ai-btc-tension?force=1' : '/api/ai-btc-tension';
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const resJson = await resp.json();
 
-    const resp = await fetch('/api/esther/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: estherMessages.map(m => ({ role: m.role, content: m.content })),
-        model,
-        apiKey: savedApiKey
-      })
-    });
-
-    const result = await resp.json();
-    if (result && result.code === 0 && result.reply) {
-      const respTime = new Date();
-      const respTimeStr = `${String(respTime.getHours()).padStart(2, '0')}:${String(respTime.getMinutes()).padStart(2, '0')}`;
-
-      estherMessages.push({
-        role: 'assistant',
-        content: result.reply,
-        timeStr: respTimeStr,
-        source: result.source,
-        model: result.model
-      });
-
-      if (elEstherModelStatus) {
-        elEstherModelStatus.innerHTML = result.source === 'gemini-api'
-          ? `<span>✦ 模式: ${escapeHtml(result.model)} (Google 官方 API 直连)</span>`
-          : `<span>⚡ 模式: ${escapeHtml(result.model)} (本地高精度买方量化引擎)</span>`;
+    if (resJson && resJson.code === 0) {
+      rawAiBtcTensionData = resJson.data || resJson;
+      renderAiBtcTensionDashboard(rawAiBtcTensionData);
+      if (force) {
+        showToast('AI–BTC 融资张力模型与正交残差已成功重新解算！');
       }
     } else {
-      estherMessages.push({
-        role: 'assistant',
-        content: `**研判生成受阻**：${escapeHtml(result?.error || '服务器未能正常返回研判结果，请重试。')}`,
-        timeStr
-      });
+      throw new Error(resJson?.error || '返回数据格式不符合预期');
     }
   } catch (err) {
-    console.error('[EstherAgent] Chat request error:', err);
-    estherMessages.push({
-      role: 'assistant',
-      content: `**网络通信异常**：${escapeHtml(err.message)}。请检查网络连接或稍后重试。`,
-      timeStr
-    });
+    console.error('[AiBtcTension] Load data failed:', err);
+    showToast(`AI–BTC 张力数据载入失败: ${err.message}`);
   } finally {
-    estherIsThinking = false;
-    if (elEstherThinkingBox) elEstherThinkingBox.style.display = 'none';
-    if (btnEstherSend) btnEstherSend.disabled = false;
-    if (elEstherStatusText) elEstherStatusText.textContent = '在线就绪';
-    if (elEstherStatusIndicator) elEstherStatusIndicator.classList.remove('thinking');
-    renderEstherMessages();
+    isAiBtcTensionLoading = false;
+    if (btnRefresh) btnRefresh.classList.remove('loading');
   }
 }
 
 /**
- * Clear chat history and restart conversation
+ * Render all components of the AI-BTC Tension Platform
  */
-function clearEstherChat() {
-  estherMessages = [];
-  renderEstherMessages();
-  showToast('已清空对话记录，重新开启宏观研判探讨');
-}
+function renderAiBtcTensionDashboard(data) {
+  if (!data) return;
 
-/**
- * Initialize Esther Agent Event Listeners
- */
-function initEstherAgent() {
-  // 1. Starter prompt pill clicks
-  if (elEstherStartersGrid) {
-    elEstherStartersGrid.addEventListener('click', e => {
-      const pill = e.target.closest('.esther-starter-pill');
-      if (!pill) return;
-      const question = pill.dataset.question;
-      if (question) {
-        sendEstherMessage(question);
-      }
-    });
+  const { current, regime_stats, regression, event_study, causality, miner_hpc_basket, trajectory_180d, series } = data;
+
+  // 1. Benchmark date
+  const elCalcDate = document.getElementById('tension-calc-date');
+  if (elCalcDate && current?.date) {
+    elCalcDate.textContent = current.date;
   }
 
-  // 2. Send button click
-  if (btnEstherSend) {
-    btnEstherSend.addEventListener('click', () => sendEstherMessage());
+  // 2. KPI Cards
+  const elRegimeCode = document.getElementById('kpi-regime-code');
+  const elRegimeName = document.getElementById('kpi-regime-name');
+  const elRegimeDesc = document.getElementById('kpi-regime-desc');
+  const regimeCard = document.querySelector('.kpi-regime-card');
+
+  if (elRegimeCode) elRegimeCode.textContent = current.regime_code || 'Q1';
+  if (elRegimeName) elRegimeName.textContent = current.regime_name || '--';
+  if (elRegimeDesc) elRegimeDesc.textContent = current.regime_description || '--';
+
+  if (regimeCard) {
+    regimeCard.className = 'bento-card tension-kpi-card kpi-regime-card';
+    if (current.regime_code) {
+      regimeCard.classList.add(`regime-${current.regime_code.toLowerCase()}`);
+    }
   }
 
-  // 3. Textarea Enter to send (Shift+Enter for newline)
-  if (elEstherChatInput) {
-    elEstherChatInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendEstherMessage();
-      }
-    });
-
-    // Auto-expand textarea
-    elEstherChatInput.addEventListener('input', () => {
-      elEstherChatInput.style.height = 'auto';
-      elEstherChatInput.style.height = `${Math.min(elEstherChatInput.scrollHeight, 120)}px`;
-    });
+  // Layer 1 P_AI
+  const elPAi = document.getElementById('kpi-p-ai');
+  const elPAiBar = document.getElementById('kpi-p-ai-bar');
+  if (elPAi) {
+    const sign = current.p_ai >= 0 ? '+' : '';
+    elPAi.textContent = `${sign}${Number(current.p_ai).toFixed(2)} σ`;
+    if (elPAiBar) {
+      const pct = Math.max(5, Math.min(95, ((current.p_ai + 2.5) / 5) * 100));
+      elPAiBar.style.width = `${pct}%`;
+    }
   }
 
-  // 4. Clear chat button
-  if (btnClearEstherChat) {
-    btnClearEstherChat.addEventListener('click', clearEstherChat);
+  // Layer 2 P_BTC
+  const elPBtc = document.getElementById('kpi-p-btc');
+  const elPBtcBar = document.getElementById('kpi-p-btc-bar');
+  if (elPBtc) {
+    const sign = current.p_btc >= 0 ? '+' : '';
+    elPBtc.textContent = `${sign}${Number(current.p_btc).toFixed(2)} σ`;
+    if (elPBtcBar) {
+      const pct = Math.max(5, Math.min(95, ((current.p_btc + 2.5) / 5) * 100));
+      elPBtcBar.style.width = `${pct}%`;
+    }
   }
 
-  // 5. Model select change
-  if (elEstherModelSelect) {
-    elEstherModelSelect.addEventListener('change', () => {
-      estherModel = elEstherModelSelect.value;
-      if (elEstherModelStatus) {
-        elEstherModelStatus.innerHTML = `<span>✦ 当前推理模型: ${escapeHtml(elEstherModelSelect.options[elEstherModelSelect.selectedIndex].text)}</span>`;
-      }
-      showToast(`已切换推理引擎为: ${elEstherModelSelect.options[elEstherModelSelect.selectedIndex].text}`);
-    });
-  }
-
-  // 6. Gemini API Key Modal
-  if (btnOpenGeminiModal && geminiKeyModal) {
-    btnOpenGeminiModal.addEventListener('click', () => {
-      if (inputGeminiApiKey) {
-        inputGeminiApiKey.value = localStorage.getItem('gemini_api_key') || '';
-      }
-      geminiKeyModal.style.display = 'flex';
-    });
-  }
-
-  if (btnCloseGeminiModal && geminiKeyModal) {
-    btnCloseGeminiModal.addEventListener('click', () => {
-      geminiKeyModal.style.display = 'none';
-    });
-  }
-
-  if (geminiKeyModal) {
-    geminiKeyModal.addEventListener('click', e => {
-      if (e.target === geminiKeyModal) {
-        geminiKeyModal.style.display = 'none';
-      }
-    });
-  }
-
-  if (btnSaveGeminiKey) {
-    btnSaveGeminiKey.addEventListener('click', () => {
-      const key = (inputGeminiApiKey ? inputGeminiApiKey.value : '').trim();
-      if (key) {
-        localStorage.setItem('gemini_api_key', key);
-        showToast('Gemini API Key 已保存至本地并激活！');
+  // Tension Intensity r
+  const elTensionR = document.getElementById('kpi-tension-r');
+  const elTensionStatus = document.getElementById('kpi-tension-status');
+  if (elTensionR) {
+    const rVal = Number(current.tension_intensity || 0);
+    elTensionR.textContent = rVal.toFixed(2);
+    if (elTensionStatus) {
+      if (rVal < 0.8) {
+        elTensionStatus.textContent = '中性平衡区';
+        elTensionStatus.className = 'text-pos';
+      } else if (rVal < 1.4) {
+        elTensionStatus.textContent = '温和张力传导';
+        elTensionStatus.className = 'text-highlight';
       } else {
-        localStorage.removeItem('gemini_api_key');
-        showToast('未输入有效 Key，已恢复内置量化启发式模式');
+        elTensionStatus.textContent = '极端引力撕裂⚠️';
+        elTensionStatus.className = 'text-neg';
       }
-      if (geminiKeyModal) geminiKeyModal.style.display = 'none';
+    }
+  }
+
+  // Macro R^2
+  const elMacroR2 = document.getElementById('kpi-macro-r2');
+  const elResidualPct = document.getElementById('kpi-macro-residual-pct');
+  if (elMacroR2 && regression) {
+    const r2Pct = (regression.r_squared * 100).toFixed(2);
+    elMacroR2.textContent = `${r2Pct}%`;
+    if (elResidualPct) {
+      elResidualPct.textContent = `${(100 - parseFloat(r2Pct)).toFixed(2)}%`;
+    }
+  }
+
+  // 3. Regime Statistics Breakdown
+  if (regime_stats) {
+    ['Q1', 'Q2', 'Q3', 'Q4'].forEach(q => {
+      const stat = regime_stats[q];
+      if (stat) {
+        const elPct = document.getElementById(`pct-${q.toLowerCase()}`);
+        const elFill = document.getElementById(`bar-fill-${q.toLowerCase()}`);
+        if (elPct) elPct.textContent = `${stat.pct}% (${stat.count}天)`;
+        if (elFill) elFill.style.width = `${stat.pct}%`;
+      }
     });
   }
 
-  if (btnClearGeminiKey) {
-    btnClearGeminiKey.addEventListener('click', () => {
-      localStorage.removeItem('gemini_api_key');
-      if (inputGeminiApiKey) inputGeminiApiKey.value = '';
-      showToast('已清除本地 API Key，使用内置高精度量化引擎');
-      if (geminiKeyModal) geminiKeyModal.style.display = 'none';
+  // 4. Render All Charts
+  renderAiBtcTensionCharts();
+
+  // 5. Populate Econometric Parameters Table
+  const tbodyOls = document.getElementById('tbody-ols-params');
+  if (tbodyOls && regression?.parameters) {
+    tbodyOls.innerHTML = regression.parameters.map(p => {
+      let stars = '';
+      if (p.p_value < 0.001) stars = '***';
+      else if (p.p_value < 0.01) stars = '**';
+      else if (p.p_value < 0.05) stars = '*';
+
+      const betaFormatted = Number(p.beta).toFixed(4);
+      const betaClass = p.beta > 0 ? 'text-pos' : (p.beta < 0 ? 'text-neg' : '');
+
+      return `
+        <tr>
+          <td><strong>${escapeHtml(p.name)}</strong> <span class="text-muted">(${escapeHtml(p.var)})</span></td>
+          <td class="${betaClass}">${betaFormatted}</td>
+          <td>${Number(p.t_stat).toFixed(2)}</td>
+          <td>${Number(p.p_value).toFixed(4)} <strong class="text-highlight">${stars}</strong></td>
+          <td class="text-secondary">${escapeHtml(p.role)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // 6. Q2 Hypothesis Test Details
+  if (regression?.q2_hypothesis_test) {
+    const q2 = regression.q2_hypothesis_test;
+    const elTStat = document.getElementById('hypo-t-stat');
+    const elPVal = document.getElementById('hypo-p-val');
+    const elStatus = document.getElementById('hypo-status');
+    const elConclusion = document.getElementById('hypo-conclusion');
+
+    if (elTStat) elTStat.textContent = Number(q2.t_stat).toFixed(2);
+    if (elPVal) elPVal.textContent = Number(q2.p_value).toFixed(4);
+    if (elStatus) {
+      if (q2.is_significant_5pct) {
+        elStatus.textContent = '显著支持 (p < 0.05)';
+        elStatus.className = 'hypo-badge text-neg';
+      } else {
+        elStatus.textContent = '未显著支持单边挤压 (p > 0.05)';
+        elStatus.className = 'hypo-badge';
+      }
+    }
+    if (elConclusion && q2.conclusion) {
+      elConclusion.textContent = q2.conclusion;
+    }
+  }
+
+  // 7. Granger Causality Details
+  if (causality) {
+    const elGrangerPai = document.getElementById('granger-pai-res');
+    const elGrangerRes = document.getElementById('granger-res-pai');
+    const elFinding = document.getElementById('granger-finding-text');
+
+    if (elGrangerPai && causality.p_ai_causes_residual?.lag_1) {
+      const f = Number(causality.p_ai_causes_residual.lag_1.f_stat).toFixed(2);
+      const p = Number(causality.p_ai_causes_residual.lag_1.p_value).toFixed(2);
+      elGrangerPai.textContent = `F=${f} (p=${p})`;
+    }
+    if (elGrangerRes && causality.residual_causes_p_ai?.lag_5) {
+      const f = Number(causality.residual_causes_p_ai.lag_5.f_stat).toFixed(2);
+      const p = Number(causality.residual_causes_p_ai.lag_5.p_value).toFixed(2);
+      elGrangerRes.textContent = `F=${f} (p=${p}*)`;
+    }
+    if (elFinding && causality.findings && causality.findings.length > 0) {
+      elFinding.textContent = causality.findings.join(' ');
+    }
+  }
+
+  // 8. Populate Miner-HPC Basket Table
+  const tbodyMiner = document.getElementById('tbody-miner-hpc');
+  if (tbodyMiner && miner_hpc_basket) {
+    tbodyMiner.innerHTML = miner_hpc_basket.map(m => `
+      <tr>
+        <td><strong class="text-highlight">${escapeHtml(m.ticker)}</strong></td>
+        <td><strong>${escapeHtml(m.name)}</strong></td>
+        <td><span class="meta-pill" style="padding:2px 6px;">${escapeHtml(m.power_mw)}</span></td>
+        <td class="text-secondary">${escapeHtml(m.partner_mode)}</td>
+        <td class="text-muted">${escapeHtml(m.financing_channel)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+/**
+ * Render all 4 Chart.js charts for AI-BTC Tension Platform
+ */
+function renderAiBtcTensionCharts() {
+  if (!rawAiBtcTensionData) return;
+  const { current, trajectory_180d, series, event_study } = rawAiBtcTensionData;
+
+  // ----------------------------------------------------
+  // Chart 1: 2D Phase Space Scatter & Trajectory Chart
+  // ----------------------------------------------------
+  const canvasPhase = document.getElementById('chart-phase-space');
+  if (canvasPhase && window.Chart) {
+    if (chartPhaseSpaceInstance) {
+      chartPhaseSpaceInstance.destroy();
+    }
+
+    const traj = trajectory_180d || [];
+    
+    // Split points into regimes for coloring
+    const q1Points = traj.filter(d => d.regime_code === 'Q1').map(d => ({ x: d.p_ai, y: d.p_btc, date: d.date }));
+    const q2Points = traj.filter(d => d.regime_code === 'Q2').map(d => ({ x: d.p_ai, y: d.p_btc, date: d.date }));
+    const q3Points = traj.filter(d => d.regime_code === 'Q3').map(d => ({ x: d.p_ai, y: d.p_btc, date: d.date }));
+    const q4Points = traj.filter(d => d.regime_code === 'Q4').map(d => ({ x: d.p_ai, y: d.p_btc, date: d.date }));
+
+    // Trajectory path line (last 60 days for clear trajectory tracking)
+    const recentTraj = traj.slice(-60).map(d => ({ x: d.p_ai, y: d.p_btc }));
+
+    chartPhaseSpaceInstance = new Chart(canvasPhase, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: '180日演化轨迹线',
+            data: recentTraj,
+            showLine: true,
+            borderColor: 'rgba(99, 102, 241, 0.45)',
+            borderWidth: 1.5,
+            borderDash: [3, 3],
+            pointRadius: 0,
+            fill: false,
+            order: 5
+          },
+          {
+            label: 'Q1 共振繁荣',
+            data: q1Points,
+            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+            borderColor: '#10b981',
+            pointRadius: 3,
+            order: 4
+          },
+          {
+            label: 'Q2 变现警报⚠️',
+            data: q2Points,
+            backgroundColor: 'rgba(239, 68, 68, 0.75)',
+            borderColor: '#ef4444',
+            pointRadius: 3.5,
+            order: 3
+          },
+          {
+            label: 'Q3 去杠杆',
+            data: q3Points,
+            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+            borderColor: '#f59e0b',
+            pointRadius: 3,
+            order: 4
+          },
+          {
+            label: 'Q4 宏观扩张',
+            data: q4Points,
+            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+            borderColor: '#6366f1',
+            pointRadius: 3,
+            order: 4
+          },
+          {
+            label: '当前实时相空间锚点',
+            data: [{ x: current.p_ai, y: current.p_btc }],
+            backgroundColor: '#ffffff',
+            borderColor: '#f43f5e',
+            borderWidth: 3,
+            pointRadius: 8,
+            pointHoverRadius: 10,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'P_AI: AI 资本开支融资压力 Z-Score (0 为中性, >0 为饥渴承压)',
+              color: '#94a3b8',
+              font: { size: 11 }
+            },
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.05)',
+              lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1
+            },
+            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: -2.5,
+            suggestedMax: 2.5
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'P_BTC: BTC 变现贴现压力 Z-Score (0 为中性, >0 为流动性流出)',
+              color: '#94a3b8',
+              font: { size: 11 }
+            },
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.05)',
+              lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1
+            },
+            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: -2.5,
+            suggestedMax: 2.5
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              label: ctx => {
+                const pt = ctx.raw;
+                const dStr = pt.date ? ` (${pt.date})` : '';
+                return `${ctx.dataset.label}${dStr}: P_AI=${pt.x.toFixed(2)}, P_BTC=${pt.y.toFixed(2)}`;
+              }
+            }
+          }
+        }
+      }
     });
+  }
+
+  // ----------------------------------------------------
+  // Chart 2: Dual Layer Time Series (P_AI vs P_BTC & r)
+  // ----------------------------------------------------
+  const canvasTension = document.getElementById('chart-tension-series');
+  if (canvasTension && window.Chart) {
+    if (chartTensionSeriesInstance) {
+      chartTensionSeriesInstance.destroy();
+    }
+
+    const displaySeries = (trajectory_180d && trajectory_180d.length > 0) ? trajectory_180d : (series || []).slice(-180);
+    const labels = displaySeries.map(d => d.date);
+    const dataPAi = displaySeries.map(d => d.p_ai);
+    const dataPBtc = displaySeries.map(d => d.p_btc);
+    const dataIntensity = displaySeries.map(d => d.tension_intensity);
+
+    chartTensionSeriesInstance = new Chart(canvasTension, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'AI 融资压力 (P_AI)',
+            data: dataPAi,
+            borderColor: '#38bdf8',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 5,
+            tension: 0.2
+          },
+          {
+            label: 'BTC 变现压力 (P_BTC)',
+            data: dataPBtc,
+            borderColor: '#f87171',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 5,
+            tension: 0.2
+          },
+          {
+            label: '张力强度 (r)',
+            data: dataIntensity,
+            borderColor: 'rgba(168, 85, 247, 0.8)',
+            borderWidth: 1.5,
+            borderDash: [4, 4],
+            backgroundColor: 'rgba(168, 85, 247, 0.08)',
+            fill: true,
+            pointRadius: 0,
+            tension: 0.2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 },
+              maxTicksLimit: 8
+            }
+          },
+          y: {
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.04)'
+            },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 }
+          }
+        }
+      }
+    });
+  }
+
+  // ----------------------------------------------------
+  // Chart 3: Macro Orthogonal Residual vs BTC Price
+  // ----------------------------------------------------
+  const canvasResidual = document.getElementById('chart-residual-series');
+  if (canvasResidual && window.Chart) {
+    if (chartResidualSeriesInstance) {
+      chartResidualSeriesInstance.destroy();
+    }
+
+    const displaySeries = (trajectory_180d && trajectory_180d.length > 0) ? trajectory_180d : (series || []).slice(-180);
+    const labels = displaySeries.map(d => d.date);
+    const dataCumRes = displaySeries.map(d => (d.cum_residual * 100).toFixed(2));
+    const dataBtcPrice = displaySeries.map(d => d.btc_close);
+
+    chartResidualSeriesInstance = new Chart(canvasResidual, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '宏观正交累计残差 Σε_BTC (%)',
+            data: dataCumRes,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 5,
+            yAxisID: 'yResidual',
+            tension: 0.15
+          },
+          {
+            label: 'BTC 现货收盘价 (USD)',
+            data: dataBtcPrice,
+            borderColor: '#fbbf24',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            pointHitRadius: 5,
+            yAxisID: 'yPrice',
+            tension: 0.15
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 },
+              maxTicksLimit: 8
+            }
+          },
+          yResidual: {
+            type: 'linear',
+            position: 'left',
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.04)'
+            },
+            ticks: {
+              color: '#34d399',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: v => `${v}%`
+            },
+            title: { display: true, text: '正交特异 Alpha 累计 (%)', color: '#34d399', font: { size: 11 } }
+          },
+          yPrice: {
+            type: 'linear',
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: '#fbbf24',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: v => `$${Math.round(v).toLocaleString()}`
+            },
+            title: { display: true, text: 'BTC 价格 (USD)', color: '#fbbf24', font: { size: 11 } }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 }
+          }
+        }
+      }
+    });
+  }
+
+  // ----------------------------------------------------
+  // Chart 4: Event Study Cumulative Abnormal Return (CAR)
+  // ----------------------------------------------------
+  const canvasEvent = document.getElementById('chart-event-car');
+  if (canvasEvent && window.Chart && event_study) {
+    if (chartEventCarInstance) {
+      chartEventCarInstance.destroy();
+    }
+
+    const labels = event_study.map(e => `${e.ticker} (${e.event_date.slice(5)})`);
+    const car1d = event_study.map(e => e.car_1d);
+    const car5d = event_study.map(e => e.car_5d);
+    const car20d = event_study.map(e => e.car_20d);
+
+    chartEventCarInstance = new Chart(canvasEvent, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'CAR [-1, +1]',
+            data: car1d,
+            backgroundColor: 'rgba(56, 189, 248, 0.75)',
+            borderColor: '#38bdf8',
+            borderWidth: 1,
+            borderRadius: 3
+          },
+          {
+            label: 'CAR [-1, +5]',
+            data: car5d,
+            backgroundColor: 'rgba(129, 140, 248, 0.75)',
+            borderColor: '#818cf8',
+            borderWidth: 1,
+            borderRadius: 3
+          },
+          {
+            label: 'CAR [-1, +20]',
+            data: car20d,
+            backgroundColor: 'rgba(244, 63, 94, 0.75)',
+            borderColor: '#f43f5e',
+            borderWidth: 1,
+            borderRadius: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 9 },
+              maxRotation: 45
+            }
+          },
+          y: {
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.04)'
+            },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: v => `${v}%`
+            },
+            title: { display: true, text: '超额异常收益 CAR (%)', color: '#94a3b8', font: { size: 10 } }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#cbd5e1', boxWidth: 10, font: { size: 10 } }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              afterBody: items => {
+                const idx = items[0].dataIndex;
+                const evt = event_study[idx];
+                return evt ? `\n事件说明: ${evt.description}\n类型: ${evt.event_type}` : '';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+/**
+ * Initialize AI-BTC Tension Platform Event Listeners
+ */
+function initAiBtcTensionEvents() {
+  const btnRefresh = document.getElementById('btn-refresh-tension');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => loadAiBtcTensionData(true));
   }
 }
 
@@ -4161,9 +4531,10 @@ initTermPremiumEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
-initEstherAgent();
+initAiBtcTensionEvents();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 loadGoldCorrelationData(false);
+loadAiBtcTensionData(false);
