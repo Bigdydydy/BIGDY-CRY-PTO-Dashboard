@@ -4,7 +4,7 @@
 [![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Architecture: Zero-Dependency](https://img.shields.io/badge/Architecture-Zero--Dependency-blue.svg)]()
-[![Tests: node:test](https://img.shields.io/badge/Tests-10%2F10%20Passing-brightgreen.svg)]()
+[![Tests: node:test](https://img.shields.io/badge/Tests-11%2F11%20Passing-brightgreen.svg)]()
 
 BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商的数字资产全景投研决策终端。系统以纯原生 Node.js（零外部 npm 运行时依赖）构建，整合了 Deribit 期权曲面、Amberdata 微观结构模型、Coinglass 链上衍生品、St. Louis FRED 宏观流动性以及 Coinbase L2 订单簿深度数据，深度融合 Sheldon Natenberg《期权波动率与定价》与 Colin Bennett《波动率交易》等经典量化工程方法论。
 
@@ -13,6 +13,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 ## 目录
 - [系统核心模块](#系统核心模块)
   - [Module 1: 宏观流动性、美债曲线与 MSTR 成本全景](#module-1-宏观流动性美债曲线与-mstr-成本全景)
+  - [Module 1-B: 双轨加密麦克莱伦市场宽度振荡器与流动性背离利差](#module-1-b-双轨加密麦克莱伦市场宽度振荡器与流动性背离利差)
   - [Module 2: 期现基差期限结构与期限溢价雷达](#module-2-期现基差期限结构与期限溢价雷达)
   - [Module 3: 大宗交易穿透与 30 天机构拆单聚合 (Iceberg)](#module-3-大宗交易穿透与-30-天机构拆单聚合-iceberg)
   - [Module 4: ATM IV 期限结构与历史分位评估](#module-4-atm-iv-期限结构与历史分位评估)
@@ -32,6 +33,17 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **FED 净流动性监测 (WALCL - TGA - RRP)**：实时同步美联储资产负债表（WALCL）、财政部一般账户（WTREGEN / TGA）与隔夜逆回购（RRPONTSYD），计算真实金融净流动性及其 20 日均线与斜率走势。
 - **MicroStrategy (MSTR) 持仓成本底线**：追踪 MicroStrategy 比特币持仓均价、累计持仓量与持仓市值，构建市场极端去杠杆周期的“机构硬支撑线”。
 - **美债基准利差 (US10Y / US02Y)**：比对无风险利率对加密资产贴现率与资本机会成本的传导效应。
+
+### Module 1-B: 双轨加密麦克莱伦市场宽度振荡器与流动性背离利差
+- **RAMO 风险调整动量振荡算法**：修正传统股票等权腾落线在加密生态被 99% 垃圾代币扭曲的问题，引入对数收益、换手率因子与流动池惩罚：
+  $$RAMO_i = \text{sign}(R_i) \cdot \ln(1 + |R_i|) \cdot \frac{\text{Vol}_{i}}{\text{Median}(\text{Vol})} \cdot \min\left(1, \frac{\text{LP}_i}{\$300\text{k}}\right)$$
+- **DEX 投机前沿 Meme 动态池 4 重门禁**：LP $\ge \$300\text{k}$、24h 交易量 $\ge \$1.5\text{M}$、FDV $\ge \$10\text{M}$ 以及 7 天留存滞后缓冲带，杜绝低摩擦抽毯与假性抖动。
+- **四象限宏观体制识别**：
+  - **Q1 全域共振繁荣 (Co-Expansion)**：Core > 0 & Frontier > 0，增量入场，蓝筹与投机共舞。
+  - **Q2 Meme 流动性抽血 (Meme Siphon)**：Core $\le$ 0 & Frontier > 0，存量内卷，利差 $\ge 40$ 触发逃顶预警。
+  - **Q3 核心价值蓄势 (Quality Accumulation)**：Core > 0 & Frontier $\le$ 0，机构吸筹优质资产，垃圾代币去泡沫。
+  - **Q4 流动性严冬深冻 (Deep Freeze)**：Core $\le$ 0 & Frontier $\le$ 0，全域出清，左侧周期见底。
+- **核心总和指数 (Core MSI)** 与 1083 天历史时序全景回测。
 
 ### Module 2: 期现基差期限结构与期限溢价雷达
 - **恒定到期基差曲线 (Constant Maturity Basis)**：拟合 30D / 60D / 90D / 180D 年化年基差（Annualized Basis）。
@@ -167,6 +179,7 @@ PORT=8080 npm start
 | `/api/term-premium` | `GET` | Gzip + ETag (304) | 获取恒定到期基差 (Carry Basis) 与期限溢价全量历史序列 |
 | `/api/coinbase-liquidity` | `GET` | Gzip + ETag (304) | 获取 Coinbase 订单簿多层级深度、金字塔倍数与滑点仿真 |
 | `/api/macro-chart` | `GET` | Gzip + ETag (304) | 获取美债收益率、FED 净流动性与 MSTR 链上持仓成本数据 |
+| `/api/crypto-mcclellan` | `GET` | Gzip + ETag (304) | 获取双轨加密麦克莱伦市场宽度振荡器、背离利差与宏观体制全量数据 |
 | `/api/cdri` | `GET` | Gzip + ETag (304) | 获取加密衍生品综合风险指数 (CDRI) 及历史分位 |
 | `/api/ssro` | `GET` | Gzip + ETag (304) | 获取稳定币供给比率振荡器 (SSRO) 宏观流动性指标 |
 | `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
@@ -174,15 +187,19 @@ PORT=8080 npm start
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
 
-### Python 计量科学计算管线 (Module 8 Pipeline)
-系统内置完备的 Python 计量经济学管线（位于 `scripts/ai_btc_tension/`），包含 FRED 宏观暗渠、SEC EDGAR 财报解析、矿企算力篮子、HAC 稳健回归与 OOS 滚窗残差模型：
+### Python 计量科学计算管线 (Quantitative Pipelines)
+系统内置完备的 Python 科学计算与计量分析管线（位于 `scripts/`）：
 
+1. **AI–BTC 融资张力与宏观暗渠管线 (`scripts/ai_btc_tension/`)**：
 ```bash
-# 1. 安装科学计算依赖
 pip install -r scripts/ai_btc_tension/requirements.txt
-
-# 2. 全量执行数据拉取、计量拟合与 JSON 导出
 python scripts/ai_btc_tension/export_to_json.py
+```
+
+2. **双轨加密麦克莱伦市场宽度管线 (`scripts/crypto_mcclellan/`)**：
+```bash
+pip install -r scripts/crypto_mcclellan/requirements.txt
+python scripts/crypto_mcclellan/export_to_json.py
 ```
 > **注**：在无 Python 运行时环境（如轻量级 Node.js 容器）中，服务端将自动以 `pipelineUnavailable` 机制诚实响应，无缝载入经过核验的基准全量快照，不产生虚假解算反馈。
 
@@ -202,6 +219,8 @@ npm test
 - [x] **动态 GEX 算法验证**：验证 Call Wall（阻力位）、Put Wall（支撑位）以及到期日动态推进。
 - [x] **大宗拆单聚合聚类验证**：验证时间窗口内的冰山订单聚合与多腿组合拆解。
 - [x] **Black-76 希腊字母算法**：验证 Delta、Gamma、Vega、Theta 解析数学准确度。
+- [x] **RAMO 风险调整动量算法与惩罚项验证**：验证 LP 惩罚项、换手率缩放与零收益边界。
+- [x] **麦克莱伦双轨振荡器与四象限宏观体制**：验证 EMA19-EMA39 差值放大、背离利差与象限状态机。
 - [x] **ETag 协商缓存**：验证 MD5 生成、`If-None-Match` 一致时返回 304 及零响应体。
 - [x] **Gzip 传输压缩**：验证大响应体自动压缩与 `Content-Encoding: gzip` 响应头。
 

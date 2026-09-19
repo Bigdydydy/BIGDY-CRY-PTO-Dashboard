@@ -99,7 +99,7 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title">宏观与风控总览</span>
-              <span class="nav-desc">美债/MSTR + CDRI</span>
+              <span class="nav-desc">美债/MSTR + 市场宽度 + CDRI</span>
             </div>
           </button>
 
@@ -391,6 +391,201 @@
         <div class="macro-chart-canvas-wrapper">
           <canvas id="macro-chart-canvas"></canvas>
         </div>
+      </div>
+    </section>
+
+    <!-- Bento Hero Card: Dual-Track Crypto McClellan Oscillator & Breadth Regimes (Directly below Module 1) -->
+    <section class="bento-card mcclellan-hero-card" id="module-crypto-mcclellan">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">01-B MARKET BREADTH</span>
+          <h2>双轨加密麦克莱伦市场宽度振荡器 (Crypto McClellan Oscillator)</h2>
+          <span class="card-subtitle-inline">Top 100 核心资产 vs 投机前沿 Meme · RAMO 流动性动量与四象限宏观体制</span>
+        </div>
+        <div class="header-controls">
+          <div class="mcclellan-live-badge-wrap">
+            <span class="mcclellan-regime-pill" id="mcclellan-header-regime-pill">-- 宏观体制</span>
+            <span class="tz-badge" id="mcclellan-update-time">更新中... (UTC+8)</span>
+          </div>
+          <button class="chart-refresh-btn" id="btn-refresh-mcclellan" title="强制刷新麦克莱伦宽度数据">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- 5 KPI Cards Grid -->
+        <div class="mcclellan-kpi-grid">
+          <!-- KPI 1: Regime -->
+          <div class="macro-metric-card" id="kpi-mcclellan-regime-card">
+            <span class="mm-label">当前宏观宽度体制 (Market Regime)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="kpi-mcclellan-regime">--</span>
+            </div>
+            <span class="mm-sub" id="kpi-mcclellan-regime-sub">象限驱动特征与资金外溢判断</span>
+          </div>
+
+          <!-- KPI 2: Core McClellan -->
+          <div class="macro-metric-card" id="kpi-mcclellan-core-card">
+            <span class="mm-label">Top 100 核心麦克莱伦振荡器</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-cyan" id="kpi-mcclellan-core">--</span>
+              <span class="mm-chip" id="kpi-mcclellan-core-chip">中性</span>
+            </div>
+            <span class="mm-sub">EMA19 - EMA39 | &gt;+50 超买, &lt;-50 超卖</span>
+          </div>
+
+          <!-- KPI 3: Frontier Meme McClellan -->
+          <div class="macro-metric-card" id="kpi-mcclellan-frontier-card">
+            <span class="mm-label">前沿投机 Meme 麦克莱伦振荡器</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-fuchsia" id="kpi-mcclellan-frontier">--</span>
+              <span class="mm-chip" id="kpi-mcclellan-frontier-chip">中性</span>
+            </div>
+            <span class="mm-sub">DEX 门禁过滤链上投机流动性宽度动量</span>
+          </div>
+
+          <!-- KPI 4: Liquidity Divergence Spread -->
+          <div class="macro-metric-card" id="kpi-mcclellan-spread-card">
+            <span class="mm-label">流动性背离利差 (Frontier - Core)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-amber" id="kpi-mcclellan-spread">--</span>
+              <span class="mm-chip" id="kpi-mcclellan-spread-chip">正常</span>
+            </div>
+            <span class="mm-sub" id="kpi-mcclellan-spread-sub">利差 &ge; 40 触发 Meme 抽血顶背离预警</span>
+          </div>
+
+          <!-- KPI 5: Core MSI Summation -->
+          <div class="macro-metric-card" id="kpi-mcclellan-msi-card">
+            <span class="mm-label">核心麦克莱伦总和指数 (Core MSI)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-green" id="kpi-mcclellan-msi">--</span>
+            </div>
+            <span class="mm-sub">长期宽度累积趋势水位 (&gt;0 宏观牛市潮汐)</span>
+          </div>
+        </div>
+
+        <!-- Controls: Timeframe selector and Alert banner -->
+        <div class="mcclellan-controls-bar">
+          <div class="view-switch timeframe-switch" id="mcclellan-timeframe-switch">
+            <button class="switch-btn" data-range="30d">30D</button>
+            <button class="switch-btn" data-range="90d">90D</button>
+            <button class="switch-btn" data-range="180d">180D</button>
+            <button class="switch-btn active" data-range="1y">1Y</button>
+            <button class="switch-btn" data-range="all">ALL (2023~)</button>
+          </div>
+          <div class="mcclellan-alert-banner hidden" id="mcclellan-alert-banner">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-text">流动性警报：Meme投机利差大幅高于核心资产 (&ge;40)，主流市场正面临流动性抽血与脆弱见顶风险！</span>
+          </div>
+        </div>
+
+        <!-- Dual Charts Layout (Two Column Grid on desktop, stacked on mobile) -->
+        <div class="mcclellan-charts-grid">
+          <!-- Chart 1: Dual Oscillators vs BTC -->
+          <div class="mcclellan-chart-card">
+            <div class="chart-header-sub">
+              <div class="chart-header-title">
+                <span class="chart-badge">OSCILLATORS</span>
+                <h4>双轨振荡器走势与 BTC 联动 (Dual Oscillators)</h4>
+              </div>
+              <div class="chart-legend-mini">
+                <span class="legend-indicator"><span class="dot" style="background:#00f2fe;"></span>Core Top100</span>
+                <span class="legend-indicator"><span class="dot" style="background:#b537f2;"></span>Frontier Meme</span>
+                <span class="legend-indicator"><span class="dot" style="background:#f59e0b;"></span>BTC (右轴)</span>
+              </div>
+            </div>
+            <div class="mcclellan-chart-wrapper">
+              <canvas id="chart-mcclellan-oscillator"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Liquidity Divergence Spread & Regime Bars -->
+          <div class="mcclellan-chart-card">
+            <div class="chart-header-sub">
+              <div class="chart-header-title">
+                <span class="chart-badge">DIVERGENCE SPREAD</span>
+                <h4>投机利差与体制着色 (Frontier - Core &amp; Regimes)</h4>
+              </div>
+              <div class="chart-legend-mini">
+                <span class="legend-indicator"><span class="rect" style="background:#10b981;"></span>共振繁荣</span>
+                <span class="legend-indicator"><span class="rect" style="background:#f59e0b;"></span>Meme抽血</span>
+                <span class="legend-indicator"><span class="rect" style="background:#06b6d4;"></span>核心蓄势</span>
+                <span class="legend-indicator"><span class="rect" style="background:#ef4444;"></span>严冬深冻</span>
+                <span class="legend-indicator"><span class="line" style="background:#60a5fa;"></span>30D MA</span>
+              </div>
+            </div>
+            <div class="mcclellan-chart-wrapper">
+              <canvas id="chart-mcclellan-spread"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Methodology & Formula Accordion -->
+        <div class="mcclellan-methodology-container">
+          <button class="methodology-accordion-btn" id="btn-mcclellan-methodology-toggle" aria-expanded="false">
+            <div class="acc-btn-title">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>指标计量设计与 4 重门禁机制 (RAMO &amp; Gatekeeper Methodology)</span>
+            </div>
+            <svg class="acc-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="methodology-accordion-content hidden" id="mcclellan-methodology-content">
+            <div class="methodology-inner-grid">
+              <div class="methodology-col">
+                <h5>1. 传统麦克莱伦在加密生态的失真与修正</h5>
+                <p>传统麦克莱伦振荡器（McClellan Oscillator）基于股市等权腾落线（Advance-Decline Line, ADL）。但在加密市场，若采用等权计数，99% 的低流动性垃圾代币会制造严重的“伪宽度繁荣”。本项目提出 <strong>RAMO (Risk-Adjusted Momentum Oscillation)</strong> 算法，结合对数收益率、换手率因子与流动池惩罚系数：</p>
+                <div class="formula-box">
+                  <code>RAMO_i = sign(R_i) * ln(1 + |R_i|) * (Vol_i / Median(Vol)) * min(1, LP_i / $300,000)</code>
+                </div>
+                <p>双轨 EMA 差值放大因子标定为 1000：<code>Oscillator = (EMA_19(NetBreadth) - EMA_39(NetBreadth)) * 1000</code>。</p>
+              </div>
+
+              <div class="methodology-col">
+                <h5>2. DEX 投机前沿 Meme 动态池 4 重门禁过滤</h5>
+                <ul class="gatekeeper-list">
+                  <li><strong>① DEX 流动性门禁 (LP &ge; $300,000)：</strong>彻底剔除无深度的薄池与恶意插针抽毯项目。</li>
+                  <li><strong>② 24h 真实成交额 (Vol &ge; $1,500,000)：</strong>过滤虚假对敲刷量与无实盘买盘代币。</li>
+                  <li><strong>③ 完全稀释估值 (FDV &ge; $10,000,000)：</strong>防止极小市值超轻微扰动污染全网宽度。</li>
+                  <li><strong>④ 7天留存滞后缓冲带 (7-Day Hysteresis)：</strong>跌破门禁后维持 7 天观察期，消除成分切换的假性抖动。</li>
+                </ul>
+              </div>
+
+              <div class="methodology-col full-width">
+                <h5>3. 四象限宏观体制分类与流动性背离预警</h5>
+                <div class="regime-cards-grid">
+                  <div class="regime-detail-box regime-q1">
+                    <span class="regime-tag tag-q1">Q1 全域共振繁荣 (Co-Expansion)</span>
+                    <p class="regime-desc"><strong>Core &gt; 0 且 Frontier &gt; 0：</strong>增量资金全速入场，核心蓝筹与链上投机共振走强，牛市主升浪最健康阶段。</p>
+                  </div>
+                  <div class="regime-detail-box regime-q2">
+                    <span class="regime-tag tag-q2">Q2 Meme 流动性抽血 (Meme Siphon)</span>
+                    <p class="regime-desc"><strong>Core &le; 0 且 Frontier &gt; 0：</strong>存量博弈极端化，场内流动性被投机代币吸干，主流资产熄火，当利差 &ge; 40 时为高危逃顶信号。</p>
+                  </div>
+                  <div class="regime-detail-box regime-q3">
+                    <span class="regime-tag tag-q3">Q3 核心价值蓄势 (Quality Accumulation)</span>
+                    <p class="regime-desc"><strong>Core &gt; 0 且 Frontier &le; 0：</strong>机构与理性资金吸筹 Top 100 优质资产，垃圾代币持续出清，健康慢牛初期的典型征兆。</p>
+                  </div>
+                  <div class="regime-detail-box regime-q4">
+                    <span class="regime-tag tag-q4">Q4 流动性严冬深冻 (Deep Freeze)</span>
+                    <p class="regime-desc"><strong>Core &le; 0 且 Frontier &le; 0：</strong>全市场流动性枯竭与全面出清，双轨振荡器深陷超卖区间（&lt;-50），左侧筑底孕育周期转折点。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 

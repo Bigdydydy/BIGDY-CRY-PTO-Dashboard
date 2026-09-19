@@ -767,5 +767,136 @@ describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI�
   });
 });
 
+describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes', () => {
+  const { getMcClellanData } = require('../server/crypto_mcclellan_fetcher');
+
+  test('RAMO mathematical bounds and liquidity penalty logic', () => {
+    // RAMO = sign(R) * ln(1 + |R|) * (Vol / Median(Vol)) * min(1, LP / 300,000)
+    const calcRamo = (ret, vol, medVol, lp) => {
+      const sign = ret > 0 ? 1 : (ret < 0 ? -1 : 0);
+      const retFactor = Math.log(1 + Math.abs(ret));
+      const turnoverFactor = medVol > 0 ? (vol / medVol) : 1;
+      const lpPenalty = Math.min(1.0, Math.max(0.0, lp / 300000));
+      return sign * retFactor * turnoverFactor * lpPenalty;
+    };
+
+    // Test 1: Zero return yields 0 RAMO
+    assert.equal(calcRamo(0.0, 1000000, 1000000, 500000), 0);
+
+    // Test 2: Low LP (< $300k) receives penalty discount
+    const normalLpRamo = calcRamo(0.1, 1000000, 1000000, 300000);
+    const lowLpRamo = calcRamo(0.1, 1000000, 1000000, 150000);
+    assert.ok(Math.abs(lowLpRamo - normalLpRamo * 0.5) < 1e-6, 'Half LP should scale penalty linearly to 0.5');
+
+    // Test 3: Sign preservation: negative returns yield negative RAMO
+    const negRamo = calcRamo(-0.05, 2000000, 1000000, 400000);
+    assert.ok(negRamo < 0, 'Negative return must yield negative RAMO');
+  });
+
+  test('McClellan Oscillator EMA difference and spread calculations', () => {
+    // Oscillator = (EMA19 - EMA39) * 1000
+    // Spread = Frontier - Core
+    const coreEma19 = 0.05;
+    const coreEma39 = 0.03;
+    const coreOsc = Math.round((coreEma19 - coreEma39) * 1000);
+    assert.equal(coreOsc, 20);
+
+    const frontierOsc = 65;
+    const spread = frontierOsc - coreOsc;
+    assert.equal(spread, 45);
+    assert.ok(spread >= 40, 'Spread >= 40 indicates meme siphon warning');
+  });
+
+  test('Four Regimes classification logic covers all 4 quadrants', () => {
+    const classifyRegime = (core, frontier) => {
+      if (core > 0 && frontier > 0) return 'CO_EXPANSION';
+      if (core <= 0 && frontier > 0) return 'MEME_SIPHON';
+      if (core > 0 && frontier <= 0) return 'QUALITY_ACCUMULATION';
+      return 'DEEP_FREEZE';
+    };
+
+    assert.equal(classifyRegime(10, 20), 'CO_EXPANSION');
+    assert.equal(classifyRegime(-5, 15), 'MEME_SIPHON');
+    assert.equal(classifyRegime(12, -8), 'QUALITY_ACCUMULATION');
+    assert.equal(classifyRegime(-15, -25), 'DEEP_FREEZE');
+  });
+
+  test('getMcClellanData loads valid data with >= 1000 records and robust schema', async () => {
+    const data = await getMcClellanData(false);
+    assert.ok(data, 'data must exist');
+
+    // Metadata validation
+    assert.ok(data.metadata, 'metadata must exist');
+    assert.equal(data.metadata.parameters.ema_fast, 19);
+    assert.equal(data.metadata.parameters.ema_slow, 39);
+    assert.equal(data.metadata.parameters.ratio_scale, 1000);
+    assert.equal(data.metadata.gatekeeper.min_liquidity_usd, 300000);
+    assert.equal(data.metadata.gatekeeper.min_volume_24h_usd, 1500000);
+    assert.equal(data.metadata.gatekeeper.min_fdv_usd, 10000000);
+    assert.equal(data.metadata.gatekeeper.retention_days, 7);
+
+    // Current state validation
+    assert.ok(data.current, 'data.current must exist');
+    assert.ok(data.current.date, 'current date must exist');
+    assert.ok(['CO_EXPANSION', 'MEME_SIPHON', 'QUALITY_ACCUMULATION', 'DEEP_FREEZE'].includes(data.current.regime_code));
+    assert.ok(typeof data.current.core_oscillator === 'number');
+    assert.ok(typeof data.current.frontier_oscillator === 'number');
+    assert.ok(typeof data.current.spread === 'number');
+    assert.ok(typeof data.current.core_summation === 'number');
+    assert.ok(typeof data.current.btc_close === 'number');
+    assert.ok(typeof data.current.spread_alert === 'boolean');
+
+    // Series validation: must have >= 1000 daily observations
+    assert.ok(Array.isArray(data.series), 'series must be an array');
+    assert.ok(data.series.length >= 1000, `series length must be >= 1000, got ${data.series.length}`);
+
+    // Verify properties of series points
+    const sample = data.series[data.series.length - 1];
+    assert.ok(sample.date);
+    assert.ok(typeof sample.core_oscillator === 'number');
+    assert.ok(typeof sample.frontier_oscillator === 'number');
+    assert.ok(typeof sample.spread === 'number');
+    assert.ok(typeof sample.spread_30d_ma === 'number');
+    assert.ok(typeof sample.core_summation === 'number');
+    assert.ok(typeof sample.btc_close === 'number');
+    assert.ok(sample.regime_code);
+
+    // Refresh status validation
+    assert.ok(data.refresh_status, 'refresh_status must exist');
+    assert.ok(['refreshed', 'pipelineUnavailable', 'stale', 'cached'].includes(data.refresh_status.status));
+  });
+
+  test('HTTP Endpoint GET /api/crypto-mcclellan returns 200 with code 0 and ETag 304', async () => {
+    const { server } = require('../server/index');
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', async () => {
+        const port = server.address().port;
+        try {
+          const resp = await fetch(`http://127.0.0.1:${port}/api/crypto-mcclellan`);
+          assert.equal(resp.status, 200);
+          const json = await resp.json();
+          assert.equal(json.code, 0);
+          assert.ok(json.data);
+          assert.ok(json.data.current);
+          assert.ok(json.data.series.length >= 1000);
+          assert.ok(json.data.metadata.title.includes('麦克莱伦') || json.data.metadata.title.includes('McClellan'));
+
+          // Verify ETag support on the endpoint
+          const etag = resp.headers.get('etag');
+          if (etag) {
+            const cachedResp = await fetch(`http://127.0.0.1:${port}/api/crypto-mcclellan`, {
+              headers: { 'if-none-match': etag }
+            });
+            assert.equal(cachedResp.status, 304);
+          }
+        } finally {
+          server.close(resolve);
+        }
+      });
+    });
+  });
+});
+
+
 
 

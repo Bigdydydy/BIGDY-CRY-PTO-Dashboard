@@ -19,6 +19,7 @@ const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
+const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -305,6 +306,24 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/crypto-mcclellan (Module 1-B: Crypto Dual-Track McClellan Oscillator & Liquidity Siphon)
+  if (pathname === '/api/crypto-mcclellan' && req.method === 'GET') {
+    try {
+      const forceRefresh = parsedUrl.query?.refresh === 'true' || parsedUrl.query?.force === '1';
+      const data = await getMcClellanData(forceRefresh);
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        refreshStatus: data.refresh_status,
+        data,
+        ...data
+      });
+    } catch (err) {
+      console.error('[API Error] crypto-mcclellan:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
   // POST /api/refresh
   if (pathname === '/api/refresh' && req.method === 'POST') {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
@@ -342,7 +361,8 @@ async function handleApiRequest(req, res, parsedUrl) {
             fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
             getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
-            getAiBtcTensionData(true).catch(e => console.error('[AiBtcTensionFetcher] Sync refresh error:', e.message))
+            getAiBtcTensionData(true).catch(e => console.error('[AiBtcTensionFetcher] Sync refresh error:', e.message)),
+            getMcClellanData(true).catch(e => console.error('[McClellanFetcher] Sync refresh error:', e.message))
           ]);
           return syncResult;
         })().finally(() => {
@@ -455,6 +475,10 @@ function startServer() {
   getAiBtcTensionData()
     .then(() => console.log('[Server] Initial AI-BTC Tension data cache ready.'))
     .catch(e => console.warn('[Server] Initial AI-BTC Tension fetch warning:', e.message));
+
+  getMcClellanData()
+    .then(() => console.log('[Server] Initial McClellan data cache ready.'))
+    .catch(e => console.warn('[Server] Initial McClellan fetch warning:', e.message));
 
   // Background auto-refresh every 30 seconds
   setInterval(async () => {

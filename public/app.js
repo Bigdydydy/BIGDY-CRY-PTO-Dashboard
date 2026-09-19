@@ -3461,6 +3461,15 @@ function switchView(viewId, updateHash = true) {
       renderMacroChart();
     }
 
+    if (mcclellanOscillatorChartInstance) {
+      mcclellanOscillatorChartInstance.resize();
+    } else if (rawMcClellanData && (viewId === 'view-overview' || viewId === 'view-all')) {
+      renderMcClellanCharts();
+    }
+    if (mcclellanSpreadChartInstance) {
+      mcclellanSpreadChartInstance.resize();
+    }
+
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
 
@@ -4652,6 +4661,464 @@ function initAiBtcTensionEvents() {
 }
 
 // ============================================================================
+// Module 1-B: Dual-Track Crypto McClellan Oscillator & Market Breadth
+// ============================================================================
+
+let rawMcClellanData = null;
+let mcclellanOscillatorChartInstance = null;
+let mcclellanSpreadChartInstance = null;
+let isMcClellanLoading = false;
+let mcclellanActiveTimeframe = '1y';
+
+/**
+ * Fetch Crypto McClellan data from server
+ */
+async function loadMcClellanData(force = false) {
+  if (isMcClellanLoading) return;
+  isMcClellanLoading = true;
+
+  const btnRefresh = document.getElementById('btn-refresh-mcclellan');
+  if (btnRefresh) btnRefresh.classList.add('loading');
+
+  try {
+    const url = force ? '/api/crypto-mcclellan?force=1' : '/api/crypto-mcclellan';
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const resJson = await resp.json();
+
+    if (resJson && resJson.code === 0) {
+      rawMcClellanData = resJson.data || resJson;
+      renderMcClellanDashboard(rawMcClellanData);
+      if (force) {
+        const rStatus = resJson.refreshStatus || rawMcClellanData.refresh_status;
+        if (rStatus?.status === 'refreshed') {
+          showToast('双轨加密麦克莱伦宽度指标已由 Python 全量重新解算并更新！');
+        } else if (rStatus?.status === 'pipelineUnavailable') {
+          showToast('当前环境未检测到 Python 运行时，已载入已核验的最新快照数据');
+        } else if (rStatus?.status === 'stale') {
+          showToast('Python 管线运行异常，已回退至已验证的快照数据');
+        } else {
+          showToast('已更新加密麦克莱伦市场宽度数据');
+        }
+      }
+    } else {
+      throw new Error(resJson?.error || '返回数据格式不符合预期');
+    }
+  } catch (err) {
+    console.error('[CryptoMcClellan] Load data failed:', err);
+    showToast(`麦克莱伦数据载入失败: ${err.message}`);
+  } finally {
+    isMcClellanLoading = false;
+    if (btnRefresh) btnRefresh.classList.remove('loading');
+  }
+}
+
+/**
+ * Render KPI cards and header badges for Crypto McClellan
+ */
+function renderMcClellanDashboard(data) {
+  if (!data) return;
+
+  const { current, metadata } = data;
+  if (!current) return;
+
+  // 1. Update time and Header Regime Pill
+  const elUpdateTime = document.getElementById('mcclellan-update-time');
+  if (elUpdateTime && current.date) {
+    elUpdateTime.textContent = `${current.date} (UTC+8)`;
+  }
+
+  const elHeaderPill = document.getElementById('mcclellan-header-regime-pill');
+  if (elHeaderPill) {
+    elHeaderPill.textContent = current.regime_name || current.regime_code || '--';
+    elHeaderPill.className = 'mcclellan-regime-pill';
+    if (current.regime_code) {
+      const cls = current.regime_code.toLowerCase().replace(/_/g, '-');
+      elHeaderPill.classList.add(`regime-${cls}`);
+    }
+  }
+
+  // 2. KPI 1: Regime
+  const elRegime = document.getElementById('kpi-mcclellan-regime');
+  const elRegimeSub = document.getElementById('kpi-mcclellan-regime-sub');
+  if (elRegime) {
+    elRegime.textContent = current.regime_name || '--';
+    if (current.regime_code === 'CO_EXPANSION') elRegime.className = 'mm-val text-pos';
+    else if (current.regime_code === 'MEME_SIPHON') elRegime.className = 'mm-val text-warn';
+    else if (current.regime_code === 'QUALITY_ACCUMULATION') elRegime.className = 'mm-val text-info';
+    else if (current.regime_code === 'DEEP_FREEZE') elRegime.className = 'mm-val text-neg';
+  }
+  if (elRegimeSub) {
+    if (current.regime_code === 'CO_EXPANSION') elRegimeSub.textContent = '增量充沛 · 核心与投机共振走强';
+    else if (current.regime_code === 'MEME_SIPHON') elRegimeSub.textContent = '存量极端博弈 · 警惕见顶流动性抽血';
+    else if (current.regime_code === 'QUALITY_ACCUMULATION') elRegimeSub.textContent = '机构稳健吸筹 · 蓝筹主导去泡沫';
+    else if (current.regime_code === 'DEEP_FREEZE') elRegimeSub.textContent = '全域流动性出清 · 熊市深度严冬筑底';
+  }
+
+  // 3. KPI 2: Core McClellan Oscillator
+  const elCore = document.getElementById('kpi-mcclellan-core');
+  const elCoreChip = document.getElementById('kpi-mcclellan-core-chip');
+  if (elCore) {
+    const coreVal = Number(current.core_oscillator);
+    const sign = coreVal > 0 ? '+' : '';
+    elCore.textContent = `${sign}${coreVal.toFixed(2)}`;
+    elCore.className = coreVal >= 0 ? 'mm-val text-cyan' : 'mm-val text-neg';
+  }
+  if (elCoreChip) {
+    const v = Number(current.core_oscillator);
+    if (v >= 50) { elCoreChip.textContent = '极度超买'; elCoreChip.className = 'mm-chip text-warn'; }
+    else if (v >= 20) { elCoreChip.textContent = '强势偏多'; elCoreChip.className = 'mm-chip text-pos'; }
+    else if (v <= -50) { elCoreChip.textContent = '极度超卖'; elCoreChip.className = 'mm-chip text-neg'; }
+    else if (v <= -20) { elCoreChip.textContent = '弱势偏空'; elCoreChip.className = 'mm-chip text-neg'; }
+    else { elCoreChip.textContent = '中性震荡'; elCoreChip.className = 'mm-chip'; }
+  }
+
+  // 4. KPI 3: Frontier Meme McClellan Oscillator
+  const elFrontier = document.getElementById('kpi-mcclellan-frontier');
+  const elFrontierChip = document.getElementById('kpi-mcclellan-frontier-chip');
+  if (elFrontier) {
+    const fVal = Number(current.frontier_oscillator);
+    const sign = fVal > 0 ? '+' : '';
+    elFrontier.textContent = `${sign}${fVal.toFixed(2)}`;
+    elFrontier.className = fVal >= 0 ? 'mm-val text-fuchsia' : 'mm-val text-neg';
+  }
+  if (elFrontierChip) {
+    const v = Number(current.frontier_oscillator);
+    if (v >= 50) { elFrontierChip.textContent = '链上高亢'; elFrontierChip.className = 'mm-chip text-fuchsia'; }
+    else if (v >= 20) { elFrontierChip.textContent = '热度上升'; elFrontierChip.className = 'mm-chip text-pos'; }
+    else if (v <= -50) { elFrontierChip.textContent = '深冻出清'; elFrontierChip.className = 'mm-chip text-neg'; }
+    else { elFrontierChip.textContent = '常态流动'; elFrontierChip.className = 'mm-chip'; }
+  }
+
+  // 5. KPI 4: Liquidity Divergence Spread
+  const elSpread = document.getElementById('kpi-mcclellan-spread');
+  const elSpreadChip = document.getElementById('kpi-mcclellan-spread-chip');
+  const elSpreadSub = document.getElementById('kpi-mcclellan-spread-sub');
+  if (elSpread) {
+    const sVal = Number(current.spread);
+    const sign = sVal > 0 ? '+' : '';
+    elSpread.textContent = `${sign}${sVal.toFixed(2)}`;
+    elSpread.className = sVal >= 40 ? 'mm-val text-warn' : (sVal >= 0 ? 'mm-val text-amber' : 'mm-val text-cyan');
+  }
+  if (elSpreadChip) {
+    const sVal = Number(current.spread);
+    if (sVal >= 40 || current.spread_alert) {
+      elSpreadChip.textContent = '抽血预警';
+      elSpreadChip.className = 'mm-chip text-warn';
+    } else if (sVal >= 20) {
+      elSpreadChip.textContent = '投机发散';
+      elSpreadChip.className = 'mm-chip text-amber';
+    } else if (sVal <= -20) {
+      elSpreadChip.textContent = '核心吸筹';
+      elSpreadChip.className = 'mm-chip text-cyan';
+    } else {
+      elSpreadChip.textContent = '利差均衡';
+      elSpreadChip.className = 'mm-chip';
+    }
+  }
+  if (elSpreadSub) {
+    const sVal = Number(current.spread);
+    if (sVal >= 40 || current.spread_alert) {
+      elSpreadSub.textContent = '⚠️ 警报: Meme利差超限，主流失血加剧';
+    } else {
+      elSpreadSub.textContent = 'Frontier - Core | 阈值 40 顶背离预警';
+    }
+  }
+
+  // 6. KPI 5: Core MSI Summation Index
+  const elMsi = document.getElementById('kpi-mcclellan-msi');
+  if (elMsi) {
+    const msiVal = Number(current.core_summation);
+    const sign = msiVal > 0 ? '+' : '';
+    elMsi.textContent = `${sign}${msiVal.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+    elMsi.className = msiVal >= 0 ? 'mm-val text-green' : 'mm-val text-neg';
+  }
+
+  // 7. Alert Banner
+  const alertBanner = document.getElementById('mcclellan-alert-banner');
+  if (alertBanner) {
+    if (current.spread_alert || Number(current.spread) >= 40) {
+      alertBanner.classList.remove('hidden');
+    } else {
+      alertBanner.classList.add('hidden');
+    }
+  }
+
+  // 8. Render Charts
+  renderMcClellanCharts();
+}
+
+/**
+ * Filter series according to active timeframe and render Dual Charts
+ */
+function renderMcClellanCharts() {
+  if (!rawMcClellanData || !rawMcClellanData.series) return;
+  const series = rawMcClellanData.series;
+
+  let filteredSeries = series;
+  if (mcclellanActiveTimeframe === '30d') {
+    filteredSeries = series.slice(-30);
+  } else if (mcclellanActiveTimeframe === '90d') {
+    filteredSeries = series.slice(-90);
+  } else if (mcclellanActiveTimeframe === '180d') {
+    filteredSeries = series.slice(-180);
+  } else if (mcclellanActiveTimeframe === '1y') {
+    filteredSeries = series.slice(-365);
+  }
+
+  const labels = filteredSeries.map(d => d.date);
+  const coreVals = filteredSeries.map(d => d.core_oscillator);
+  const frontierVals = filteredSeries.map(d => d.frontier_oscillator);
+  const spreadVals = filteredSeries.map(d => d.spread);
+  const spreadMaVals = filteredSeries.map(d => d.spread_30d_ma);
+  const btcVals = filteredSeries.map(d => d.btc_close);
+
+  // ----------------------------------------------------
+  // Chart 1: Dual Oscillators (Core vs Frontier vs BTC)
+  // ----------------------------------------------------
+  const canvasOsc = document.getElementById('chart-mcclellan-oscillator');
+  if (canvasOsc && window.Chart) {
+    if (mcclellanOscillatorChartInstance) {
+      mcclellanOscillatorChartInstance.destroy();
+    }
+
+    mcclellanOscillatorChartInstance = new Chart(canvasOsc, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Core Top 100 Oscillator',
+            data: coreVals,
+            borderColor: '#00f2fe',
+            backgroundColor: 'rgba(0, 242, 254, 0.08)',
+            borderWidth: 1.8,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Frontier Meme Oscillator',
+            data: frontierVals,
+            borderColor: '#b537f2',
+            backgroundColor: 'rgba(181, 55, 242, 0.05)',
+            borderWidth: 1.8,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            label: 'BTC 价格 (USD)',
+            data: btcVals,
+            borderColor: 'rgba(245, 158, 11, 0.55)',
+            borderWidth: 1.2,
+            borderDash: [3, 3],
+            pointRadius: 0,
+            yAxisID: 'yBtc'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 350 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 9 },
+              maxRotation: 0,
+              maxTicksLimit: 8
+            }
+          },
+          y: {
+            position: 'left',
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.25)' : (Math.abs(ctx.tick.value) === 50 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.04)')
+            },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 9 },
+              callback: v => `${v > 0 ? '+' : ''}${v}`
+            },
+            title: { display: true, text: '振荡器 (EMA19 - EMA39) * 1000', color: '#94a3b8', font: { size: 9 } }
+          },
+          yBtc: {
+            position: 'right',
+            grid: { display: false },
+            ticks: {
+              color: '#d97706',
+              font: { family: 'JetBrains Mono', size: 9 },
+              callback: v => `$${Math.round(v / 1000)}k`
+            },
+            title: { display: true, text: 'BTC (USD)', color: '#d97706', font: { size: 9 } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              label: item => {
+                const dsLabel = item.dataset.label || '';
+                const val = item.raw;
+                if (dsLabel.includes('BTC')) {
+                  return ` ${dsLabel}: $${Number(val).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+                }
+                const sign = val > 0 ? '+' : '';
+                return ` ${dsLabel}: ${sign}${Number(val).toFixed(2)}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ----------------------------------------------------
+  // Chart 2: Liquidity Divergence Spread & Regimes Bar
+  // ----------------------------------------------------
+  const canvasSpread = document.getElementById('chart-mcclellan-spread');
+  if (canvasSpread && window.Chart) {
+    if (mcclellanSpreadChartInstance) {
+      mcclellanSpreadChartInstance.destroy();
+    }
+
+    // Dynamic bar colors based on regime code
+    const barColors = filteredSeries.map(d => {
+      if (d.regime_code === 'CO_EXPANSION') return 'rgba(16, 185, 129, 0.8)';
+      if (d.regime_code === 'MEME_SIPHON') return 'rgba(245, 158, 11, 0.8)';
+      if (d.regime_code === 'QUALITY_ACCUMULATION') return 'rgba(6, 182, 212, 0.8)';
+      return 'rgba(239, 68, 68, 0.8)';
+    });
+
+    mcclellanSpreadChartInstance = new Chart(canvasSpread, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'line',
+            label: '30D 移动均线',
+            data: spreadMaVals,
+            borderColor: '#60a5fa',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            tension: 0.2,
+            order: 1
+          },
+          {
+            type: 'bar',
+            label: '背离利差 (Frontier - Core)',
+            data: spreadVals,
+            backgroundColor: barColors,
+            borderRadius: 2,
+            order: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 350 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 9 },
+              maxRotation: 0,
+              maxTicksLimit: 8
+            }
+          },
+          y: {
+            grid: {
+              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.3)' : (ctx.tick.value === 40 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.04)')
+            },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 9 },
+              callback: v => `${v > 0 ? '+' : ''}${v}`
+            },
+            title: { display: true, text: '背离利差 Spread (阈值: 40)', color: '#94a3b8', font: { size: 9 } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono' },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              afterBody: items => {
+                const idx = items[0].dataIndex;
+                const point = filteredSeries[idx];
+                if (!point) return '';
+                const regMap = {
+                  CO_EXPANSION: '全域共振繁荣 (Co-Expansion)',
+                  MEME_SIPHON: 'Meme 流动性抽血 (Meme Siphon)',
+                  QUALITY_ACCUMULATION: '核心价值蓄势 (Quality Accumulation)',
+                  DEEP_FREEZE: '流动性严冬深冻 (Deep Freeze)'
+                };
+                const regName = regMap[point.regime_code] || point.regime_code;
+                const alertText = point.spread >= 40 ? '\n⚠️ 达到 40 警戒线，抽血风险高' : '';
+                return `\n当前体制: ${regName}${alertText}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+/**
+ * Initialize event handlers for McClellan module
+ */
+function initMcClellanEvents() {
+  const btnRefresh = document.getElementById('btn-refresh-mcclellan');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => loadMcClellanData(true));
+  }
+
+  // Timeframe selector
+  const tfContainer = document.getElementById('mcclellan-timeframe-switch');
+  if (tfContainer) {
+    tfContainer.querySelectorAll('.switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        tfContainer.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mcclellanActiveTimeframe = btn.dataset.range || '1y';
+        renderMcClellanCharts();
+      });
+    });
+  }
+
+  // Collapsible methodology accordion
+  const btnAccordion = document.getElementById('btn-mcclellan-methodology-toggle');
+  const accContent = document.getElementById('mcclellan-methodology-content');
+  if (btnAccordion && accContent) {
+    btnAccordion.addEventListener('click', () => {
+      const isExpanded = btnAccordion.getAttribute('aria-expanded') === 'true';
+      btnAccordion.setAttribute('aria-expanded', !isExpanded);
+      accContent.classList.toggle('hidden', isExpanded);
+    });
+  }
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initMacroChartEvents();
@@ -4661,9 +5128,11 @@ initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
 initAiBtcTensionEvents();
+initMcClellanEvents();
 initNavigation();
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 loadGoldCorrelationData(false);
 loadAiBtcTensionData(false);
+loadMcClellanData(false);
