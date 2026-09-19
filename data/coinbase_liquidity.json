@@ -1,115 +1,115 @@
 {
   "exchange": "Coinbase Exchange",
   "product": "BTC-USD",
-  "timestamp": 1789792665864,
-  "updatedAt": "2026-09-19T04:37:45.864Z",
-  "midPrice": 80964.01,
-  "bestBid": 80964.01,
-  "bestAsk": 80964.02,
+  "timestamp": 1789799679496,
+  "updatedAt": "2026-09-19T06:34:39.496Z",
+  "midPrice": 81008.21,
+  "bestBid": 81008.21,
+  "bestAsk": 81008.22,
   "spreadUsd": 0.01,
   "spreadBps": 0.001,
   "depthProfile": {
     "5": {
       "tierBps": 5,
       "label": "±5 bps",
-      "bidUsd": 909836,
-      "bidUsdM": 0.91,
-      "bidBtc": 11.24,
-      "askUsd": 1574887,
-      "askUsdM": 1.57,
-      "askBtc": 19.45,
-      "totalUsd": 2484723,
-      "totalUsdM": 2.48,
-      "totalBtc": 30.69,
-      "bidPct": 36.6,
-      "askPct": 63.4,
-      "imbalanceDelta": -13.4
+      "bidUsd": 556246,
+      "bidUsdM": 0.56,
+      "bidBtc": 6.87,
+      "askUsd": 976105,
+      "askUsdM": 0.98,
+      "askBtc": 12.05,
+      "totalUsd": 1532352,
+      "totalUsdM": 1.53,
+      "totalBtc": 18.91,
+      "bidPct": 36.3,
+      "askPct": 63.7,
+      "imbalanceDelta": -13.7
     },
     "10": {
       "tierBps": 10,
       "label": "±10 bps",
-      "bidUsd": 2087752,
-      "bidUsdM": 2.09,
-      "bidBtc": 25.8,
-      "askUsd": 2507765,
-      "askUsdM": 2.51,
-      "askBtc": 30.96,
-      "totalUsd": 4595518,
-      "totalUsdM": 4.6,
-      "totalBtc": 56.76,
-      "bidPct": 45.4,
-      "askPct": 54.6,
-      "imbalanceDelta": -4.6
+      "bidUsd": 1360656,
+      "bidUsdM": 1.36,
+      "bidBtc": 16.81,
+      "askUsd": 2180250,
+      "askUsdM": 2.18,
+      "askBtc": 26.9,
+      "totalUsd": 3540906,
+      "totalUsdM": 3.54,
+      "totalBtc": 43.7,
+      "bidPct": 38.4,
+      "askPct": 61.6,
+      "imbalanceDelta": -11.6
     },
     "20": {
       "tierBps": 20,
       "label": "±20 bps",
-      "bidUsd": 5560550,
-      "bidUsdM": 5.56,
-      "bidBtc": 68.75,
-      "askUsd": 5053546,
-      "askUsdM": 5.05,
-      "askBtc": 62.35,
-      "totalUsd": 10614097,
-      "totalUsdM": 10.61,
-      "totalBtc": 131.1,
-      "bidPct": 52.4,
-      "askPct": 47.6,
-      "imbalanceDelta": 2.4
+      "bidUsd": 4375225,
+      "bidUsdM": 4.38,
+      "bidBtc": 54.08,
+      "askUsd": 5470729,
+      "askUsdM": 5.47,
+      "askBtc": 67.46,
+      "totalUsd": 9845954,
+      "totalUsdM": 9.85,
+      "totalBtc": 121.54,
+      "bidPct": 44.4,
+      "askPct": 55.6,
+      "imbalanceDelta": -5.6
     },
     "50": {
       "tierBps": 50,
       "label": "±50 bps",
-      "bidUsd": 12715358,
-      "bidUsdM": 12.72,
-      "bidBtc": 157.41,
-      "askUsd": 13726582,
-      "askUsdM": 13.73,
-      "askBtc": 169.05,
-      "totalUsd": 26441939,
-      "totalUsdM": 26.44,
-      "totalBtc": 326.47,
-      "bidPct": 48.1,
-      "askPct": 51.9,
-      "imbalanceDelta": -1.9
+      "bidUsd": 12180993,
+      "bidUsdM": 12.18,
+      "bidBtc": 150.78,
+      "askUsd": 14074507,
+      "askUsdM": 14.07,
+      "askBtc": 173.31,
+      "totalUsd": 26255501,
+      "totalUsdM": 26.26,
+      "totalBtc": 324.09,
+      "bidPct": 46.4,
+      "askPct": 53.6,
+      "imbalanceDelta": -3.6
     },
     "100": {
       "tierBps": 100,
       "label": "±100 bps",
-      "bidUsd": 12998352,
-      "bidUsdM": 13,
-      "bidBtc": 160.93,
-      "askUsd": 14623893,
-      "askUsdM": 14.62,
-      "askBtc": 180.04,
-      "totalUsd": 27622245,
-      "totalUsdM": 27.62,
-      "totalBtc": 340.98,
-      "bidPct": 47.1,
-      "askPct": 52.9,
-      "imbalanceDelta": -2.9
+      "bidUsd": 12512608,
+      "bidUsdM": 12.51,
+      "bidBtc": 154.9,
+      "askUsd": 15072550,
+      "askUsdM": 15.07,
+      "askBtc": 185.53,
+      "totalUsd": 27585158,
+      "totalUsdM": 27.59,
+      "totalBtc": 340.43,
+      "bidPct": 45.4,
+      "askPct": 54.6,
+      "imbalanceDelta": -4.6
     },
     "200": {
       "tierBps": 200,
       "label": "±200 bps",
-      "bidUsd": 16145571,
-      "bidUsdM": 16.15,
-      "bidBtc": 200.35,
-      "askUsd": 28011770,
-      "askUsdM": 28.01,
-      "askBtc": 342.91,
-      "totalUsd": 44157341,
-      "totalUsdM": 44.16,
-      "totalBtc": 543.26,
-      "bidPct": 36.6,
-      "askPct": 63.4,
-      "imbalanceDelta": -13.4
+      "bidUsd": 15579336,
+      "bidUsdM": 15.58,
+      "bidBtc": 193.31,
+      "askUsd": 30187267,
+      "askUsdM": 30.19,
+      "askBtc": 369.45,
+      "totalUsd": 45766603,
+      "totalUsdM": 45.77,
+      "totalBtc": 562.76,
+      "bidPct": 34,
+      "askPct": 66,
+      "imbalanceDelta": -16
     }
   },
   "pyramidRatios": {
-    "ratio100_10": 6.01,
-    "ratio50_10": 5.75,
-    "ratio200_100": 1.6,
+    "ratio100_10": 7.79,
+    "ratio50_10": 7.41,
+    "ratio200_100": 1.66,
     "baseline100_10": 3.1
   },
   "slippageSimulation": [
@@ -118,154 +118,154 @@
       "sizeUsdM": 0.25,
       "sizeLabel": "$250K",
       "sell": {
-        "avgPrice": 80950.56,
-        "worstPrice": 80943.01,
-        "slippageBps": 1.66,
-        "maxImpactBps": 2.59
+        "avgPrice": 80997.2,
+        "worstPrice": 80989.82,
+        "slippageBps": 1.36,
+        "maxImpactBps": 2.27
       },
       "buy": {
-        "avgPrice": 80969.35,
-        "worstPrice": 80974.5,
-        "slippageBps": 0.66,
-        "maxImpactBps": 1.3
+        "avgPrice": 81022.26,
+        "worstPrice": 81028.43,
+        "slippageBps": 1.73,
+        "maxImpactBps": 2.5
       },
-      "asymmetryRatio": 2.52,
-      "penaltyBps": 1
+      "asymmetryRatio": 0.79,
+      "penaltyBps": -0.37
     },
     {
       "sizeUsd": 500000,
       "sizeUsdM": 0.5,
       "sizeLabel": "$500K",
       "sell": {
-        "avgPrice": 80945.49,
-        "worstPrice": 80937.36,
-        "slippageBps": 2.29,
-        "maxImpactBps": 3.29
+        "avgPrice": 80987.97,
+        "worstPrice": 80972.53,
+        "slippageBps": 2.5,
+        "maxImpactBps": 4.41
       },
       "buy": {
-        "avgPrice": 80974.16,
-        "worstPrice": 80984.53,
-        "slippageBps": 1.25,
-        "maxImpactBps": 2.53
+        "avgPrice": 81026.55,
+        "worstPrice": 81036.49,
+        "slippageBps": 2.26,
+        "maxImpactBps": 3.49
       },
-      "asymmetryRatio": 1.83,
-      "penaltyBps": 1.04
+      "asymmetryRatio": 1.11,
+      "penaltyBps": 0.24
     },
     {
       "sizeUsd": 1000000,
       "sizeUsdM": 1,
       "sizeLabel": "$1M",
       "sell": {
-        "avgPrice": 80937.17,
-        "worstPrice": 80915.5,
-        "slippageBps": 3.32,
-        "maxImpactBps": 5.99
+        "avgPrice": 80971.83,
+        "worstPrice": 80944.02,
+        "slippageBps": 4.49,
+        "maxImpactBps": 7.92
       },
       "buy": {
-        "avgPrice": 80985.13,
-        "worstPrice": 81000,
-        "slippageBps": 2.61,
-        "maxImpactBps": 4.44
+        "avgPrice": 81034.63,
+        "worstPrice": 81053.04,
+        "slippageBps": 3.26,
+        "maxImpactBps": 5.53
       },
-      "asymmetryRatio": 1.27,
-      "penaltyBps": 0.71
+      "asymmetryRatio": 1.38,
+      "penaltyBps": 1.23
     },
     {
       "sizeUsd": 2000000,
       "sizeUsdM": 2,
       "sizeLabel": "$2M",
       "sell": {
-        "avgPrice": 80918.86,
-        "worstPrice": 80885.8,
-        "slippageBps": 5.58,
-        "maxImpactBps": 9.66
+        "avgPrice": 80943.26,
+        "worstPrice": 80897.11,
+        "slippageBps": 8.02,
+        "maxImpactBps": 13.72
       },
       "buy": {
-        "avgPrice": 80996.19,
-        "worstPrice": 81024.84,
-        "slippageBps": 3.97,
-        "maxImpactBps": 7.51
+        "avgPrice": 81050.93,
+        "worstPrice": 81089.21,
+        "slippageBps": 5.27,
+        "maxImpactBps": 10
       },
-      "asymmetryRatio": 1.41,
-      "penaltyBps": 1.61
+      "asymmetryRatio": 1.52,
+      "penaltyBps": 2.75
     },
     {
       "sizeUsd": 5000000,
       "sizeUsdM": 5,
       "sizeLabel": "$5M",
       "sell": {
-        "avgPrice": 80889.73,
-        "worstPrice": 80852.78,
-        "slippageBps": 9.17,
-        "maxImpactBps": 13.74
+        "avgPrice": 80896.68,
+        "worstPrice": 80817.27,
+        "slippageBps": 13.77,
+        "maxImpactBps": 23.57
       },
       "buy": {
-        "avgPrice": 81046.23,
-        "worstPrice": 81124.62,
-        "slippageBps": 10.15,
-        "maxImpactBps": 19.84
+        "avgPrice": 81091.28,
+        "worstPrice": 81145.98,
+        "slippageBps": 10.25,
+        "maxImpactBps": 17.01
       },
-      "asymmetryRatio": 0.9,
-      "penaltyBps": -0.98
+      "asymmetryRatio": 1.34,
+      "penaltyBps": 3.52
     },
     {
       "sizeUsd": 10000000,
       "sizeUsdM": 10,
       "sizeLabel": "$10M",
       "sell": {
-        "avgPrice": 80813.44,
-        "worstPrice": 80646.4,
-        "slippageBps": 18.6,
-        "maxImpactBps": 39.23
+        "avgPrice": 80811.39,
+        "worstPrice": 80673.37,
+        "slippageBps": 24.3,
+        "maxImpactBps": 41.33
       },
       "buy": {
-        "avgPrice": 81138.33,
-        "worstPrice": 81353.27,
-        "slippageBps": 21.53,
-        "maxImpactBps": 48.08
+        "avgPrice": 81163.44,
+        "worstPrice": 81323.43,
+        "slippageBps": 19.16,
+        "maxImpactBps": 38.91
       },
-      "asymmetryRatio": 0.86,
-      "penaltyBps": -2.93
+      "asymmetryRatio": 1.27,
+      "penaltyBps": 5.14
     },
     {
       "sizeUsd": 20000000,
       "sizeUsdM": 20,
       "sizeLabel": "$20M",
       "sell": {
-        "avgPrice": 80214.46,
-        "worstPrice": 78000,
-        "slippageBps": 92.58,
-        "maxImpactBps": 366.09
+        "avgPrice": 80140.62,
+        "worstPrice": 77777,
+        "slippageBps": 107.1,
+        "maxImpactBps": 398.87
       },
       "buy": {
-        "avgPrice": 81422.95,
+        "avgPrice": 81419.59,
         "worstPrice": 82000,
-        "slippageBps": 56.68,
-        "maxImpactBps": 127.96
+        "slippageBps": 50.78,
+        "maxImpactBps": 122.43
       },
-      "asymmetryRatio": 1.63,
-      "penaltyBps": 35.9
+      "asymmetryRatio": 2.11,
+      "penaltyBps": 56.32
     }
   ],
   "percentiles": {
-    "pricePctl": 98.3,
-    "volume24hPctl": 0.6,
-    "volume7dPctl": 51.1,
-    "volume24hBtc": 756.9,
-    "volume7dBtc": 6333.9
+    "pricePctl": 98.9,
+    "volume24hPctl": 91.1,
+    "volume7dPctl": 52.2,
+    "volume24hBtc": 11660.2,
+    "volume7dBtc": 6464.2
   },
   "regime": {
-    "code": "FALSE_PROSPERITY",
-    "label": "🚨 虚假繁荣 / 贫瘠逼空",
-    "severity": "critical",
-    "color": "#f43f5e",
-    "bid10Pct": 45.4,
-    "pyramidRatio100_10": 6.01
+    "code": "SELL_WALL_PRESSURE",
+    "label": "⚠️ 顶部分发 / 卖墙重压",
+    "severity": "warning",
+    "color": "#f59e0b",
+    "bid10Pct": 38.4,
+    "pyramidRatio100_10": 7.79
   },
   "insights": [
-    "【阶梯买盘占比】±5 bps 与 ±10 bps 买单占比分别为 36.6% 与 45.4%（卖方主导 63.4% / 54.6%），印证盘口上方堆积限价卖单，越靠近现价承接越单薄。",
-    "【90天分位数背离】Coinbase 现货价格处于 90 天第 98.3% 分位（偏热），但 24h 现货成交量仅居第 0.6% 分位（极度低迷），呈现典型的“高位缩量、流动性贫瘠”。",
-    "【大单执行冲击】实测 $5M 市价抛售执行滑点为 9.17 bps（底价 $80,852.78），比同规模买入滑点高出 0 bps，下行缓冲具备非对称脆弱性。",
-    "【金字塔倍数】100 bps 深度与 10 bps 深度比值为 6.01x（健康基准 ~3.1x），表明做市商防御性挂单向远端（50-100 bps）撤退，即时缓冲层相对中空。"
+    "【阶梯买盘占比】±5 bps 与 ±10 bps 买单占比分别为 36.3% 与 38.4%（卖方主导 63.7% / 61.6%），盘口上方堆积限价卖单，越靠近现价承接越单薄。",
+    "【90天滚动量价分位】Coinbase 现货价格处于 90 天第 98.9% 分位（高位偏热），真·24h 滚动成交量居第 91.1% 分位（放量活跃，约 11660 ₿），7D 均量居第 52.2% 分位。",
+    "【大单执行冲击】实测 $5M 市价抛售执行滑点为 13.77 bps（底价 $80,817.27），比同规模买入滑点高出 3.52 bps，下行缓冲具备非对称脆弱性。",
+    "【金字塔倍数】100 bps 深度与 10 bps 深度比值为 7.79x（健康基准 ~3.1x），表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。"
   ]
 }

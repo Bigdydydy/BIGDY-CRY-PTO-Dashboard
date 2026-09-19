@@ -244,7 +244,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     });
   }
 
-  // 4. 90-Day Rolling Percentiles from Coinbase Daily Candles
+  // 4. 90-Day Rolling Percentiles from Coinbase Daily Candles & Rolling 24h Stats
   let pctlPrice = 50.0;
   let pctlVol24h = 50.0;
   let pctlVol7d = 50.0;
@@ -252,47 +252,72 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   let cur7dVolBtc = 0;
 
   if (Array.isArray(candleData) && candleData.length >= 30) {
-    // candles are sorted newest first [ time, low, high, open, close, volume ]
-    const candles90 = candleData.slice(0, 90).reverse(); // oldest to newest
-    const closes = candles90.map(c => parseFloat(c[4]));
-    const volumes = candles90.map(c => parseFloat(c[5]));
+    // candleData is sorted newest first: [ [time, low, high, open, close, volume], ... ]
+    // candleData[0] is the INCOMPLETE current UTC day's candle.
+    // Completed past daily candles start at index 1:
+    const completedCandles = candleData.slice(1, 91); // 90 completed full days
+    const completedVolumes = completedCandles.map(c => parseFloat(c[5])).filter(v => Number.isFinite(v) && v > 0);
+    const historicalCloses = candleData.slice(0, 90).map(c => parseFloat(c[4])).filter(v => Number.isFinite(v) && v > 0);
 
-    const latestClose = closes[closes.length - 1] || midPrice;
-    cur24hVolBtc = volumes[volumes.length - 1] || parseFloat(tickerStats.stats?.volume || 0);
+    const latestClose = midPrice || (candleData[0] ? parseFloat(candleData[0][4]) : 0);
 
-    const last7Vols = volumes.slice(-7);
-    cur7dVolBtc = last7Vols.reduce((a, b) => a + b, 0) / (last7Vols.length || 1);
+    // True rolling 24h volume from Coinbase official /stats endpoint:
+    const rollingStatsVol = parseFloat(tickerStats.stats?.volume || tickerStats.ticker?.volume || 0);
+    if (rollingStatsVol > 0) {
+      cur24hVolBtc = rollingStatsVol;
+    } else if (completedVolumes.length > 0) {
+      // Fallback: if stats endpoint volume is unavailable, use yesterday's completed full 24h volume
+      cur24hVolBtc = completedVolumes[0];
+    } else if (candleData[0]) {
+      cur24hVolBtc = parseFloat(candleData[0][5]);
+    }
 
-    pctlPrice = calcPercentile(closes, latestClose);
-    pctlVol24h = calcPercentile(volumes, cur24hVolBtc);
-    pctlVol7d = calcPercentile(volumes, cur7dVolBtc);
+    // 7-day average volume: average of past 7 completed 24h days
+    const last7CompletedVols = completedVolumes.slice(0, 7);
+    cur7dVolBtc = last7CompletedVols.length > 0
+      ? last7CompletedVols.reduce((a, b) => a + b, 0) / last7CompletedVols.length
+      : cur24hVolBtc;
+
+    pctlPrice = calcPercentile(historicalCloses, latestClose);
+    pctlVol24h = calcPercentile(completedVolumes, cur24hVolBtc);
+    pctlVol7d = calcPercentile(completedVolumes, cur7dVolBtc);
   }
 
-  // 5. Macro-Microstructure Regime Diagnosis
+  // 5. Macro-Microstructure Regime Diagnosis (Amberdata Framework)
   const bid10Pct = depthProfile[10].bidPct;
   const bid5Pct = depthProfile[5].bidPct;
 
   let regimeCode = 'NEUTRAL_BALANCED';
-  let regimeLabel = '中性均衡承接';
+  let regimeLabel = '⚪ 中性均衡 / 震荡整理';
   let regimeSeverity = 'neutral';
-  let regimeColor = '#38bdf8';
+  let regimeColor = '#a1a1aa';
 
-  if (pctlPrice >= 75 && (pctlVol24h <= 20 || pctlVol7d <= 30) && bid10Pct < 48.5) {
+  if (pctlPrice >= 75 && (pctlVol24h <= 25 || pctlVol7d <= 30) && bid10Pct < 48.5 && pyramidRatio100_10 > 5.0) {
     regimeCode = 'FALSE_PROSPERITY';
     regimeLabel = '🚨 虚假繁荣 / 贫瘠逼空';
     regimeSeverity = 'critical';
     regimeColor = '#f43f5e';
-  } else if (bid10Pct < 46.0 || bid5Pct < 45.0) {
-    regimeCode = 'SELL_WALL_PRESSURE';
-    regimeLabel = '⚠️ 近端卖墙压制 / 承接中空';
-    regimeSeverity = 'warning';
-    regimeColor = '#f59e0b';
-  } else if (pctlPrice >= 70 && pctlVol7d >= 60 && bid10Pct >= 51.0) {
-    regimeCode = 'HEALTHY_ACCUMULATION';
-    regimeLabel = '🟢 充盈承接 / 现货放量买入';
+  } else if (pctlPrice >= 70 && (pctlVol24h >= 55 || pctlVol7d >= 60) && bid10Pct >= 51.0 && pyramidRatio100_10 <= 5.5) {
+    regimeCode = 'HEALTHY_EXPANSION';
+    regimeLabel = '🟢 充盈共振 / 稳健主升';
     regimeSeverity = 'success';
     regimeColor = '#10b981';
-  } else if (pyramidRatio100_10 > 6.5) {
+  } else if (pctlPrice >= 55 && pctlVol24h >= 45 && (bid10Pct < 46.0 || bid5Pct < 45.0)) {
+    regimeCode = 'SELL_WALL_PRESSURE';
+    regimeLabel = '⚠️ 顶部分发 / 卖墙重压';
+    regimeSeverity = 'warning';
+    regimeColor = '#f59e0b';
+  } else if (pctlPrice <= 30 && pctlVol24h <= 35 && bid10Pct >= 51.5 && pyramidRatio100_10 <= 4.5) {
+    regimeCode = 'ACCUMULATION_BOTTOM';
+    regimeLabel = '💎 机构吸筹 / 缩量筑底';
+    regimeSeverity = 'success';
+    regimeColor = '#38bdf8';
+  } else if (pctlPrice <= 30 && pctlVol24h >= 75 && bid10Pct < 45.0) {
+    regimeCode = 'PANIC_CAPITULATION';
+    regimeLabel = '🔴 恐慌踩踏 / 流动性击穿';
+    regimeSeverity = 'critical';
+    regimeColor = '#ef4444';
+  } else if (pyramidRatio100_10 > 6.0) {
     regimeCode = 'HOLLOW_NEAR_END';
     regimeLabel = '⚡ 金字塔形变 / 防线下移';
     regimeSeverity = 'warning';
@@ -301,10 +326,10 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
 
   // Key institutional diagnostic insights
   const insights = [
-    `【阶梯买盘占比】±5 bps 与 ±10 bps 买单占比分别为 ${bid5Pct}% 与 ${bid10Pct}%（卖方主导 ${depthProfile[5].askPct}% / ${depthProfile[10].askPct}%），印证盘口上方堆积限价卖单，越靠近现价承接越单薄。`,
-    `【90天分位数背离】Coinbase 现货价格处于 90 天第 ${pctlPrice}% 分位（偏热），但 24h 现货成交量仅居第 ${pctlVol24h}% 分位（极度低迷），呈现典型的“高位缩量、流动性贫瘠”。`,
-    `【大单执行冲击】实测 $5M 市价抛售执行滑点为 ${slippageSimulation[4].sell.slippageBps} bps（底价 $${slippageSimulation[4].sell.worstPrice.toLocaleString()}），比同规模买入滑点高出 ${Math.max(0, slippageSimulation[4].penaltyBps)} bps，下行缓冲具备非对称脆弱性。`,
-    `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），表明做市商防御性挂单向远端（50-100 bps）撤退，即时缓冲层相对中空。`
+    `【阶梯买盘占比】±5 bps 与 ±10 bps 买单占比分别为 ${bid5Pct}% 与 ${bid10Pct}%（卖方主导 ${depthProfile[5].askPct}% / ${depthProfile[10].askPct}%），${bid10Pct < 48 ? '盘口上方堆积限价卖单，越靠近现价承接越单薄。' : '买卖双向挂单相对均衡。'}`,
+    `【90天滚动量价分位】Coinbase 现货价格处于 90 天第 ${pctlPrice}% 分位（${pctlPrice >= 75 ? '高位偏热' : (pctlPrice <= 25 ? '低位低估' : '常态中枢')}），真·24h 滚动成交量居第 ${pctlVol24h}% 分位（${pctlVol24h <= 25 ? '极度低迷' : (pctlVol24h >= 70 ? '放量活跃' : '中性温和')}，约 ${cur24hVolBtc.toFixed(0)} ₿），7D 均量居第 ${pctlVol7d}% 分位。`,
+    `【大单执行冲击】实测 $5M 市价抛售执行滑点为 ${slippageSimulation[4].sell.slippageBps} bps（底价 $${slippageSimulation[4].sell.worstPrice.toLocaleString()}），比同规模买入滑点${slippageSimulation[4].penaltyBps >= 0 ? `高出 ${slippageSimulation[4].penaltyBps} bps` : `低 ${Math.abs(slippageSimulation[4].penaltyBps)} bps`}，${slippageSimulation[4].penaltyBps > 0 ? '下行缓冲具备非对称脆弱性。' : '买卖盘滑点结构对称。'}`,
+    `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），${pyramidRatio100_10 > 5.5 ? '表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。' : '做市商阶梯深度逐级递增，具备良好吸震能力。'}`
   ];
 
   return {
@@ -409,6 +434,7 @@ async function getCoinbaseLiquidityData(forceRefresh = false) {
 module.exports = {
   getCoinbaseLiquidityData,
   calcPercentile,
-  walkOrderBook
+  walkOrderBook,
+  processCoinbaseData
 };
 

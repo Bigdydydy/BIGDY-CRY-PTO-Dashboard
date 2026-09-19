@@ -448,6 +448,58 @@ describe('Phase 2: ECDF Mid-Rank Percentile & Order Book Walk', () => {
     assert.equal(res2.avgPrice, 70250);
     assert.equal(res2.worstPrice, 70500);
   });
+
+  test('processCoinbaseData uses true rolling 24h volume and excludes uncompleted candle', () => {
+    const { processCoinbaseData } = require('../server/coinbase_fetcher');
+    const mockBook = {
+      bids: [['80000', '10.0'], ['79900', '20.0'], ['79500', '50.0'], ['79000', '100.0']],
+      asks: [['80010', '10.0'], ['80100', '20.0'], ['80500', '50.0'], ['81000', '100.0']]
+    };
+    // 35 candles: index 0 is today's incomplete candle (small volume: 500 BTC)
+    // index 1..34 are completed days (volume ~ 10,000 BTC)
+    const mockCandles = [];
+    mockCandles.push([Date.now() / 1000, 79000, 81000, 79500, 80000, 500]); // in-progress
+    for (let i = 1; i <= 34; i++) {
+      mockCandles.push([Date.now() / 1000 - i * 86400, 75000, 82000, 76000, 80000, 10000 + i * 10]);
+    }
+
+    const mockStats = {
+      ticker: { price: '80005', volume: '10150' },
+      stats: { volume: '10150' } // True rolling 24h volume
+    };
+
+    const result = processCoinbaseData(mockBook, mockCandles, mockStats);
+    assert.ok(result.percentiles);
+    assert.equal(result.percentiles.volume24hBtc, 10150, 'Must use rolling 24h volume from stats, NOT incomplete candle volume (500)');
+    assert.ok(result.percentiles.volume24hPctl > 40, 'Volume percentile must be sensible (>40%), not collapsed to 0%');
+  });
+
+  test('processCoinbaseData accurately classifies FALSE_PROSPERITY vs SELL_WALL_PRESSURE', () => {
+    const { processCoinbaseData } = require('../server/coinbase_fetcher');
+    // Case 1: High price, very low volume, sell dominance, high pyramid ratio => FALSE_PROSPERITY
+    const thinBook = {
+      bids: [['80000', '0.5'], ['79000', '50.0']], // very thin near end, heavy far end => high pyramid ratio
+      asks: [['80010', '5.0'], ['80100', '10.0'], ['80500', '20.0']]
+    };
+    const mockCandles = [];
+    mockCandles.push([Date.now() / 1000, 79000, 81000, 79500, 80000, 100]);
+    for (let i = 1; i <= 34; i++) {
+      mockCandles.push([Date.now() / 1000 - i * 86400, 70000, 75000, 71000, 72000, 10000]);
+    }
+    const lowStats = { stats: { volume: '500' } }; // low volume 500 vs 10000 => pctl <= 25
+
+    const rFalse = processCoinbaseData(thinBook, mockCandles, lowStats);
+    assert.equal(rFalse.regime.code, 'FALSE_PROSPERITY');
+
+    // Case 2: High price, active volume, heavy ask wall => SELL_WALL_PRESSURE
+    const wallBook = {
+      bids: [['80000', '2.0']],
+      asks: [['80010', '20.0']] // ask dominant => bid10Pct < 46
+    };
+    const activeStats = { stats: { volume: '10000' } };
+    const rWall = processCoinbaseData(wallBook, mockCandles, activeStats);
+    assert.equal(rWall.regime.code, 'SELL_WALL_PRESSURE');
+  });
 });
 
 describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
