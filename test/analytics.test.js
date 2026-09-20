@@ -409,6 +409,22 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
     const r2 = evaluateCarryRegime(invertedState, []);
     assert.equal(r2.regimeCode, 'OVERCROWDED_INVERSION');
   });
+
+  test('calculateCarryScore correctly decouples yield and structure without sign inversion', () => {
+    const { calculateCarryScore } = require('../server/term_premium_engine');
+    // 1. Positive excess and positive spread -> High positive score
+    const s1 = calculateCarryScore(3.0, 2.0); // (3/10)*60 + (2/4)*40 = 18 + 20 = 38.0
+    assert.equal(s1, 38.0);
+
+    // 2. Negative excess (-1.0%) and inverted spread (-3.0%) -> Strongly negative score (NOT positive!)
+    const s2 = calculateCarryScore(-1.0, -3.0); // (-1/10)*60 + (-3/4)*40 = -6 + (-30) = -36.0
+    assert.equal(s2, -36.0);
+    assert.ok(s2 < 0, 'Inverted curve with negative excess must never yield positive score');
+
+    // 3. Neutral state: 0% excess and 0% spread -> 0.0
+    const s3 = calculateCarryScore(0.0, 0.0);
+    assert.equal(s3, 0.0);
+  });
 });
 
 describe('Phase 2: ECDF Mid-Rank Percentile & Order Book Walk', () => {

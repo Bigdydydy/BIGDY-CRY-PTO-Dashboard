@@ -13,7 +13,7 @@
     "spread180d30d": -1.54,
     "excessReturn": 7.73,
     "excessOverTBill": 11.23,
-    "carryScore": -30.9,
+    "carryScore": 38.9,
     "btcPrice": 93373,
     "isRealData": true
   },
@@ -31,7 +31,7 @@
     "spread180d30d": -1.85,
     "excessReturn": 8.51,
     "excessOverTBill": 12.01,
-    "carryScore": -34,
+    "carryScore": 42,
     "btcPrice": 94386,
     "isRealData": true
   },
@@ -49,7 +49,7 @@
     "spread180d30d": -2.37,
     "excessReturn": 9.15,
     "excessOverTBill": 12.65,
-    "carryScore": -36.6,
+    "carryScore": 43.2,
     "btcPrice": 96902,
     "isRealData": true
   },
@@ -67,7 +67,7 @@
     "spread180d30d": -0.72,
     "excessReturn": 7.6,
     "excessOverTBill": 11.1,
-    "carryScore": -30.4,
+    "carryScore": 42,
     "btcPrice": 98135,
     "isRealData": true
   },
@@ -85,7 +85,7 @@
     "spread180d30d": 0.56,
     "excessReturn": 6.06,
     "excessOverTBill": 9.56,
-    "carryScore": 24.2,
+    "carryScore": 39.2,
     "btcPrice": 98211,
     "isRealData": true
   },
@@ -103,7 +103,7 @@
     "spread180d30d": 1.91,
     "excessReturn": 4.25,
     "excessOverTBill": 7.75,
-    "carryScore": 17,
+    "carryScore": 35.1,
     "btcPrice": 98339,
     "isRealData": true
   },
@@ -121,7 +121,7 @@
     "spread180d30d": 1.98,
     "excessReturn": 3.95,
     "excessOverTBill": 7.45,
-    "carryScore": 15.8,
+    "carryScore": 33.7,
     "btcPrice": 102277,
     "isRealData": true
   },
@@ -139,7 +139,7 @@
     "spread180d30d": 1.51,
     "excessReturn": 3.89,
     "excessOverTBill": 7.39,
-    "carryScore": 15.6,
+    "carryScore": 31,
     "btcPrice": 96943,
     "isRealData": true
   },
@@ -157,7 +157,7 @@
     "spread180d30d": 2.24,
     "excessReturn": 3.06,
     "excessOverTBill": 6.56,
-    "carryScore": 12.2,
+    "carryScore": 29.8,
     "btcPrice": 95047,
     "isRealData": true
   },
@@ -175,7 +175,7 @@
     "spread180d30d": 1.29,
     "excessReturn": 4.15,
     "excessOverTBill": 7.65,
-    "carryScore": 16.6,
+    "carryScore": 31.5,
     "btcPrice": 92544,
     "isRealData": true
   },
@@ -193,7 +193,7 @@
     "spread180d30d": 3.07,
     "excessReturn": 2.2,
     "excessOverTBill": 5.7,
-    "carryScore": 8.8,
+    "carryScore": 29,
     "btcPrice": 94703,
     "isRealData": true
   },
@@ -211,7 +211,7 @@
     "spread180d30d": 3.4,
     "excessReturn": 1.59,
     "excessOverTBill": 5.09,
-    "carryScore": 6.4,
+    "carryScore": 27.1,
     "btcPrice": 94573,
     "isRealData": true
   },
@@ -229,7 +229,7 @@
     "spread180d30d": 3.21,
     "excessReturn": 1.51,
     "excessOverTBill": 5.01,
-    "carryScore": 6,
+    "carryScore": 25.8,
     "btcPrice": 94502,
     "isRealData": true
   },
@@ -247,7 +247,7 @@
     "spread180d30d": 2.51,
     "excessReturn": 2.5,
     "excessOverTBill": 6,
-    "carryScore": 10,
+    "carryScore": 28.1,
     "btcPrice": 94502,
     "isRealData": true
   },
@@ -265,7 +265,7 @@
     "spread180d30d": 2.15,
     "excessReturn": 3.21,
     "excessOverTBill": 6.71,
-    "carryScore": 12.8,
+    "carryScore": 30.6,
     "btcPrice": 96529,
     "isRealData": true
   },
@@ -283,7 +283,7 @@
     "spread180d30d": 1.85,
     "excessReturn": 4.08,
     "excessOverTBill": 7.58,
-    "carryScore": 16.3,
+    "carryScore": 34.3,
     "btcPrice": 100511,
     "isRealData": true
   },
@@ -301,7 +301,7 @@
     "spread180d30d": 0.45,
     "excessReturn": 5.54,
     "excessOverTBill": 9.04,
-    "carryScore": 22.2,
+    "carryScore": 35.6,
     "btcPrice": 99980,
     "isRealData": true
   },
@@ -319,7 +319,7 @@
     "spread180d30d": 0.24,
     "excessReturn": 5.73,
     "excessOverTBill": 9.23,
-    "carryScore": 22.9,
+    "carryScore": 35.7,
     "btcPrice": 104114,
     "isRealData": true
   },
@@ -337,7 +337,7 @@
     "spread180d30d": 1.32,
     "excessReturn": 4.46,
     "excessOverTBill": 7.96,
-    "carryScore": 17.8,
+    "carryScore": 33.9,
     "btcPrice": 104436,
     "isRealData": true
   },
@@ -355,7 +355,7 @@
     "spread180d30d": 0.66,
     "excessReturn": 6.54,
     "excessOverTBill": 10.04,
-    "carryScore": 26.2,
+    "carryScore": 42.7,
     "btcPrice": 101224,
     "isRealData": true
   },
@@ -373,7 +373,7 @@
     "spread180d30d": 0.4,
     "excessReturn": 5.5,
     "excessOverTBill": 9,
-    "carryScore": 22,
+    "carryScore": 35.2,
     "btcPrice": 102141,
     "isRealData": true
   },
@@ -391,7 +391,7 @@
     "spread180d30d": 1.53,
     "excessReturn": 5.13,
     "excessOverTBill": 8.63,
-    "carryScore": 20.5,
+    "carryScore": 39.1,
     "btcPrice": 106156,
     "isRealData": true
   },
@@ -409,7 +409,7 @@
     "spread180d30d": 2.14,
     "excessReturn": 4.09,
     "excessOverTBill": 7.59,
-    "carryScore": 16.4,
+    "carryScore": 36.2,
     "btcPrice": 103649,
     "isRealData": true
   },
@@ -427,7 +427,7 @@
     "spread180d30d": 1.26,
     "excessReturn": 5.17,
     "excessOverTBill": 8.67,
-    "carryScore": 20.7,
+    "carryScore": 38,
     "btcPrice": 103928,
     "isRealData": true
   },
@@ -445,7 +445,7 @@
     "spread180d30d": 3.12,
     "excessReturn": 3.03,
     "excessOverTBill": 6.53,
-    "carryScore": 12.1,
+    "carryScore": 35.4,
     "btcPrice": 104848,
     "isRealData": true
   },
@@ -463,7 +463,7 @@
     "spread180d30d": 2.95,
     "excessReturn": 3.21,
     "excessOverTBill": 6.71,
-    "carryScore": 12.8,
+    "carryScore": 35.7,
     "btcPrice": 104726,
     "isRealData": true
   },
@@ -481,7 +481,7 @@
     "spread180d30d": 1.91,
     "excessReturn": 4.65,
     "excessOverTBill": 8.15,
-    "carryScore": 18.6,
+    "carryScore": 38.6,
     "btcPrice": 102578,
     "isRealData": true
   },
@@ -499,7 +499,7 @@
     "spread180d30d": 3.84,
     "excessReturn": 2.8,
     "excessOverTBill": 6.3,
-    "carryScore": 11.2,
+    "carryScore": 38.3,
     "btcPrice": 102089,
     "isRealData": true
   },
@@ -517,7 +517,7 @@
     "spread180d30d": 3.59,
     "excessReturn": 2.7,
     "excessOverTBill": 6.2,
-    "carryScore": 10.8,
+    "carryScore": 36.4,
     "btcPrice": 101290,
     "isRealData": true
   },
@@ -535,7 +535,7 @@
     "spread180d30d": 1.89,
     "excessReturn": 3.78,
     "excessOverTBill": 7.28,
-    "carryScore": 15.1,
+    "carryScore": 33.4,
     "btcPrice": 103734,
     "isRealData": true
   },
@@ -553,7 +553,7 @@
     "spread180d30d": 3.48,
     "excessReturn": 1.15,
     "excessOverTBill": 4.65,
-    "carryScore": 4.6,
+    "carryScore": 26.7,
     "btcPrice": 104741,
     "isRealData": true
   },
@@ -571,7 +571,7 @@
     "spread180d30d": 2.64,
     "excessReturn": 2.53,
     "excessOverTBill": 6.03,
-    "carryScore": 10.1,
+    "carryScore": 30.2,
     "btcPrice": 102411,
     "isRealData": true
   },
@@ -589,7 +589,7 @@
     "spread180d30d": 1.03,
     "excessReturn": 4.07,
     "excessOverTBill": 7.57,
-    "carryScore": 16.3,
+    "carryScore": 30.3,
     "btcPrice": 100627,
     "isRealData": true
   },
@@ -607,7 +607,7 @@
     "spread180d30d": 0.77,
     "excessReturn": 3.25,
     "excessOverTBill": 6.75,
-    "carryScore": 13,
+    "carryScore": 23.9,
     "btcPrice": 97679,
     "isRealData": true
   },
@@ -625,7 +625,7 @@
     "spread180d30d": 2.13,
     "excessReturn": 2.02,
     "excessOverTBill": 5.52,
-    "carryScore": 8.1,
+    "carryScore": 24.5,
     "btcPrice": 101447,
     "isRealData": true
   },
@@ -643,7 +643,7 @@
     "spread180d30d": 2.44,
     "excessReturn": 0.77,
     "excessOverTBill": 4.27,
-    "carryScore": 3.1,
+    "carryScore": 18.8,
     "btcPrice": 97810,
     "isRealData": true
   },
@@ -661,7 +661,7 @@
     "spread180d30d": 2.02,
     "excessReturn": 0.59,
     "excessOverTBill": 4.09,
-    "carryScore": 2.4,
+    "carryScore": 15.3,
     "btcPrice": 96625,
     "isRealData": true
   },
@@ -679,7 +679,7 @@
     "spread180d30d": 1.89,
     "excessReturn": 1.02,
     "excessOverTBill": 4.52,
-    "carryScore": 4.1,
+    "carryScore": 17.3,
     "btcPrice": 96563,
     "isRealData": true
   },
@@ -697,7 +697,7 @@
     "spread180d30d": 2.34,
     "excessReturn": -0.27,
     "excessOverTBill": 3.23,
-    "carryScore": -1.1,
+    "carryScore": 12.2,
     "btcPrice": 96538,
     "isRealData": true
   },
@@ -715,7 +715,7 @@
     "spread180d30d": 2.43,
     "excessReturn": -0.48,
     "excessOverTBill": 3.02,
-    "carryScore": -1.9,
+    "carryScore": 11.6,
     "btcPrice": 96480,
     "isRealData": true
   },
@@ -733,7 +733,7 @@
     "spread180d30d": 2.41,
     "excessReturn": -0.06,
     "excessOverTBill": 3.44,
-    "carryScore": -0.2,
+    "carryScore": 14.1,
     "btcPrice": 96478,
     "isRealData": true
   },
@@ -751,7 +751,7 @@
     "spread180d30d": 1.71,
     "excessReturn": -0.04,
     "excessOverTBill": 3.46,
-    "carryScore": -0.2,
+    "carryScore": 10.1,
     "btcPrice": 97451,
     "isRealData": true
   },
@@ -769,7 +769,7 @@
     "spread180d30d": 1.59,
     "excessReturn": 0.08,
     "excessOverTBill": 3.58,
-    "carryScore": 0.3,
+    "carryScore": 10.1,
     "btcPrice": 95765,
     "isRealData": true
   },
@@ -787,7 +787,7 @@
     "spread180d30d": 2.94,
     "excessReturn": -0.84,
     "excessOverTBill": 2.66,
-    "carryScore": -3.4,
+    "carryScore": 12.9,
     "btcPrice": 97873,
     "isRealData": true
   },
@@ -805,7 +805,7 @@
     "spread180d30d": 2.12,
     "excessReturn": -0.41,
     "excessOverTBill": 3.09,
-    "carryScore": -1.6,
+    "carryScore": 10.4,
     "btcPrice": 96627,
     "isRealData": true
   },
@@ -823,7 +823,7 @@
     "spread180d30d": 1.4,
     "excessReturn": -0.33,
     "excessOverTBill": 3.17,
-    "carryScore": -1.3,
+    "carryScore": 6.6,
     "btcPrice": 97501,
     "isRealData": true
   },
@@ -841,7 +841,7 @@
     "spread180d30d": 2.2,
     "excessReturn": -0.82,
     "excessOverTBill": 2.68,
-    "carryScore": -3.3,
+    "carryScore": 8.6,
     "btcPrice": 97595,
     "isRealData": true
   },
@@ -859,7 +859,7 @@
     "spread180d30d": 1.91,
     "excessReturn": -0.6,
     "excessOverTBill": 2.9,
-    "carryScore": -2.4,
+    "carryScore": 8.3,
     "btcPrice": 96127,
     "isRealData": true
   },
@@ -877,7 +877,7 @@
     "spread180d30d": 1.73,
     "excessReturn": -1.33,
     "excessOverTBill": 2.17,
-    "carryScore": -5.3,
+    "carryScore": 2.8,
     "btcPrice": 95775,
     "isRealData": true
   },
@@ -895,7 +895,7 @@
     "spread180d30d": 2.44,
     "excessReturn": -1.57,
     "excessOverTBill": 1.93,
-    "carryScore": -6.3,
+    "carryScore": 5.9,
     "btcPrice": 95605,
     "isRealData": true
   },
@@ -913,7 +913,7 @@
     "spread180d30d": 3.22,
     "excessReturn": -2.5,
     "excessOverTBill": 1,
-    "carryScore": -10,
+    "carryScore": 5.4,
     "btcPrice": 96637,
     "isRealData": true
   },
@@ -931,7 +931,7 @@
     "spread180d30d": 1.81,
     "excessReturn": -1.35,
     "excessOverTBill": 2.15,
-    "carryScore": -5.4,
+    "carryScore": 3.4,
     "btcPrice": 98341,
     "isRealData": true
   },
@@ -949,7 +949,7 @@
     "spread180d30d": 3.02,
     "excessReturn": -2.24,
     "excessOverTBill": 1.26,
-    "carryScore": -9,
+    "carryScore": 5.8,
     "btcPrice": 96144,
     "isRealData": true
   },
@@ -967,7 +967,7 @@
     "spread180d30d": 2.26,
     "excessReturn": -1.81,
     "excessOverTBill": 1.69,
-    "carryScore": -7.2,
+    "carryScore": 3.5,
     "btcPrice": 96574,
     "isRealData": true
   },
@@ -985,7 +985,7 @@
     "spread180d30d": 1.94,
     "excessReturn": -1.26,
     "excessOverTBill": 2.24,
-    "carryScore": -5,
+    "carryScore": 5,
     "btcPrice": 96263,
     "isRealData": true
   },
@@ -1003,7 +1003,7 @@
     "spread180d30d": 2.32,
     "excessReturn": -2.31,
     "excessOverTBill": 1.19,
-    "carryScore": -9.2,
+    "carryScore": 1.1,
     "btcPrice": 91530,
     "isRealData": true
   },
@@ -1021,7 +1021,7 @@
     "spread180d30d": 0.67,
     "excessReturn": -0.18,
     "excessOverTBill": 3.32,
-    "carryScore": -0.7,
+    "carryScore": 3.2,
     "btcPrice": 88577,
     "isRealData": true
   },
@@ -1039,7 +1039,7 @@
     "spread180d30d": 0.62,
     "excessReturn": -0.04,
     "excessOverTBill": 3.46,
-    "carryScore": -0.2,
+    "carryScore": 3.8,
     "btcPrice": 84101,
     "isRealData": true
   },
@@ -1057,7 +1057,7 @@
     "spread180d30d": 0.5,
     "excessReturn": 0.13,
     "excessOverTBill": 3.63,
-    "carryScore": 0.5,
+    "carryScore": 4.1,
     "btcPrice": 84635,
     "isRealData": true
   },
@@ -1075,7 +1075,7 @@
     "spread180d30d": -0.23,
     "excessReturn": -0.12,
     "excessOverTBill": 3.38,
-    "carryScore": 0.5,
+    "carryScore": -2.2,
     "btcPrice": 84308,
     "isRealData": true
   },
@@ -1093,7 +1093,7 @@
     "spread180d30d": 0.46,
     "excessReturn": -0.78,
     "excessOverTBill": 2.72,
-    "carryScore": -3.1,
+    "carryScore": -1.7,
     "btcPrice": 86025,
     "isRealData": true
   },
@@ -1111,7 +1111,7 @@
     "spread180d30d": 1.57,
     "excessReturn": -2.47,
     "excessOverTBill": 1.03,
-    "carryScore": -9.9,
+    "carryScore": -4.2,
     "btcPrice": 94271,
     "isRealData": true
   },
@@ -1129,7 +1129,7 @@
     "spread180d30d": -1.15,
     "excessReturn": -0.56,
     "excessOverTBill": 2.94,
-    "carryScore": 2.2,
+    "carryScore": -11.2,
     "btcPrice": 86159,
     "isRealData": true
   },
@@ -1147,7 +1147,7 @@
     "spread180d30d": -0.58,
     "excessReturn": -1.77,
     "excessOverTBill": 1.73,
-    "carryScore": 7.1,
+    "carryScore": -14.5,
     "btcPrice": 87250,
     "isRealData": true
   },
@@ -1165,7 +1165,7 @@
     "spread180d30d": -0.41,
     "excessReturn": -1.66,
     "excessOverTBill": 1.84,
-    "carryScore": 6.6,
+    "carryScore": -12.8,
     "btcPrice": 90610,
     "isRealData": true
   },
@@ -1183,7 +1183,7 @@
     "spread180d30d": -0.54,
     "excessReturn": -1.54,
     "excessOverTBill": 1.96,
-    "carryScore": 6.2,
+    "carryScore": -12.9,
     "btcPrice": 89922,
     "isRealData": true
   },
@@ -1201,7 +1201,7 @@
     "spread180d30d": -1.48,
     "excessReturn": -1.12,
     "excessOverTBill": 2.38,
-    "carryScore": 4.5,
+    "carryScore": -17,
     "btcPrice": 86760,
     "isRealData": true
   },
@@ -1219,7 +1219,7 @@
     "spread180d30d": -0.53,
     "excessReturn": -1.44,
     "excessOverTBill": 2.06,
-    "carryScore": 5.8,
+    "carryScore": -12.4,
     "btcPrice": 86200,
     "isRealData": true
   },
@@ -1237,7 +1237,7 @@
     "spread180d30d": -0.33,
     "excessReturn": -1.06,
     "excessOverTBill": 2.44,
-    "carryScore": 4.2,
+    "carryScore": -8.7,
     "btcPrice": 80706,
     "isRealData": true
   },
@@ -1255,7 +1255,7 @@
     "spread180d30d": -0.36,
     "excessReturn": -0.67,
     "excessOverTBill": 2.83,
-    "carryScore": 2.7,
+    "carryScore": -6.6,
     "btcPrice": 78552,
     "isRealData": true
   },
@@ -1273,7 +1273,7 @@
     "spread180d30d": 0,
     "excessReturn": -1.3,
     "excessOverTBill": 2.2,
-    "carryScore": -5.2,
+    "carryScore": -7.8,
     "btcPrice": 82899,
     "isRealData": true
   },
@@ -1291,7 +1291,7 @@
     "spread180d30d": 0.55,
     "excessReturn": -1.5,
     "excessOverTBill": 2,
-    "carryScore": -6,
+    "carryScore": -5.1,
     "btcPrice": 83651,
     "isRealData": true
   },
@@ -1309,7 +1309,7 @@
     "spread180d30d": -1.54,
     "excessReturn": -0.32,
     "excessOverTBill": 3.18,
-    "carryScore": 1.3,
+    "carryScore": -13,
     "btcPrice": 81077,
     "isRealData": true
   },
@@ -1327,7 +1327,7 @@
     "spread180d30d": -0.3,
     "excessReturn": -1.47,
     "excessOverTBill": 2.03,
-    "carryScore": 5.9,
+    "carryScore": -10.9,
     "btcPrice": 83985,
     "isRealData": true
   },
@@ -1345,7 +1345,7 @@
     "spread180d30d": 1.94,
     "excessReturn": -2.95,
     "excessOverTBill": 0.55,
-    "carryScore": -11.8,
+    "carryScore": -3.5,
     "btcPrice": 84349,
     "isRealData": true
   },
@@ -1363,7 +1363,7 @@
     "spread180d30d": 0.84,
     "excessReturn": -2.06,
     "excessOverTBill": 1.44,
-    "carryScore": -8.2,
+    "carryScore": -6.1,
     "btcPrice": 82564,
     "isRealData": true
   },
@@ -1381,7 +1381,7 @@
     "spread180d30d": -0.87,
     "excessReturn": -1.1,
     "excessOverTBill": 2.4,
-    "carryScore": 4.4,
+    "carryScore": -13.1,
     "btcPrice": 84029,
     "isRealData": true
   },
@@ -1399,7 +1399,7 @@
     "spread180d30d": 0.36,
     "excessReturn": -2.85,
     "excessOverTBill": 0.65,
-    "carryScore": -11.4,
+    "carryScore": -14.3,
     "btcPrice": 82702,
     "isRealData": true
   },
@@ -1417,7 +1417,7 @@
     "spread180d30d": 3.65,
     "excessReturn": -4.65,
     "excessOverTBill": -1.15,
-    "carryScore": -18.6,
+    "carryScore": -0.3,
     "btcPrice": 86872,
     "isRealData": true
   },
@@ -1435,7 +1435,7 @@
     "spread180d30d": -0.66,
     "excessReturn": -2.17,
     "excessOverTBill": 1.33,
-    "carryScore": 8.7,
+    "carryScore": -18,
     "btcPrice": 84172,
     "isRealData": true
   },
@@ -1453,7 +1453,7 @@
     "spread180d30d": -3.95,
     "excessReturn": -0.22,
     "excessOverTBill": 3.28,
-    "carryScore": 0.9,
+    "carryScore": -31.5,
     "btcPrice": 84066,
     "isRealData": true
   },
@@ -1471,7 +1471,7 @@
     "spread180d30d": -4.19,
     "excessReturn": -0.05,
     "excessOverTBill": 3.45,
-    "carryScore": 0.2,
+    "carryScore": -32.5,
     "btcPrice": 83840,
     "isRealData": true
   },
@@ -1489,7 +1489,7 @@
     "spread180d30d": -5.62,
     "excessReturn": 0.77,
     "excessOverTBill": 4.27,
-    "carryScore": -3.1,
+    "carryScore": -35.4,
     "btcPrice": 86087,
     "isRealData": true
   },
@@ -1507,7 +1507,7 @@
     "spread180d30d": -10.67,
     "excessReturn": 3.59,
     "excessOverTBill": 7.09,
-    "carryScore": -14.4,
+    "carryScore": -18.5,
     "btcPrice": 87519,
     "isRealData": true
   },
@@ -1525,7 +1525,7 @@
     "spread180d30d": -9.18,
     "excessReturn": 3,
     "excessOverTBill": 6.5,
-    "carryScore": -12,
+    "carryScore": -22,
     "btcPrice": 87434,
     "isRealData": true
   },
@@ -1543,7 +1543,7 @@
     "spread180d30d": -7.87,
     "excessReturn": 2.04,
     "excessOverTBill": 5.54,
-    "carryScore": -8.2,
+    "carryScore": -27.8,
     "btcPrice": 86914,
     "isRealData": true
   },
@@ -1561,7 +1561,7 @@
     "spread180d30d": -15.23,
     "excessReturn": 6,
     "excessOverTBill": 9.5,
-    "carryScore": -24,
+    "carryScore": -4,
     "btcPrice": 87214,
     "isRealData": true
   },
@@ -1579,7 +1579,7 @@
     "spread180d30d": 1.05,
     "excessReturn": -3.24,
     "excessOverTBill": 0.26,
-    "carryScore": -13,
+    "carryScore": -14.3,
     "btcPrice": 84380,
     "isRealData": true
   },
@@ -1597,7 +1597,7 @@
     "spread180d30d": 1.29,
     "excessReturn": -3.7,
     "excessOverTBill": -0.2,
-    "carryScore": -14.8,
+    "carryScore": -15.9,
     "btcPrice": 82614,
     "isRealData": true
   },
@@ -1615,7 +1615,7 @@
     "spread180d30d": 1.56,
     "excessReturn": -3.94,
     "excessOverTBill": -0.44,
-    "carryScore": -15.8,
+    "carryScore": -16,
     "btcPrice": 82358,
     "isRealData": true
   },
@@ -1633,7 +1633,7 @@
     "spread180d30d": 1,
     "excessReturn": -3.69,
     "excessOverTBill": -0.19,
-    "carryScore": -14.8,
+    "carryScore": -17.2,
     "btcPrice": 82537,
     "isRealData": true
   },
@@ -1651,7 +1651,7 @@
     "spread180d30d": 1.16,
     "excessReturn": -3.1,
     "excessOverTBill": 0.4,
-    "carryScore": -12.4,
+    "carryScore": -12.9,
     "btcPrice": 85173,
     "isRealData": true
   },
@@ -1669,7 +1669,7 @@
     "spread180d30d": 1.86,
     "excessReturn": -4.02,
     "excessOverTBill": -0.52,
-    "carryScore": -16.1,
+    "carryScore": -15,
     "btcPrice": 82496,
     "isRealData": true
   },
@@ -1687,7 +1687,7 @@
     "spread180d30d": 0.66,
     "excessReturn": -2.28,
     "excessOverTBill": 1.22,
-    "carryScore": -9.1,
+    "carryScore": -10.4,
     "btcPrice": 83158,
     "isRealData": true
   },
@@ -1705,7 +1705,7 @@
     "spread180d30d": 0.6,
     "excessReturn": -2.54,
     "excessOverTBill": 0.96,
-    "carryScore": -10.2,
+    "carryScore": -12.2,
     "btcPrice": 83858,
     "isRealData": true
   },
@@ -1723,7 +1723,7 @@
     "spread180d30d": 1.18,
     "excessReturn": -2.77,
     "excessOverTBill": 0.73,
-    "carryScore": -11.1,
+    "carryScore": -10.7,
     "btcPrice": 83501,
     "isRealData": true
   },
@@ -1741,7 +1741,7 @@
     "spread180d30d": 1.21,
     "excessReturn": -3.57,
     "excessOverTBill": -0.07,
-    "carryScore": -14.3,
+    "carryScore": -15.3,
     "btcPrice": 78360,
     "isRealData": true
   },
@@ -1759,7 +1759,7 @@
     "spread180d30d": 1.54,
     "excessReturn": -3.01,
     "excessOverTBill": 0.49,
-    "carryScore": -12,
+    "carryScore": -10.4,
     "btcPrice": 79135,
     "isRealData": true
   },
@@ -1777,7 +1777,7 @@
     "spread180d30d": 0.01,
     "excessReturn": -1.28,
     "excessOverTBill": 2.22,
-    "carryScore": -5.1,
+    "carryScore": -7.6,
     "btcPrice": 76252,
     "isRealData": true
   },
@@ -1795,7 +1795,7 @@
     "spread180d30d": 2.03,
     "excessReturn": -2.06,
     "excessOverTBill": 1.44,
-    "carryScore": -8.2,
+    "carryScore": -2,
     "btcPrice": 82594,
     "isRealData": true
   },
@@ -1813,7 +1813,7 @@
     "spread180d30d": 1.23,
     "excessReturn": -2.54,
     "excessOverTBill": 0.96,
-    "carryScore": -10.2,
+    "carryScore": -8.9,
     "btcPrice": 79548,
     "isRealData": true
   },
@@ -1831,7 +1831,7 @@
     "spread180d30d": 0.96,
     "excessReturn": -3.24,
     "excessOverTBill": 0.26,
-    "carryScore": -13,
+    "carryScore": -14.4,
     "btcPrice": 83383,
     "isRealData": true
   },
@@ -1849,7 +1849,7 @@
     "spread180d30d": 1.31,
     "excessReturn": -3.07,
     "excessOverTBill": 0.43,
-    "carryScore": -12.3,
+    "carryScore": -11.7,
     "btcPrice": 85268,
     "isRealData": true
   },
@@ -1867,7 +1867,7 @@
     "spread180d30d": 0.93,
     "excessReturn": -2.5,
     "excessOverTBill": 1,
-    "carryScore": -10,
+    "carryScore": -10.2,
     "btcPrice": 83726,
     "isRealData": true
   },
@@ -1885,7 +1885,7 @@
     "spread180d30d": 1.38,
     "excessReturn": -3.28,
     "excessOverTBill": 0.22,
-    "carryScore": -13.1,
+    "carryScore": -12.5,
     "btcPrice": 84590,
     "isRealData": true
   },
@@ -1903,7 +1903,7 @@
     "spread180d30d": 1.29,
     "excessReturn": -2.98,
     "excessOverTBill": 0.52,
-    "carryScore": -11.9,
+    "carryScore": -11.1,
     "btcPrice": 83655,
     "isRealData": true
   },
@@ -1921,7 +1921,7 @@
     "spread180d30d": 1.01,
     "excessReturn": -2.62,
     "excessOverTBill": 0.88,
-    "carryScore": -10.5,
+    "carryScore": -10.4,
     "btcPrice": 84035,
     "isRealData": true
   },
@@ -1939,7 +1939,7 @@
     "spread180d30d": 1.1,
     "excessReturn": -2.82,
     "excessOverTBill": 0.68,
-    "carryScore": -11.3,
+    "carryScore": -11.1,
     "btcPrice": 84958,
     "isRealData": true
   },
@@ -1957,7 +1957,7 @@
     "spread180d30d": 1.17,
     "excessReturn": -2.96,
     "excessOverTBill": 0.54,
-    "carryScore": -11.8,
+    "carryScore": -11.6,
     "btcPrice": 84463,
     "isRealData": true
   },
@@ -1975,7 +1975,7 @@
     "spread180d30d": 0.87,
     "excessReturn": -2.11,
     "excessOverTBill": 1.39,
-    "carryScore": -8.4,
+    "carryScore": -8.1,
     "btcPrice": 85074,
     "isRealData": true
   },
@@ -1993,7 +1993,7 @@
     "spread180d30d": 1.26,
     "excessReturn": -3.03,
     "excessOverTBill": 0.47,
-    "carryScore": -12.1,
+    "carryScore": -11.4,
     "btcPrice": 85186,
     "isRealData": true
   },
@@ -2011,7 +2011,7 @@
     "spread180d30d": 1.86,
     "excessReturn": -3.51,
     "excessOverTBill": -0.01,
-    "carryScore": -14,
+    "carryScore": -11,
     "btcPrice": 87511,
     "isRealData": true
   },
@@ -2029,7 +2029,7 @@
     "spread180d30d": 1.9,
     "excessReturn": -3.1,
     "excessOverTBill": 0.4,
-    "carryScore": -12.4,
+    "carryScore": -8.2,
     "btcPrice": 93484,
     "isRealData": true
   },
@@ -2047,7 +2047,7 @@
     "spread180d30d": 2.03,
     "excessReturn": -3.21,
     "excessOverTBill": 0.29,
-    "carryScore": -12.8,
+    "carryScore": -8.2,
     "btcPrice": 93735,
     "isRealData": true
   },
@@ -2065,7 +2065,7 @@
     "spread180d30d": 1.33,
     "excessReturn": -2.51,
     "excessOverTBill": 0.99,
-    "carryScore": -10,
+    "carryScore": -7.8,
     "btcPrice": 94016,
     "isRealData": true
   },
@@ -2083,7 +2083,7 @@
     "spread180d30d": 1.46,
     "excessReturn": -2.55,
     "excessOverTBill": 0.95,
-    "carryScore": -10.2,
+    "carryScore": -7.2,
     "btcPrice": 94717,
     "isRealData": true
   },
@@ -2101,7 +2101,7 @@
     "spread180d30d": 0.17,
     "excessReturn": -1.25,
     "excessOverTBill": 2.25,
-    "carryScore": -5,
+    "carryScore": -6.5,
     "btcPrice": 94665,
     "isRealData": true
   },
@@ -2119,7 +2119,7 @@
     "spread180d30d": 1.11,
     "excessReturn": -2.28,
     "excessOverTBill": 1.22,
-    "carryScore": -9.1,
+    "carryScore": -7.5,
     "btcPrice": 93775,
     "isRealData": true
   },
@@ -2137,7 +2137,7 @@
     "spread180d30d": 0.87,
     "excessReturn": -1.95,
     "excessOverTBill": 1.55,
-    "carryScore": -7.8,
+    "carryScore": -6.8,
     "btcPrice": 95038,
     "isRealData": true
   },
@@ -2155,7 +2155,7 @@
     "spread180d30d": 0.41,
     "excessReturn": -1.44,
     "excessOverTBill": 2.06,
-    "carryScore": -5.8,
+    "carryScore": -6.3,
     "btcPrice": 94273,
     "isRealData": true
   },
@@ -2173,7 +2173,7 @@
     "spread180d30d": 0.28,
     "excessReturn": -1.43,
     "excessOverTBill": 2.07,
-    "carryScore": -5.7,
+    "carryScore": -7,
     "btcPrice": 94179,
     "isRealData": true
   },
@@ -2191,7 +2191,7 @@
     "spread180d30d": 0.11,
     "excessReturn": -1.61,
     "excessOverTBill": 1.89,
-    "carryScore": -6.4,
+    "carryScore": -9.1,
     "btcPrice": 96525,
     "isRealData": true
   },
@@ -2209,7 +2209,7 @@
     "spread180d30d": 1.09,
     "excessReturn": -2.56,
     "excessOverTBill": 0.94,
-    "carryScore": -10.2,
+    "carryScore": -9.1,
     "btcPrice": 96927,
     "isRealData": true
   },
@@ -2227,7 +2227,7 @@
     "spread180d30d": 1.1,
     "excessReturn": -2.8,
     "excessOverTBill": 0.7,
-    "carryScore": -11.2,
+    "carryScore": -10.5,
     "btcPrice": 95881,
     "isRealData": true
   },
@@ -2245,7 +2245,7 @@
     "spread180d30d": 2.06,
     "excessReturn": -4.26,
     "excessOverTBill": -0.76,
-    "carryScore": -17,
+    "carryScore": -13.7,
     "btcPrice": 94292,
     "isRealData": true
   },
@@ -2263,7 +2263,7 @@
     "spread180d30d": 1.93,
     "excessReturn": -3.39,
     "excessOverTBill": 0.11,
-    "carryScore": -13.6,
+    "carryScore": -9.1,
     "btcPrice": 94729,
     "isRealData": true
   },
@@ -2281,7 +2281,7 @@
     "spread180d30d": 1.84,
     "excessReturn": -3.7,
     "excessOverTBill": -0.2,
-    "carryScore": -14.8,
+    "carryScore": -11.5,
     "btcPrice": 96828,
     "isRealData": true
   },
@@ -2299,7 +2299,7 @@
     "spread180d30d": 1.78,
     "excessReturn": -3.88,
     "excessOverTBill": -0.38,
-    "carryScore": -15.5,
+    "carryScore": -12.8,
     "btcPrice": 97051,
     "isRealData": true
   },
@@ -2317,7 +2317,7 @@
     "spread180d30d": 1.6,
     "excessReturn": -2.8,
     "excessOverTBill": 0.7,
-    "carryScore": -11.2,
+    "carryScore": -7.4,
     "btcPrice": 103261,
     "isRealData": true
   },
@@ -2335,7 +2335,7 @@
     "spread180d30d": 1.97,
     "excessReturn": -3.02,
     "excessOverTBill": 0.48,
-    "carryScore": -12.1,
+    "carryScore": -6.4,
     "btcPrice": 102990,
     "isRealData": true
   },
@@ -2353,7 +2353,7 @@
     "spread180d30d": 1.53,
     "excessReturn": -2.16,
     "excessOverTBill": 1.34,
-    "carryScore": -8.6,
+    "carryScore": -3.9,
     "btcPrice": 104819,
     "isRealData": true
   },
@@ -2371,7 +2371,7 @@
     "spread180d30d": 1.33,
     "excessReturn": -1.76,
     "excessOverTBill": 1.74,
-    "carryScore": -7,
+    "carryScore": -2.7,
     "btcPrice": 104133,
     "isRealData": true
   },
@@ -2389,7 +2389,7 @@
     "spread180d30d": 1.64,
     "excessReturn": -2.28,
     "excessOverTBill": 1.22,
-    "carryScore": -9.1,
+    "carryScore": -3.9,
     "btcPrice": 102796,
     "isRealData": true
   },
@@ -2407,7 +2407,7 @@
     "spread180d30d": 1.24,
     "excessReturn": -1.44,
     "excessOverTBill": 2.06,
-    "carryScore": -5.8,
+    "carryScore": -1,
     "btcPrice": 104137,
     "isRealData": true
   },
@@ -2425,7 +2425,7 @@
     "spread180d30d": 1.4,
     "excessReturn": -1.72,
     "excessOverTBill": 1.78,
-    "carryScore": -6.9,
+    "carryScore": -1.8,
     "btcPrice": 103534,
     "isRealData": true
   },
@@ -2443,7 +2443,7 @@
     "spread180d30d": 2.1,
     "excessReturn": -3,
     "excessOverTBill": 0.5,
-    "carryScore": -12,
+    "carryScore": -5.1,
     "btcPrice": 103792,
     "isRealData": true
   },
@@ -2461,7 +2461,7 @@
     "spread180d30d": 2.15,
     "excessReturn": -2.95,
     "excessOverTBill": 0.55,
-    "carryScore": -11.8,
+    "carryScore": -4.5,
     "btcPrice": 103500,
     "isRealData": true
   },
@@ -2479,7 +2479,7 @@
     "spread180d30d": 2.43,
     "excessReturn": -3.64,
     "excessOverTBill": -0.14,
-    "carryScore": -14.6,
+    "carryScore": -6.8,
     "btcPrice": 103162,
     "isRealData": true
   },
@@ -2497,7 +2497,7 @@
     "spread180d30d": 0.66,
     "excessReturn": -1.08,
     "excessOverTBill": 2.42,
-    "carryScore": -4.3,
+    "carryScore": -2.4,
     "btcPrice": 106498,
     "isRealData": true
   },
@@ -2515,7 +2515,7 @@
     "spread180d30d": 1.4,
     "excessReturn": -2.37,
     "excessOverTBill": 1.13,
-    "carryScore": -9.5,
+    "carryScore": -5.6,
     "btcPrice": 105613,
     "isRealData": true
   },
@@ -2533,7 +2533,7 @@
     "spread180d30d": 0.96,
     "excessReturn": -1.79,
     "excessOverTBill": 1.71,
-    "carryScore": -7.2,
+    "carryScore": -4.7,
     "btcPrice": 106875,
     "isRealData": true
   },
@@ -2551,7 +2551,7 @@
     "spread180d30d": 1.11,
     "excessReturn": -1.02,
     "excessOverTBill": 2.48,
-    "carryScore": -4.1,
+    "carryScore": 0.8,
     "btcPrice": 109693,
     "isRealData": true
   },
@@ -2569,7 +2569,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -0.15,
     "excessOverTBill": 3.35,
-    "carryScore": 0.6,
+    "carryScore": -1,
     "btcPrice": 111733,
     "isRealData": true
   },
@@ -2587,7 +2587,7 @@
     "spread180d30d": 0.13,
     "excessReturn": -0.56,
     "excessOverTBill": 2.94,
-    "carryScore": -2.2,
+    "carryScore": -2.6,
     "btcPrice": 107331,
     "isRealData": true
   },
@@ -2605,7 +2605,7 @@
     "spread180d30d": 0.68,
     "excessReturn": -1,
     "excessOverTBill": 2.5,
-    "carryScore": -4,
+    "carryScore": -1.6,
     "btcPrice": 107798,
     "isRealData": true
   },
@@ -2623,7 +2623,7 @@
     "spread180d30d": 0.67,
     "excessReturn": -0.9,
     "excessOverTBill": 2.6,
-    "carryScore": -3.6,
+    "carryScore": -1.1,
     "btcPrice": 109055,
     "isRealData": true
   },
@@ -2641,7 +2641,7 @@
     "spread180d30d": 0.51,
     "excessReturn": -0.54,
     "excessOverTBill": 2.96,
-    "carryScore": -2.2,
+    "carryScore": 0.1,
     "btcPrice": 109467,
     "isRealData": true
   },
@@ -2659,7 +2659,7 @@
     "spread180d30d": 0.4,
     "excessReturn": -0.54,
     "excessOverTBill": 2.96,
-    "carryScore": -2.2,
+    "carryScore": -0.6,
     "btcPrice": 108979,
     "isRealData": true
   },
@@ -2677,7 +2677,7 @@
     "spread180d30d": 0.65,
     "excessReturn": -0.66,
     "excessOverTBill": 2.84,
-    "carryScore": -2.6,
+    "carryScore": 0.3,
     "btcPrice": 107814,
     "isRealData": true
   },
@@ -2695,7 +2695,7 @@
     "spread180d30d": 1.07,
     "excessReturn": -1.03,
     "excessOverTBill": 2.47,
-    "carryScore": -4.1,
+    "carryScore": 0.8,
     "btcPrice": 105576,
     "isRealData": true
   },
@@ -2713,7 +2713,7 @@
     "spread180d30d": 2.47,
     "excessReturn": -2.06,
     "excessOverTBill": 1.44,
-    "carryScore": -8.2,
+    "carryScore": 4,
     "btcPrice": 104036,
     "isRealData": true
   },
@@ -2731,7 +2731,7 @@
     "spread180d30d": 2.19,
     "excessReturn": -2.11,
     "excessOverTBill": 1.39,
-    "carryScore": -8.4,
+    "carryScore": 2,
     "btcPrice": 104647,
     "isRealData": true
   },
@@ -2749,7 +2749,7 @@
     "spread180d30d": 1.66,
     "excessReturn": -1.59,
     "excessOverTBill": 1.91,
-    "carryScore": -6.4,
+    "carryScore": 1.7,
     "btcPrice": 105703,
     "isRealData": true
   },
@@ -2767,7 +2767,7 @@
     "spread180d30d": 1.01,
     "excessReturn": -1.2,
     "excessOverTBill": 2.3,
-    "carryScore": -4.8,
+    "carryScore": -0.4,
     "btcPrice": 105906,
     "isRealData": true
   },
@@ -2785,7 +2785,7 @@
     "spread180d30d": 1.11,
     "excessReturn": -1.84,
     "excessOverTBill": 1.66,
-    "carryScore": -7.4,
+    "carryScore": -3.5,
     "btcPrice": 105450,
     "isRealData": true
   },
@@ -2803,7 +2803,7 @@
     "spread180d30d": 2.38,
     "excessReturn": -3.1,
     "excessOverTBill": 0.4,
-    "carryScore": -12.4,
+    "carryScore": -2.3,
     "btcPrice": 104746,
     "isRealData": true
   },
@@ -2821,7 +2821,7 @@
     "spread180d30d": 3.27,
     "excessReturn": -3.82,
     "excessOverTBill": -0.32,
-    "carryScore": -15.3,
+    "carryScore": -0.4,
     "btcPrice": 101563,
     "isRealData": true
   },
@@ -2839,7 +2839,7 @@
     "spread180d30d": 1.78,
     "excessReturn": -2.82,
     "excessOverTBill": 0.68,
-    "carryScore": -11.3,
+    "carryScore": -4.6,
     "btcPrice": 104390,
     "isRealData": true
   },
@@ -2857,7 +2857,7 @@
     "spread180d30d": 2.58,
     "excessReturn": -3.61,
     "excessOverTBill": -0.11,
-    "carryScore": -14.4,
+    "carryScore": -3.7,
     "btcPrice": 105616,
     "isRealData": true
   },
@@ -2875,7 +2875,7 @@
     "spread180d30d": 1.63,
     "excessReturn": -2.45,
     "excessOverTBill": 1.05,
-    "carryScore": -9.8,
+    "carryScore": -3.2,
     "btcPrice": 105785,
     "isRealData": true
   },
@@ -2893,7 +2893,7 @@
     "spread180d30d": 2.11,
     "excessReturn": -3.35,
     "excessOverTBill": 0.15,
-    "carryScore": -13.4,
+    "carryScore": -5.2,
     "btcPrice": 110307,
     "isRealData": true
   },
@@ -2911,7 +2911,7 @@
     "spread180d30d": 0.56,
     "excessReturn": -2.12,
     "excessOverTBill": 1.38,
-    "carryScore": -8.5,
+    "carryScore": -8.7,
     "btcPrice": 110294,
     "isRealData": true
   },
@@ -2929,7 +2929,7 @@
     "spread180d30d": 2.02,
     "excessReturn": -3.22,
     "excessOverTBill": 0.28,
-    "carryScore": -12.9,
+    "carryScore": -4.8,
     "btcPrice": 108674,
     "isRealData": true
   },
@@ -2947,7 +2947,7 @@
     "spread180d30d": 3.1,
     "excessReturn": -4.77,
     "excessOverTBill": -1.27,
-    "carryScore": -19.1,
+    "carryScore": -6.2,
     "btcPrice": 105726,
     "isRealData": true
   },
@@ -2965,7 +2965,7 @@
     "spread180d30d": 2.73,
     "excessReturn": -4.32,
     "excessOverTBill": -0.82,
-    "carryScore": -17.3,
+    "carryScore": -6.1,
     "btcPrice": 106117,
     "isRealData": true
   },
@@ -2983,7 +2983,7 @@
     "spread180d30d": 3.5,
     "excessReturn": -4.79,
     "excessOverTBill": -1.29,
-    "carryScore": -19.2,
+    "carryScore": -3.1,
     "btcPrice": 105466,
     "isRealData": true
   },
@@ -3001,7 +3001,7 @@
     "spread180d30d": 2.47,
     "excessReturn": -4.05,
     "excessOverTBill": -0.55,
-    "carryScore": -16.2,
+    "carryScore": -6,
     "btcPrice": 105603,
     "isRealData": true
   },
@@ -3019,7 +3019,7 @@
     "spread180d30d": 3.65,
     "excessReturn": -4.88,
     "excessOverTBill": -1.38,
-    "carryScore": -19.5,
+    "carryScore": -2.1,
     "btcPrice": 106846,
     "isRealData": true
   },
@@ -3037,7 +3037,7 @@
     "spread180d30d": 3.17,
     "excessReturn": -4.27,
     "excessOverTBill": -0.77,
-    "carryScore": -17.1,
+    "carryScore": -1.9,
     "btcPrice": 104585,
     "isRealData": true
   },
@@ -3055,7 +3055,7 @@
     "spread180d30d": 4.4,
     "excessReturn": -5.38,
     "excessOverTBill": -1.88,
-    "carryScore": -21.5,
+    "carryScore": 0.9,
     "btcPrice": 104920,
     "isRealData": true
   },
@@ -3073,7 +3073,7 @@
     "spread180d30d": 4.49,
     "excessReturn": -5.58,
     "excessOverTBill": -2.08,
-    "carryScore": -22.3,
+    "carryScore": 0.6,
     "btcPrice": 104677,
     "isRealData": true
   },
@@ -3091,7 +3091,7 @@
     "spread180d30d": 3.69,
     "excessReturn": -4.89,
     "excessOverTBill": -1.39,
-    "carryScore": -19.6,
+    "carryScore": -1.1,
     "btcPrice": 103318,
     "isRealData": true
   },
@@ -3109,7 +3109,7 @@
     "spread180d30d": 0.29,
     "excessReturn": -3.14,
     "excessOverTBill": 0.36,
-    "carryScore": -12.6,
+    "carryScore": -16.5,
     "btcPrice": 102152,
     "isRealData": true
   },
@@ -3127,7 +3127,7 @@
     "spread180d30d": 4.22,
     "excessReturn": -6.16,
     "excessOverTBill": -2.66,
-    "carryScore": -24.6,
+    "carryScore": -4.5,
     "btcPrice": 100999,
     "isRealData": true
   },
@@ -3145,7 +3145,7 @@
     "spread180d30d": 4.23,
     "excessReturn": -5.86,
     "excessOverTBill": -2.36,
-    "carryScore": -23.4,
+    "carryScore": -2.4,
     "btcPrice": 105437,
     "isRealData": true
   },
@@ -3163,7 +3163,7 @@
     "spread180d30d": -2.68,
     "excessReturn": -1.4,
     "excessOverTBill": 2.1,
-    "carryScore": 5.6,
+    "carryScore": -29.3,
     "btcPrice": 106136,
     "isRealData": true
   },
@@ -3181,7 +3181,7 @@
     "spread180d30d": 5.54,
     "excessReturn": -6.07,
     "excessOverTBill": -2.57,
-    "carryScore": -24.3,
+    "carryScore": 3.6,
     "btcPrice": 107405,
     "isRealData": true
   },
@@ -3199,7 +3199,7 @@
     "spread180d30d": 3.08,
     "excessReturn": -4.71,
     "excessOverTBill": -1.21,
-    "carryScore": -18.8,
+    "carryScore": -4.1,
     "btcPrice": 107012,
     "isRealData": true
   },
@@ -3217,7 +3217,7 @@
     "spread180d30d": 1.95,
     "excessReturn": -4.19,
     "excessOverTBill": -0.69,
-    "carryScore": -16.8,
+    "carryScore": -15.6,
     "btcPrice": 107105,
     "isRealData": true
   },
@@ -3235,7 +3235,7 @@
     "spread180d30d": 1.7,
     "excessReturn": -4.09,
     "excessOverTBill": -0.59,
-    "carryScore": -16.4,
+    "carryScore": -16.3,
     "btcPrice": 107351,
     "isRealData": true
   },
@@ -3253,7 +3253,7 @@
     "spread180d30d": 1.91,
     "excessReturn": -3.82,
     "excessOverTBill": -0.32,
-    "carryScore": -15.3,
+    "carryScore": -13.7,
     "btcPrice": 108384,
     "isRealData": true
   },
@@ -3271,7 +3271,7 @@
     "spread180d30d": 2.06,
     "excessReturn": -4.22,
     "excessOverTBill": -0.72,
-    "carryScore": -16.9,
+    "carryScore": -15.3,
     "btcPrice": 107174,
     "isRealData": true
   },
@@ -3289,7 +3289,7 @@
     "spread180d30d": 2.66,
     "excessReturn": -5.36,
     "excessOverTBill": -1.86,
-    "carryScore": -21.4,
+    "carryScore": -19.2,
     "btcPrice": 105709,
     "isRealData": true
   },
@@ -3307,7 +3307,7 @@
     "spread180d30d": 2.63,
     "excessReturn": -5,
     "excessOverTBill": -1.5,
-    "carryScore": -20,
+    "carryScore": -17.1,
     "btcPrice": 108885,
     "isRealData": true
   },
@@ -3325,7 +3325,7 @@
     "spread180d30d": 2.23,
     "excessReturn": -4.3,
     "excessOverTBill": -0.8,
-    "carryScore": -17.2,
+    "carryScore": -14.8,
     "btcPrice": 109634,
     "isRealData": true
   },
@@ -3343,7 +3343,7 @@
     "spread180d30d": 2.21,
     "excessReturn": -4.49,
     "excessOverTBill": -0.99,
-    "carryScore": -18,
+    "carryScore": -15.9,
     "btcPrice": 108026,
     "isRealData": true
   },
@@ -3361,7 +3361,7 @@
     "spread180d30d": 2.48,
     "excessReturn": -4.9,
     "excessOverTBill": -1.4,
-    "carryScore": -19.6,
+    "carryScore": -17,
     "btcPrice": 108242,
     "isRealData": true
   },
@@ -3379,7 +3379,7 @@
     "spread180d30d": 2.29,
     "excessReturn": -4.11,
     "excessOverTBill": -0.61,
-    "carryScore": -16.4,
+    "carryScore": -13.1,
     "btcPrice": 109222,
     "isRealData": true
   },
@@ -3397,7 +3397,7 @@
     "spread180d30d": 2.36,
     "excessReturn": -4.57,
     "excessOverTBill": -1.07,
-    "carryScore": -18.3,
+    "carryScore": -15.5,
     "btcPrice": 108275,
     "isRealData": true
   },
@@ -3415,7 +3415,7 @@
     "spread180d30d": 2.08,
     "excessReturn": -3.92,
     "excessOverTBill": -0.42,
-    "carryScore": -15.7,
+    "carryScore": -13,
     "btcPrice": 108953,
     "isRealData": true
   },
@@ -3433,7 +3433,7 @@
     "spread180d30d": 1.54,
     "excessReturn": -2.71,
     "excessOverTBill": 0.79,
-    "carryScore": -10.8,
+    "carryScore": -8.5,
     "btcPrice": 111285,
     "isRealData": true
   },
@@ -3451,7 +3451,7 @@
     "spread180d30d": 1.13,
     "excessReturn": -2.42,
     "excessOverTBill": 1.08,
-    "carryScore": -9.7,
+    "carryScore": -8.7,
     "btcPrice": 116026,
     "isRealData": true
   },
@@ -3469,7 +3469,7 @@
     "spread180d30d": 0.9,
     "excessReturn": -1.75,
     "excessOverTBill": 1.75,
-    "carryScore": -7,
+    "carryScore": -5.9,
     "btcPrice": 117582,
     "isRealData": true
   },
@@ -3487,7 +3487,7 @@
     "spread180d30d": 0.77,
     "excessReturn": -1.23,
     "excessOverTBill": 2.27,
-    "carryScore": -4.9,
+    "carryScore": -3.5,
     "btcPrice": 117470,
     "isRealData": true
   },
@@ -3505,7 +3505,7 @@
     "spread180d30d": 1.05,
     "excessReturn": -1.06,
     "excessOverTBill": 2.44,
-    "carryScore": -4.2,
+    "carryScore": -1,
     "btcPrice": 119135,
     "isRealData": true
   },
@@ -3523,7 +3523,7 @@
     "spread180d30d": 0.49,
     "excessReturn": -0.71,
     "excessOverTBill": 2.79,
-    "carryScore": -2.8,
+    "carryScore": -1.8,
     "btcPrice": 119872,
     "isRealData": true
   },
@@ -3541,7 +3541,7 @@
     "spread180d30d": 0.29,
     "excessReturn": -0.25,
     "excessOverTBill": 3.25,
-    "carryScore": -1,
+    "carryScore": 0,
     "btcPrice": 117770,
     "isRealData": true
   },
@@ -3559,7 +3559,7 @@
     "spread180d30d": 0.33,
     "excessReturn": -0.51,
     "excessOverTBill": 2.99,
-    "carryScore": -2,
+    "carryScore": -1.3,
     "btcPrice": 118700,
     "isRealData": true
   },
@@ -3577,7 +3577,7 @@
     "spread180d30d": 0.62,
     "excessReturn": -1.14,
     "excessOverTBill": 2.36,
-    "carryScore": -4.6,
+    "carryScore": -3.5,
     "btcPrice": 119272,
     "isRealData": true
   },
@@ -3595,7 +3595,7 @@
     "spread180d30d": 0.72,
     "excessReturn": -0.75,
     "excessOverTBill": 2.75,
-    "carryScore": -3,
+    "carryScore": -0.7,
     "btcPrice": 118024,
     "isRealData": true
   },
@@ -3613,7 +3613,7 @@
     "spread180d30d": 0.01,
     "excessReturn": 0.01,
     "excessOverTBill": 3.51,
-    "carryScore": 0,
+    "carryScore": 0.2,
     "btcPrice": 117913,
     "isRealData": true
   },
@@ -3631,7 +3631,7 @@
     "spread180d30d": -0.01,
     "excessReturn": 0.4,
     "excessOverTBill": 3.9,
-    "carryScore": -1.6,
+    "carryScore": 2.3,
     "btcPrice": 117321,
     "isRealData": true
   },
@@ -3649,7 +3649,7 @@
     "spread180d30d": 0.08,
     "excessReturn": 0.12,
     "excessOverTBill": 3.62,
-    "carryScore": 0.5,
+    "carryScore": 1.1,
     "btcPrice": 117433,
     "isRealData": true
   },
@@ -3667,7 +3667,7 @@
     "spread180d30d": 0.06,
     "excessReturn": 0.43,
     "excessOverTBill": 3.93,
-    "carryScore": 1.7,
+    "carryScore": 2.9,
     "btcPrice": 120019,
     "isRealData": true
   },
@@ -3685,7 +3685,7 @@
     "spread180d30d": -0.72,
     "excessReturn": 1.11,
     "excessOverTBill": 4.61,
-    "carryScore": -4.4,
+    "carryScore": 2.8,
     "btcPrice": 118814,
     "isRealData": true
   },
@@ -3703,7 +3703,7 @@
     "spread180d30d": -0.19,
     "excessReturn": 0.57,
     "excessOverTBill": 4.07,
-    "carryScore": -2.3,
+    "carryScore": 2.4,
     "btcPrice": 118379,
     "isRealData": true
   },
@@ -3721,7 +3721,7 @@
     "spread180d30d": 0.07,
     "excessReturn": 0.13,
     "excessOverTBill": 3.63,
-    "carryScore": 0.5,
+    "carryScore": 1.2,
     "btcPrice": 117639,
     "isRealData": true
   },
@@ -3739,7 +3739,7 @@
     "spread180d30d": 0.11,
     "excessReturn": 0.43,
     "excessOverTBill": 3.93,
-    "carryScore": 1.7,
+    "carryScore": 3.3,
     "btcPrice": 117964,
     "isRealData": true
   },
@@ -3757,7 +3757,7 @@
     "spread180d30d": -1.07,
     "excessReturn": 1.58,
     "excessOverTBill": 5.08,
-    "carryScore": -6.3,
+    "carryScore": 3.6,
     "btcPrice": 119466,
     "isRealData": true
   },
@@ -3775,7 +3775,7 @@
     "spread180d30d": -0.68,
     "excessReturn": 1.22,
     "excessOverTBill": 4.72,
-    "carryScore": -4.9,
+    "carryScore": 3.5,
     "btcPrice": 118064,
     "isRealData": true
   },
@@ -3793,7 +3793,7 @@
     "spread180d30d": -0.27,
     "excessReturn": 0.62,
     "excessOverTBill": 4.12,
-    "carryScore": -2.5,
+    "carryScore": 2.1,
     "btcPrice": 117927,
     "isRealData": true
   },
@@ -3811,7 +3811,7 @@
     "spread180d30d": 0.82,
     "excessReturn": -1.39,
     "excessOverTBill": 2.11,
-    "carryScore": -5.6,
+    "carryScore": -3.6,
     "btcPrice": 117836,
     "isRealData": true
   },
@@ -3829,7 +3829,7 @@
     "spread180d30d": 0.45,
     "excessReturn": -1.33,
     "excessOverTBill": 2.17,
-    "carryScore": -5.3,
+    "carryScore": -5.4,
     "btcPrice": 115751,
     "isRealData": true
   },
@@ -3847,7 +3847,7 @@
     "spread180d30d": 1.2,
     "excessReturn": -2.85,
     "excessOverTBill": 0.65,
-    "carryScore": -11.4,
+    "carryScore": -10.3,
     "btcPrice": 113246,
     "isRealData": true
   },
@@ -3865,7 +3865,7 @@
     "spread180d30d": -0.09,
     "excessReturn": -0.94,
     "excessOverTBill": 2.56,
-    "carryScore": 3.8,
+    "carryScore": -6.2,
     "btcPrice": 112527,
     "isRealData": true
   },
@@ -3901,7 +3901,7 @@
     "spread180d30d": 0.08,
     "excessReturn": -0.76,
     "excessOverTBill": 2.74,
-    "carryScore": -3,
+    "carryScore": -4.2,
     "btcPrice": 115050,
     "isRealData": true
   },
@@ -3919,7 +3919,7 @@
     "spread180d30d": 0.06,
     "excessReturn": -0.54,
     "excessOverTBill": 2.96,
-    "carryScore": -2.2,
+    "carryScore": -2.8,
     "btcPrice": 114120,
     "isRealData": true
   },
@@ -3937,7 +3937,7 @@
     "spread180d30d": 0.73,
     "excessReturn": -1.13,
     "excessOverTBill": 2.37,
-    "carryScore": -4.5,
+    "carryScore": -2.5,
     "btcPrice": 115030,
     "isRealData": true
   },
@@ -3955,7 +3955,7 @@
     "spread180d30d": 0.98,
     "excessReturn": -0.72,
     "excessOverTBill": 2.78,
-    "carryScore": -2.9,
+    "carryScore": 1.5,
     "btcPrice": 117513,
     "isRealData": true
   },
@@ -3973,7 +3973,7 @@
     "spread180d30d": 0.69,
     "excessReturn": -0.3,
     "excessOverTBill": 3.2,
-    "carryScore": -1.2,
+    "carryScore": 2.3,
     "btcPrice": 116679,
     "isRealData": true
   },
@@ -3991,7 +3991,7 @@
     "spread180d30d": 0.24,
     "excessReturn": 0.45,
     "excessOverTBill": 3.95,
-    "carryScore": 1.8,
+    "carryScore": 4.1,
     "btcPrice": 116495,
     "isRealData": true
   },
@@ -4009,7 +4009,7 @@
     "spread180d30d": 0.73,
     "excessReturn": 0.19,
     "excessOverTBill": 3.69,
-    "carryScore": 0.8,
+    "carryScore": 5.4,
     "btcPrice": 119311,
     "isRealData": true
   },
@@ -4027,7 +4027,7 @@
     "spread180d30d": -0.04,
     "excessReturn": 0.7,
     "excessOverTBill": 4.2,
-    "carryScore": -2.8,
+    "carryScore": 4,
     "btcPrice": 118702,
     "isRealData": true
   },
@@ -4045,7 +4045,7 @@
     "spread180d30d": 0.9,
     "excessReturn": 0.48,
     "excessOverTBill": 3.98,
-    "carryScore": 1.9,
+    "carryScore": 8.4,
     "btcPrice": 120112,
     "isRealData": true
   },
@@ -4063,7 +4063,7 @@
     "spread180d30d": 0.05,
     "excessReturn": 1.52,
     "excessOverTBill": 5.02,
-    "carryScore": 6.1,
+    "carryScore": 9.4,
     "btcPrice": 123360,
     "isRealData": true
   },
@@ -4081,7 +4081,7 @@
     "spread180d30d": 1.03,
     "excessReturn": 0.71,
     "excessOverTBill": 4.21,
-    "carryScore": 2.8,
+    "carryScore": 10.7,
     "btcPrice": 118388,
     "isRealData": true
   },
@@ -4099,7 +4099,7 @@
     "spread180d30d": 1.25,
     "excessReturn": -0.05,
     "excessOverTBill": 3.45,
-    "carryScore": -0.2,
+    "carryScore": 7.4,
     "btcPrice": 117441,
     "isRealData": true
   },
@@ -4117,7 +4117,7 @@
     "spread180d30d": 1.68,
     "excessReturn": -0.51,
     "excessOverTBill": 2.99,
-    "carryScore": -2,
+    "carryScore": 7.3,
     "btcPrice": 117458,
     "isRealData": true
   },
@@ -4135,7 +4135,7 @@
     "spread180d30d": 1.87,
     "excessReturn": -1.06,
     "excessOverTBill": 2.44,
-    "carryScore": -4.2,
+    "carryScore": 5.2,
     "btcPrice": 117493,
     "isRealData": true
   },
@@ -4153,7 +4153,7 @@
     "spread180d30d": 1.62,
     "excessReturn": -1.9,
     "excessOverTBill": 1.6,
-    "carryScore": -7.6,
+    "carryScore": -1.3,
     "btcPrice": 116279,
     "isRealData": true
   },
@@ -4171,7 +4171,7 @@
     "spread180d30d": 1.8,
     "excessReturn": -2.42,
     "excessOverTBill": 1.08,
-    "carryScore": -9.7,
+    "carryScore": -3.3,
     "btcPrice": 112851,
     "isRealData": true
   },
@@ -4189,7 +4189,7 @@
     "spread180d30d": 0.88,
     "excessReturn": -1.81,
     "excessOverTBill": 1.69,
-    "carryScore": -7.2,
+    "carryScore": -5.4,
     "btcPrice": 114272,
     "isRealData": true
   },
@@ -4207,7 +4207,7 @@
     "spread180d30d": 0.79,
     "excessReturn": -1.63,
     "excessOverTBill": 1.87,
-    "carryScore": -6.5,
+    "carryScore": -4.8,
     "btcPrice": 112479,
     "isRealData": true
   },
@@ -4225,7 +4225,7 @@
     "spread180d30d": -0.36,
     "excessReturn": 0.41,
     "excessOverTBill": 3.91,
-    "carryScore": -1.6,
+    "carryScore": 0.2,
     "btcPrice": 116898,
     "isRealData": true
   },
@@ -4243,7 +4243,7 @@
     "spread180d30d": -0.83,
     "excessReturn": 0.89,
     "excessOverTBill": 4.39,
-    "carryScore": -3.6,
+    "carryScore": 0,
     "btcPrice": 115386,
     "isRealData": true
   },
@@ -4261,7 +4261,7 @@
     "spread180d30d": -1.68,
     "excessReturn": 1.96,
     "excessOverTBill": 5.46,
-    "carryScore": -7.8,
+    "carryScore": 1,
     "btcPrice": 113478,
     "isRealData": true
   },
@@ -4279,7 +4279,7 @@
     "spread180d30d": 0.75,
     "excessReturn": -1.14,
     "excessOverTBill": 2.36,
-    "carryScore": -4.6,
+    "carryScore": -2,
     "btcPrice": 110134,
     "isRealData": true
   },
@@ -4297,7 +4297,7 @@
     "spread180d30d": 0.04,
     "excessReturn": -0.18,
     "excessOverTBill": 3.32,
-    "carryScore": -0.7,
+    "carryScore": -0.8,
     "btcPrice": 111786,
     "isRealData": true
   },
@@ -4315,7 +4315,7 @@
     "spread180d30d": 0.4,
     "excessReturn": -0.53,
     "excessOverTBill": 2.97,
-    "carryScore": -2.1,
+    "carryScore": -0.6,
     "btcPrice": 111260,
     "isRealData": true
   },
@@ -4333,7 +4333,7 @@
     "spread180d30d": 0.78,
     "excessReturn": -1.03,
     "excessOverTBill": 2.47,
-    "carryScore": -4.1,
+    "carryScore": -1.1,
     "btcPrice": 112571,
     "isRealData": true
   },
@@ -4351,7 +4351,7 @@
     "spread180d30d": 1.09,
     "excessReturn": -1.04,
     "excessOverTBill": 2.46,
-    "carryScore": -4.2,
+    "carryScore": 1,
     "btcPrice": 108386,
     "isRealData": true
   },
@@ -4369,7 +4369,7 @@
     "spread180d30d": 1.86,
     "excessReturn": -2.12,
     "excessOverTBill": 1.38,
-    "carryScore": -8.5,
+    "carryScore": -0.3,
     "btcPrice": 108825,
     "isRealData": true
   },
@@ -4387,7 +4387,7 @@
     "spread180d30d": 1.99,
     "excessReturn": -2.3,
     "excessOverTBill": 1.2,
-    "carryScore": -9.2,
+    "carryScore": -0.4,
     "btcPrice": 108259,
     "isRealData": true
   },
@@ -4405,7 +4405,7 @@
     "spread180d30d": 1.14,
     "excessReturn": -1.8,
     "excessOverTBill": 1.7,
-    "carryScore": -7.2,
+    "carryScore": -3.1,
     "btcPrice": 109249,
     "isRealData": true
   },
@@ -4423,7 +4423,7 @@
     "spread180d30d": 1.35,
     "excessReturn": -1.98,
     "excessOverTBill": 1.52,
-    "carryScore": -7.9,
+    "carryScore": -2.7,
     "btcPrice": 111242,
     "isRealData": true
   },
@@ -4441,7 +4441,7 @@
     "spread180d30d": 1.33,
     "excessReturn": -1.7,
     "excessOverTBill": 1.8,
-    "carryScore": -6.8,
+    "carryScore": -1.1,
     "btcPrice": 111757,
     "isRealData": true
   },
@@ -4459,7 +4459,7 @@
     "spread180d30d": 1.72,
     "excessReturn": -3.08,
     "excessOverTBill": 0.42,
-    "carryScore": -12.3,
+    "carryScore": -6.6,
     "btcPrice": 110741,
     "isRealData": true
   },
@@ -4477,7 +4477,7 @@
     "spread180d30d": 1.27,
     "excessReturn": -2.5,
     "excessOverTBill": 1,
-    "carryScore": -10,
+    "carryScore": -6.1,
     "btcPrice": 110673,
     "isRealData": true
   },
@@ -4495,7 +4495,7 @@
     "spread180d30d": 1.53,
     "excessReturn": -2.39,
     "excessOverTBill": 1.11,
-    "carryScore": -9.6,
+    "carryScore": -3.6,
     "btcPrice": 110227,
     "isRealData": true
   },
@@ -4513,7 +4513,7 @@
     "spread180d30d": 1.56,
     "excessReturn": -2.07,
     "excessOverTBill": 1.43,
-    "carryScore": -8.3,
+    "carryScore": -1.4,
     "btcPrice": 111144,
     "isRealData": true
   },
@@ -4531,7 +4531,7 @@
     "spread180d30d": 1.66,
     "excessReturn": -2.33,
     "excessOverTBill": 1.17,
-    "carryScore": -9.3,
+    "carryScore": -2.2,
     "btcPrice": 112088,
     "isRealData": true
   },
@@ -4549,7 +4549,7 @@
     "spread180d30d": -0.31,
     "excessReturn": -0.44,
     "excessOverTBill": 3.06,
-    "carryScore": 1.8,
+    "carryScore": -4.8,
     "btcPrice": 111546,
     "isRealData": true
   },
@@ -4567,7 +4567,7 @@
     "spread180d30d": -0.09,
     "excessReturn": -0.87,
     "excessOverTBill": 2.63,
-    "carryScore": 3.5,
+    "carryScore": -5.9,
     "btcPrice": 113982,
     "isRealData": true
   },
@@ -4585,7 +4585,7 @@
     "spread180d30d": -2.13,
     "excessReturn": 0.87,
     "excessOverTBill": 4.37,
-    "carryScore": -3.5,
+    "carryScore": -10.2,
     "btcPrice": 115527,
     "isRealData": true
   },
@@ -4603,7 +4603,7 @@
     "spread180d30d": 1.17,
     "excessReturn": -1.26,
     "excessOverTBill": 2.24,
-    "carryScore": -5,
+    "carryScore": 0.9,
     "btcPrice": 116111,
     "isRealData": true
   },
@@ -4621,7 +4621,7 @@
     "spread180d30d": -1.32,
     "excessReturn": 0.96,
     "excessOverTBill": 4.46,
-    "carryScore": -3.8,
+    "carryScore": -3.9,
     "btcPrice": 115973,
     "isRealData": true
   },
@@ -4639,7 +4639,7 @@
     "spread180d30d": 0.18,
     "excessReturn": 0.4,
     "excessOverTBill": 3.9,
-    "carryScore": 1.6,
+    "carryScore": 3.8,
     "btcPrice": 115326,
     "isRealData": true
   },
@@ -4657,7 +4657,7 @@
     "spread180d30d": 0.57,
     "excessReturn": -0.84,
     "excessOverTBill": 2.66,
-    "carryScore": -3.4,
+    "carryScore": -0.8,
     "btcPrice": 115386,
     "isRealData": true
   },
@@ -4675,7 +4675,7 @@
     "spread180d30d": 1.52,
     "excessReturn": -1.84,
     "excessOverTBill": 1.66,
-    "carryScore": -7.4,
+    "carryScore": 0.5,
     "btcPrice": 116839,
     "isRealData": true
   },
@@ -4693,7 +4693,7 @@
     "spread180d30d": -0.79,
     "excessReturn": -1.14,
     "excessOverTBill": 2.36,
-    "carryScore": 4.6,
+    "carryScore": -12.7,
     "btcPrice": 116484,
     "isRealData": true
   },
@@ -4711,7 +4711,7 @@
     "spread180d30d": -1.95,
     "excessReturn": 0.05,
     "excessOverTBill": 3.55,
-    "carryScore": -0.2,
+    "carryScore": -14.5,
     "btcPrice": 117125,
     "isRealData": true
   },
@@ -4729,7 +4729,7 @@
     "spread180d30d": 1.31,
     "excessReturn": -1.95,
     "excessOverTBill": 1.55,
-    "carryScore": -7.8,
+    "carryScore": -1.7,
     "btcPrice": 115696,
     "isRealData": true
   },
@@ -4747,7 +4747,7 @@
     "spread180d30d": -1.75,
     "excessReturn": -0.19,
     "excessOverTBill": 3.31,
-    "carryScore": 0.8,
+    "carryScore": -14.5,
     "btcPrice": 115753,
     "isRealData": true
   },
@@ -4765,7 +4765,7 @@
     "spread180d30d": -1.94,
     "excessReturn": -0.04,
     "excessOverTBill": 3.46,
-    "carryScore": 0.2,
+    "carryScore": -15.1,
     "btcPrice": 115303,
     "isRealData": true
   },
@@ -4783,7 +4783,7 @@
     "spread180d30d": 2.5,
     "excessReturn": -3,
     "excessOverTBill": 0.5,
-    "carryScore": -12,
+    "carryScore": 1.3,
     "btcPrice": 112748,
     "isRealData": true
   },
@@ -4801,7 +4801,7 @@
     "spread180d30d": -0.62,
     "excessReturn": -0.86,
     "excessOverTBill": 2.64,
-    "carryScore": 3.4,
+    "carryScore": -10,
     "btcPrice": 112038,
     "isRealData": true
   },
@@ -4819,7 +4819,7 @@
     "spread180d30d": -0.91,
     "excessReturn": -0.95,
     "excessOverTBill": 2.55,
-    "carryScore": 3.8,
+    "carryScore": -12.8,
     "btcPrice": 113350,
     "isRealData": true
   },
@@ -4855,7 +4855,7 @@
     "spread180d30d": 0.82,
     "excessReturn": -1.7,
     "excessOverTBill": 1.8,
-    "carryScore": -6.8,
+    "carryScore": -6.2,
     "btcPrice": 109706,
     "isRealData": true
   },
@@ -4873,7 +4873,7 @@
     "spread180d30d": 0.91,
     "excessReturn": -1.77,
     "excessOverTBill": 1.73,
-    "carryScore": -7.1,
+    "carryScore": -6.3,
     "btcPrice": 109684,
     "isRealData": true
   },
@@ -4891,7 +4891,7 @@
     "spread180d30d": 1.06,
     "excessReturn": -1.83,
     "excessOverTBill": 1.67,
-    "carryScore": -7.3,
+    "carryScore": -5.9,
     "btcPrice": 112215,
     "isRealData": true
   },
@@ -4909,7 +4909,7 @@
     "spread180d30d": 0.99,
     "excessReturn": -1.06,
     "excessOverTBill": 2.44,
-    "carryScore": -4.2,
+    "carryScore": -1.6,
     "btcPrice": 114383,
     "isRealData": true
   },
@@ -4927,7 +4927,7 @@
     "spread180d30d": 0.67,
     "excessReturn": -0.78,
     "excessOverTBill": 2.72,
-    "carryScore": -3.1,
+    "carryScore": -1.4,
     "btcPrice": 114064,
     "isRealData": true
   },
@@ -4945,7 +4945,7 @@
     "spread180d30d": 0.86,
     "excessReturn": -1.05,
     "excessOverTBill": 2.45,
-    "carryScore": -4.2,
+    "carryScore": -2.1,
     "btcPrice": 118678,
     "isRealData": true
   },
@@ -4963,7 +4963,7 @@
     "spread180d30d": 0.75,
     "excessReturn": -0.58,
     "excessOverTBill": 2.92,
-    "carryScore": -2.3,
+    "carryScore": 0.2,
     "btcPrice": 120623,
     "isRealData": true
   },
@@ -4981,7 +4981,7 @@
     "spread180d30d": 0.61,
     "excessReturn": -0.52,
     "excessOverTBill": 2.98,
-    "carryScore": -2.1,
+    "carryScore": 0,
     "btcPrice": 122315,
     "isRealData": true
   },
@@ -4999,7 +4999,7 @@
     "spread180d30d": 0.24,
     "excessReturn": -0.27,
     "excessOverTBill": 3.23,
-    "carryScore": -1.1,
+    "carryScore": -0.4,
     "btcPrice": 122457,
     "isRealData": true
   },
@@ -5017,7 +5017,7 @@
     "spread180d30d": -0.43,
     "excessReturn": 0.66,
     "excessOverTBill": 4.16,
-    "carryScore": -2.6,
+    "carryScore": 1.8,
     "btcPrice": 123524,
     "isRealData": true
   },
@@ -5035,7 +5035,7 @@
     "spread180d30d": -0.4,
     "excessReturn": 0.66,
     "excessOverTBill": 4.16,
-    "carryScore": -2.6,
+    "carryScore": 2,
     "btcPrice": 124715,
     "isRealData": true
   },
@@ -5053,7 +5053,7 @@
     "spread180d30d": 0.03,
     "excessReturn": 0.41,
     "excessOverTBill": 3.91,
-    "carryScore": 1.6,
+    "carryScore": 2.6,
     "btcPrice": 121404,
     "isRealData": true
   },
@@ -5071,7 +5071,7 @@
     "spread180d30d": 0.31,
     "excessReturn": -0.22,
     "excessOverTBill": 3.28,
-    "carryScore": -0.9,
+    "carryScore": 0.3,
     "btcPrice": 123345,
     "isRealData": true
   },
@@ -5089,7 +5089,7 @@
     "spread180d30d": 0.15,
     "excessReturn": -0.25,
     "excessOverTBill": 3.25,
-    "carryScore": -1,
+    "carryScore": -0.8,
     "btcPrice": 121704,
     "isRealData": true
   },
@@ -5107,7 +5107,7 @@
     "spread180d30d": 0.76,
     "excessReturn": -1.13,
     "excessOverTBill": 2.37,
-    "carryScore": -4.5,
+    "carryScore": -2.9,
     "btcPrice": 112975,
     "isRealData": true
   },
@@ -5125,7 +5125,7 @@
     "spread180d30d": 0.51,
     "excessReturn": -0.82,
     "excessOverTBill": 2.68,
-    "carryScore": -3.3,
+    "carryScore": -2.4,
     "btcPrice": 110773,
     "isRealData": true
   },
@@ -5143,7 +5143,7 @@
     "spread180d30d": 0.71,
     "excessReturn": -0.97,
     "excessOverTBill": 2.53,
-    "carryScore": -3.9,
+    "carryScore": -2.2,
     "btcPrice": 115085,
     "isRealData": true
   },
@@ -5161,7 +5161,7 @@
     "spread180d30d": 0.74,
     "excessReturn": -1.37,
     "excessOverTBill": 2.13,
-    "carryScore": -5.5,
+    "carryScore": -4.3,
     "btcPrice": 115280,
     "isRealData": true
   },
@@ -5179,7 +5179,7 @@
     "spread180d30d": 2.06,
     "excessReturn": -3.07,
     "excessOverTBill": 0.43,
-    "carryScore": -12.3,
+    "carryScore": -7.6,
     "btcPrice": 113088,
     "isRealData": true
   },
@@ -5197,7 +5197,7 @@
     "spread180d30d": 1.11,
     "excessReturn": -2.09,
     "excessOverTBill": 1.41,
-    "carryScore": -8.4,
+    "carryScore": -6.6,
     "btcPrice": 110803,
     "isRealData": true
   },
@@ -5215,7 +5215,7 @@
     "spread180d30d": 1.02,
     "excessReturn": -2.28,
     "excessOverTBill": 1.22,
-    "carryScore": -9.1,
+    "carryScore": -8.3,
     "btcPrice": 108202,
     "isRealData": true
   },
@@ -5233,7 +5233,7 @@
     "spread180d30d": 0.93,
     "excessReturn": -2.69,
     "excessOverTBill": 0.81,
-    "carryScore": -10.8,
+    "carryScore": -11.1,
     "btcPrice": 106468,
     "isRealData": true
   },
@@ -5251,7 +5251,7 @@
     "spread180d30d": 1.3,
     "excessReturn": -2.26,
     "excessOverTBill": 1.24,
-    "carryScore": -9,
+    "carryScore": -6.6,
     "btcPrice": 107207,
     "isRealData": true
   },
@@ -5269,7 +5269,7 @@
     "spread180d30d": 1.72,
     "excessReturn": -2.48,
     "excessOverTBill": 1.02,
-    "carryScore": -9.9,
+    "carryScore": -5.6,
     "btcPrice": 108685,
     "isRealData": true
   },
@@ -5287,7 +5287,7 @@
     "spread180d30d": 1.72,
     "excessReturn": -2.77,
     "excessOverTBill": 0.73,
-    "carryScore": -11.1,
+    "carryScore": -7.3,
     "btcPrice": 110587,
     "isRealData": true
   },
@@ -5305,7 +5305,7 @@
     "spread180d30d": 2,
     "excessReturn": -3.4,
     "excessOverTBill": 0.1,
-    "carryScore": -13.6,
+    "carryScore": -9.5,
     "btcPrice": 108369,
     "isRealData": true
   },
@@ -5323,7 +5323,7 @@
     "spread180d30d": 1.52,
     "excessReturn": -2.87,
     "excessOverTBill": 0.63,
-    "carryScore": -11.5,
+    "carryScore": -8.9,
     "btcPrice": 107600,
     "isRealData": true
   },
@@ -5341,7 +5341,7 @@
     "spread180d30d": 1.9,
     "excessReturn": -2.97,
     "excessOverTBill": 0.53,
-    "carryScore": -11.9,
+    "carryScore": -7.4,
     "btcPrice": 110108,
     "isRealData": true
   },
@@ -5359,7 +5359,7 @@
     "spread180d30d": 1.72,
     "excessReturn": -3.07,
     "excessOverTBill": 0.43,
-    "carryScore": -12.3,
+    "carryScore": -9,
     "btcPrice": 111040,
     "isRealData": true
   },
@@ -5377,7 +5377,7 @@
     "spread180d30d": 1.17,
     "excessReturn": -2.58,
     "excessOverTBill": 0.92,
-    "carryScore": -10.3,
+    "carryScore": -9,
     "btcPrice": 111668,
     "isRealData": true
   },
@@ -5413,7 +5413,7 @@
     "spread180d30d": 0.99,
     "excessReturn": -2.4,
     "excessOverTBill": 1.1,
-    "carryScore": -9.6,
+    "carryScore": -8.8,
     "btcPrice": 114110,
     "isRealData": true
   },
@@ -5431,7 +5431,7 @@
     "spread180d30d": 1.33,
     "excessReturn": -2.72,
     "excessOverTBill": 0.78,
-    "carryScore": -10.9,
+    "carryScore": -8.8,
     "btcPrice": 112925,
     "isRealData": true
   },
@@ -5449,7 +5449,7 @@
     "spread180d30d": 1.76,
     "excessReturn": -3.78,
     "excessOverTBill": -0.28,
-    "carryScore": -15.1,
+    "carryScore": -12.7,
     "btcPrice": 110049,
     "isRealData": true
   },
@@ -5467,7 +5467,7 @@
     "spread180d30d": 1.79,
     "excessReturn": -3.37,
     "excessOverTBill": 0.13,
-    "carryScore": -13.5,
+    "carryScore": -10,
     "btcPrice": 108311,
     "isRealData": true
   },
@@ -5485,7 +5485,7 @@
     "spread180d30d": 1.39,
     "excessReturn": -3.27,
     "excessOverTBill": 0.23,
-    "carryScore": -13.1,
+    "carryScore": -11.6,
     "btcPrice": 109563,
     "isRealData": true
   },
@@ -5503,7 +5503,7 @@
     "spread180d30d": 1.49,
     "excessReturn": -3.46,
     "excessOverTBill": 0.04,
-    "carryScore": -13.8,
+    "carryScore": -12.2,
     "btcPrice": 110061,
     "isRealData": true
   },
@@ -5521,7 +5521,7 @@
     "spread180d30d": 1.36,
     "excessReturn": -3.48,
     "excessOverTBill": 0.02,
-    "carryScore": -13.9,
+    "carryScore": -13,
     "btcPrice": 110534,
     "isRealData": true
   },
@@ -5557,7 +5557,7 @@
     "spread180d30d": 2.01,
     "excessReturn": -4.86,
     "excessOverTBill": -1.36,
-    "carryScore": -19.4,
+    "carryScore": -17.5,
     "btcPrice": 101468,
     "isRealData": true
   },
@@ -5575,7 +5575,7 @@
     "spread180d30d": 0.98,
     "excessReturn": -3.56,
     "excessOverTBill": -0.06,
-    "carryScore": -14.2,
+    "carryScore": -15.6,
     "btcPrice": 103880,
     "isRealData": true
   },
@@ -5593,7 +5593,7 @@
     "spread180d30d": 1,
     "excessReturn": -3.61,
     "excessOverTBill": -0.11,
-    "carryScore": -14.4,
+    "carryScore": -15.8,
     "btcPrice": 101293,
     "isRealData": true
   },
@@ -5611,7 +5611,7 @@
     "spread180d30d": 0.92,
     "excessReturn": -3.5,
     "excessOverTBill": 0,
-    "carryScore": -14,
+    "carryScore": -15.6,
     "btcPrice": 103294,
     "isRealData": true
   },
@@ -5629,7 +5629,7 @@
     "spread180d30d": 0.87,
     "excessReturn": -4.09,
     "excessOverTBill": -0.59,
-    "carryScore": -16.4,
+    "carryScore": -19.3,
     "btcPrice": 102287,
     "isRealData": true
   },
@@ -5647,7 +5647,7 @@
     "spread180d30d": 1.59,
     "excessReturn": -4.7,
     "excessOverTBill": -1.2,
-    "carryScore": -18.8,
+    "carryScore": -18.7,
     "btcPrice": 104707,
     "isRealData": true
   },
@@ -5665,7 +5665,7 @@
     "spread180d30d": 1.2,
     "excessReturn": -3.93,
     "excessOverTBill": -0.43,
-    "carryScore": -15.7,
+    "carryScore": -16.4,
     "btcPrice": 105992,
     "isRealData": true
   },
@@ -5683,7 +5683,7 @@
     "spread180d30d": 1.7,
     "excessReturn": -4.46,
     "excessOverTBill": -0.96,
-    "carryScore": -17.8,
+    "carryScore": -16.5,
     "btcPrice": 103019,
     "isRealData": true
   },
@@ -5701,7 +5701,7 @@
     "spread180d30d": 2.49,
     "excessReturn": -5.6,
     "excessOverTBill": -2.1,
-    "carryScore": -22.4,
+    "carryScore": -18.5,
     "btcPrice": 101644,
     "isRealData": true
   },
@@ -5719,7 +5719,7 @@
     "spread180d30d": 1.21,
     "excessReturn": -4.65,
     "excessOverTBill": -1.15,
-    "carryScore": -18.6,
+    "carryScore": -20.6,
     "btcPrice": 99623,
     "isRealData": true
   },
@@ -5737,7 +5737,7 @@
     "spread180d30d": 0.98,
     "excessReturn": -4.1,
     "excessOverTBill": -0.6,
-    "carryScore": -16.4,
+    "carryScore": -18.5,
     "btcPrice": 94510,
     "isRealData": true
   },
@@ -5755,7 +5755,7 @@
     "spread180d30d": 0.58,
     "excessReturn": -3.88,
     "excessOverTBill": -0.38,
-    "carryScore": -15.5,
+    "carryScore": -19.7,
     "btcPrice": 95553,
     "isRealData": true
   },
@@ -5773,7 +5773,7 @@
     "spread180d30d": 1.15,
     "excessReturn": -4.27,
     "excessOverTBill": -0.77,
-    "carryScore": -17.1,
+    "carryScore": -18.5,
     "btcPrice": 94193,
     "isRealData": true
   },
@@ -5791,7 +5791,7 @@
     "spread180d30d": 1.16,
     "excessReturn": -4.63,
     "excessOverTBill": -1.13,
-    "carryScore": -18.5,
+    "carryScore": -20.5,
     "btcPrice": 92110,
     "isRealData": true
   },
@@ -5809,7 +5809,7 @@
     "spread180d30d": 1.13,
     "excessReturn": -4.14,
     "excessOverTBill": -0.64,
-    "carryScore": -16.6,
+    "carryScore": -17.7,
     "btcPrice": 92925,
     "isRealData": true
   },
@@ -5827,7 +5827,7 @@
     "spread180d30d": 0.2,
     "excessReturn": -3.29,
     "excessOverTBill": 0.21,
-    "carryScore": -13.2,
+    "carryScore": -18.4,
     "btcPrice": 91484,
     "isRealData": true
   },
@@ -5845,7 +5845,7 @@
     "spread180d30d": 0.09,
     "excessReturn": -3.45,
     "excessOverTBill": 0.05,
-    "carryScore": -13.8,
+    "carryScore": -20.1,
     "btcPrice": 86543,
     "isRealData": true
   },
@@ -5863,7 +5863,7 @@
     "spread180d30d": 0.05,
     "excessReturn": -4.17,
     "excessOverTBill": -0.67,
-    "carryScore": -16.7,
+    "carryScore": -24.7,
     "btcPrice": 85090,
     "isRealData": true
   },
@@ -5881,7 +5881,7 @@
     "spread180d30d": 1.56,
     "excessReturn": -5.18,
     "excessOverTBill": -1.68,
-    "carryScore": -20.7,
+    "carryScore": -21.1,
     "btcPrice": 84695,
     "isRealData": true
   },
@@ -5899,7 +5899,7 @@
     "spread180d30d": 0.6,
     "excessReturn": -4.17,
     "excessOverTBill": -0.67,
-    "carryScore": -16.7,
+    "carryScore": -21.1,
     "btcPrice": 86824,
     "isRealData": true
   },
@@ -5917,7 +5917,7 @@
     "spread180d30d": 0.53,
     "excessReturn": -3.69,
     "excessOverTBill": -0.19,
-    "carryScore": -14.8,
+    "carryScore": -18.6,
     "btcPrice": 88265,
     "isRealData": true
   },
@@ -5935,7 +5935,7 @@
     "spread180d30d": 0,
     "excessReturn": -3.19,
     "excessOverTBill": 0.31,
-    "carryScore": -12.8,
+    "carryScore": -19.1,
     "btcPrice": 87336,
     "isRealData": true
   },
@@ -5953,7 +5953,7 @@
     "spread180d30d": 1.54,
     "excessReturn": -3.88,
     "excessOverTBill": -0.38,
-    "carryScore": -15.5,
+    "carryScore": -13.2,
     "btcPrice": 90486,
     "isRealData": true
   },
@@ -5971,7 +5971,7 @@
     "spread180d30d": 1.15,
     "excessReturn": -3.6,
     "excessOverTBill": -0.1,
-    "carryScore": -14.4,
+    "carryScore": -13.9,
     "btcPrice": 91329,
     "isRealData": true
   },
@@ -5989,7 +5989,7 @@
     "spread180d30d": 1.48,
     "excessReturn": -4.1,
     "excessOverTBill": -0.6,
-    "carryScore": -16.4,
+    "carryScore": -14.8,
     "btcPrice": 90917,
     "isRealData": true
   },
@@ -6007,7 +6007,7 @@
     "spread180d30d": 0.43,
     "excessReturn": -3,
     "excessOverTBill": 0.5,
-    "carryScore": -12,
+    "carryScore": -15.1,
     "btcPrice": 90836,
     "isRealData": true
   },
@@ -6025,7 +6025,7 @@
     "spread180d30d": 0.79,
     "excessReturn": -3.5,
     "excessOverTBill": 0,
-    "carryScore": -14,
+    "carryScore": -15.7,
     "btcPrice": 90383,
     "isRealData": true
   },
@@ -6043,7 +6043,7 @@
     "spread180d30d": 0.73,
     "excessReturn": -3.62,
     "excessOverTBill": -0.12,
-    "carryScore": -14.5,
+    "carryScore": -16.8,
     "btcPrice": 86287,
     "isRealData": true
   },
@@ -6061,7 +6061,7 @@
     "spread180d30d": -0.27,
     "excessReturn": -2.7,
     "excessOverTBill": 0.8,
-    "carryScore": 10.8,
+    "carryScore": -18,
     "btcPrice": 91314,
     "isRealData": true
   },
@@ -6079,7 +6079,7 @@
     "spread180d30d": 0.03,
     "excessReturn": -2.93,
     "excessOverTBill": 0.57,
-    "carryScore": -11.7,
+    "carryScore": -17.5,
     "btcPrice": 93462,
     "isRealData": true
   },
@@ -6097,7 +6097,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -3.04,
     "excessOverTBill": 0.46,
-    "carryScore": 12.2,
+    "carryScore": -18.4,
     "btcPrice": 92111,
     "isRealData": true
   },
@@ -6115,7 +6115,7 @@
     "spread180d30d": 3.91,
     "excessReturn": -6.59,
     "excessOverTBill": -3.09,
-    "carryScore": -26.4,
+    "carryScore": -12.3,
     "btcPrice": 89350,
     "isRealData": true
   },
@@ -6133,7 +6133,7 @@
     "spread180d30d": 1.81,
     "excessReturn": -5.19,
     "excessOverTBill": -1.69,
-    "carryScore": -20.8,
+    "carryScore": -18.4,
     "btcPrice": 89253,
     "isRealData": true
   },
@@ -6151,7 +6151,7 @@
     "spread180d30d": 0.42,
     "excessReturn": -4.18,
     "excessOverTBill": -0.68,
-    "carryScore": -16.7,
+    "carryScore": -22.2,
     "btcPrice": 90418,
     "isRealData": true
   },
@@ -6169,7 +6169,7 @@
     "spread180d30d": 1.76,
     "excessReturn": -4.86,
     "excessOverTBill": -1.36,
-    "carryScore": -19.4,
+    "carryScore": -16.7,
     "btcPrice": 90655,
     "isRealData": true
   },
@@ -6187,7 +6187,7 @@
     "spread180d30d": 1.04,
     "excessReturn": -4.53,
     "excessOverTBill": -1.03,
-    "carryScore": -18.1,
+    "carryScore": -19.8,
     "btcPrice": 92702,
     "isRealData": true
   },
@@ -6205,7 +6205,7 @@
     "spread180d30d": 1.24,
     "excessReturn": -4.51,
     "excessOverTBill": -1.01,
-    "carryScore": -18,
+    "carryScore": -18.2,
     "btcPrice": 92038,
     "isRealData": true
   },
@@ -6223,7 +6223,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -3.93,
     "excessOverTBill": -0.43,
-    "carryScore": 15.7,
+    "carryScore": -23.8,
     "btcPrice": 92551,
     "isRealData": true
   },
@@ -6241,7 +6241,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -3.89,
     "excessOverTBill": -0.39,
-    "carryScore": 15.6,
+    "carryScore": -23.5,
     "btcPrice": 90280,
     "isRealData": true
   },
@@ -6259,7 +6259,7 @@
     "spread180d30d": -0.67,
     "excessReturn": -3.36,
     "excessOverTBill": 0.14,
-    "carryScore": 13.4,
+    "carryScore": -25.1,
     "btcPrice": 90258,
     "isRealData": true
   },
@@ -6277,7 +6277,7 @@
     "spread180d30d": -0.42,
     "excessReturn": -3.88,
     "excessOverTBill": -0.38,
-    "carryScore": 15.5,
+    "carryScore": -26.3,
     "btcPrice": 88158,
     "isRealData": true
   },
@@ -6295,7 +6295,7 @@
     "spread180d30d": -0.05,
     "excessReturn": -4.48,
     "excessOverTBill": -0.98,
-    "carryScore": 17.9,
+    "carryScore": -27.3,
     "btcPrice": 86426,
     "isRealData": true
   },
@@ -6313,7 +6313,7 @@
     "spread180d30d": 0.3,
     "excessReturn": -5.21,
     "excessOverTBill": -1.71,
-    "carryScore": -20.8,
+    "carryScore": -29.2,
     "btcPrice": 87864,
     "isRealData": true
   },
@@ -6331,7 +6331,7 @@
     "spread180d30d": -2.78,
     "excessReturn": -2.42,
     "excessOverTBill": 1.08,
-    "carryScore": 9.7,
+    "carryScore": -35.5,
     "btcPrice": 86226,
     "isRealData": true
   },
@@ -6349,7 +6349,7 @@
     "spread180d30d": -4.41,
     "excessReturn": -1.45,
     "excessOverTBill": 2.05,
-    "carryScore": 5.8,
+    "carryScore": -42.2,
     "btcPrice": 85461,
     "isRealData": true
   },
@@ -6367,7 +6367,7 @@
     "spread180d30d": -4.13,
     "excessReturn": -0.83,
     "excessOverTBill": 2.67,
-    "carryScore": 3.3,
+    "carryScore": -36.5,
     "btcPrice": 88102,
     "isRealData": true
   },
@@ -6385,7 +6385,7 @@
     "spread180d30d": -11.64,
     "excessReturn": 3.72,
     "excessOverTBill": 7.22,
-    "carryScore": -14.9,
+    "carryScore": -17.7,
     "btcPrice": 88333,
     "isRealData": true
   },
@@ -6403,7 +6403,7 @@
     "spread180d30d": -6.44,
     "excessReturn": 0.58,
     "excessOverTBill": 4.08,
-    "carryScore": -2.3,
+    "carryScore": -36.5,
     "btcPrice": 88639,
     "isRealData": true
   },
@@ -6421,7 +6421,7 @@
     "spread180d30d": 1.65,
     "excessReturn": -4.31,
     "excessOverTBill": -0.81,
-    "carryScore": -17.2,
+    "carryScore": -13.2,
     "btcPrice": 88559,
     "isRealData": true
   },
@@ -6439,7 +6439,7 @@
     "spread180d30d": -4.53,
     "excessReturn": -0.66,
     "excessOverTBill": 2.84,
-    "carryScore": 2.6,
+    "carryScore": -39.3,
     "btcPrice": 87427,
     "isRealData": true
   },
@@ -6457,7 +6457,7 @@
     "spread180d30d": 2.06,
     "excessReturn": -5.02,
     "excessOverTBill": -1.52,
-    "carryScore": -20.1,
+    "carryScore": -14.1,
     "btcPrice": 87614,
     "isRealData": true
   },
@@ -6475,7 +6475,7 @@
     "spread180d30d": -10.12,
     "excessReturn": 2.55,
     "excessOverTBill": 6.05,
-    "carryScore": -10.2,
+    "carryScore": -24.7,
     "btcPrice": 87178,
     "isRealData": true
   },
@@ -6493,7 +6493,7 @@
     "spread180d30d": 0.46,
     "excessReturn": -3.27,
     "excessOverTBill": 0.23,
-    "carryScore": -13.1,
+    "carryScore": -17.4,
     "btcPrice": 87304,
     "isRealData": true
   },
@@ -6511,7 +6511,7 @@
     "spread180d30d": -0.05,
     "excessReturn": -2.55,
     "excessOverTBill": 0.95,
-    "carryScore": 10.2,
+    "carryScore": -15.5,
     "btcPrice": 87813,
     "isRealData": true
   },
@@ -6529,7 +6529,7 @@
     "spread180d30d": 0.44,
     "excessReturn": -3.15,
     "excessOverTBill": 0.35,
-    "carryScore": -12.6,
+    "carryScore": -16.7,
     "btcPrice": 87889,
     "isRealData": true
   },
@@ -6547,7 +6547,7 @@
     "spread180d30d": 0.38,
     "excessReturn": -3.41,
     "excessOverTBill": 0.09,
-    "carryScore": -13.6,
+    "carryScore": -18.6,
     "btcPrice": 87142,
     "isRealData": true
   },
@@ -6565,7 +6565,7 @@
     "spread180d30d": -0.24,
     "excessReturn": -3.4,
     "excessOverTBill": 0.1,
-    "carryScore": 13.6,
+    "carryScore": -21.6,
     "btcPrice": 88403,
     "isRealData": true
   },
@@ -6583,7 +6583,7 @@
     "spread180d30d": -0.28,
     "excessReturn": -3.33,
     "excessOverTBill": 0.17,
-    "carryScore": 13.3,
+    "carryScore": -21.4,
     "btcPrice": 87508,
     "isRealData": true
   },
@@ -6601,7 +6601,7 @@
     "spread180d30d": -0.32,
     "excessReturn": -3.36,
     "excessOverTBill": 0.14,
-    "carryScore": 13.4,
+    "carryScore": -21.7,
     "btcPrice": 88747,
     "isRealData": true
   },
@@ -6619,7 +6619,7 @@
     "spread180d30d": -0.01,
     "excessReturn": -3.53,
     "excessOverTBill": -0.03,
-    "carryScore": 14.1,
+    "carryScore": -21.3,
     "btcPrice": 89959,
     "isRealData": true
   },
@@ -6637,7 +6637,7 @@
     "spread180d30d": -0.21,
     "excessReturn": -3.06,
     "excessOverTBill": 0.44,
-    "carryScore": 12.2,
+    "carryScore": -19.4,
     "btcPrice": 90604,
     "isRealData": true
   },
@@ -6655,7 +6655,7 @@
     "spread180d30d": -0.26,
     "excessReturn": -2.58,
     "excessOverTBill": 0.92,
-    "carryScore": 10.3,
+    "carryScore": -16.8,
     "btcPrice": 91506,
     "isRealData": true
   },
@@ -6673,7 +6673,7 @@
     "spread180d30d": 0.41,
     "excessReturn": -3.39,
     "excessOverTBill": 0.11,
-    "carryScore": -13.6,
+    "carryScore": -18.2,
     "btcPrice": 93893,
     "isRealData": true
   },
@@ -6691,7 +6691,7 @@
     "spread180d30d": -0.13,
     "excessReturn": -2.58,
     "excessOverTBill": 0.92,
-    "carryScore": 10.3,
+    "carryScore": -16.2,
     "btcPrice": 93717,
     "isRealData": true
   },
@@ -6709,7 +6709,7 @@
     "spread180d30d": 0,
     "excessReturn": -2.78,
     "excessOverTBill": 0.72,
-    "carryScore": -11.1,
+    "carryScore": -16.7,
     "btcPrice": 91289,
     "isRealData": true
   },
@@ -6727,7 +6727,7 @@
     "spread180d30d": 0.24,
     "excessReturn": -3.16,
     "excessOverTBill": 0.34,
-    "carryScore": -12.6,
+    "carryScore": -17.8,
     "btcPrice": 91049,
     "isRealData": true
   },
@@ -6745,7 +6745,7 @@
     "spread180d30d": 0.16,
     "excessReturn": -3.07,
     "excessOverTBill": 0.43,
-    "carryScore": -12.3,
+    "carryScore": -17.5,
     "btcPrice": 90524,
     "isRealData": true
   },
@@ -6763,7 +6763,7 @@
     "spread180d30d": -0.04,
     "excessReturn": -2.85,
     "excessOverTBill": 0.65,
-    "carryScore": 11.4,
+    "carryScore": -17.3,
     "btcPrice": 90386,
     "isRealData": true
   },
@@ -6781,7 +6781,7 @@
     "spread180d30d": -0.42,
     "excessReturn": -2.59,
     "excessOverTBill": 0.91,
-    "carryScore": 10.4,
+    "carryScore": -17.7,
     "btcPrice": 90885,
     "isRealData": true
   },
@@ -6799,7 +6799,7 @@
     "spread180d30d": 0.01,
     "excessReturn": -2.92,
     "excessOverTBill": 0.58,
-    "carryScore": -11.7,
+    "carryScore": -17.4,
     "btcPrice": 91206,
     "isRealData": true
   },
@@ -6817,7 +6817,7 @@
     "spread180d30d": 0.13,
     "excessReturn": -2.73,
     "excessOverTBill": 0.77,
-    "carryScore": -10.9,
+    "carryScore": -15.7,
     "btcPrice": 95369,
     "isRealData": true
   },
@@ -6835,7 +6835,7 @@
     "spread180d30d": 1.92,
     "excessReturn": -4.8,
     "excessOverTBill": -1.3,
-    "carryScore": -19.2,
+    "carryScore": -18.7,
     "btcPrice": 96958,
     "isRealData": true
   },
@@ -6853,7 +6853,7 @@
     "spread180d30d": 0.54,
     "excessReturn": -3.25,
     "excessOverTBill": 0.25,
-    "carryScore": -13,
+    "carryScore": -16.6,
     "btcPrice": 95589,
     "isRealData": true
   },
@@ -6871,7 +6871,7 @@
     "spread180d30d": 0.58,
     "excessReturn": -3.24,
     "excessOverTBill": 0.26,
-    "carryScore": -13,
+    "carryScore": -16.3,
     "btcPrice": 95526,
     "isRealData": true
   },
@@ -6889,7 +6889,7 @@
     "spread180d30d": 0.8,
     "excessReturn": -3.65,
     "excessOverTBill": -0.15,
-    "carryScore": -14.6,
+    "carryScore": -17.6,
     "btcPrice": 95120,
     "isRealData": true
   },
@@ -6907,7 +6907,7 @@
     "spread180d30d": 0.96,
     "excessReturn": -3.72,
     "excessOverTBill": -0.22,
-    "carryScore": -14.9,
+    "carryScore": -17.2,
     "btcPrice": 93640,
     "isRealData": true
   },
@@ -6925,7 +6925,7 @@
     "spread180d30d": 0.4,
     "excessReturn": -3.36,
     "excessOverTBill": 0.14,
-    "carryScore": -13.4,
+    "carryScore": -18,
     "btcPrice": 92559,
     "isRealData": true
   },
@@ -6943,7 +6943,7 @@
     "spread180d30d": 0.75,
     "excessReturn": -3.75,
     "excessOverTBill": -0.25,
-    "carryScore": -15,
+    "carryScore": -18.4,
     "btcPrice": 88324,
     "isRealData": true
   },
@@ -6961,7 +6961,7 @@
     "spread180d30d": 0.33,
     "excessReturn": -3.53,
     "excessOverTBill": -0.03,
-    "carryScore": -14.1,
+    "carryScore": -19.4,
     "btcPrice": 89373,
     "isRealData": true
   },
@@ -6979,7 +6979,7 @@
     "spread180d30d": 0.33,
     "excessReturn": -3.4,
     "excessOverTBill": 0.1,
-    "carryScore": -13.6,
+    "carryScore": -18.6,
     "btcPrice": 89469,
     "isRealData": true
   },
@@ -6997,7 +6997,7 @@
     "spread180d30d": -0.51,
     "excessReturn": -2.92,
     "excessOverTBill": 0.58,
-    "carryScore": 11.7,
+    "carryScore": -20.4,
     "btcPrice": 89493,
     "isRealData": true
   },
@@ -7015,7 +7015,7 @@
     "spread180d30d": -0.16,
     "excessReturn": -2.97,
     "excessOverTBill": 0.53,
-    "carryScore": 11.9,
+    "carryScore": -18.6,
     "btcPrice": 89089,
     "isRealData": true
   },
@@ -7033,7 +7033,7 @@
     "spread180d30d": -0.71,
     "excessReturn": -2.43,
     "excessOverTBill": 1.07,
-    "carryScore": 9.7,
+    "carryScore": -18.5,
     "btcPrice": 86572,
     "isRealData": true
   },
@@ -7051,7 +7051,7 @@
     "spread180d30d": -0.84,
     "excessReturn": -2.5,
     "excessOverTBill": 1,
-    "carryScore": 10,
+    "carryScore": -19.7,
     "btcPrice": 88253,
     "isRealData": true
   },
@@ -7069,7 +7069,7 @@
     "spread180d30d": -0.84,
     "excessReturn": -2.47,
     "excessOverTBill": 1.03,
-    "carryScore": 9.9,
+    "carryScore": -19.6,
     "btcPrice": 89131,
     "isRealData": true
   },
@@ -7087,7 +7087,7 @@
     "spread180d30d": -0.68,
     "excessReturn": -2.6,
     "excessOverTBill": 0.9,
-    "carryScore": 10.4,
+    "carryScore": -19.4,
     "btcPrice": 89174,
     "isRealData": true
   },
@@ -7105,7 +7105,7 @@
     "spread180d30d": -0.87,
     "excessReturn": -2.68,
     "excessOverTBill": 0.82,
-    "carryScore": 10.7,
+    "carryScore": -21.1,
     "btcPrice": 84524,
     "isRealData": true
   },
@@ -7123,7 +7123,7 @@
     "spread180d30d": -0.56,
     "excessReturn": -2.5,
     "excessOverTBill": 1,
-    "carryScore": 10,
+    "carryScore": -18.2,
     "btcPrice": 84121,
     "isRealData": true
   },
@@ -7141,7 +7141,7 @@
     "spread180d30d": 0.81,
     "excessReturn": -4.63,
     "excessOverTBill": -1.13,
-    "carryScore": -18.5,
+    "carryScore": -23.1,
     "btcPrice": 78652,
     "isRealData": true
   },
@@ -7159,7 +7159,7 @@
     "spread180d30d": 0.05,
     "excessReturn": -3.84,
     "excessOverTBill": -0.34,
-    "carryScore": -15.4,
+    "carryScore": -22.8,
     "btcPrice": 76895,
     "isRealData": true
   },
@@ -7177,7 +7177,7 @@
     "spread180d30d": 0.14,
     "excessReturn": -4.53,
     "excessOverTBill": -1.03,
-    "carryScore": -18.1,
+    "carryScore": -26.4,
     "btcPrice": 78675,
     "isRealData": true
   },
@@ -7195,7 +7195,7 @@
     "spread180d30d": 0.34,
     "excessReturn": -4.14,
     "excessOverTBill": -0.64,
-    "carryScore": -16.6,
+    "carryScore": -22.9,
     "btcPrice": 75672,
     "isRealData": true
   },
@@ -7213,7 +7213,7 @@
     "spread180d30d": 0.37,
     "excessReturn": -4.28,
     "excessOverTBill": -0.78,
-    "carryScore": -17.1,
+    "carryScore": -23.6,
     "btcPrice": 73018,
     "isRealData": true
   },
@@ -7231,7 +7231,7 @@
     "spread180d30d": 0.79,
     "excessReturn": -5.29,
     "excessOverTBill": -1.79,
-    "carryScore": -21.2,
+    "carryScore": -27.1,
     "btcPrice": 62802,
     "isRealData": true
   },
@@ -7249,7 +7249,7 @@
     "spread180d30d": 2.35,
     "excessReturn": -7.06,
     "excessOverTBill": -3.56,
-    "carryScore": -28.2,
+    "carryScore": -28.4,
     "btcPrice": 70533,
     "isRealData": true
   },
@@ -7267,7 +7267,7 @@
     "spread180d30d": 1.47,
     "excessReturn": -5.69,
     "excessOverTBill": -2.19,
-    "carryScore": -22.8,
+    "carryScore": -25.3,
     "btcPrice": 69256,
     "isRealData": true
   },
@@ -7285,7 +7285,7 @@
     "spread180d30d": 1.76,
     "excessReturn": -5.74,
     "excessOverTBill": -2.24,
-    "carryScore": -23,
+    "carryScore": -23.9,
     "btcPrice": 70290,
     "isRealData": true
   },
@@ -7303,7 +7303,7 @@
     "spread180d30d": 1.45,
     "excessReturn": -5.4,
     "excessOverTBill": -1.9,
-    "carryScore": -21.6,
+    "carryScore": -23.6,
     "btcPrice": 70097,
     "isRealData": true
   },
@@ -7321,7 +7321,7 @@
     "spread180d30d": 2.29,
     "excessReturn": -6.48,
     "excessOverTBill": -2.98,
-    "carryScore": -25.9,
+    "carryScore": -25,
     "btcPrice": 68805,
     "isRealData": true
   },
@@ -7339,7 +7339,7 @@
     "spread180d30d": 2.09,
     "excessReturn": -6.5,
     "excessOverTBill": -3,
-    "carryScore": -26,
+    "carryScore": -26.3,
     "btcPrice": 67037,
     "isRealData": true
   },
@@ -7357,7 +7357,7 @@
     "spread180d30d": 1.63,
     "excessReturn": -6.23,
     "excessOverTBill": -2.73,
-    "carryScore": -24.9,
+    "carryScore": -27.5,
     "btcPrice": 66209,
     "isRealData": true
   },
@@ -7375,7 +7375,7 @@
     "spread180d30d": 1.68,
     "excessReturn": -6.35,
     "excessOverTBill": -2.85,
-    "carryScore": -25.4,
+    "carryScore": -27.8,
     "btcPrice": 68815,
     "isRealData": true
   },
@@ -7393,7 +7393,7 @@
     "spread180d30d": 1.38,
     "excessReturn": -6.19,
     "excessOverTBill": -2.69,
-    "carryScore": -24.8,
+    "carryScore": -28.5,
     "btcPrice": 69793,
     "isRealData": true
   },
@@ -7411,7 +7411,7 @@
     "spread180d30d": 1.52,
     "excessReturn": -5.96,
     "excessOverTBill": -2.46,
-    "carryScore": -23.8,
+    "carryScore": -26.4,
     "btcPrice": 68795,
     "isRealData": true
   },
@@ -7429,7 +7429,7 @@
     "spread180d30d": 2,
     "excessReturn": -6.68,
     "excessOverTBill": -3.18,
-    "carryScore": -26.7,
+    "carryScore": -27.6,
     "btcPrice": 68868,
     "isRealData": true
   },
@@ -7447,7 +7447,7 @@
     "spread180d30d": 1.93,
     "excessReturn": -5.74,
     "excessOverTBill": -2.24,
-    "carryScore": -23,
+    "carryScore": -22.3,
     "btcPrice": 67474,
     "isRealData": true
   },
@@ -7465,7 +7465,7 @@
     "spread180d30d": 1.89,
     "excessReturn": -6.47,
     "excessOverTBill": -2.97,
-    "carryScore": -25.9,
+    "carryScore": -26.9,
     "btcPrice": 66444,
     "isRealData": true
   },
@@ -7483,7 +7483,7 @@
     "spread180d30d": 2.18,
     "excessReturn": -6.32,
     "excessOverTBill": -2.82,
-    "carryScore": -25.3,
+    "carryScore": -24.2,
     "btcPrice": 66972,
     "isRealData": true
   },
@@ -7501,7 +7501,7 @@
     "spread180d30d": 2.65,
     "excessReturn": -6.59,
     "excessOverTBill": -3.09,
-    "carryScore": -26.4,
+    "carryScore": -22.6,
     "btcPrice": 67986,
     "isRealData": true
   },
@@ -7519,7 +7519,7 @@
     "spread180d30d": 1.38,
     "excessReturn": -5.51,
     "excessOverTBill": -2.01,
-    "carryScore": -22,
+    "carryScore": -24.3,
     "btcPrice": 67972,
     "isRealData": true
   },
@@ -7537,7 +7537,7 @@
     "spread180d30d": 1.92,
     "excessReturn": -5.89,
     "excessOverTBill": -2.39,
-    "carryScore": -23.6,
+    "carryScore": -23,
     "btcPrice": 67616,
     "isRealData": true
   },
@@ -7555,7 +7555,7 @@
     "spread180d30d": 1.81,
     "excessReturn": -6.16,
     "excessOverTBill": -2.66,
-    "carryScore": -24.6,
+    "carryScore": -25.3,
     "btcPrice": 64635,
     "isRealData": true
   },
@@ -7573,7 +7573,7 @@
     "spread180d30d": 1.88,
     "excessReturn": -6.44,
     "excessOverTBill": -2.94,
-    "carryScore": -25.8,
+    "carryScore": -26.4,
     "btcPrice": 64060,
     "isRealData": true
   },
@@ -7591,7 +7591,7 @@
     "spread180d30d": 3.25,
     "excessReturn": -8.1,
     "excessOverTBill": -4.6,
-    "carryScore": -32.4,
+    "carryScore": -27.4,
     "btcPrice": 67995,
     "isRealData": true
   },
@@ -7609,7 +7609,7 @@
     "spread180d30d": 2.84,
     "excessReturn": -7.83,
     "excessOverTBill": -4.33,
-    "carryScore": -31.3,
+    "carryScore": -28.3,
     "btcPrice": 67484,
     "isRealData": true
   },
@@ -7627,7 +7627,7 @@
     "spread180d30d": 2.01,
     "excessReturn": -7.02,
     "excessOverTBill": -3.52,
-    "carryScore": -28.1,
+    "carryScore": -28.7,
     "btcPrice": 65865,
     "isRealData": true
   },
@@ -7645,7 +7645,7 @@
     "spread180d30d": 1.51,
     "excessReturn": -6.56,
     "excessOverTBill": -3.06,
-    "carryScore": -26.2,
+    "carryScore": -29.3,
     "btcPrice": 66985,
     "isRealData": true
   },
@@ -7663,7 +7663,7 @@
     "spread180d30d": 3.76,
     "excessReturn": -7.71,
     "excessOverTBill": -4.21,
-    "carryScore": -30.8,
+    "carryScore": -21,
     "btcPrice": 65771,
     "isRealData": true
   },
@@ -7681,7 +7681,7 @@
     "spread180d30d": 1.23,
     "excessReturn": -6.29,
     "excessOverTBill": -2.79,
-    "carryScore": -25.2,
+    "carryScore": -29.4,
     "btcPrice": 68831,
     "isRealData": true
   },
@@ -7699,7 +7699,7 @@
     "spread180d30d": 0.09,
     "excessReturn": -6.11,
     "excessOverTBill": -2.61,
-    "carryScore": -24.4,
+    "carryScore": -36.1,
     "btcPrice": 68339,
     "isRealData": true
   },
@@ -7717,7 +7717,7 @@
     "spread180d30d": 0.87,
     "excessReturn": -5.33,
     "excessOverTBill": -1.83,
-    "carryScore": -21.3,
+    "carryScore": -26,
     "btcPrice": 72679,
     "isRealData": true
   },
@@ -7735,7 +7735,7 @@
     "spread180d30d": 1.13,
     "excessReturn": -6.04,
     "excessOverTBill": -2.54,
-    "carryScore": -24.2,
+    "carryScore": -28.5,
     "btcPrice": 70895,
     "isRealData": true
   },
@@ -7753,7 +7753,7 @@
     "spread180d30d": 1.62,
     "excessReturn": -6.78,
     "excessOverTBill": -3.28,
-    "carryScore": -27.1,
+    "carryScore": -29.4,
     "btcPrice": 68120,
     "isRealData": true
   },
@@ -7771,7 +7771,7 @@
     "spread180d30d": 1.43,
     "excessReturn": -6.55,
     "excessOverTBill": -3.05,
-    "carryScore": -26.2,
+    "carryScore": -29.3,
     "btcPrice": 67258,
     "isRealData": true
   },
@@ -7789,7 +7789,7 @@
     "spread180d30d": 1.76,
     "excessReturn": -7.02,
     "excessOverTBill": -3.52,
-    "carryScore": -28.1,
+    "carryScore": -29.7,
     "btcPrice": 65964,
     "isRealData": true
   },
@@ -7807,7 +7807,7 @@
     "spread180d30d": 2.07,
     "excessReturn": -6.72,
     "excessOverTBill": -3.22,
-    "carryScore": -26.9,
+    "carryScore": -25.6,
     "btcPrice": 68439,
     "isRealData": true
   },
@@ -7825,7 +7825,7 @@
     "spread180d30d": 2.95,
     "excessReturn": -7.43,
     "excessOverTBill": -3.93,
-    "carryScore": -29.7,
+    "carryScore": -23.6,
     "btcPrice": 69962,
     "isRealData": true
   },
@@ -7843,7 +7843,7 @@
     "spread180d30d": 3.1,
     "excessReturn": -7.55,
     "excessOverTBill": -4.05,
-    "carryScore": -30.2,
+    "carryScore": -23.1,
     "btcPrice": 70202,
     "isRealData": true
   },
@@ -7861,7 +7861,7 @@
     "spread180d30d": 2.54,
     "excessReturn": -7.14,
     "excessOverTBill": -3.64,
-    "carryScore": -28.6,
+    "carryScore": -24.5,
     "btcPrice": 70534,
     "isRealData": true
   },
@@ -7879,7 +7879,7 @@
     "spread180d30d": 2.46,
     "excessReturn": -7.08,
     "excessOverTBill": -3.58,
-    "carryScore": -28.3,
+    "carryScore": -24.6,
     "btcPrice": 70947,
     "isRealData": true
   },
@@ -7897,7 +7897,7 @@
     "spread180d30d": 2.22,
     "excessReturn": -7.06,
     "excessOverTBill": -3.56,
-    "carryScore": -28.2,
+    "carryScore": -26.2,
     "btcPrice": 71236,
     "isRealData": true
   },
@@ -7915,7 +7915,7 @@
     "spread180d30d": 1.29,
     "excessReturn": -6.49,
     "excessOverTBill": -2.99,
-    "carryScore": -26,
+    "carryScore": -29.3,
     "btcPrice": 72828,
     "isRealData": true
   },
@@ -7933,7 +7933,7 @@
     "spread180d30d": 0.18,
     "excessReturn": -5.85,
     "excessOverTBill": -2.35,
-    "carryScore": -23.4,
+    "carryScore": -33.8,
     "btcPrice": 74884,
     "isRealData": true
   },
@@ -7951,7 +7951,7 @@
     "spread180d30d": -0.4,
     "excessReturn": -4.94,
     "excessOverTBill": -1.44,
-    "carryScore": 19.8,
+    "carryScore": -32.6,
     "btcPrice": 73929,
     "isRealData": true
   },
@@ -7969,7 +7969,7 @@
     "spread180d30d": 0.82,
     "excessReturn": -6.09,
     "excessOverTBill": -2.59,
-    "carryScore": -24.4,
+    "carryScore": -30.3,
     "btcPrice": 71255,
     "isRealData": true
   },
@@ -7987,7 +7987,7 @@
     "spread180d30d": 1.15,
     "excessReturn": -6.27,
     "excessOverTBill": -2.77,
-    "carryScore": -25.1,
+    "carryScore": -28.9,
     "btcPrice": 69922,
     "isRealData": true
   },
@@ -8005,7 +8005,7 @@
     "spread180d30d": -2.84,
     "excessReturn": -3.43,
     "excessOverTBill": 0.07,
-    "carryScore": 13.7,
+    "carryScore": -42.3,
     "btcPrice": 70502,
     "isRealData": true
   },
@@ -8023,7 +8023,7 @@
     "spread180d30d": -2.67,
     "excessReturn": -4.5,
     "excessOverTBill": -1,
-    "carryScore": 18,
+    "carryScore": -47.5,
     "btcPrice": 68908,
     "isRealData": true
   },
@@ -8041,7 +8041,7 @@
     "spread180d30d": -1.4,
     "excessReturn": -4.97,
     "excessOverTBill": -1.47,
-    "carryScore": 19.9,
+    "carryScore": -40.7,
     "btcPrice": 67847,
     "isRealData": true
   },
@@ -8059,7 +8059,7 @@
     "spread180d30d": 4.25,
     "excessReturn": -8.03,
     "excessOverTBill": -4.53,
-    "carryScore": -32.1,
+    "carryScore": -15.3,
     "btcPrice": 70884,
     "isRealData": true
   },
@@ -8077,7 +8077,7 @@
     "spread180d30d": -0.1,
     "excessReturn": -5.59,
     "excessOverTBill": -2.09,
-    "carryScore": 22.4,
+    "carryScore": -34.3,
     "btcPrice": 70533,
     "isRealData": true
   },
@@ -8095,7 +8095,7 @@
     "spread180d30d": -4.61,
     "excessReturn": -3.16,
     "excessOverTBill": 0.34,
-    "carryScore": 12.6,
+    "carryScore": -55,
     "btcPrice": 71307,
     "isRealData": true
   },
@@ -8113,7 +8113,7 @@
     "spread180d30d": 12.33,
     "excessReturn": -13.08,
     "excessOverTBill": -9.58,
-    "carryScore": -52.3,
+    "carryScore": -20,
     "btcPrice": 68782,
     "isRealData": true
   },
@@ -8131,7 +8131,7 @@
     "spread180d30d": 0.91,
     "excessReturn": -6.1,
     "excessOverTBill": -2.6,
-    "carryScore": -24.4,
+    "carryScore": -32.2,
     "btcPrice": 66360,
     "isRealData": true
   },
@@ -8149,7 +8149,7 @@
     "spread180d30d": 0.3,
     "excessReturn": -5.65,
     "excessOverTBill": -2.15,
-    "carryScore": -22.6,
+    "carryScore": -32.5,
     "btcPrice": 66320,
     "isRealData": true
   },
@@ -8167,7 +8167,7 @@
     "spread180d30d": 0.14,
     "excessReturn": -5.94,
     "excessOverTBill": -2.44,
-    "carryScore": -23.8,
+    "carryScore": -35,
     "btcPrice": 65964,
     "isRealData": true
   },
@@ -8185,7 +8185,7 @@
     "spread180d30d": 0.44,
     "excessReturn": -5.64,
     "excessOverTBill": -2.14,
-    "carryScore": -22.6,
+    "carryScore": -31.7,
     "btcPrice": 66739,
     "isRealData": true
   },
@@ -8203,7 +8203,7 @@
     "spread180d30d": 1.18,
     "excessReturn": -6.45,
     "excessOverTBill": -2.95,
-    "carryScore": -25.8,
+    "carryScore": -33,
     "btcPrice": 68219,
     "isRealData": true
   },
@@ -8221,7 +8221,7 @@
     "spread180d30d": 1.37,
     "excessReturn": -6.47,
     "excessOverTBill": -2.97,
-    "carryScore": -25.9,
+    "carryScore": -32,
     "btcPrice": 68105,
     "isRealData": true
   },
@@ -8239,7 +8239,7 @@
     "spread180d30d": 1.22,
     "excessReturn": -6.18,
     "excessOverTBill": -2.68,
-    "carryScore": -24.7,
+    "carryScore": -31.1,
     "btcPrice": 66896,
     "isRealData": true
   },
@@ -8257,7 +8257,7 @@
     "spread180d30d": 1.54,
     "excessReturn": -6.47,
     "excessOverTBill": -2.97,
-    "carryScore": -25.9,
+    "carryScore": -31.1,
     "btcPrice": 66953,
     "isRealData": true
   },
@@ -8275,7 +8275,7 @@
     "spread180d30d": 1.4,
     "excessReturn": -6.3,
     "excessOverTBill": -2.8,
-    "carryScore": -25.2,
+    "carryScore": -30.8,
     "btcPrice": 67292,
     "isRealData": true
   },
@@ -8293,7 +8293,7 @@
     "spread180d30d": 1.33,
     "excessReturn": -6.2,
     "excessOverTBill": -2.7,
-    "carryScore": -24.8,
+    "carryScore": -30.6,
     "btcPrice": 69000,
     "isRealData": true
   },
@@ -8311,7 +8311,7 @@
     "spread180d30d": 1.29,
     "excessReturn": -5.93,
     "excessOverTBill": -2.43,
-    "carryScore": -23.7,
+    "carryScore": -29.1,
     "btcPrice": 68853,
     "isRealData": true
   },
@@ -8329,7 +8329,7 @@
     "spread180d30d": 1.22,
     "excessReturn": -5.92,
     "excessOverTBill": -2.42,
-    "carryScore": -23.7,
+    "carryScore": -29.3,
     "btcPrice": 71917,
     "isRealData": true
   },
@@ -8347,7 +8347,7 @@
     "spread180d30d": 1.96,
     "excessReturn": -7.16,
     "excessOverTBill": -3.66,
-    "carryScore": -28.6,
+    "carryScore": -33,
     "btcPrice": 71081,
     "isRealData": true
   },
@@ -8365,7 +8365,7 @@
     "spread180d30d": 1.64,
     "excessReturn": -6.86,
     "excessOverTBill": -3.36,
-    "carryScore": -27.4,
+    "carryScore": -32.8,
     "btcPrice": 71799,
     "isRealData": true
   },
@@ -8383,7 +8383,7 @@
     "spread180d30d": 2.04,
     "excessReturn": -7.17,
     "excessOverTBill": -3.67,
-    "carryScore": -28.7,
+    "carryScore": -32.5,
     "btcPrice": 72986,
     "isRealData": true
   },
@@ -8401,7 +8401,7 @@
     "spread180d30d": 1.19,
     "excessReturn": -6.96,
     "excessOverTBill": -3.46,
-    "carryScore": -27.8,
+    "carryScore": -35.6,
     "btcPrice": 73077,
     "isRealData": true
   },
@@ -8419,7 +8419,7 @@
     "spread180d30d": 1.31,
     "excessReturn": -7.12,
     "excessOverTBill": -3.62,
-    "carryScore": -28.5,
+    "carryScore": -35.9,
     "btcPrice": 70748,
     "isRealData": true
   },
@@ -8437,7 +8437,7 @@
     "spread180d30d": 1.26,
     "excessReturn": -6.99,
     "excessOverTBill": -3.49,
-    "carryScore": -28,
+    "carryScore": -35.3,
     "btcPrice": 74447,
     "isRealData": true
   },
@@ -8455,7 +8455,7 @@
     "spread180d30d": 1.93,
     "excessReturn": -7.08,
     "excessOverTBill": -3.58,
-    "carryScore": -28.3,
+    "carryScore": -32.3,
     "btcPrice": 74180,
     "isRealData": true
   },
@@ -8473,7 +8473,7 @@
     "spread180d30d": 2,
     "excessReturn": -7.17,
     "excessOverTBill": -3.67,
-    "carryScore": -28.7,
+    "carryScore": -32.5,
     "btcPrice": 74829,
     "isRealData": true
   },
@@ -8491,7 +8491,7 @@
     "spread180d30d": 2,
     "excessReturn": -7.3,
     "excessOverTBill": -3.8,
-    "carryScore": -29.2,
+    "carryScore": -33.2,
     "btcPrice": 75178,
     "isRealData": true
   },
@@ -8509,7 +8509,7 @@
     "spread180d30d": 2.34,
     "excessReturn": -7.35,
     "excessOverTBill": -3.85,
-    "carryScore": -29.4,
+    "carryScore": -31.6,
     "btcPrice": 77103,
     "isRealData": true
   },
@@ -8527,7 +8527,7 @@
     "spread180d30d": 1.73,
     "excessReturn": -6.96,
     "excessOverTBill": -3.46,
-    "carryScore": -27.8,
+    "carryScore": -32.6,
     "btcPrice": 75727,
     "isRealData": true
   },
@@ -8545,7 +8545,7 @@
     "spread180d30d": 1.85,
     "excessReturn": -7.12,
     "excessOverTBill": -3.62,
-    "carryScore": -28.5,
+    "carryScore": -32.7,
     "btcPrice": 73819,
     "isRealData": true
   },
@@ -8563,7 +8563,7 @@
     "spread180d30d": 2.13,
     "excessReturn": -7.7,
     "excessOverTBill": -4.2,
-    "carryScore": -30.8,
+    "carryScore": -34.7,
     "btcPrice": 75876,
     "isRealData": true
   },
@@ -8581,7 +8581,7 @@
     "spread180d30d": 1.5,
     "excessReturn": -6.98,
     "excessOverTBill": -3.48,
-    "carryScore": -27.9,
+    "carryScore": -33.8,
     "btcPrice": 76352,
     "isRealData": true
   },
@@ -8599,7 +8599,7 @@
     "spread180d30d": 1.6,
     "excessReturn": -7.38,
     "excessOverTBill": -3.88,
-    "carryScore": -29.5,
+    "carryScore": -35.6,
     "btcPrice": 78214,
     "isRealData": true
   },
@@ -8617,7 +8617,7 @@
     "spread180d30d": 2.2,
     "excessReturn": -7.47,
     "excessOverTBill": -3.97,
-    "carryScore": -29.9,
+    "carryScore": -32.7,
     "btcPrice": 78279,
     "isRealData": true
   },
@@ -8635,7 +8635,7 @@
     "spread180d30d": 1.21,
     "excessReturn": -6.83,
     "excessOverTBill": -3.33,
-    "carryScore": -27.3,
+    "carryScore": -34.3,
     "btcPrice": 77462,
     "isRealData": true
   },
@@ -8653,7 +8653,7 @@
     "spread180d30d": 1.9,
     "excessReturn": -7.42,
     "excessOverTBill": -3.92,
-    "carryScore": -29.7,
+    "carryScore": -33.9,
     "btcPrice": 77641,
     "isRealData": true
   },
@@ -8671,7 +8671,7 @@
     "spread180d30d": 1.77,
     "excessReturn": -7.3,
     "excessOverTBill": -3.8,
-    "carryScore": -29.2,
+    "carryScore": -34,
     "btcPrice": 78668,
     "isRealData": true
   },
@@ -8689,7 +8689,7 @@
     "spread180d30d": 1.65,
     "excessReturn": -7.32,
     "excessOverTBill": -3.82,
-    "carryScore": -29.3,
+    "carryScore": -34.7,
     "btcPrice": 77368,
     "isRealData": true
   },
@@ -8707,7 +8707,7 @@
     "spread180d30d": 1.56,
     "excessReturn": -7.46,
     "excessOverTBill": -3.96,
-    "carryScore": -29.8,
+    "carryScore": -36,
     "btcPrice": 76330,
     "isRealData": true
   },
@@ -8725,7 +8725,7 @@
     "spread180d30d": 1.23,
     "excessReturn": -6.87,
     "excessOverTBill": -3.37,
-    "carryScore": -27.5,
+    "carryScore": -34.3,
     "btcPrice": 75758,
     "isRealData": true
   },
@@ -8743,7 +8743,7 @@
     "spread180d30d": 1.26,
     "excessReturn": -7.04,
     "excessOverTBill": -3.54,
-    "carryScore": -28.2,
+    "carryScore": -35,
     "btcPrice": 76308,
     "isRealData": true
   },
@@ -8761,7 +8761,7 @@
     "spread180d30d": 1.37,
     "excessReturn": -6.9,
     "excessOverTBill": -3.4,
-    "carryScore": -27.6,
+    "carryScore": -33.6,
     "btcPrice": 78234,
     "isRealData": true
   },
@@ -8779,7 +8779,7 @@
     "spread180d30d": 1.52,
     "excessReturn": -7.02,
     "excessOverTBill": -3.52,
-    "carryScore": -28.1,
+    "carryScore": -33.4,
     "btcPrice": 78684,
     "isRealData": true
   },
@@ -8797,7 +8797,7 @@
     "spread180d30d": 1.08,
     "excessReturn": -6.86,
     "excessOverTBill": -3.36,
-    "carryScore": -27.4,
+    "carryScore": -35,
     "btcPrice": 78577,
     "isRealData": true
   },
@@ -8815,7 +8815,7 @@
     "spread180d30d": 1.65,
     "excessReturn": -7.25,
     "excessOverTBill": -3.75,
-    "carryScore": -29,
+    "carryScore": -33.9,
     "btcPrice": 79853,
     "isRealData": true
   },
@@ -8833,7 +8833,7 @@
     "spread180d30d": 2.14,
     "excessReturn": -7.51,
     "excessOverTBill": -4.01,
-    "carryScore": -30,
+    "carryScore": -32.6,
     "btcPrice": 80904,
     "isRealData": true
   },
@@ -8851,7 +8851,7 @@
     "spread180d30d": 1.6,
     "excessReturn": -6.98,
     "excessOverTBill": -3.48,
-    "carryScore": -27.9,
+    "carryScore": -32.5,
     "btcPrice": 81441,
     "isRealData": true
   },
@@ -8869,7 +8869,7 @@
     "spread180d30d": 2.03,
     "excessReturn": -7.29,
     "excessOverTBill": -3.79,
-    "carryScore": -29.2,
+    "carryScore": -31.8,
     "btcPrice": 80012,
     "isRealData": true
   },
@@ -8887,7 +8887,7 @@
     "spread180d30d": 1.04,
     "excessReturn": -6.46,
     "excessOverTBill": -2.96,
-    "carryScore": -25.8,
+    "carryScore": -32.7,
     "btcPrice": 80194,
     "isRealData": true
   },
@@ -8905,7 +8905,7 @@
     "spread180d30d": 0.92,
     "excessReturn": -6.63,
     "excessOverTBill": -3.13,
-    "carryScore": -26.5,
+    "carryScore": -34.3,
     "btcPrice": 80668,
     "isRealData": true
   },
@@ -8923,7 +8923,7 @@
     "spread180d30d": 1.95,
     "excessReturn": -7.41,
     "excessOverTBill": -3.91,
-    "carryScore": -29.6,
+    "carryScore": -32.8,
     "btcPrice": 82211,
     "isRealData": true
   },
@@ -8941,7 +8941,7 @@
     "spread180d30d": 1.36,
     "excessReturn": -6.68,
     "excessOverTBill": -3.18,
-    "carryScore": -26.7,
+    "carryScore": -31.9,
     "btcPrice": 81730,
     "isRealData": true
   },
@@ -8959,7 +8959,7 @@
     "spread180d30d": 2.31,
     "excessReturn": -7.47,
     "excessOverTBill": -3.97,
-    "carryScore": -29.9,
+    "carryScore": -30.8,
     "btcPrice": 80490,
     "isRealData": true
   },
@@ -8977,7 +8977,7 @@
     "spread180d30d": 0.15,
     "excessReturn": -5.4,
     "excessOverTBill": -1.9,
-    "carryScore": -21.6,
+    "carryScore": -31.4,
     "btcPrice": 79294,
     "isRealData": true
   },
@@ -8995,7 +8995,7 @@
     "spread180d30d": 1.96,
     "excessReturn": -7.13,
     "excessOverTBill": -3.63,
-    "carryScore": -28.5,
+    "carryScore": -30.9,
     "btcPrice": 81078,
     "isRealData": true
   },
@@ -9013,7 +9013,7 @@
     "spread180d30d": 2.34,
     "excessReturn": -7.82,
     "excessOverTBill": -4.32,
-    "carryScore": -31.3,
+    "carryScore": -32.5,
     "btcPrice": 79071,
     "isRealData": true
   },
@@ -9031,7 +9031,7 @@
     "spread180d30d": 2.42,
     "excessReturn": -7.8,
     "excessOverTBill": -4.3,
-    "carryScore": -31.2,
+    "carryScore": -31.9,
     "btcPrice": 78117,
     "isRealData": true
   },
@@ -9049,7 +9049,7 @@
     "spread180d30d": 0.66,
     "excessReturn": -7.02,
     "excessOverTBill": -3.52,
-    "carryScore": -28.1,
+    "carryScore": -38,
     "btcPrice": 77416,
     "isRealData": true
   },
@@ -9067,7 +9067,7 @@
     "spread180d30d": 2.14,
     "excessReturn": -7.64,
     "excessOverTBill": -4.14,
-    "carryScore": -30.6,
+    "carryScore": -32.4,
     "btcPrice": 76957,
     "isRealData": true
   },
@@ -9085,7 +9085,7 @@
     "spread180d30d": 1.72,
     "excessReturn": -6.91,
     "excessOverTBill": -3.41,
-    "carryScore": -27.6,
+    "carryScore": -30.7,
     "btcPrice": 76772,
     "isRealData": true
   },
@@ -9103,7 +9103,7 @@
     "spread180d30d": 1.48,
     "excessReturn": -6.55,
     "excessOverTBill": -3.05,
-    "carryScore": -26.2,
+    "carryScore": -30,
     "btcPrice": 77485,
     "isRealData": true
   },
@@ -9121,7 +9121,7 @@
     "spread180d30d": 0.47,
     "excessReturn": -6.06,
     "excessOverTBill": -2.56,
-    "carryScore": -24.2,
+    "carryScore": -33.4,
     "btcPrice": 77546,
     "isRealData": true
   },
@@ -9139,7 +9139,7 @@
     "spread180d30d": 0.37,
     "excessReturn": -6.31,
     "excessOverTBill": -2.81,
-    "carryScore": -25.2,
+    "carryScore": -35.5,
     "btcPrice": 75449,
     "isRealData": true
   },
@@ -9157,7 +9157,7 @@
     "spread180d30d": 1.13,
     "excessReturn": -6.82,
     "excessOverTBill": -3.32,
-    "carryScore": -27.3,
+    "carryScore": -33.6,
     "btcPrice": 76653,
     "isRealData": true
   },
@@ -9175,7 +9175,7 @@
     "spread180d30d": -0.74,
     "excessReturn": -4.94,
     "excessOverTBill": -1.44,
-    "carryScore": 19.8,
+    "carryScore": -34.3,
     "btcPrice": 76978,
     "isRealData": true
   },
@@ -9193,7 +9193,7 @@
     "spread180d30d": 0.28,
     "excessReturn": -5.79,
     "excessOverTBill": -2.29,
-    "carryScore": -23.2,
+    "carryScore": -32.9,
     "btcPrice": 77249,
     "isRealData": true
   },
@@ -9211,7 +9211,7 @@
     "spread180d30d": 0.12,
     "excessReturn": -5.35,
     "excessOverTBill": -1.85,
-    "carryScore": -21.4,
+    "carryScore": -31.3,
     "btcPrice": 75826,
     "isRealData": true
   },
@@ -9229,7 +9229,7 @@
     "spread180d30d": -0.62,
     "excessReturn": -4.89,
     "excessOverTBill": -1.39,
-    "carryScore": 19.6,
+    "carryScore": -33.3,
     "btcPrice": 74329,
     "isRealData": true
   },
@@ -9247,7 +9247,7 @@
     "spread180d30d": -0.79,
     "excessReturn": -4.66,
     "excessOverTBill": -1.16,
-    "carryScore": 18.6,
+    "carryScore": -33.2,
     "btcPrice": 73516,
     "isRealData": true
   },
@@ -9265,7 +9265,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -5.2,
     "excessOverTBill": -1.7,
-    "carryScore": 20.8,
+    "carryScore": -31.3,
     "btcPrice": 73368,
     "isRealData": true
   },
@@ -9283,7 +9283,7 @@
     "spread180d30d": -0.29,
     "excessReturn": -4.96,
     "excessOverTBill": -1.46,
-    "carryScore": 19.8,
+    "carryScore": -31.7,
     "btcPrice": 73768,
     "isRealData": true
   },
@@ -9301,7 +9301,7 @@
     "spread180d30d": 0.07,
     "excessReturn": -5.26,
     "excessOverTBill": -1.76,
-    "carryScore": -21,
+    "carryScore": -31.1,
     "btcPrice": 73574,
     "isRealData": true
   },
@@ -9319,7 +9319,7 @@
     "spread180d30d": -0.33,
     "excessReturn": -4.72,
     "excessOverTBill": -1.22,
-    "carryScore": 18.9,
+    "carryScore": -30.6,
     "btcPrice": 71316,
     "isRealData": true
   },
@@ -9337,7 +9337,7 @@
     "spread180d30d": 0.25,
     "excessReturn": -5.02,
     "excessOverTBill": -1.52,
-    "carryScore": -20.1,
+    "carryScore": -28.4,
     "btcPrice": 66663,
     "isRealData": true
   },
@@ -9355,7 +9355,7 @@
     "spread180d30d": 0.24,
     "excessReturn": -5.37,
     "excessOverTBill": -1.87,
-    "carryScore": -21.5,
+    "carryScore": -30.5,
     "btcPrice": 64049,
     "isRealData": true
   },
@@ -9373,7 +9373,7 @@
     "spread180d30d": 0.59,
     "excessReturn": -5.56,
     "excessOverTBill": -2.06,
-    "carryScore": -22.2,
+    "carryScore": -29.3,
     "btcPrice": 63814,
     "isRealData": true
   },
@@ -9391,7 +9391,7 @@
     "spread180d30d": 0.04,
     "excessReturn": -4.95,
     "excessOverTBill": -1.45,
-    "carryScore": -19.8,
+    "carryScore": -29.5,
     "btcPrice": 61036,
     "isRealData": true
   },
@@ -9409,7 +9409,7 @@
     "spread180d30d": 0.24,
     "excessReturn": -4.96,
     "excessOverTBill": -1.46,
-    "carryScore": -19.8,
+    "carryScore": -28.1,
     "btcPrice": 60854,
     "isRealData": true
   },
@@ -9427,7 +9427,7 @@
     "spread180d30d": 0.23,
     "excessReturn": -5.59,
     "excessOverTBill": -2.09,
-    "carryScore": -22.4,
+    "carryScore": -31.9,
     "btcPrice": 63307,
     "isRealData": true
   },
@@ -9445,7 +9445,7 @@
     "spread180d30d": 0.41,
     "excessReturn": -5.21,
     "excessOverTBill": -1.71,
-    "carryScore": -20.8,
+    "carryScore": -28.4,
     "btcPrice": 63062,
     "isRealData": true
   },
@@ -9463,7 +9463,7 @@
     "spread180d30d": -0.4,
     "excessReturn": -4.47,
     "excessOverTBill": -0.97,
-    "carryScore": 17.9,
+    "carryScore": -29.7,
     "btcPrice": 61689,
     "isRealData": true
   },
@@ -9481,7 +9481,7 @@
     "spread180d30d": -0.68,
     "excessReturn": -4.28,
     "excessOverTBill": -0.78,
-    "carryScore": 17.1,
+    "carryScore": -30.6,
     "btcPrice": 61453,
     "isRealData": true
   },
@@ -9499,7 +9499,7 @@
     "spread180d30d": -0.15,
     "excessReturn": -4.71,
     "excessOverTBill": -1.21,
-    "carryScore": 18.8,
+    "carryScore": -29.4,
     "btcPrice": 63563,
     "isRealData": true
   },
@@ -9517,7 +9517,7 @@
     "spread180d30d": 0.01,
     "excessReturn": -4.72,
     "excessOverTBill": -1.22,
-    "carryScore": -18.9,
+    "carryScore": -28.2,
     "btcPrice": 63539,
     "isRealData": true
   },
@@ -9535,7 +9535,7 @@
     "spread180d30d": 1.11,
     "excessReturn": -5.76,
     "excessOverTBill": -2.26,
-    "carryScore": -23,
+    "carryScore": -26.5,
     "btcPrice": 64425,
     "isRealData": true
   },
@@ -9553,7 +9553,7 @@
     "spread180d30d": 0.6,
     "excessReturn": -5.32,
     "excessOverTBill": -1.82,
-    "carryScore": -21.3,
+    "carryScore": -27.5,
     "btcPrice": 65706,
     "isRealData": true
   },
@@ -9571,7 +9571,7 @@
     "spread180d30d": 1.88,
     "excessReturn": -6.26,
     "excessOverTBill": -2.76,
-    "carryScore": -25,
+    "carryScore": -23.6,
     "btcPrice": 66279,
     "isRealData": true
   },
@@ -9589,7 +9589,7 @@
     "spread180d30d": -1.85,
     "excessReturn": -3.66,
     "excessOverTBill": -0.16,
-    "carryScore": 14.6,
+    "carryScore": -35.9,
     "btcPrice": 65615,
     "isRealData": true
   },
@@ -9607,7 +9607,7 @@
     "spread180d30d": -0.33,
     "excessReturn": -4.56,
     "excessOverTBill": -1.06,
-    "carryScore": 18.2,
+    "carryScore": -29.8,
     "btcPrice": 64449,
     "isRealData": true
   },
@@ -9625,7 +9625,7 @@
     "spread180d30d": -1.13,
     "excessReturn": -4.25,
     "excessOverTBill": -0.75,
-    "carryScore": 17,
+    "carryScore": -34,
     "btcPrice": 62885,
     "isRealData": true
   },
@@ -9643,7 +9643,7 @@
     "spread180d30d": 0.19,
     "excessReturn": -5.08,
     "excessOverTBill": -1.58,
-    "carryScore": -20.3,
+    "carryScore": -29,
     "btcPrice": 63481,
     "isRealData": true
   },
@@ -9661,7 +9661,7 @@
     "spread180d30d": 5.41,
     "excessReturn": -8.14,
     "excessOverTBill": -4.64,
-    "carryScore": -32.6,
+    "carryScore": -8.8,
     "btcPrice": 64230,
     "isRealData": true
   },
@@ -9679,7 +9679,7 @@
     "spread180d30d": 4.35,
     "excessReturn": -6.7,
     "excessOverTBill": -3.2,
-    "carryScore": -26.8,
+    "carryScore": -6.7,
     "btcPrice": 63235,
     "isRealData": true
   },
@@ -9697,7 +9697,7 @@
     "spread180d30d": 6.36,
     "excessReturn": -8.61,
     "excessOverTBill": -5.11,
-    "carryScore": -34.4,
+    "carryScore": -11.7,
     "btcPrice": 63954,
     "isRealData": true
   },
@@ -9715,7 +9715,7 @@
     "spread180d30d": 0.73,
     "excessReturn": -5.38,
     "excessOverTBill": -1.88,
-    "carryScore": -21.5,
+    "carryScore": -26.6,
     "btcPrice": 62652,
     "isRealData": true
   },
@@ -9733,7 +9733,7 @@
     "spread180d30d": 3.34,
     "excessReturn": -7.51,
     "excessOverTBill": -4.01,
-    "carryScore": -30,
+    "carryScore": -19,
     "btcPrice": 60985,
     "isRealData": true
   },
@@ -9751,7 +9751,7 @@
     "spread180d30d": 4.72,
     "excessReturn": -7.9,
     "excessOverTBill": -4.4,
-    "carryScore": -31.6,
+    "carryScore": -10.3,
     "btcPrice": 59701,
     "isRealData": true
   },
@@ -9769,7 +9769,7 @@
     "spread180d30d": 0.68,
     "excessReturn": -5.41,
     "excessOverTBill": -1.91,
-    "carryScore": -21.6,
+    "carryScore": -29.2,
     "btcPrice": 60013,
     "isRealData": true
   },
@@ -9787,7 +9787,7 @@
     "spread180d30d": 0.87,
     "excessReturn": -5.69,
     "excessOverTBill": -2.19,
-    "carryScore": -22.8,
+    "carryScore": -30,
     "btcPrice": 59938,
     "isRealData": true
   },
@@ -9805,7 +9805,7 @@
     "spread180d30d": -0.05,
     "excessReturn": -4.88,
     "excessOverTBill": -1.38,
-    "carryScore": 19.5,
+    "carryScore": -29.5,
     "btcPrice": 59479,
     "isRealData": true
   },
@@ -9823,7 +9823,7 @@
     "spread180d30d": 0.62,
     "excessReturn": -5.24,
     "excessOverTBill": -1.74,
-    "carryScore": -21,
+    "carryScore": -28.4,
     "btcPrice": 60170,
     "isRealData": true
   },
@@ -9841,7 +9841,7 @@
     "spread180d30d": 0.45,
     "excessReturn": -4.85,
     "excessOverTBill": -1.35,
-    "carryScore": -19.4,
+    "carryScore": -26.9,
     "btcPrice": 58530,
     "isRealData": true
   },
@@ -9859,7 +9859,7 @@
     "spread180d30d": -0.04,
     "excessReturn": -4.65,
     "excessOverTBill": -1.15,
-    "carryScore": 18.6,
+    "carryScore": -28.1,
     "btcPrice": 59963,
     "isRealData": true
   },
@@ -9877,7 +9877,7 @@
     "spread180d30d": 0.03,
     "excessReturn": -4.55,
     "excessOverTBill": -1.05,
-    "carryScore": -18.2,
+    "carryScore": -27.2,
     "btcPrice": 61486,
     "isRealData": true
   },
@@ -9895,7 +9895,7 @@
     "spread180d30d": 0.6,
     "excessReturn": -4.86,
     "excessOverTBill": -1.36,
-    "carryScore": -19.4,
+    "carryScore": -26.2,
     "btcPrice": 62522,
     "isRealData": true
   },
@@ -9913,7 +9913,7 @@
     "spread180d30d": 0.23,
     "excessReturn": -4.66,
     "excessOverTBill": -1.16,
-    "carryScore": -18.6,
+    "carryScore": -26.9,
     "btcPrice": 63088,
     "isRealData": true
   },
@@ -9931,7 +9931,7 @@
     "spread180d30d": 0.26,
     "excessReturn": -4.4,
     "excessOverTBill": -0.9,
-    "carryScore": -17.6,
+    "carryScore": -25.1,
     "btcPrice": 63587,
     "isRealData": true
   },
@@ -9949,7 +9949,7 @@
     "spread180d30d": 0.28,
     "excessReturn": -4.31,
     "excessOverTBill": -0.81,
-    "carryScore": -17.2,
+    "carryScore": -24.5,
     "btcPrice": 64001,
     "isRealData": true
   },
@@ -9967,7 +9967,7 @@
     "spread180d30d": -0.2,
     "excessReturn": -4.17,
     "excessOverTBill": -0.67,
-    "carryScore": 16.7,
+    "carryScore": -26,
     "btcPrice": 63317,
     "isRealData": true
   },
@@ -9985,7 +9985,7 @@
     "spread180d30d": 0.04,
     "excessReturn": -4.38,
     "excessOverTBill": -0.88,
-    "carryScore": -17.5,
+    "carryScore": -26.1,
     "btcPrice": 62236,
     "isRealData": true
   },
@@ -10003,7 +10003,7 @@
     "spread180d30d": -0.26,
     "excessReturn": -4.15,
     "excessOverTBill": -0.65,
-    "carryScore": 16.6,
+    "carryScore": -26.3,
     "btcPrice": 63180,
     "isRealData": true
   },
@@ -10021,7 +10021,7 @@
     "spread180d30d": -0.21,
     "excessReturn": -4.07,
     "excessOverTBill": -0.57,
-    "carryScore": 16.3,
+    "carryScore": -25.5,
     "btcPrice": 64123,
     "isRealData": true
   },
@@ -10039,7 +10039,7 @@
     "spread180d30d": 0.16,
     "excessReturn": -4.6,
     "excessOverTBill": -1.1,
-    "carryScore": -18.4,
+    "carryScore": -26.7,
     "btcPrice": 63777,
     "isRealData": true
   },
@@ -10057,7 +10057,7 @@
     "spread180d30d": 0.15,
     "excessReturn": -4.5,
     "excessOverTBill": -1,
-    "carryScore": -18,
+    "carryScore": -26.2,
     "btcPrice": 63742,
     "isRealData": true
   },
@@ -10075,7 +10075,7 @@
     "spread180d30d": -0.03,
     "excessReturn": -4.11,
     "excessOverTBill": -0.61,
-    "carryScore": 16.4,
+    "carryScore": -24.8,
     "btcPrice": 62263,
     "isRealData": true
   },
@@ -10093,7 +10093,7 @@
     "spread180d30d": 0.09,
     "excessReturn": -4.24,
     "excessOverTBill": -0.74,
-    "carryScore": -17,
+    "carryScore": -25,
     "btcPrice": 64991,
     "isRealData": true
   },
@@ -10111,7 +10111,7 @@
     "spread180d30d": -0.21,
     "excessReturn": -4.11,
     "excessOverTBill": -0.61,
-    "carryScore": 16.4,
+    "carryScore": -25.8,
     "btcPrice": 64712,
     "isRealData": true
   },
@@ -10129,7 +10129,7 @@
     "spread180d30d": -0.35,
     "excessReturn": -3.91,
     "excessOverTBill": -0.41,
-    "carryScore": 15.6,
+    "carryScore": -25.3,
     "btcPrice": 63779,
     "isRealData": true
   },
@@ -10147,7 +10147,7 @@
     "spread180d30d": -0.08,
     "excessReturn": -4.24,
     "excessOverTBill": -0.74,
-    "carryScore": 17,
+    "carryScore": -25.8,
     "btcPrice": 63892,
     "isRealData": true
   },
@@ -10165,7 +10165,7 @@
     "spread180d30d": -0.08,
     "excessReturn": -3.97,
     "excessOverTBill": -0.47,
-    "carryScore": 15.9,
+    "carryScore": -24.2,
     "btcPrice": 64794,
     "isRealData": true
   },
@@ -10183,7 +10183,7 @@
     "spread180d30d": 0.53,
     "excessReturn": -4.76,
     "excessOverTBill": -1.26,
-    "carryScore": -19,
+    "carryScore": -25.7,
     "btcPrice": 64681,
     "isRealData": true
   },
@@ -10201,7 +10201,7 @@
     "spread180d30d": 0.03,
     "excessReturn": -4.16,
     "excessOverTBill": -0.66,
-    "carryScore": -16.6,
+    "carryScore": -24.8,
     "btcPrice": 65211,
     "isRealData": true
   },
@@ -10219,7 +10219,7 @@
     "spread180d30d": -0.23,
     "excessReturn": -3.59,
     "excessOverTBill": -0.09,
-    "carryScore": 14.4,
+    "carryScore": -22.7,
     "btcPrice": 66516,
     "isRealData": true
   },
@@ -10237,7 +10237,7 @@
     "spread180d30d": -0.06,
     "excessReturn": -3.96,
     "excessOverTBill": -0.46,
-    "carryScore": 15.8,
+    "carryScore": -24.1,
     "btcPrice": 66082,
     "isRealData": true
   },
@@ -10255,7 +10255,7 @@
     "spread180d30d": 0.14,
     "excessReturn": -4.23,
     "excessOverTBill": -0.73,
-    "carryScore": -16.9,
+    "carryScore": -24.6,
     "btcPrice": 65049,
     "isRealData": true
   },
@@ -10273,7 +10273,7 @@
     "spread180d30d": 0.1,
     "excessReturn": -4.21,
     "excessOverTBill": -0.71,
-    "carryScore": -16.8,
+    "carryScore": -24.8,
     "btcPrice": 64087,
     "isRealData": true
   },
@@ -10291,7 +10291,7 @@
     "spread180d30d": 0.2,
     "excessReturn": -4.23,
     "excessOverTBill": -0.73,
-    "carryScore": -16.9,
+    "carryScore": -24.3,
     "btcPrice": 64307,
     "isRealData": true
   },
@@ -10309,7 +10309,7 @@
     "spread180d30d": -0.21,
     "excessReturn": -3.54,
     "excessOverTBill": -0.04,
-    "carryScore": 14.2,
+    "carryScore": -22.4,
     "btcPrice": 65342,
     "isRealData": true
   },
@@ -10327,7 +10327,7 @@
     "spread180d30d": -0.5,
     "excessReturn": -3.36,
     "excessOverTBill": 0.14,
-    "carryScore": 13.4,
+    "carryScore": -23,
     "btcPrice": 63696,
     "isRealData": true
   },
@@ -10345,7 +10345,7 @@
     "spread180d30d": 0.06,
     "excessReturn": -4.07,
     "excessOverTBill": -0.57,
-    "carryScore": -16.3,
+    "carryScore": -24.1,
     "btcPrice": 63848,
     "isRealData": true
   },
@@ -10363,7 +10363,7 @@
     "spread180d30d": -0.23,
     "excessReturn": -3.76,
     "excessOverTBill": -0.26,
-    "carryScore": 15,
+    "carryScore": -23.9,
     "btcPrice": 63899,
     "isRealData": true
   },
@@ -10381,7 +10381,7 @@
     "spread180d30d": 0.26,
     "excessReturn": -4.09,
     "excessOverTBill": -0.59,
-    "carryScore": -16.4,
+    "carryScore": -23,
     "btcPrice": 64722,
     "isRealData": true
   },
@@ -10399,7 +10399,7 @@
     "spread180d30d": -0.11,
     "excessReturn": -3.76,
     "excessOverTBill": -0.26,
-    "carryScore": 15,
+    "carryScore": -23.2,
     "btcPrice": 62824,
     "isRealData": true
   },
@@ -10417,7 +10417,7 @@
     "spread180d30d": -0.32,
     "excessReturn": -3.58,
     "excessOverTBill": -0.08,
-    "carryScore": 14.3,
+    "carryScore": -23.4,
     "btcPrice": 62760,
     "isRealData": true
   },
@@ -10435,7 +10435,7 @@
     "spread180d30d": -0.26,
     "excessReturn": -3.51,
     "excessOverTBill": -0.01,
-    "carryScore": 14,
+    "carryScore": -22.5,
     "btcPrice": 63499,
     "isRealData": true
   },
@@ -10453,7 +10453,7 @@
     "spread180d30d": 0,
     "excessReturn": -3.54,
     "excessOverTBill": -0.04,
-    "carryScore": -14.2,
+    "carryScore": -21.2,
     "btcPrice": 63463,
     "isRealData": true
   },
@@ -10471,7 +10471,7 @@
     "spread180d30d": -0.14,
     "excessReturn": -3.57,
     "excessOverTBill": -0.07,
-    "carryScore": 14.3,
+    "carryScore": -22.2,
     "btcPrice": 64047,
     "isRealData": true
   },
@@ -10489,7 +10489,7 @@
     "spread180d30d": 0.32,
     "excessReturn": -3.83,
     "excessOverTBill": -0.33,
-    "carryScore": -15.3,
+    "carryScore": -21.1,
     "btcPrice": 64599,
     "isRealData": true
   },
@@ -10507,7 +10507,7 @@
     "spread180d30d": 0.4,
     "excessReturn": -3.68,
     "excessOverTBill": -0.18,
-    "carryScore": -14.7,
+    "carryScore": -19.7,
     "btcPrice": 64263,
     "isRealData": true
   },
@@ -10525,7 +10525,7 @@
     "spread180d30d": 0.61,
     "excessReturn": -4.14,
     "excessOverTBill": -0.64,
-    "carryScore": -16.6,
+    "carryScore": -21.2,
     "btcPrice": 64884,
     "isRealData": true
   },
@@ -10543,7 +10543,7 @@
     "spread180d30d": 0.24,
     "excessReturn": -3.79,
     "excessOverTBill": -0.29,
-    "carryScore": -15.2,
+    "carryScore": -21.3,
     "btcPrice": 64909,
     "isRealData": true
   },
@@ -10561,7 +10561,7 @@
     "spread180d30d": 0.76,
     "excessReturn": -4.3,
     "excessOverTBill": -0.8,
-    "carryScore": -17.2,
+    "carryScore": -21.3,
     "btcPrice": 64851,
     "isRealData": true
   },
@@ -10579,7 +10579,7 @@
     "spread180d30d": 0.51,
     "excessReturn": -4.43,
     "excessOverTBill": -0.93,
-    "carryScore": -17.7,
+    "carryScore": -23.6,
     "btcPrice": 63912,
     "isRealData": true
   },
@@ -10597,7 +10597,7 @@
     "spread180d30d": 0.35,
     "excessReturn": -4.16,
     "excessOverTBill": -0.66,
-    "carryScore": -16.6,
+    "carryScore": -22.8,
     "btcPrice": 63536,
     "isRealData": true
   },
@@ -10615,7 +10615,7 @@
     "spread180d30d": -0.23,
     "excessReturn": -3.52,
     "excessOverTBill": -0.02,
-    "carryScore": 14.1,
+    "carryScore": -22.5,
     "btcPrice": 63415,
     "isRealData": true
   },
@@ -10633,7 +10633,7 @@
     "spread180d30d": -0.97,
     "excessReturn": -2.75,
     "excessOverTBill": 0.75,
-    "carryScore": 11,
+    "carryScore": -22.4,
     "btcPrice": 63424,
     "isRealData": true
   },
@@ -10651,7 +10651,7 @@
     "spread180d30d": -0.52,
     "excessReturn": -3.28,
     "excessOverTBill": 0.22,
-    "carryScore": 13.1,
+    "carryScore": -22.8,
     "btcPrice": 62977,
     "isRealData": true
   },
@@ -10669,7 +10669,7 @@
     "spread180d30d": -0.04,
     "excessReturn": -3.66,
     "excessOverTBill": -0.16,
-    "carryScore": 14.6,
+    "carryScore": -22.3,
     "btcPrice": 63022,
     "isRealData": true
   },
@@ -10687,7 +10687,7 @@
     "spread180d30d": -0.49,
     "excessReturn": -3.33,
     "excessOverTBill": 0.17,
-    "carryScore": 13.3,
+    "carryScore": -23,
     "btcPrice": 62836,
     "isRealData": true
   },
@@ -10705,7 +10705,7 @@
     "spread180d30d": -0.37,
     "excessReturn": -3.03,
     "excessOverTBill": 0.47,
-    "carryScore": 12.1,
+    "carryScore": -20.4,
     "btcPrice": 64477,
     "isRealData": true
   },
@@ -10723,7 +10723,7 @@
     "spread180d30d": -0.71,
     "excessReturn": -2.89,
     "excessOverTBill": 0.61,
-    "carryScore": 11.6,
+    "carryScore": -21.8,
     "btcPrice": 64680,
     "isRealData": true
   },
@@ -10741,7 +10741,7 @@
     "spread180d30d": -0.24,
     "excessReturn": -3.37,
     "excessOverTBill": 0.13,
-    "carryScore": 13.5,
+    "carryScore": -21.8,
     "btcPrice": 69298,
     "isRealData": true
   },
@@ -10759,7 +10759,7 @@
     "spread180d30d": 0.55,
     "excessReturn": -3.78,
     "excessOverTBill": -0.28,
-    "carryScore": -15.1,
+    "carryScore": -19.2,
     "btcPrice": 73004,
     "isRealData": true
   },
@@ -10777,7 +10777,7 @@
     "spread180d30d": -0.14,
     "excessReturn": -3.64,
     "excessOverTBill": -0.14,
-    "carryScore": 14.6,
+    "carryScore": -22.8,
     "btcPrice": 78326,
     "isRealData": true
   },
@@ -10795,7 +10795,7 @@
     "spread180d30d": -0.05,
     "excessReturn": -3.29,
     "excessOverTBill": 0.21,
-    "carryScore": 13.2,
+    "carryScore": -20,
     "btcPrice": 77058,
     "isRealData": true
   },
@@ -10813,7 +10813,7 @@
     "spread180d30d": -2.37,
     "excessReturn": -1.53,
     "excessOverTBill": 1.97,
-    "carryScore": 6.1,
+    "carryScore": -24.5,
     "btcPrice": 77725,
     "isRealData": true
   },
@@ -10831,7 +10831,7 @@
     "spread180d30d": -0.94,
     "excessReturn": -2.98,
     "excessOverTBill": 0.52,
-    "carryScore": 11.9,
+    "carryScore": -24,
     "btcPrice": 78978,
     "isRealData": true
   },
@@ -10849,7 +10849,7 @@
     "spread180d30d": -0.4,
     "excessReturn": -2.95,
     "excessOverTBill": 0.55,
-    "carryScore": 11.8,
+    "carryScore": -20.3,
     "btcPrice": 78524,
     "isRealData": true
   },
@@ -10867,7 +10867,7 @@
     "spread180d30d": 0.53,
     "excessReturn": -3.64,
     "excessOverTBill": -0.14,
-    "carryScore": -14.6,
+    "carryScore": -18.3,
     "btcPrice": 79023,
     "isRealData": true
   },
@@ -10885,7 +10885,7 @@
     "spread180d30d": -0.15,
     "excessReturn": -3.36,
     "excessOverTBill": 0.14,
-    "carryScore": 13.4,
+    "carryScore": -21.1,
     "btcPrice": 80268,
     "isRealData": true
   },
@@ -10903,7 +10903,7 @@
     "spread180d30d": 0.15,
     "excessReturn": -3.33,
     "excessOverTBill": 0.17,
-    "carryScore": -13.3,
+    "carryScore": -19,
     "btcPrice": 77838,
     "isRealData": true
   },
@@ -10921,7 +10921,7 @@
     "spread180d30d": -0.46,
     "excessReturn": -2.74,
     "excessOverTBill": 0.76,
-    "carryScore": 11,
+    "carryScore": -19.4,
     "btcPrice": 78233,
     "isRealData": true
   },
@@ -10939,7 +10939,7 @@
     "spread180d30d": 0.6,
     "excessReturn": -3.51,
     "excessOverTBill": -0.01,
-    "carryScore": -14,
+    "carryScore": -17.1,
     "btcPrice": 77682,
     "isRealData": true
   },
@@ -10957,7 +10957,7 @@
     "spread180d30d": -0.32,
     "excessReturn": -2.77,
     "excessOverTBill": 0.73,
-    "carryScore": 11.1,
+    "carryScore": -18.8,
     "btcPrice": 78560,
     "isRealData": true
   },
@@ -10975,7 +10975,7 @@
     "spread180d30d": -0.28,
     "excessReturn": -3.33,
     "excessOverTBill": 0.17,
-    "carryScore": 13.3,
+    "carryScore": -21.9,
     "btcPrice": 77398,
     "isRealData": true
   },
@@ -10993,7 +10993,7 @@
     "spread180d30d": 0.76,
     "excessReturn": -4.03,
     "excessOverTBill": -0.53,
-    "carryScore": -16.1,
+    "carryScore": -19,
     "btcPrice": 77305,
     "isRealData": true
   },
@@ -11011,7 +11011,7 @@
     "spread180d30d": 0.51,
     "excessReturn": -3.68,
     "excessOverTBill": -0.18,
-    "carryScore": -14.7,
+    "carryScore": -18.6,
     "btcPrice": 81261,
     "isRealData": true
   },
@@ -11029,7 +11029,7 @@
     "spread180d30d": 0.62,
     "excessReturn": -4.18,
     "excessOverTBill": -0.68,
-    "carryScore": -16.7,
+    "carryScore": -20.7,
     "btcPrice": 79674,
     "isRealData": true
   },
@@ -11047,7 +11047,7 @@
     "spread180d30d": -0.97,
     "excessReturn": -2.99,
     "excessOverTBill": 0.51,
-    "carryScore": 12,
+    "carryScore": -24.7,
     "btcPrice": 79833,
     "isRealData": true
   },
@@ -11065,7 +11065,7 @@
     "spread180d30d": -0.68,
     "excessReturn": -3.09,
     "excessOverTBill": 0.41,
-    "carryScore": 12.4,
+    "carryScore": -23.3,
     "btcPrice": 80337,
     "isRealData": true
   },
@@ -11083,7 +11083,7 @@
     "spread180d30d": 0.69,
     "excessReturn": -3.92,
     "excessOverTBill": -0.42,
-    "carryScore": -15.7,
+    "carryScore": -18.6,
     "btcPrice": 79092,
     "isRealData": true
   },
@@ -11101,7 +11101,7 @@
     "spread180d30d": -0.6,
     "excessReturn": -2.93,
     "excessOverTBill": 0.57,
-    "carryScore": 11.7,
+    "carryScore": -21.9,
     "btcPrice": 78446,
     "isRealData": true
   },
@@ -11119,7 +11119,7 @@
     "spread180d30d": -0.96,
     "excessReturn": -2.65,
     "excessOverTBill": 0.85,
-    "carryScore": 10.6,
+    "carryScore": -22.8,
     "btcPrice": 78281,
     "isRealData": true
   },
@@ -11137,7 +11137,7 @@
     "spread180d30d": -0.69,
     "excessReturn": -3,
     "excessOverTBill": 0.5,
-    "carryScore": 12,
+    "carryScore": -23,
     "btcPrice": 76534,
     "isRealData": true
   },
@@ -11155,7 +11155,7 @@
     "spread180d30d": -0.38,
     "excessReturn": -3.13,
     "excessOverTBill": 0.37,
-    "carryScore": 12.5,
+    "carryScore": -21.6,
     "btcPrice": 77208,
     "isRealData": true
   },
@@ -11173,7 +11173,7 @@
     "spread180d30d": -0.52,
     "excessReturn": -2.75,
     "excessOverTBill": 0.75,
-    "carryScore": 11,
+    "carryScore": -20.3,
     "btcPrice": 77268,
     "isRealData": true
   },
@@ -11191,7 +11191,7 @@
     "spread180d30d": -0.67,
     "excessReturn": -2.64,
     "excessOverTBill": 0.86,
-    "carryScore": 10.6,
+    "carryScore": -20.8,
     "btcPrice": 76804,
     "isRealData": true
   },
@@ -11209,7 +11209,7 @@
     "spread180d30d": 0.03,
     "excessReturn": -3.05,
     "excessOverTBill": 0.45,
-    "carryScore": -12.2,
+    "carryScore": -18.1,
     "btcPrice": 78183,
     "isRealData": true
   },
@@ -11227,7 +11227,7 @@
     "spread180d30d": -2.4,
     "excessReturn": -1.41,
     "excessOverTBill": 2.09,
-    "carryScore": 5.6,
+    "carryScore": -26.5,
     "btcPrice": 75583,
     "isRealData": true
   },
@@ -11245,7 +11245,7 @@
     "spread180d30d": -2.82,
     "excessReturn": -1.11,
     "excessOverTBill": 2.39,
-    "carryScore": 4.4,
+    "carryScore": -28,
     "btcPrice": 76144,
     "isRealData": true
   },
@@ -11263,7 +11263,7 @@
     "spread180d30d": -2.91,
     "excessReturn": -1.13,
     "excessOverTBill": 2.37,
-    "carryScore": 4.5,
+    "carryScore": -28.9,
     "btcPrice": 76353,
     "isRealData": true
   },
@@ -11281,7 +11281,7 @@
     "spread180d30d": -1.48,
     "excessReturn": -1.98,
     "excessOverTBill": 1.52,
-    "carryScore": 7.9,
+    "carryScore": -23.2,
     "btcPrice": 80877,
     "isRealData": true
   },
@@ -11299,7 +11299,7 @@
     "spread180d30d": -4.32,
     "excessReturn": -0.08,
     "excessOverTBill": 3.42,
-    "carryScore": 0.3,
+    "carryScore": -33.6,
     "btcPrice": 81234,
     "isRealData": true
   }

@@ -2169,8 +2169,8 @@ function renderTermPremium(data, forceRedraw = false) {
     }
     if (elTpScoreValue && c.carryScore !== undefined) {
       elTpScoreValue.textContent = `${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
-      if (c.carryScore > 15) elTpScoreValue.style.color = '#10b981';
-      else if (c.carryScore > 5) elTpScoreValue.style.color = '#f59e0b';
+      if (c.carryScore >= 10) elTpScoreValue.style.color = '#10b981';
+      else if (c.carryScore >= -15) elTpScoreValue.style.color = '#f59e0b';
       else elTpScoreValue.style.color = '#f43f5e';
     }
     if (elTpExcessVal && c.excessReturn !== undefined) {
@@ -2178,8 +2178,10 @@ function renderTermPremium(data, forceRedraw = false) {
       elTpExcessVal.style.color = c.excessReturn >= 0 ? '#10b981' : '#f43f5e';
     }
     if (elTpScoreBarFill && c.carryScore !== undefined) {
-      const pct = Math.max(5, Math.min(95, ((c.carryScore + 10) / 40) * 100));
+      // Map [-60, +60] smoothly to [5%, 95%] with 0 at 50%
+      const pct = Math.max(5, Math.min(95, ((c.carryScore + 60) / 120) * 100));
       elTpScoreBarFill.style.width = `${pct}%`;
+      elTpScoreBarFill.style.backgroundColor = c.carryScore >= 10 ? '#10b981' : (c.carryScore >= -15 ? '#f59e0b' : '#f43f5e');
     }
   }
 

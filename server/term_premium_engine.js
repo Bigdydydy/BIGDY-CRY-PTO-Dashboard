@@ -15,7 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { getHistoricalBasisData } = require('./basis_fetcher');
+const { getHistoricalBasisData, calculateCarryScore } = require('./basis_fetcher');
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const T_BILL_RATE = 4.5; // 4.5% US Treasury Bill risk-free rate
@@ -165,8 +165,8 @@ async function loadHistoricalBasisSeries(liveCurrent) {
     target.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
     target.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
     target.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    const sign = target.spread90d7d >= 0 ? 1 : -1;
-    target.carryScore = Number(((target.excessReturn / 25.0) * sign * 100).toFixed(1));
+    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
+    target.carryScore = calculateCarryScore(target.excessReturn, target.spread90d7d);
     if (liveCurrent.spotPrice) target.btcPrice = Math.round(liveCurrent.spotPrice);
     if (liveCurrent.timestamp) target.timestamp = liveCurrent.timestamp;
     target.isLiveDeribit = true;
@@ -198,8 +198,8 @@ function generateHistoricalSeries(liveCurrent) {
     last.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
     last.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
     last.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    const sign = last.spread90d7d >= 0 ? 1 : -1;
-    last.carryScore = Number(((last.excessReturn / 25.0) * sign * 100).toFixed(1));
+    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
+    last.carryScore = calculateCarryScore(last.excessReturn, last.spread90d7d);
     if (liveCurrent.spotPrice) last.btcPrice = Math.round(liveCurrent.spotPrice);
   }
   return series;
@@ -334,6 +334,7 @@ module.exports = {
   generateHistoricalSeries,
   evaluateCarryRegime,
   analyzeTermPremium,
+  calculateCarryScore,
   T_BILL_RATE,
   HURDLE_RATE
 };

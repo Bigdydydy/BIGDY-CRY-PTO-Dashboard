@@ -49,6 +49,16 @@ function interpolate(x, x0, x1, y0, y1) {
 }
 
 /**
+ * Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
+ * Strictly bounded [-100, +100]. 0.0 corresponds to neutral hurdle (8% APR + flat curve)
+ */
+function calculateCarryScore(excessReturn, spread90d7d) {
+  const yieldScore = Math.max(-60, Math.min(60, (excessReturn / 10.0) * 60));
+  const structScore = Math.max(-40, Math.min(40, (spread90d7d / 4.0) * 40));
+  return Number((yieldScore + structScore).toFixed(1));
+}
+
+/**
  * Fetch all historical basis data from Binance DAPI for a given contract type
  */
 async function fetchBinanceBasisSeries(contractType, startTs = new Date('2025-01-01T00:00:00Z').getTime()) {
@@ -146,8 +156,9 @@ async function fetchAndBuildHistoricalBasis() {
     const spread180d30d = Number((apr180d - apr30d).toFixed(2));
     const excessReturn = Number((apr30d - 8.0).toFixed(2)); // Against 8.0% institutional hurdle rate
     const excessOverTBill = Number((apr30d - 4.5).toFixed(2)); // Against 4.5% risk-free T-Bill
-    const sign = spread90d7d >= 0 ? 1 : -1;
-    const carryScore = Number(((excessReturn / 25.0) * sign * 100).toFixed(1));
+
+    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
+    const carryScore = calculateCarryScore(excessReturn, spread90d7d);
     const btcPrice = Math.round(Number(cq.indexPrice));
 
     resultSeries.push({
@@ -233,5 +244,6 @@ async function getHistoricalBasisData(forceRefresh = false) {
 module.exports = {
   getHistoricalBasisData,
   fetchAndBuildHistoricalBasis,
+  calculateCarryScore,
   CACHE_FILE
 };
