@@ -330,7 +330,8 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
     loadHistoricalBasisSeries,
     evaluateCarryRegime,
     analyzeTermPremium,
-    T_BILL_RATE
+    T_BILL_RATE,
+    HURDLE_RATE
   } = require('../server/term_premium_engine');
 
   test('Verified real historical dataset exists and is clean', () => {
@@ -341,6 +342,7 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
     assert.ok(series.length >= 600, `Dataset must contain >= 600 daily records, got ${series.length}`);
 
     // Check chronological order and validity of fields
+    let sum30d = 0;
     for (let i = 0; i < series.length; i++) {
       const row = series[i];
       assert.ok(typeof row.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date), `Row ${i} date format`);
@@ -349,13 +351,19 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
       }
       assert.ok(typeof row.apr7d === 'number' && !isNaN(row.apr7d), `Row ${i} apr7d`);
       assert.ok(typeof row.apr30d === 'number' && !isNaN(row.apr30d), `Row ${i} apr30d`);
+      assert.ok(typeof row.apr60d === 'number' && !isNaN(row.apr60d), `Row ${i} apr60d`);
       assert.ok(typeof row.apr90d === 'number' && !isNaN(row.apr90d), `Row ${i} apr90d`);
       assert.ok(typeof row.apr180d === 'number' && !isNaN(row.apr180d), `Row ${i} apr180d`);
       assert.ok(typeof row.spread90d7d === 'number' && !isNaN(row.spread90d7d), `Row ${i} spread90d7d`);
       assert.ok(typeof row.spread30d7d === 'number' && !isNaN(row.spread30d7d), `Row ${i} spread30d7d`);
       assert.ok(typeof row.excessReturn === 'number' && !isNaN(row.excessReturn), `Row ${i} excessReturn`);
       assert.ok(typeof row.carryScore === 'number' && !isNaN(row.carryScore), `Row ${i} carryScore`);
+      sum30d += row.apr30d;
     }
+
+    // Economically sound check: avg 30D basis should be > 4.0% (verifies upstream Binance bug fix)
+    const avg30d = sum30d / series.length;
+    assert.ok(avg30d > 4.0, `Average 30D basis rate should be > 4.0%, got ${avg30d.toFixed(2)}%`);
   });
 
   test('analyzeTermPremium returns verified real metadata and current regime', async () => {
@@ -365,9 +373,11 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
     assert.ok(result.metadata.dataSource.includes('Binance'));
     assert.ok(result.series.length >= 600);
     assert.ok(result.current);
+    assert.ok(typeof result.current.apr60d === 'number');
     assert.ok(result.regime);
     assert.ok(result.regime.regimeCode);
     assert.equal(result.tBillRate, T_BILL_RATE);
+    assert.equal(result.hurdleRate, HURDLE_RATE);
   });
 
   test('evaluateCarryRegime classifies normal contango vs overcrowded inversion', () => {

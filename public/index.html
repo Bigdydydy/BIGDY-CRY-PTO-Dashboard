@@ -900,11 +900,15 @@
                 <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
                 <span>30D 基差 APR</span>
               </button>
+              <button class="tp-legend-btn active" data-series="hurdle" id="btn-toggle-hurdle" title="8.0% 机构资本机会成本基准线">
+                <span class="legend-color-dot" style="background-color: #ec4899;"></span>
+                <span>8.0% 机构资本成本</span>
+              </button>
               <button class="tp-legend-btn active" data-series="tbill" id="btn-toggle-tbill" title="4.5% 美债无风险利率基准">
                 <span class="legend-color-dot" style="background-color: #f43f5e;"></span>
                 <span>4.5% 美债机会成本</span>
               </button>
-              <button class="tp-legend-btn" data-series="allCurves" id="btn-toggle-all-curves" title="显示全部常数基差曲线 (7D/90D/180D)">
+              <button class="tp-legend-btn" data-series="allCurves" id="btn-toggle-all-curves" title="显示全部常数基差曲线 (7D/60D/90D/180D)">
                 <span class="legend-color-dot" style="background-color: #64748b;"></span>
                 <span>展开全期限曲线</span>
               </button>
@@ -919,10 +923,10 @@
             <div class="tp-data-audit-strip">
               <div class="tp-audit-left">
                 <span><strong class="text-cyan">数据源:</strong> Binance COIN-M 季度交割基差 (DAPI 2025.01 ~ 至今真实日线) + Deribit 实时盘口</span>
-                <span><strong class="text-cyan">插值模型:</strong> 恒定到期 (7D/30D/90D/180D)</span>
-                <span><strong class="text-cyan">缺失处理:</strong> 时间加权线性插值与前值顺延</span>
+                <span><strong class="text-cyan">插值模型:</strong> 恒定到期 (7D/30D/60D/90D/180D)</span>
+                <span><strong class="text-cyan">资本成本基准:</strong> 8.0% 机构机会成本 / 4.5% 美债无风险利率</span>
               </div>
-              <span id="tp-history-points-badge" class="tp-audit-right">625+ 真实历史日线</span>
+              <span id="tp-history-points-badge" class="tp-audit-right">628 真实历史日线</span>
             </div>
           </div>
 
@@ -942,6 +946,10 @@
                 <div class="tp-basis-item highlight">
                   <span class="tp-b-lbl">30D 主力端</span>
                   <span class="tp-b-val" id="tp-val-30d">--%</span>
+                </div>
+                <div class="tp-basis-item">
+                  <span class="tp-b-lbl">60D 中期端</span>
+                  <span class="tp-b-val" id="tp-val-60d">--%</span>
                 </div>
                 <div class="tp-basis-item">
                   <span class="tp-b-lbl">90D 季度端</span>

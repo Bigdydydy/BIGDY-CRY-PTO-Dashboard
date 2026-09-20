@@ -2032,6 +2032,7 @@ let tpVisibleSeries = {
   spread30d7d: true,
   spread180d30d: true,
   apr30d: true,
+  hurdle: true,
   tbill: true,
   allCurves: false
 };
@@ -2046,6 +2047,7 @@ const elTpHistoryPointsBadge = document.getElementById('tp-history-points-badge'
 
 const elTpVal7d = document.getElementById('tp-val-7d');
 const elTpVal30d = document.getElementById('tp-val-30d');
+const elTpVal60d = document.getElementById('tp-val-60d');
 const elTpVal90d = document.getElementById('tp-val-90d');
 const elTpVal180d = document.getElementById('tp-val-180d');
 
@@ -2068,6 +2070,7 @@ const btnToggleSpread90d7d = document.getElementById('btn-toggle-spread90d7d');
 const btnToggleSpread30d7d = document.getElementById('btn-toggle-spread30d7d');
 const btnToggleSpread180d30d = document.getElementById('btn-toggle-spread180d30d');
 const btnToggleApr30d = document.getElementById('btn-toggle-apr30d');
+const btnToggleHurdle = document.getElementById('btn-toggle-hurdle');
 const btnToggleTbill = document.getElementById('btn-toggle-tbill');
 const btnToggleAllCurves = document.getElementById('btn-toggle-all-curves');
 
@@ -2132,6 +2135,10 @@ function renderTermPremium(data, forceRedraw = false) {
     if (elTpVal30d) {
       elTpVal30d.textContent = `${c.apr30d >= 0 ? '+' : ''}${c.apr30d.toFixed(2)}%`;
       elTpVal30d.style.color = '#f59e0b';
+    }
+    if (elTpVal60d) {
+      elTpVal60d.textContent = `${c.apr60d !== undefined ? (c.apr60d >= 0 ? '+' : '') + c.apr60d.toFixed(2) + '%' : '--%'}`;
+      elTpVal60d.style.color = '#38bdf8';
     }
     if (elTpVal90d) {
       elTpVal90d.textContent = `${c.apr90d >= 0 ? '+' : ''}${c.apr90d.toFixed(2)}%`;
@@ -2216,6 +2223,7 @@ function renderTermPremiumChart() {
 
   const dates = sliced.map(s => s.date);
   const apr30dData = sliced.map(s => s.apr30d);
+  const hurdleData = sliced.map(() => 8.0);
   const tbillData = sliced.map(() => 4.5);
   const spread90d7dData = sliced.map(s => s.spread90d7d);
   const spread30d7dData = sliced.map(s => s.spread30d7d);
@@ -2238,21 +2246,52 @@ function renderTermPremiumChart() {
       itemStyle: { color: '#f59e0b' },
       markArea: {
         silent: true,
-        data: [[
-          {
-            yAxis: -15,
-            itemStyle: { color: 'rgba(244, 63, 94, 0.05)' },
-            label: {
-              show: true,
-              position: 'insideBottomRight',
-              color: 'rgba(244, 63, 94, 0.65)',
-              fontSize: 10,
-              formatter: '美债机会成本劣势区 (<5%)'
-            }
-          },
-          { yAxis: 5.0 }
-        ]]
+        data: [
+          [
+            {
+              yAxis: -15,
+              itemStyle: { color: 'rgba(244, 63, 94, 0.04)' },
+              label: {
+                show: true,
+                position: 'insideBottomRight',
+                color: 'rgba(244, 63, 94, 0.65)',
+                fontSize: 10,
+                formatter: '机会成本劣势区 (<8.0%)'
+              }
+            },
+            { yAxis: 8.0 }
+          ],
+          [
+            {
+              yAxis: 8.0,
+              itemStyle: { color: 'rgba(16, 185, 129, 0.03)' },
+              label: {
+                show: true,
+                position: 'insideTopRight',
+                color: 'rgba(16, 185, 129, 0.65)',
+                fontSize: 10,
+                formatter: '结构性套利扩张区 (>8.0%)'
+              }
+            },
+            { yAxis: 30 }
+          ]
+        ]
       }
+    });
+  }
+
+  // Top Grid Series: 8.0% Institutional Hurdle Rate
+  if (tpVisibleSeries.hurdle) {
+    seriesList.push({
+      id: 'top-hurdle',
+      name: '8.0% 机构资本成本',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: hurdleData,
+      lineStyle: { width: 1.8, color: '#ec4899', type: 'dashed' },
+      itemStyle: { color: '#ec4899' }
     });
   }
 
@@ -2266,12 +2305,12 @@ function renderTermPremiumChart() {
       yAxisIndex: 0,
       showSymbol: false,
       data: tbillData,
-      lineStyle: { width: 1.8, color: '#f43f5e', type: 'dashed' },
+      lineStyle: { width: 1.5, color: '#f43f5e', type: 'dotted' },
       itemStyle: { color: '#f43f5e' }
     });
   }
 
-  // Top Grid Series: Optional Full Curve (7D, 90D, 180D)
+  // Top Grid Series: Optional Full Curve (7D, 60D, 90D, 180D)
   if (tpVisibleSeries.allCurves) {
     seriesList.push({
       id: 'top-apr7d',
@@ -2283,6 +2322,17 @@ function renderTermPremiumChart() {
       data: sliced.map(s => s.apr7d),
       lineStyle: { width: 1.2, color: '#a1a1aa', type: 'dotted' },
       itemStyle: { color: '#a1a1aa' }
+    });
+    seriesList.push({
+      id: 'top-apr60d',
+      name: '60D 中期端 APR',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      showSymbol: false,
+      data: sliced.map(s => s.apr60d),
+      lineStyle: { width: 1.4, color: '#818cf8', type: 'dotted' },
+      itemStyle: { color: '#818cf8' }
     });
     seriesList.push({
       id: 'top-apr90d',
@@ -2551,6 +2601,7 @@ function initTermPremiumEvents() {
   setupToggle(btnToggleSpread30d7d, 'spread30d7d');
   setupToggle(btnToggleSpread180d30d, 'spread180d30d');
   setupToggle(btnToggleApr30d, 'apr30d');
+  setupToggle(btnToggleHurdle, 'hurdle');
   setupToggle(btnToggleTbill, 'tbill');
 
   if (btnToggleAllCurves) {

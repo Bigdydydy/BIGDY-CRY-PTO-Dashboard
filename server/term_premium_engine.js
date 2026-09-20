@@ -18,7 +18,8 @@ const path = require('path');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-const T_BILL_RATE = 4.5; // 4.5% US Treasury Bill benchmark rate
+const T_BILL_RATE = 4.5; // 4.5% US Treasury Bill risk-free rate
+const HURDLE_RATE = 8.0; // 8.0% Institutional Capital Opportunity Cost Benchmark
 
 /**
  * Parses Deribit futures expiry e.g. "BTC-25SEP26" -> Date object (at 08:00 UTC)
@@ -42,7 +43,7 @@ function interpolate(x, x0, x1, y0, y1) {
 }
 
 /**
- * Calculates Constant Maturity Basis APRs (7D, 30D, 90D, 180D) from live futures curve
+ * Calculates Constant Maturity Basis APRs (7D, 30D, 60D, 90D, 180D) from live futures curve
  */
 function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()) {
   if (!futuresList || !futuresList.length || !spotPrice || spotPrice <= 0) {
@@ -100,6 +101,7 @@ function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()
 
   const apr7d = getAPRAtDay(7);
   const apr30d = getAPRAtDay(30);
+  const apr60d = getAPRAtDay(60);
   const apr90d = getAPRAtDay(90);
   const apr180d = getAPRAtDay(180);
 
@@ -108,6 +110,7 @@ function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()
     contracts,
     apr7d,
     apr30d,
+    apr60d,
     apr90d,
     apr180d,
     timestamp: now
@@ -153,14 +156,17 @@ async function loadHistoricalBasisSeries(liveCurrent) {
 
     target.apr7d = liveCurrent.apr7d;
     target.apr30d = liveCurrent.apr30d;
+    target.apr60d = liveCurrent.apr60d;
     target.apr90d = liveCurrent.apr90d;
     target.apr180d = liveCurrent.apr180d;
     target.spread90d7d = Number((liveCurrent.apr90d - liveCurrent.apr7d).toFixed(2));
     target.spread30d7d = Number((liveCurrent.apr30d - liveCurrent.apr7d).toFixed(2));
+    target.spread60d30d = Number((liveCurrent.apr60d - liveCurrent.apr30d).toFixed(2));
     target.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
-    target.excessReturn = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
+    target.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
+    target.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
     const sign = target.spread90d7d >= 0 ? 1 : -1;
-    target.carryScore = Number(((target.excessReturn / 34.0) * sign * 100).toFixed(1));
+    target.carryScore = Number(((target.excessReturn / 25.0) * sign * 100).toFixed(1));
     if (liveCurrent.spotPrice) target.btcPrice = Math.round(liveCurrent.spotPrice);
     if (liveCurrent.timestamp) target.timestamp = liveCurrent.timestamp;
     target.isLiveDeribit = true;
@@ -183,14 +189,17 @@ function generateHistoricalSeries(liveCurrent) {
     const last = series[series.length - 1];
     last.apr7d = liveCurrent.apr7d;
     last.apr30d = liveCurrent.apr30d;
+    last.apr60d = liveCurrent.apr60d;
     last.apr90d = liveCurrent.apr90d;
     last.apr180d = liveCurrent.apr180d;
     last.spread90d7d = Number((liveCurrent.apr90d - liveCurrent.apr7d).toFixed(2));
     last.spread30d7d = Number((liveCurrent.apr30d - liveCurrent.apr7d).toFixed(2));
+    last.spread60d30d = Number((liveCurrent.apr60d - liveCurrent.apr30d).toFixed(2));
     last.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
-    last.excessReturn = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
+    last.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
+    last.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
     const sign = last.spread90d7d >= 0 ? 1 : -1;
-    last.carryScore = Number(((last.excessReturn / 34.0) * sign * 100).toFixed(1));
+    last.carryScore = Number(((last.excessReturn / 25.0) * sign * 100).toFixed(1));
     if (liveCurrent.spotPrice) last.btcPrice = Math.round(liveCurrent.spotPrice);
   }
   return series;
@@ -200,7 +209,7 @@ function generateHistoricalSeries(liveCurrent) {
  * Evaluates current Term Premium & Carry Regime state
  */
 function evaluateCarryRegime(latest, contracts) {
-  const { apr7d, apr30d, apr90d, apr180d, spread90d7d, spread30d7d, spread180d30d, excessReturn, carryScore } = latest;
+  const { apr7d, apr30d, apr60d, apr90d, apr180d, spread90d7d, spread30d7d, spread180d30d, excessReturn, carryScore } = latest;
 
   let regimeCode = 'NORMAL_CONTANGO';
   let regimeName = '标准正向升水 (Healthy Contango)';
@@ -230,26 +239,26 @@ function evaluateCarryRegime(latest, contracts) {
       `流动性真空：现货卖压导致盘口滑点扩大，做市商撤单形成负反馈循环。`,
       `避险情绪蔓延：远期缺乏升水支撑，市场进入极端防御与去杠杆通道。`
     ];
-  } else if (apr30d < 5.0) {
-    // Marginal Carry / Dead Carry (Section 5: 64% of 2025)
+  } else if (apr30d < 8.0) {
+    // Marginal Carry / Sub-Hurdle Carry (below 8.0% institutional cost)
     regimeCode = 'MARGINAL_CARRY';
-    regimeName = '微利鸡肋观望期 (Marginal / Dead Carry)';
+    regimeName = '微利观望 / 成本倒挂 (Sub-Hurdle / Marginal Carry)';
     regimeBadgeClass = 'badge-warning';
-    statusSummary = `30D 基差 (${apr30d}%) 低于或贴近 4.5% 美债无风险利率（超额收益 ${excessReturn}%），扣除交易摩擦后缺乏配置吸引力，资金回流无风险理财。`;
+    statusSummary = `30D 基差 (${apr30d}%) 低于 8.0% 机构资本机会成本门槛（超额收益 ${excessReturn}%），扣除借贷利息、对冲滑点与交易所对手方风险后，套利盈亏比缺乏吸引力。`;
     keyPointers = [
-      `机会成本劣势：基差收益无法有效覆盖交易摩擦与交易所对手方风险，机构资金选择观望。`,
-      `期限结构扁平：7D 至 180D 跨期利差维持在 ${spread90d7d}% 极窄区间，缺乏波动弹性。`,
-      `等待机制转换：需静待宏观流动性转向或现货强买盘推动基差重新回升至 8% 以上。`
+      `机构资本成本劣势：基差无法覆盖 8.0% 资金机会成本（包含无风险利率 4.5% + 3.5% 风险溢价），套利资金入场动能减弱。`,
+      `期限结构扁平：30D 与 90D 利差维持在极窄区间，缺乏波动弹性与展期收益。`,
+      `等待机制转换：需静待现货强买盘或杠杆多头推动主力基差重新跨越 8.0% 临界线，打开套利空间。`
     ];
   } else {
-    // Normal Contango (>5% and healthy slope)
+    // Healthy Contango (> 8.0%)
     regimeCode = 'NORMAL_CONTANGO';
     regimeName = '标准正向升水 (Healthy Contango)';
     regimeBadgeClass = 'badge-pos';
-    statusSummary = `基差期限结构健康向上倾斜（90D-7D 溢价 +${spread90d7d}%），30D 基差 (${apr30d}%) 提供稳定的无风险超额收益 (+${excessReturn}%)，机构套利环境顺畅。`;
+    statusSummary = `基差期限结构健康向上倾斜（90D-7D 溢价 +${spread90d7d}%），30D 基差 (${apr30d}%) 高于 8.0% 机构资本机会成本（超额收益 +${excessReturn}%），具备稳健的跨期套利空间。`;
     keyPointers = [
       `正向升水结构：远期稳定维持溢价，反映市场对后市持有持续乐观的温和风险偏好。`,
-      `展期套利顺畅：期现对冲仓位可获取稳定年化利息，吸引合规长线资金持续入场沉淀。`,
+      `展期套利顺畅：期现对冲仓位可获取超越 8.0% 资金成本的稳健年化收益，吸引合规长线资金持续入场。`,
       `跨期利差健康：短端与远端利差保持合理斜率，做市商报价连续且具备充足深度缓冲。`
     ];
   }
@@ -272,12 +281,15 @@ async function analyzeTermPremium(futuresList, spotPrice) {
   const latest = historicalSeries[historicalSeries.length - 1] || {
     apr7d: 8.5,
     apr30d: 9.0,
+    apr60d: 9.4,
     apr90d: 9.8,
     apr180d: 10.5,
     spread90d7d: 1.3,
     spread30d7d: 0.5,
+    spread60d30d: 0.4,
     spread180d30d: 1.5,
-    excessReturn: 4.5,
+    excessReturn: 1.0,
+    excessOverTBill: 4.5,
     carryScore: 13.2,
     timestamp: Date.now(),
     date: new Date().toISOString().slice(0, 10)
@@ -287,6 +299,7 @@ async function analyzeTermPremium(futuresList, spotPrice) {
   return {
     spotPrice: live?.spotPrice || spotPrice,
     tBillRate: T_BILL_RATE,
+    hurdleRate: HURDLE_RATE,
     metadata: {
       dataSource: 'Binance COIN-M Delivery Futures 真实交割基差 (2025.01 ~ 至今) + Deribit 实时盘口恒定到期插值',
       timeRange: '2025-01-01 至当前最新',
@@ -296,12 +309,15 @@ async function analyzeTermPremium(futuresList, spotPrice) {
     current: {
       apr7d: latest.apr7d,
       apr30d: latest.apr30d,
+      apr60d: latest.apr60d,
       apr90d: latest.apr90d,
       apr180d: latest.apr180d,
       spread90d7d: latest.spread90d7d,
       spread30d7d: latest.spread30d7d,
+      spread60d30d: latest.spread60d30d,
       spread180d30d: latest.spread180d30d,
       excessReturn: latest.excessReturn,
+      excessOverTBill: latest.excessOverTBill,
       carryScore: latest.carryScore,
       timestamp: latest.timestamp,
       date: latest.date
@@ -318,6 +334,7 @@ module.exports = {
   generateHistoricalSeries,
   evaluateCarryRegime,
   analyzeTermPremium,
-  T_BILL_RATE
+  T_BILL_RATE,
+  HURDLE_RATE
 };
 

@@ -103,37 +103,51 @@ async function fetchAndBuildHistoricalBasis() {
     const daysToQ1 = Math.max(0.5, (q1Expiry.getTime() - dateObj.getTime()) / 86400000);
     const daysToQ2 = Math.max(daysToQ1 + 10, (q2Expiry.getTime() - dateObj.getTime()) / 86400000);
 
-    const cqApr = Number(cq.annualizedBasisRate) * 100;
-    const nqApr = nq ? Number(nq.annualizedBasisRate) * 100 : cqApr;
+    // Calculate true annualized basis APR: basisRate * (365 / daysToExpiry) * 100%
+    // Note: Do not use Binance cq.annualizedBasisRate directly as it uses live contract expiry for historical queries
+    const effectiveDaysQ1 = Math.max(3, daysToQ1);
+    const effectiveDaysQ2 = Math.max(14, daysToQ2);
 
-    // Constant maturity interpolation for 7D, 30D, 90D, 180D
+    const cqBasisRate = Number(cq.basisRate) || (Number(cq.basis) / Number(cq.indexPrice));
+    const cqApr = Number((cqBasisRate * (365 / effectiveDaysQ1) * 100).toFixed(2));
+
+    let nqApr = cqApr;
+    if (nq) {
+      const nqBasisRate = Number(nq.basisRate) || (Number(nq.basis) / Number(nq.indexPrice));
+      nqApr = Number((nqBasisRate * (365 / effectiveDaysQ2) * 100).toFixed(2));
+    }
+
+    // Constant maturity interpolation for 7D, 30D, 60D, 90D, 180D
     function getAPRAtDay(targetD) {
       if (targetD <= daysToQ1) {
         // Extrapolate towards short end
         const slope = (nqApr - cqApr) / (daysToQ2 - daysToQ1);
         const val = cqApr - (daysToQ1 - targetD) * slope * 0.8;
-        return Math.max(0.2, val);
+        return Number(val.toFixed(2));
       }
       if (targetD >= daysToQ2) {
         // Project long end with gentle slope dampening
         const slope = (nqApr - cqApr) / (daysToQ2 - daysToQ1);
         const val = nqApr + (targetD - daysToQ2) * slope * 0.5;
-        return Math.max(0.5, val);
+        return Number(val.toFixed(2));
       }
-      return interpolate(targetD, daysToQ1, daysToQ2, cqApr, nqApr);
+      return Number(interpolate(targetD, daysToQ1, daysToQ2, cqApr, nqApr).toFixed(2));
     }
 
-    const apr7d = Number(getAPRAtDay(7).toFixed(2));
-    const apr30d = Number(getAPRAtDay(30).toFixed(2));
-    const apr90d = Number(getAPRAtDay(90).toFixed(2));
-    const apr180d = Number(getAPRAtDay(180).toFixed(2));
+    const apr7d = getAPRAtDay(7);
+    const apr30d = getAPRAtDay(30);
+    const apr60d = getAPRAtDay(60);
+    const apr90d = getAPRAtDay(90);
+    const apr180d = getAPRAtDay(180);
 
     const spread90d7d = Number((apr90d - apr7d).toFixed(2));
     const spread30d7d = Number((apr30d - apr7d).toFixed(2));
+    const spread60d30d = Number((apr60d - apr30d).toFixed(2));
     const spread180d30d = Number((apr180d - apr30d).toFixed(2));
-    const excessReturn = Number((apr30d - 4.5).toFixed(2));
+    const excessReturn = Number((apr30d - 8.0).toFixed(2)); // Against 8.0% institutional hurdle rate
+    const excessOverTBill = Number((apr30d - 4.5).toFixed(2)); // Against 4.5% risk-free T-Bill
     const sign = spread90d7d >= 0 ? 1 : -1;
-    const carryScore = Number(((excessReturn / 35.0) * sign * 100).toFixed(1));
+    const carryScore = Number(((excessReturn / 25.0) * sign * 100).toFixed(1));
     const btcPrice = Math.round(Number(cq.indexPrice));
 
     resultSeries.push({
@@ -141,12 +155,15 @@ async function fetchAndBuildHistoricalBasis() {
       timestamp: cq.timestamp,
       apr7d,
       apr30d,
+      apr60d,
       apr90d,
       apr180d,
       spread90d7d,
       spread30d7d,
+      spread60d30d,
       spread180d30d,
       excessReturn,
+      excessOverTBill,
       carryScore,
       btcPrice,
       isRealData: true
