@@ -1098,6 +1098,84 @@ describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes',
   });
 });
 
+describe('System Audit & Data Provenance Verification Engine', () => {
+  const { getSystemAuditData } = require('../server/audit_engine');
+
+  test('getSystemAuditData returns complete registry of all 11 quantitative modules with provenance signatures', async () => {
+    const audit = await getSystemAuditData(false);
+    assert.equal(audit.code, 0);
+    assert.ok(audit.serverTimeUTC);
+    assert.ok(typeof audit.serverUptimeSeconds === 'number');
+    assert.ok(['HEALTHY', 'DEGRADED'].includes(audit.overallHealth));
+    assert.equal(audit.modulesCount, 11, 'Must register exactly 11 core modules');
+    assert.ok(audit.onlineModulesCount >= 8, 'At least 8 modules must be online');
+
+    const expectedModules = [
+      'macro_liquidity',
+      'option_atm_iv',
+      'term_premium_basis',
+      'dynamic_gex',
+      'whale_block_trades',
+      'iv_smile_and_skew',
+      'coinbase_orderbook_liquidity',
+      'gold_btc_correlation',
+      'ssro_oscillator',
+      'crypto_mcclellan_breadth',
+      'ai_btc_tension'
+    ];
+
+    for (const modId of expectedModules) {
+      const mod = audit.modules[modId];
+      assert.ok(mod, `Module ${modId} must exist in audit report`);
+      assert.ok(mod.name, `${modId} must have human-readable name`);
+      assert.ok(mod.primarySource, `${modId} must specify official primary source`);
+      assert.ok(Array.isArray(mod.targetEndpoints) && mod.targetEndpoints.length > 0, `${modId} targetEndpoints`);
+      assert.ok(mod.timeframe, `${modId} timeframe description`);
+      assert.ok(mod.updateInterval, `${modId} updateInterval`);
+      assert.equal(mod.isRealtime, true, `${modId} isRealtime`);
+      assert.ok(Array.isArray(mod.provenanceSignatures) && mod.provenanceSignatures.length > 0, `${modId} provenanceSignatures`);
+      assert.ok(['ONLINE', 'INITIALIZING'].includes(mod.healthStatus), `${modId} healthStatus`);
+    }
+
+    // Specific financial & provenance integrity checks
+    assert.ok(audit.modules.macro_liquidity.recordCount >= 2000, 'Macro points count');
+    assert.ok(audit.modules.macro_liquidity.mstrPurchasesCount >= 100, 'MSTR official purchases count');
+    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('AMBERDATA_5_STAGE_REGIME_STATE_MACHINE'));
+    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('AMBERDATA_0.50PCT_ETF_FRICTION_THRESHOLD'));
+    assert.ok(audit.modules.gold_btc_correlation.recordCount >= 1000, 'Gold PAXG 1000 daily points');
+    assert.ok(audit.modules.ssro_oscillator.recordCount >= 2000, 'DefiLlama & BTC joined series 2000+ points');
+  });
+
+  test('HTTP Endpoint GET /api/system/audit returns 200 with code 0 and ETag 304', async () => {
+    const { server } = require('../server/index');
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', async () => {
+        const port = server.address().port;
+        try {
+          const resp = await fetch(`http://127.0.0.1:${port}/api/system/audit`);
+          assert.equal(resp.status, 200);
+          const json = await resp.json();
+          assert.equal(json.code, 0);
+          assert.equal(json.modulesCount, 11);
+          assert.ok(json.modules.macro_liquidity);
+          assert.ok(json.modules.coinbase_orderbook_liquidity);
+
+          // Test ETag
+          const etag = resp.headers.get('etag');
+          if (etag) {
+            const cachedResp = await fetch(`http://127.0.0.1:${port}/api/system/audit`, {
+              headers: { 'if-none-match': etag }
+            });
+            assert.equal(cachedResp.status, 304);
+          }
+        } finally {
+          server.close(resolve);
+        }
+      });
+    });
+  });
+});
+
 
 
 

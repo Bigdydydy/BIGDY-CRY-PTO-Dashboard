@@ -20,6 +20,7 @@ const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
+const { getSystemAuditData } = require('./audit_engine');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -346,6 +347,19 @@ async function handleApiRequest(req, res, parsedUrl) {
       });
     } catch (err) {
       console.error('[API Error] crypto-mcclellan:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/system/audit or GET /api/audit (Comprehensive Data Provenance & Health Audit)
+  if ((pathname === '/api/system/audit' || pathname === '/api/audit') && req.method === 'GET') {
+    try {
+      const doProbe = parsedUrl.query?.probe === '1' || parsedUrl.query?.probe === 'true';
+      const auditPayload = await getSystemAuditData(doProbe);
+      sendJsonResponse(req, res, 200, auditPayload);
+    } catch (err) {
+      console.error('[API Error] system-audit:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
     }
     return;
