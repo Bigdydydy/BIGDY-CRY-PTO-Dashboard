@@ -451,22 +451,25 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
     assert.equal(result.hurdleRate, HURDLE_RATE);
   });
 
-  test('evaluateCarryRegime classifies normal contango vs overcrowded inversion', () => {
-    const normalState = {
+  test('evaluateCarryRegime classifies all Amberdata institutional regimes accurately', () => {
+    const contangoState = {
       apr7d: 8.0,
       apr30d: 9.5,
+      apr60d: 10.2,
       apr90d: 11.0,
       apr180d: 12.5,
       spread90d7d: 3.0,
       spread30d7d: 1.5,
       spread180d30d: 3.0,
-      excessReturn: 5.0,
-      carryScore: 14.7
+      excessReturn: 1.5,
+      excessOverTBill: 5.0,
+      carryScore: 15.3,
+      unannualizedBasis30d: 0.78
     };
-    const r1 = evaluateCarryRegime(normalState, []);
+    const r1 = evaluateCarryRegime(contangoState, []);
     assert.equal(r1.regimeCode, 'NORMAL_CONTANGO');
 
-    const invertedState = {
+    const overcrowdedState = {
       apr7d: 15.0,
       apr30d: 13.0,
       apr90d: 12.0,
@@ -474,27 +477,76 @@ describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
       spread90d7d: -3.0,
       spread30d7d: -2.0,
       spread180d30d: -2.0,
-      excessReturn: 8.5,
-      carryScore: -25.0
+      excessReturn: 5.0,
+      excessOverTBill: 8.5,
+      carryScore: 10.4,
+      unannualizedBasis30d: 1.07
     };
-    const r2 = evaluateCarryRegime(invertedState, []);
+    const r2 = evaluateCarryRegime(overcrowdedState, []);
     assert.equal(r2.regimeCode, 'OVERCROWDED_INVERSION');
+
+    const subTbillState = {
+      apr7d: 4.0,
+      apr30d: 4.2,
+      apr90d: 4.6,
+      spread90d7d: 0.6,
+      spread30d7d: 0.2,
+      excessReturn: -3.8,
+      excessOverTBill: -0.3,
+      carryScore: -0.8,
+      unannualizedBasis30d: 0.35
+    };
+    const r3 = evaluateCarryRegime(subTbillState, []);
+    assert.equal(r3.regimeCode, 'SUB_TBILL_DRAIN');
+
+    const marginalState = {
+      apr7d: 6.5,
+      apr30d: 7.2,
+      apr90d: 7.8,
+      spread90d7d: 1.3,
+      spread30d7d: 0.7,
+      excessReturn: -0.8,
+      excessOverTBill: 2.7,
+      carryScore: 7.9,
+      unannualizedBasis30d: 0.59
+    };
+    const r4 = evaluateCarryRegime(marginalState, []);
+    assert.equal(r4.regimeCode, 'MARGINAL_CARRY');
   });
 
-  test('calculateCarryScore correctly decouples yield and structure without sign inversion', () => {
+  test('calculateCarryScore implements Amberdata continuous risk-adjusted formula', () => {
     const { calculateCarryScore } = require('../server/term_premium_engine');
-    // 1. Positive excess and positive spread -> High positive score
-    const s1 = calculateCarryScore(3.0, 2.0); // (3/10)*60 + (2/4)*40 = 18 + 20 = 38.0
-    assert.equal(s1, 38.0);
+    // 1. High excess return (10.0% over T-bill) & steep curve (2.0%) -> Excellent tier (> 20)
+    const s1 = calculateCarryScore(10.0, 2.0, 45.0);
+    assert.equal(s1, 30.7);
+    assert.ok(s1 > 20, 'High excess with steep curve must be in Excellent tier (>20)');
 
-    // 2. Negative excess (-1.0%) and inverted spread (-3.0%) -> Strongly negative score (NOT positive!)
-    const s2 = calculateCarryScore(-1.0, -3.0); // (-1/10)*60 + (-3/4)*40 = -6 + (-30) = -36.0
-    assert.equal(s2, -36.0);
-    assert.ok(s2 < 0, 'Inverted curve with negative excess must never yield positive score');
+    // 2. Marginal excess (5.0% over T-bill) & positive curve (2.0%) -> Marginal tier (10 ~ 20)
+    const s2 = calculateCarryScore(5.0, 2.0, 45.0);
+    assert.equal(s2, 15.3);
+    assert.ok(s2 >= 10 && s2 <= 20, 'Moderate excess must be in Marginal tier (10~20)');
 
-    // 3. Neutral state: 0% excess and 0% spread -> 0.0
-    const s3 = calculateCarryScore(0.0, 0.0);
-    assert.equal(s3, 0.0);
+    // 3. Sub-hurdle excess (1.0% over T-bill) -> Avoid tier (< 10)
+    const s3 = calculateCarryScore(1.0, 2.0, 45.0);
+    assert.equal(s3, 3.1);
+    assert.ok(s3 < 10, 'Low excess must be in Avoid tier (<10)');
+
+    // 4. Negative excess (-1.0%) with inverted curve (-3.0%) -> Smooth negative score
+    const s4 = calculateCarryScore(-1.0, -3.0, 45.0);
+    assert.equal(s4, -1.2);
+    assert.ok(s4 < 0, 'Negative excess with inversion must be negative');
+
+    // 5. Neutral state: 0% excess and 0% spread -> 0.0
+    const s5 = calculateCarryScore(0.0, 0.0, 45.0);
+    assert.equal(s5, 0.0);
+  });
+
+  test('analyzeTermPremium outputs unannualized basis and ETF friction metrics', async () => {
+    const result = await analyzeTermPremium([], 77000);
+    assert.ok(result.current.unannualizedBasis30d !== undefined);
+    assert.equal(result.current.etfFrictionThreshold, 0.50);
+    assert.ok(['COVERED', 'UNWIND_RISK'].includes(result.current.etfArbitrageStatus));
+    assert.ok(typeof result.current.etfArbitrageMargin === 'number');
   });
 });
 

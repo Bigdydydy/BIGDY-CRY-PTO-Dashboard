@@ -165,8 +165,14 @@ async function loadHistoricalBasisSeries(liveCurrent) {
     target.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
     target.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
     target.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
-    target.carryScore = calculateCarryScore(target.excessReturn, target.spread90d7d);
+    // Continuous Risk-Adjusted Institutional Carry Score (Amberdata Section 5)
+    target.carryScore = calculateCarryScore(target.excessOverTBill, target.spread90d7d);
+    // Unannualized 30D Basis % = APR * (30 / 365)
+    target.unannualizedBasis30d = Number((liveCurrent.apr30d * (30 / 365)).toFixed(3));
+    // ETF Arbitrage Friction Threshold = 0.50% (Amberdata: Mgmt 0.25% + Creation 0.10% + Slippage 0.15%)
+    target.etfFrictionThreshold = 0.50;
+    target.etfArbitrageMargin = Number((target.unannualizedBasis30d - 0.50).toFixed(3));
+    target.etfArbitrageStatus = target.unannualizedBasis30d >= 0.50 ? 'COVERED' : 'UNWIND_RISK';
     if (liveCurrent.spotPrice) target.btcPrice = Math.round(liveCurrent.spotPrice);
     if (liveCurrent.timestamp) target.timestamp = liveCurrent.timestamp;
     target.isLiveDeribit = true;
@@ -198,18 +204,21 @@ function generateHistoricalSeries(liveCurrent) {
     last.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
     last.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
     last.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
-    last.carryScore = calculateCarryScore(last.excessReturn, last.spread90d7d);
+    last.carryScore = calculateCarryScore(last.excessOverTBill, last.spread90d7d);
+    last.unannualizedBasis30d = Number((liveCurrent.apr30d * (30 / 365)).toFixed(3));
+    last.etfFrictionThreshold = 0.50;
+    last.etfArbitrageMargin = Number((last.unannualizedBasis30d - 0.50).toFixed(3));
+    last.etfArbitrageStatus = last.unannualizedBasis30d >= 0.50 ? 'COVERED' : 'UNWIND_RISK';
     if (liveCurrent.spotPrice) last.btcPrice = Math.round(liveCurrent.spotPrice);
   }
   return series;
 }
 
 /**
- * Evaluates current Term Premium & Carry Regime state
+ * Evaluates current Term Premium & Carry Regime state (Refined Amberdata 5-Tier Framework)
  */
 function evaluateCarryRegime(latest, contracts) {
-  const { apr7d, apr30d, apr60d, apr90d, apr180d, spread90d7d, spread30d7d, spread180d30d, excessReturn, carryScore } = latest;
+  const { apr7d, apr30d, apr60d, apr90d, apr180d, spread90d7d, spread30d7d, spread180d30d, excessReturn, excessOverTBill, carryScore, unannualizedBasis30d } = latest;
 
   let regimeCode = 'NORMAL_CONTANGO';
   let regimeName = '标准正向升水 (Healthy Contango)';
@@ -218,7 +227,7 @@ function evaluateCarryRegime(latest, contracts) {
   let keyPointers = [];
 
   if (spread30d7d < -0.8 && apr7d > 12.0) {
-    // Overcrowding Inversion (Section 5 Case: Jan 2025 euphoria)
+    // 1. Overcrowding Inversion (Amberdata Section 5 Case: Jan 2025 R1 euphoria)
     regimeCode = 'OVERCROWDED_INVERSION';
     regimeName = '多头拥挤倒挂 (Overcrowded Inversion)';
     regimeBadgeClass = 'badge-neg';
@@ -229,29 +238,40 @@ function evaluateCarryRegime(latest, contracts) {
       `警惕获利盘止损：短端微小回调易触发高杠杆多头集体止损，引发局部踩踏。`
     ];
   } else if (apr30d < 3.0 || (spread90d7d < 0 && apr30d < 5.0)) {
-    // Crisis Compression / Backwardation
+    // 2. Crisis Compression / Backwardation (Amberdata Section 5 Case: Oct 2025 R5 cascade)
     regimeCode = 'CRISIS_COMPRESSION';
     regimeName = '基差断崖压缩 / 踩踏倒挂 (Compression Cascade)';
     regimeBadgeClass = 'badge-neg';
-    statusSummary = `基差全曲线跌入低位 (${apr30d}%)，中短期溢价倒挂 (${spread90d7d}%)。市场遭遇强烈流动性冲击，套利盘被迫平仓进一步加剧现货卖压。`;
+    statusSummary = `基差全曲线跌入极低贴水区间 (${apr30d}%)，中短期溢价倒挂 (${spread90d7d}%)。市场遭遇强烈流动性冲击，套利盘被迫平仓进一步加剧现货卖压。`;
     keyPointers = [
       `套利反噬效应：基差快速跌破成本临界点，引发对冲基金被动平仓（抛现货买期货平空）。`,
       `流动性真空：现货卖压导致盘口滑点扩大，做市商撤单形成负反馈循环。`,
       `避险情绪蔓延：远期缺乏升水支撑，市场进入极端防御与去杠杆通道。`
     ];
-  } else if (apr30d < 8.0) {
-    // Marginal Carry / Sub-Hurdle Carry (below 8.0% institutional cost)
-    regimeCode = 'MARGINAL_CARRY';
-    regimeName = '微利观望 / 成本倒挂 (Sub-Hurdle / Marginal Carry)';
-    regimeBadgeClass = 'badge-warning';
-    statusSummary = `30D 基差 (${apr30d}%) 低于 8.0% 机构资本机会成本门槛（超额收益 ${excessReturn}%），扣除借贷利息、对冲滑点与交易所对手方风险后，套利盈亏比缺乏吸引力。`;
+  } else if (apr30d < 5.0) {
+    // 3. Sub-TBill Drain (Amberdata Section 5: <5% fails T-Bills, 64% of year, capital drains)
+    regimeCode = 'SUB_TBILL_DRAIN';
+    regimeName = '跌破美债基准 / 资金外流 (Sub-TBill Drain)';
+    regimeBadgeClass = 'badge-neg';
+    statusSummary = `30D 基差 (${apr30d}%) 跌破 4.5% 美债无风险利率基准（超额美债仅 ${excessOverTBill || (apr30d - 4.5).toFixed(2)}%），套利机会成本丧失，资金回流传统无风险国债。`;
     keyPointers = [
-      `机构资本成本劣势：基差无法覆盖 8.0% 资金机会成本（包含无风险利率 4.5% + 3.5% 风险溢价），套利资金入场动能减弱。`,
+      `机会成本劣势：基差收益率完全无法覆盖 4.5% 美债无风险利率，套利资金缺乏经济学合理性。`,
+      `资本逆向外流：套利头寸逐步解体，资金倾向于赎回离场回流高收益美元流动性工具。`,
+      `现货买盘疲软：缺乏期现套利多头支撑，现货价格发现完全依赖被动型长钱。`
+    ];
+  } else if (apr30d < 8.0) {
+    // 4. Marginal Carry (Amberdata Section 5: 5%~8% sub-hurdle for institutions)
+    regimeCode = 'MARGINAL_CARRY';
+    regimeName = '微利观望 / 门槛倒挂 (Sub-Hurdle / Marginal Carry)';
+    regimeBadgeClass = 'badge-warning';
+    statusSummary = `30D 基差 (${apr30d}%) 虽高于美债利率但低于 8.0% 机构资本机会成本门槛（超额机构成本 ${excessReturn}%），仅适合加密原生资金微利运转。`;
+    keyPointers = [
+      `机构资本成本劣势：基差无法覆盖 8.0% 资金机会成本（包含无风险利率 4.5% + 3.5% 风险溢价），主流大型对冲基金观望。`,
       `期限结构扁平：30D 与 90D 利差维持在极窄区间，缺乏波动弹性与展期收益。`,
       `等待机制转换：需静待现货强买盘或杠杆多头推动主力基差重新跨越 8.0% 临界线，打开套利空间。`
     ];
   } else {
-    // Healthy Contango (> 8.0%)
+    // 5. Healthy Contango (> 8.0%, Amberdata: >8% Good/Institutional tier)
     regimeCode = 'NORMAL_CONTANGO';
     regimeName = '标准正向升水 (Healthy Contango)';
     regimeBadgeClass = 'badge-pos';
@@ -291,6 +311,10 @@ async function analyzeTermPremium(futuresList, spotPrice) {
     excessReturn: 1.0,
     excessOverTBill: 4.5,
     carryScore: 13.2,
+    unannualizedBasis30d: 0.74,
+    etfFrictionThreshold: 0.50,
+    etfArbitrageMargin: 0.24,
+    etfArbitrageStatus: 'COVERED',
     timestamp: Date.now(),
     date: new Date().toISOString().slice(0, 10)
   };
@@ -319,6 +343,10 @@ async function analyzeTermPremium(futuresList, spotPrice) {
       excessReturn: latest.excessReturn,
       excessOverTBill: latest.excessOverTBill,
       carryScore: latest.carryScore,
+      unannualizedBasis30d: latest.unannualizedBasis30d !== undefined ? latest.unannualizedBasis30d : Number((latest.apr30d * (30 / 365)).toFixed(3)),
+      etfFrictionThreshold: 0.50,
+      etfArbitrageMargin: latest.etfArbitrageMargin !== undefined ? latest.etfArbitrageMargin : Number(((latest.apr30d * (30 / 365)) - 0.50).toFixed(3)),
+      etfArbitrageStatus: (latest.unannualizedBasis30d || (latest.apr30d * (30 / 365))) >= 0.50 ? 'COVERED' : 'UNWIND_RISK',
       timestamp: latest.timestamp,
       date: latest.date
     },

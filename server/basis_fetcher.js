@@ -49,13 +49,22 @@ function interpolate(x, x0, x1, y0, y1) {
 }
 
 /**
- * Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
- * Strictly bounded [-100, +100]. 0.0 corresponds to neutral hurdle (8% APR + flat curve)
+ * Continuous Risk-Adjusted Institutional Carry Score
+ * Rooted in Amberdata Section 5: (Excess Return / 30D Realized Volatility) * Structure Factor
+ * Calibrated strictly to Amberdata institutional tiers:
+ *   Score > 20: Excellent (Strong Institutional Carry Allocation)
+ *   Score 10 ~ 20: Marginal / Neutral (Crypto-native tier)
+ *   Score < 10: Avoid / Sub-hurdle (Capital withdraws to T-Bills)
  */
-function calculateCarryScore(excessReturn, spread90d7d) {
-  const yieldScore = Math.max(-60, Math.min(60, (excessReturn / 10.0) * 60));
-  const structScore = Math.max(-40, Math.min(40, (spread90d7d / 4.0) * 40));
-  return Number((yieldScore + structScore).toFixed(1));
+function calculateCarryScore(excessOverTBill, spread90d7d, volatility30d = 45.0) {
+  const vol = Math.max(15.0, volatility30d || 45.0);
+  const baseRatio = (excessOverTBill / vol) * 100;
+  // Smooth Hyperbolic Tangent Structure Multiplier replacing discrete Sign()
+  // Penalizes curve inversion smoothly without violent sign flip
+  const structMultiplier = Math.max(0.2, 1.0 + 0.5 * Math.tanh((spread90d7d || 0) / 2.0));
+  let finalScore = baseRatio * structMultiplier;
+  finalScore = Math.max(-50, Math.min(50, finalScore));
+  return Number(finalScore.toFixed(1));
 }
 
 /**

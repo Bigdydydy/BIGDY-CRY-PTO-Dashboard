@@ -2458,6 +2458,63 @@ body {
   color: #f59e0b;
 }
 
+/* Amberdata 0.50% ETF Friction & Unannualized Basis Audit Strip */
+.tp-etf-friction-strip {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xs);
+  padding: 6px 10px;
+}
+
+.tp-ef-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  flex-wrap: wrap;
+}
+
+.tp-ef-title {
+  color: var(--text-muted);
+}
+
+.tp-ef-val {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tp-ef-threshold {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.tp-ef-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.tp-ef-badge.profitable {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.tp-ef-badge.unprofitable {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
 /* Multi-spread list */
 .tp-spread-list {
   display: flex;

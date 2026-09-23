@@ -2050,6 +2050,8 @@ const elTpVal30d = document.getElementById('tp-val-30d');
 const elTpVal60d = document.getElementById('tp-val-60d');
 const elTpVal90d = document.getElementById('tp-val-90d');
 const elTpVal180d = document.getElementById('tp-val-180d');
+const elTpUnann30d = document.getElementById('tp-unann-30d');
+const elTpEtfStatusBadge = document.getElementById('tp-etf-status-badge');
 
 const elTpSpread90d7d = document.getElementById('tp-spread-90d7d');
 const elTpSpread30d7d = document.getElementById('tp-spread-30d7d');
@@ -2118,6 +2120,7 @@ function renderTermPremium(data, forceRedraw = false) {
   }
   if (elTpHeaderScorePill && c && c.carryScore !== undefined) {
     elTpHeaderScorePill.textContent = `Carry: ${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
+    elTpHeaderScorePill.style.color = c.carryScore >= 20 ? '#10b981' : (c.carryScore >= 10 ? '#f59e0b' : '#f43f5e');
   }
   if (elTpHeaderExcessPill && c && c.excessReturn !== undefined) {
     elTpHeaderExcessPill.textContent = `超额: ${c.excessReturn >= 0 ? '+' : ''}${c.excessReturn.toFixed(2)}%`;
@@ -2149,6 +2152,23 @@ function renderTermPremium(data, forceRedraw = false) {
       elTpVal180d.style.color = c.apr180d >= 0 ? '#10b981' : '#f43f5e';
     }
 
+    // 1-B. Amberdata 0.50% ETF Friction Audit
+    if (elTpUnann30d && c.unannualizedBasis30d !== undefined) {
+      elTpUnann30d.textContent = `${c.unannualizedBasis30d >= 0 ? '+' : ''}${c.unannualizedBasis30d.toFixed(2)}%`;
+      elTpUnann30d.style.color = c.unannualizedBasis30d >= 0.50 ? '#10b981' : (c.unannualizedBasis30d > 0 ? '#f59e0b' : '#f43f5e');
+    }
+    if (elTpEtfStatusBadge) {
+      const isCovered = c.etfArbitrageStatus === 'COVERED' || c.unannualizedBasis30d >= 0.50;
+      const margin = c.etfArbitrageMargin !== undefined ? c.etfArbitrageMargin : (c.unannualizedBasis30d ? c.unannualizedBasis30d - 0.50 : 0);
+      if (isCovered) {
+        elTpEtfStatusBadge.textContent = `摩擦覆盖 (+${margin >= 0 ? margin.toFixed(2) : '0.00'}%)`;
+        elTpEtfStatusBadge.className = 'tp-ef-badge profitable';
+      } else {
+        elTpEtfStatusBadge.textContent = `摩擦破位 (${margin.toFixed(2)}%)`;
+        elTpEtfStatusBadge.className = 'tp-ef-badge unprofitable';
+      }
+    }
+
     // 2. Multi-Span Spreads Breakdown
     if (elTpSpread90d7d) {
       elTpSpread90d7d.textContent = `${c.spread90d7d >= 0 ? '+' : ''}${c.spread90d7d.toFixed(2)}%`;
@@ -2169,8 +2189,9 @@ function renderTermPremium(data, forceRedraw = false) {
     }
     if (elTpScoreValue && c.carryScore !== undefined) {
       elTpScoreValue.textContent = `${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
-      if (c.carryScore >= 10) elTpScoreValue.style.color = '#10b981';
-      else if (c.carryScore >= -15) elTpScoreValue.style.color = '#f59e0b';
+      // Amberdata 3-tier benchmark: <10 Avoid, 10-20 Marginal, >20 Excellent
+      if (c.carryScore >= 20) elTpScoreValue.style.color = '#10b981';
+      else if (c.carryScore >= 10) elTpScoreValue.style.color = '#f59e0b';
       else elTpScoreValue.style.color = '#f43f5e';
     }
     if (elTpExcessVal && c.excessReturn !== undefined) {
@@ -2178,10 +2199,10 @@ function renderTermPremium(data, forceRedraw = false) {
       elTpExcessVal.style.color = c.excessReturn >= 0 ? '#10b981' : '#f43f5e';
     }
     if (elTpScoreBarFill && c.carryScore !== undefined) {
-      // Map [-60, +60] smoothly to [5%, 95%] with 0 at 50%
-      const pct = Math.max(5, Math.min(95, ((c.carryScore + 60) / 120) * 100));
+      // Map Amberdata scale [0, 30] to [5%, 95%]
+      const pct = Math.max(5, Math.min(95, (c.carryScore / 30) * 100));
       elTpScoreBarFill.style.width = `${pct}%`;
-      elTpScoreBarFill.style.backgroundColor = c.carryScore >= 10 ? '#10b981' : (c.carryScore >= -15 ? '#f59e0b' : '#f43f5e');
+      elTpScoreBarFill.style.backgroundColor = c.carryScore >= 20 ? '#10b981' : (c.carryScore >= 10 ? '#f59e0b' : '#f43f5e');
     }
   }
 
