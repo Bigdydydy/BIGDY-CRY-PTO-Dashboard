@@ -65,6 +65,57 @@ describe('Module 1: ATM IV & Percentile Engine', () => {
     assert.equal(result.percentile, null);
     assert.ok(!result.paragraph.includes('undefined%'));
     assert.ok(result.paragraph.includes('参考常模'));
+    assert.equal(result.isRealtime, false);
+  });
+
+  test('Real-time atmData ingestion correctly interpolates 1M, 2M, 3M, 6M IV from live term structure', () => {
+    const mockAtmData = [
+      {
+        underlying_index: 'BTC-24SEP26',
+        day: 2,
+        atm_index: 0,
+        underlying_price: 86000,
+        list: [{ iv: 37.0, strike: 86000, delta: 0.50 }]
+      },
+      {
+        underlying_index: 'BTC-9OCT26',
+        day: 17,
+        atm_index: 0,
+        underlying_price: 86200,
+        list: [{ iv: 36.5, strike: 86000, delta: 0.51 }]
+      },
+      {
+        underlying_index: 'BTC-30OCT26',
+        day: 38,
+        atm_index: 0,
+        underlying_price: 86500,
+        list: [{ iv: 37.0, strike: 87000, delta: 0.50 }]
+      },
+      {
+        underlying_index: 'BTC-25DEC26',
+        day: 94,
+        atm_index: 0,
+        underlying_price: 87200,
+        list: [{ iv: 38.8, strike: 88000, delta: 0.52 }]
+      },
+      {
+        underlying_index: 'BTC-26MAR27',
+        day: 185,
+        atm_index: 0,
+        underlying_price: 88200,
+        list: [{ iv: 39.5, strike: 88000, delta: 0.53 }]
+      }
+    ];
+
+    const result = analyzeAtmIv(mockIvHistory, mockDvolStats, mockAtmData);
+    assert.equal(result.isRealtime, true, 'isRealtime should be true when atmData is provided');
+    assert.ok(result.termPoints.length >= 5, 'termPoints should be populated');
+    // 30D is interpolated between 17D (36.5%) and 38D (37.0%)
+    assert.ok(result.iv1m >= 36.5 && result.iv1m <= 37.0, `iv1m (${result.iv1m}) should be interpolated between 36.5 and 37.0`);
+    // 90D is interpolated between 38D (37.0%) and 94D (38.8%)
+    assert.ok(result.iv3m >= 37.0 && result.iv3m <= 38.8, `iv3m (${result.iv3m}) should be interpolated between 37.0 and 38.8`);
+    assert.equal(result.curveType, 'Contango');
+    assert.ok(result.dailyExpectedMovePct > 0);
   });
 });
 
@@ -314,6 +365,26 @@ describe('HTTP Server Lifecycle & Security Endpoints', () => {
           const body2 = await r2.json();
           assert.equal(body2.code, 429);
           assert.ok(body2.error.includes('请求过于频繁'));
+        } finally {
+          server.close(resolve);
+        }
+      });
+    });
+  });
+
+  test('GET /api/macro-chart returns 200 with code 0 and valid real-time spot price', async () => {
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', async () => {
+        const port = server.address().port;
+        try {
+          const resp = await fetch(`http://127.0.0.1:${port}/api/macro-chart`);
+          assert.equal(resp.status, 200);
+          const body = await resp.json();
+          assert.equal(body.code, 0);
+          assert.ok(body.summary, 'summary object must exist');
+          assert.ok(typeof body.summary.currentBtc === 'number' && body.summary.currentBtc > 50000);
+          assert.ok(typeof body.summary.mstrProfitMultiplier === 'number');
+          assert.ok(Array.isArray(body.points) && body.points.length > 0);
         } finally {
           server.close(resolve);
         }

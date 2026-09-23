@@ -152,21 +152,97 @@ function formatDeribitExpiry(date) {
 
 /**
  * Module 1: ATM IV Term Structure & Intelligent Extreme Range Evaluation
+ * Enhanced with real-time atmData feed across maturities and smooth fallback to ivHistory
  */
-function analyzeAtmIv(ivHistory, dvolStats) {
-  if (!ivHistory || !ivHistory.length) {
-    return {
-      status: 'insufficient_data',
-      summaryText: '暂无足够 ATM IV 历史数据。'
-    };
+function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
+  let iv1m = null;
+  let iv2m = null;
+  let iv3m = null;
+  let iv6m = null;
+  let iv1y = null;
+  let termPoints = [];
+  let isRealtime = false;
+
+  // 1. Try extracting real-time ATM IVs across maturities from live atmData
+  if (Array.isArray(atmData) && atmData.length > 0) {
+    const rawPoints = [];
+    for (const expItem of atmData) {
+      if (!expItem) continue;
+      const list = expItem.list;
+      let atmObj = null;
+      if (Array.isArray(list) && list.length > 0) {
+        if (typeof expItem.atm_index === 'number' && list[expItem.atm_index]) {
+          atmObj = list[expItem.atm_index];
+        } else {
+          // Find strike with delta closest to 0.50
+          atmObj = list.reduce((best, cur) => {
+            if (!best) return cur;
+            const diffCur = Math.abs((cur.delta || 0.5) - 0.5);
+            const diffBest = Math.abs((best.delta || 0.5) - 0.5);
+            return diffCur < diffBest ? cur : best;
+          }, null);
+        }
+      }
+
+      const dte = (typeof expItem.day === 'number' && expItem.day > 0)
+        ? expItem.day
+        : (expItem.hour ? Number((expItem.hour / 24).toFixed(2)) : 0);
+
+      if (atmObj && typeof atmObj.iv === 'number' && dte > 0) {
+        rawPoints.push({
+          expiry: expItem.underlying_index,
+          dte,
+          iv: Number(atmObj.iv.toFixed(2)),
+          strike: atmObj.strike,
+          delta: atmObj.delta,
+          underlyingPrice: expItem.underlying_price
+        });
+      }
+    }
+
+    if (rawPoints.length >= 2) {
+      rawPoints.sort((a, b) => a.dte - b.dte);
+      termPoints = rawPoints;
+
+      function interpolateDte(targetDte) {
+        if (targetDte <= rawPoints[0].dte) return rawPoints[0].iv;
+        if (targetDte >= rawPoints[rawPoints.length - 1].dte) return rawPoints[rawPoints.length - 1].iv;
+        for (let i = 0; i < rawPoints.length - 1; i++) {
+          const p1 = rawPoints[i];
+          const p2 = rawPoints[i + 1];
+          if (targetDte >= p1.dte && targetDte <= p2.dte) {
+            if (p2.dte === p1.dte) return p1.iv;
+            const weight = (targetDte - p1.dte) / (p2.dte - p1.dte);
+            return Number((p1.iv + weight * (p2.iv - p1.iv)).toFixed(2));
+          }
+        }
+        return rawPoints[rawPoints.length - 1].iv;
+      }
+
+      iv1m = interpolateDte(30);
+      iv2m = interpolateDte(60);
+      iv3m = interpolateDte(90);
+      iv6m = interpolateDte(180);
+      iv1y = interpolateDte(365);
+      isRealtime = true;
+    }
   }
 
-  const latest = ivHistory[ivHistory.length - 1];
-  const iv1m = latest.month1;
-  const iv2m = latest.month2;
-  const iv3m = latest.month3;
-  const iv6m = latest.month6;
-  const iv1y = latest.one_year;
+  // 2. Fallback to ivHistory if atmData is unavailable
+  if (iv1m === null) {
+    if (!ivHistory || !ivHistory.length) {
+      return {
+        status: 'insufficient_data',
+        summaryText: '暂无足够 ATM IV 历史数据。'
+      };
+    }
+    const latest = ivHistory[ivHistory.length - 1];
+    iv1m = latest.month1;
+    iv2m = latest.month2;
+    iv3m = latest.month3;
+    iv6m = latest.month6;
+    iv1y = latest.one_year;
+  }
 
   let curveType = 'Flat';
   let curveDesc = '平坦';
@@ -262,6 +338,8 @@ function analyzeAtmIv(ivHistory, dvolStats) {
     dvolMin: dvolStats?.min || 33.8,
     dvolMax: dvolStats?.max || 82.6,
     dvolMedian: dvolStats?.median || 48.5,
+    isRealtime,
+    termPoints,
     regime,
     regimeTag,
     extremeAlert,

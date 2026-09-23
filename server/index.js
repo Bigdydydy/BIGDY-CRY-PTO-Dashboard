@@ -153,8 +153,8 @@ async function handleApiRequest(req, res, parsedUrl) {
       // Filter trades from persistent 30-day store based on user-selected window
       const activeTrades = filterTradesByWindow(data.blockTrades, timeRangeParam);
 
-      // Always re-run analysis dynamically on current data
-      const atmAnalysis = analyzeAtmIv(data.ivHistory, data.dvolStats);
+      // Always re-run analysis dynamically on current data (enhanced with real-time atmData)
+      const atmAnalysis = analyzeAtmIv(data.ivHistory, data.dvolStats, data.atmData);
       const gexAnalysis = analyzeDynamicGex(data.gex, new Date());
       const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam);
       blockAnalysis.timeRange = timeRangeParam;
@@ -216,9 +216,36 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
       const macroData = await getMacroChartData(forceParam);
+
+      // Inject real-time Spot Price and dynamically recalculate current multipliers
+      const cache = getCachedData();
+      const realtimeSpot = cache.gex?.index_price || cache.termPremium?.spotPrice || null;
+
+      let finalMacroData = macroData;
+      if (realtimeSpot && macroData && macroData.summary) {
+        const updatedSummary = { ...macroData.summary };
+        updatedSummary.currentBtc = realtimeSpot;
+        if (updatedSummary.currentMstrCost) {
+          updatedSummary.mstrProfitMultiplier = Number((realtimeSpot / updatedSummary.currentMstrCost).toFixed(2));
+        }
+
+        // Dynamically update the latest point in points array if today
+        const points = Array.isArray(macroData.points) ? [...macroData.points] : [];
+        if (points.length > 0) {
+          const lastIdx = points.length - 1;
+          points[lastIdx] = { ...points[lastIdx], btcPrice: realtimeSpot };
+        }
+
+        finalMacroData = {
+          ...macroData,
+          points,
+          summary: updatedSummary
+        };
+      }
+
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...macroData
+        ...finalMacroData
       });
     } catch (err) {
       console.error('[API Error] macro-chart:', err);
@@ -480,7 +507,11 @@ function startServer() {
     .then(() => console.log('[Server] Initial McClellan data cache ready.'))
     .catch(e => console.warn('[Server] Initial McClellan fetch warning:', e.message));
 
-  // Background auto-refresh every 30 seconds
+  getMacroChartData()
+    .then(() => console.log('[Server] Initial Macro chart data cache ready.'))
+    .catch(e => console.warn('[Server] Initial Macro fetch warning:', e.message));
+
+  // Background auto-refresh for high-frequency market data every 30 seconds
   setInterval(async () => {
     try {
       await refreshAllMarketData('BTC');
@@ -488,6 +519,15 @@ function startServer() {
       console.warn('[Server] Background sync check error:', e.message);
     }
   }, 30000);
+
+  // Background auto-refresh for macro data every 5 minutes (300,000 ms)
+  setInterval(async () => {
+    try {
+      await getMacroChartData(true);
+    } catch (e) {
+      console.warn('[Server] Background macro sync error:', e.message);
+    }
+  }, 300000);
 }
 
 if (require.main === module) {

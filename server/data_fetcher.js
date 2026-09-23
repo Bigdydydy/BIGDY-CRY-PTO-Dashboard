@@ -148,7 +148,7 @@ async function fetchDeribitFutures(currency = 'BTC') {
 /**
  * Compare new data against fingerprints to detect actual updates
  */
-function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades = 0) {
+function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades = 0, newAtmData = null) {
   const prevFps = dataCache.lastFingerprints;
   const changes = {
     hasAnyUpdate: false,
@@ -156,6 +156,7 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
     newTradesCount: 0,
     gex: false,
     ivHistory: false,
+    atmData: false,
     skewChart: false,
     ivSkewMonth: false,
     priceChanged: false,
@@ -192,7 +193,16 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
     changes.hasAnyUpdate = true;
   }
 
-  // 4. Skew Chart diff
+  // 4. Real-time ATM IV diff across maturities
+  const atmFp = Array.isArray(newAtmData) && newAtmData.length
+    ? newAtmData.map(x => `${x.underlying_index}:${(x.list?.[x.atm_index]?.iv || 0).toFixed(2)}`).join('|')
+    : '';
+  if (prevFps.atmData && prevFps.atmData !== atmFp) {
+    changes.atmData = true;
+    changes.hasAnyUpdate = true;
+  }
+
+  // 5. Skew Chart diff
   const latestSkewItem = newSkewChart && newSkewChart.length ? newSkewChart[newSkewChart.length - 1] : null;
   const skewFp = latestSkewItem ? `${latestSkewItem.timestamps}_${latestSkewItem.days30}_${latestSkewItem.day1}` : '';
   if (prevFps.skewChart && prevFps.skewChart !== skewFp) {
@@ -200,7 +210,7 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
     changes.hasAnyUpdate = true;
   }
 
-  // 5. IV Skew Month (Smile) diff
+  // 6. IV Skew Month (Smile) diff
   const smileFp = newIvSkewMonth?.month1 ? `${newIvSkewMonth.month1.underlying_price}_${newIvSkewMonth.month1.iv_list?.length}` : '';
   if (prevFps.ivSkewMonth && prevFps.ivSkewMonth !== smileFp) {
     changes.ivSkewMonth = true;
@@ -216,7 +226,7 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
     if (changes.blockTrades) parts.push(`新增 ${changes.newTradesCount} 笔大宗成交并持久沉淀`);
     if (changes.priceChanged) parts.push(`现货更新至 $${Math.round(newPrice).toLocaleString()}`);
     if (changes.gex) parts.push('GEX 敞口更新');
-    if (changes.ivHistory) parts.push('ATM IV 更新');
+    if (changes.atmData || changes.ivHistory) parts.push('ATM IV 期限结构变动');
     if (changes.skewChart) parts.push('25Δ 偏度更新');
     if (changes.ivSkewMonth) parts.push('微笑曲线更新');
     changes.summary = `检测到新变动: ${parts.join('、')}，所有量化模块已全量重新研判`;
@@ -228,6 +238,7 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
   dataCache.lastFingerprints = {
     gex: gexFp,
     ivHistory: ivFp,
+    atmData: atmFp,
     skewChart: skewFp,
     ivSkewMonth: smileFp
   };
@@ -281,6 +292,7 @@ async function refreshAllMarketData(currency = 'BTC') {
   const newIvHistory = ivHistoryRes.status === 'fulfilled' ? ivHistoryRes.value : dataCache.ivHistory;
   const newSkewChart = skewChartRes.status === 'fulfilled' ? skewChartRes.value : dataCache.skewChart;
   const newIvSkewMonth = ivSkewMonthRes.status === 'fulfilled' ? ivSkewMonthRes.value : dataCache.ivSkewMonth;
+  const newAtmData = atmDataRes.status === 'fulfilled' ? atmDataRes.value : dataCache.atmData;
   const spotPrice = newGex?.index_price || 77400;
 
   // Calculate Term Premium & Basis Structure
@@ -296,8 +308,8 @@ async function refreshAllMarketData(currency = 'BTC') {
     dataCache.goldCorrelation = goldRes.value;
   }
 
-  // Run change detection with persistent trade store additions
-  const changeReport = detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades);
+  // Run change detection with persistent trade store additions and real-time ATM data
+  const changeReport = detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades, newAtmData);
 
   // Update in-memory data
   dataCache.blockTrades = accumulatedTrades;
@@ -306,7 +318,7 @@ async function refreshAllMarketData(currency = 'BTC') {
   dataCache.ivHistory = newIvHistory;
   dataCache.skewChart = newSkewChart;
   dataCache.ivSkewMonth = newIvSkewMonth;
-  if (atmDataRes.status === 'fulfilled') dataCache.atmData = atmDataRes.value;
+  dataCache.atmData = newAtmData;
   if (dvolStatsRes.status === 'fulfilled' && dvolStatsRes.value) dataCache.dvolStats = dvolStatsRes.value;
 
   dataCache.lastSyncCheckTime = checkTime;
