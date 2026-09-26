@@ -4,7 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BIGDY 衍生品量化智能研判雷达</title>
-  <link rel="stylesheet" href="/style.css?v=20260913_1">
+  <!-- Anti-FOUC: Immediately apply saved or system theme before render -->
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('bigdy_theme');
+        var theme = savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css?v=20260924_k95">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -42,6 +52,32 @@
           <span class="meta-label">BTC 现货</span>
           <span class="meta-value accent" id="index-price">$--,---</span>
         </div>
+
+        <!-- Studio K95 Day/Night Dual-Mode Switcher Pill -->
+        <div class="theme-switch-pill" id="theme-switch-pill" data-active="dark" role="radiogroup" aria-label="显示风格切换">
+          <button class="theme-btn" id="theme-btn-dark" data-theme-val="dark" title="切换夜间黑曜石模式 (快捷键: Alt+T)" aria-label="夜间黑曜石模式">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+            <span class="theme-btn-label">夜间</span>
+          </button>
+          <button class="theme-btn" id="theme-btn-light" data-theme-val="light" title="切换日间画廊模式 (快捷键: Alt+T)" aria-label="日间画廊模式">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <span class="theme-btn-label">日间</span>
+          </button>
+          <div class="theme-pill-slider" id="theme-pill-slider"></div>
+        </div>
+
         <button id="btn-refresh" class="btn-refresh">
           <svg id="refresh-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
             <path d="M23 4v6h-6"></path>
@@ -98,7 +134,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">宏观与风控总览</span>
+              <span class="nav-title"><span class="nav-index">01/</span>宏观与风控总览</span>
               <span class="nav-desc">美债/MSTR + 市场宽度 + CDRI</span>
             </div>
           </button>
@@ -110,7 +146,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">期现基差与溢价</span>
+              <span class="nav-title"><span class="nav-index">02/</span>期现基差与溢价</span>
               <span class="nav-desc">常数期限谱系与利差</span>
             </div>
           </button>
@@ -123,7 +159,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">期权微观结构套件</span>
+              <span class="nav-title"><span class="nav-index">03/</span>期权微观结构套件</span>
               <span class="nav-desc">ATM IV / GEX / 偏度 / 微笑</span>
             </div>
           </button>
@@ -137,7 +173,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">大宗巨鲸战略雷达</span>
+              <span class="nav-title"><span class="nav-index">04/</span>大宗巨鲸战略雷达</span>
               <span class="nav-desc">冰山拆单与 BTC 确界盈亏</span>
             </div>
           </button>
@@ -152,7 +188,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">稳定币供应比率 (SSRO)</span>
+              <span class="nav-title"><span class="nav-index">05/</span>稳定币供应比率 (SSRO)</span>
               <span class="nav-desc">宏观流动性与 BTC 购买力</span>
             </div>
           </button>
@@ -164,7 +200,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">Coinbase 深度雷达</span>
+              <span class="nav-title"><span class="nav-index">06/</span>Coinbase 深度雷达</span>
               <span class="nav-desc">阶梯深度谱系与大单滑点</span>
             </div>
           </button>
@@ -178,7 +214,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">金/BTC 比率与相关性</span>
+              <span class="nav-title"><span class="nav-index">07/</span>金/BTC 比率与相关性</span>
               <span class="nav-desc">XAU/BTC 比价 &amp; 30D 宏观联动</span>
             </div>
           </button>
@@ -193,7 +229,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">AI–BTC 融资张力</span>
+              <span class="nav-title"><span class="nav-index">08/</span>AI–BTC 融资张力</span>
               <span class="nav-desc">四象限相空间 · 正交因果剥离</span>
             </div>
           </button>
@@ -215,7 +251,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">全模块平铺画卷</span>
+              <span class="nav-title"><span class="nav-index">ALL/</span>全模块平铺画卷</span>
               <span class="nav-desc">展开全部 5 大模块</span>
             </div>
           </button>
@@ -223,6 +259,28 @@
       </div>
 
       <div class="sidebar-footer">
+        <div class="sidebar-theme-row">
+          <span class="sidebar-theme-title">主题风格</span>
+          <div class="theme-switch-pill compact" id="sidebar-theme-switch-pill" data-active="dark" role="radiogroup" aria-label="移动端主题切换">
+            <button class="theme-btn" id="sidebar-theme-btn-dark" data-theme-val="dark" title="夜间模式" aria-label="夜间黑曜石模式">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+              <span class="theme-btn-label">夜间</span>
+            </button>
+            <button class="theme-btn" id="sidebar-theme-btn-light" data-theme-val="light" title="日间模式" aria-label="日间画廊模式">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4.5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              </svg>
+              <span class="theme-btn-label">日间</span>
+            </button>
+            <div class="theme-pill-slider" id="sidebar-theme-pill-slider"></div>
+          </div>
+        </div>
         <div class="sidebar-status-card">
           <div class="status-indicator-line">
             <span class="live-dot-green"></span>

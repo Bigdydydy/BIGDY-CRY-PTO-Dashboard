@@ -16,6 +16,194 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// ============================================================================
+// Studio K95 Day/Night Dual-Theme Architecture & Controller
+// ============================================================================
+
+/**
+ * Get current application theme ('light' or 'dark')
+ */
+function getAppTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+/**
+ * Returns null for ECharts light mode, 'dark' for dark mode
+ */
+function getEchartsTheme() {
+  return getAppTheme() === 'light' ? null : 'dark';
+}
+
+/**
+ * Dynamic theme palette for Chart.js and ECharts
+ */
+function getChartThemeColors() {
+  const isLight = getAppTheme() === 'light';
+  return {
+    isLight,
+    gridLine: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.04)',
+    gridLineStrong: isLight ? 'rgba(0, 0, 0, 0.28)' : 'rgba(255, 255, 255, 0.25)',
+    axisLine: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.08)',
+    tickColor: isLight ? '#52525b' : '#71717a',
+    textPrimary: isLight ? '#121214' : '#fafafa',
+    textSecondary: isLight ? '#4b4b52' : '#a1a1aa',
+    textMuted: isLight ? '#71717a' : '#71717a',
+    tooltipBg: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(18, 18, 24, 0.94)',
+    tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)',
+    tooltipText: isLight ? '#121214' : '#e4e4e7',
+    tooltipTitle: isLight ? '#121214' : '#fafafa',
+    tooltipBody: isLight ? '#27272a' : '#e4e4e7',
+    tooltipDivider: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+    axisPointerBg: isLight ? '#e4e4e7' : '#27272a',
+    crossColor: isLight ? '#94a3b8' : '#64748b'
+  };
+}
+
+/**
+ * Synchronize UI state across all theme switcher pills on page
+ */
+function syncThemeSwitchers(theme) {
+  const pills = document.querySelectorAll('.theme-switch-pill');
+  pills.forEach(pill => {
+    pill.setAttribute('data-active', theme);
+    const darkBtn = pill.querySelector('[data-theme-val="dark"]');
+    const lightBtn = pill.querySelector('[data-theme-val="light"]');
+    if (darkBtn) darkBtn.classList.toggle('active', theme === 'dark');
+    if (lightBtn) lightBtn.classList.toggle('active', theme === 'light');
+  });
+}
+
+/**
+ * Dispose and re-render all visible charts for the active theme
+ */
+function reloadAllChartsForTheme() {
+  // Dispose all existing ECharts instances so they re-initialize with the matching theme palette
+  if (typeof termPremiumChartInstance !== 'undefined' && termPremiumChartInstance) {
+    try { termPremiumChartInstance.dispose(); } catch (e) {}
+    termPremiumChartInstance = null;
+  }
+  if (typeof ssroChartInstance !== 'undefined' && ssroChartInstance) {
+    try { ssroChartInstance.dispose(); } catch (e) {}
+    ssroChartInstance = null;
+  }
+  if (typeof cbDepthChartInstance !== 'undefined' && cbDepthChartInstance) {
+    try { cbDepthChartInstance.dispose(); } catch (e) {}
+    cbDepthChartInstance = null;
+  }
+  if (typeof cbSlippageChartInstance !== 'undefined' && cbSlippageChartInstance) {
+    try { cbSlippageChartInstance.dispose(); } catch (e) {}
+    cbSlippageChartInstance = null;
+  }
+  if (typeof goldChartInstance !== 'undefined' && goldChartInstance) {
+    try { goldChartInstance.dispose(); } catch (e) {}
+    goldChartInstance = null;
+  }
+  if (typeof cdriChartInstance !== 'undefined' && cdriChartInstance) {
+    try { cdriChartInstance.dispose(); } catch (e) {}
+    cdriChartInstance = null;
+  }
+
+  // Trigger all module chart re-renders
+  if (typeof renderMacroChart === 'function' && typeof rawMacroData !== 'undefined' && rawMacroData) {
+    renderMacroChart();
+  }
+  if (typeof renderCdriChart === 'function' && typeof rawCdriData !== 'undefined' && rawCdriData) {
+    renderCdriChart();
+  }
+  if (typeof renderTermPremiumChart === 'function' && typeof currentTermPremiumData !== 'undefined' && currentTermPremiumData) {
+    renderTermPremiumChart();
+  }
+  if (typeof renderSsroChart === 'function' && typeof rawSsroData !== 'undefined' && rawSsroData) {
+    renderSsroChart();
+  }
+  if (typeof renderCbDepthChart === 'function' && typeof rawCoinbaseData !== 'undefined' && rawCoinbaseData) {
+    renderCbDepthChart(rawCoinbaseData);
+    renderCbSlippageChart(rawCoinbaseData);
+  }
+  if (typeof renderGoldChart === 'function' && typeof rawGoldData !== 'undefined' && rawGoldData) {
+    renderGoldChart();
+  }
+  if (typeof renderAiBtcTensionCharts === 'function' && typeof rawAiBtcTensionData !== 'undefined' && rawAiBtcTensionData) {
+    renderAiBtcTensionCharts();
+  }
+  if (typeof renderMcClellanCharts === 'function' && typeof rawMcClellanData !== 'undefined' && rawMcClellanData) {
+    renderMcClellanCharts();
+  }
+}
+
+/**
+ * Set application theme and persist preference
+ */
+function setTheme(theme, isUserAction = true) {
+  if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  if (isUserAction) {
+    try {
+      localStorage.setItem('bigdy_theme', theme);
+    } catch (e) {}
+  }
+  syncThemeSwitchers(theme);
+  reloadAllChartsForTheme();
+}
+
+/**
+ * Toggle between light and dark themes
+ */
+function toggleTheme() {
+  const nextTheme = getAppTheme() === 'light' ? 'dark' : 'light';
+  setTheme(nextTheme, true);
+  if (typeof showToast === 'function') {
+    showToast(`已切换至 Studio K95 ${nextTheme === 'light' ? '日间画廊模式 (Gallery)' : '夜间黑曜石模式 (Noir)'}`);
+  }
+}
+
+/**
+ * Initialize theme controller, event bindings, and hotkeys
+ */
+function initThemeController() {
+  // Determine initial theme
+  let initialTheme = 'dark';
+  try {
+    const saved = localStorage.getItem('bigdy_theme');
+    if (saved === 'light' || saved === 'dark') {
+      initialTheme = saved;
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      initialTheme = 'light';
+    }
+  } catch (e) {}
+
+  document.documentElement.setAttribute('data-theme', initialTheme);
+  syncThemeSwitchers(initialTheme);
+
+  // Bind clicks on all .theme-btn inside .theme-switch-pill
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.theme-btn');
+    if (btn && btn.dataset.themeVal) {
+      e.preventDefault();
+      setTheme(btn.dataset.themeVal, true);
+    }
+  });
+
+  // Global hotkey: Alt+T toggles theme
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      toggleTheme();
+    }
+  });
+
+  // Watch for system color scheme change if user hasn't explicitly set localStorage
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+      try {
+        if (!localStorage.getItem('bigdy_theme')) {
+          setTheme(e.matches ? 'light' : 'dark', false);
+        }
+      } catch (err) {}
+    });
+  }
+}
+
 let currentMarketData = null;
 let currentGexMode = 'focused'; // 'focused' or 'all'
 let currentBlockTab = 'icebergs'; // 'icebergs' or 'singles'
@@ -1178,6 +1366,7 @@ function renderMacroChart() {
   }
 
   const ctx = canvas.getContext('2d');
+  const colors = getChartThemeColors();
 
   // Gradient for BTC Price line
   const btcGradient = ctx.createLinearGradient(0, 0, 0, 350);
@@ -1364,12 +1553,12 @@ function renderMacroChart() {
           },
           tooltip: {
             enabled: true,
-            backgroundColor: 'rgba(18, 18, 24, 0.94)',
-            borderColor: 'rgba(255, 255, 255, 0.12)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
-            titleColor: '#fafafa',
+            titleColor: colors.tooltipTitle,
             titleFont: { family: 'JetBrains Mono', size: 12, weight: '600' },
-            bodyColor: '#e4e4e7',
+            bodyColor: colors.tooltipBody,
             bodyFont: { family: 'JetBrains Mono', size: 11 },
             padding: 12,
             boxPadding: 6,
@@ -1404,11 +1593,11 @@ function renderMacroChart() {
         scales: {
           x: {
             grid: {
-              color: 'rgba(255, 255, 255, 0.04)',
-              borderColor: 'rgba(255, 255, 255, 0.08)'
+              color: colors.gridLine,
+              borderColor: colors.axisLine
             },
             ticks: {
-              color: '#71717a',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 10 },
               maxRotation: 0,
               autoSkip: true,
@@ -1419,11 +1608,11 @@ function renderMacroChart() {
             type: 'linear',
             position: 'left',
             grid: {
-              color: 'rgba(255, 255, 255, 0.04)',
-              borderColor: 'rgba(255, 255, 255, 0.08)'
+              color: colors.gridLine,
+              borderColor: colors.axisLine
             },
             ticks: {
-              color: '#fbbf24',
+              color: colors.isLight ? '#b45309' : '#fbbf24',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: function(v) {
                 if (v >= 1000) return '$' + Math.round(v / 1000) + 'k';
@@ -1433,7 +1622,7 @@ function renderMacroChart() {
             title: {
               display: true,
               text: 'BTC & MSTR Cost (USD)',
-              color: '#fbbf24',
+              color: colors.isLight ? '#b45309' : '#fbbf24',
               font: { family: 'Inter', size: 10, weight: '500' }
             }
           },
@@ -1442,10 +1631,10 @@ function renderMacroChart() {
             position: 'right',
             grid: {
               drawOnChartArea: false,
-              borderColor: 'rgba(255, 255, 255, 0.08)'
+              borderColor: colors.axisLine
             },
             ticks: {
-              color: '#38bdf8',
+              color: colors.isLight ? '#0284c7' : '#38bdf8',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: function(v) {
                 return v.toFixed(1) + '%';
@@ -1454,7 +1643,7 @@ function renderMacroChart() {
             title: {
               display: true,
               text: '美债利率与利差 (%)',
-              color: '#38bdf8',
+              color: colors.isLight ? '#0284c7' : '#38bdf8',
               font: { family: 'Inter', size: 10, weight: '500' }
             }
           },
@@ -1463,10 +1652,10 @@ function renderMacroChart() {
             position: 'right',
             grid: {
               drawOnChartArea: false,
-              borderColor: 'rgba(236, 72, 153, 0.15)'
+              borderColor: colors.isLight ? 'rgba(219, 39, 119, 0.25)' : 'rgba(236, 72, 153, 0.15)'
             },
             ticks: {
-              color: '#f472b6',
+              color: colors.isLight ? '#db2777' : '#f472b6',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: function(v) {
                 if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
@@ -1476,7 +1665,7 @@ function renderMacroChart() {
             title: {
               display: true,
               text: 'MSTR 速度 (BTC/天)',
-              color: '#f472b6',
+              color: colors.isLight ? '#db2777' : '#f472b6',
               font: { family: 'Inter', size: 10, weight: '500' }
             },
             suggestedMin: 0
@@ -1486,10 +1675,10 @@ function renderMacroChart() {
             position: 'right',
             grid: {
               drawOnChartArea: false,
-              borderColor: 'rgba(99, 102, 241, 0.18)'
+              borderColor: colors.isLight ? 'rgba(79, 70, 229, 0.25)' : 'rgba(99, 102, 241, 0.18)'
             },
             ticks: {
-              color: '#818cf8',
+              color: colors.isLight ? '#4f46e5' : '#818cf8',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: function(v) {
                 return v.toFixed(1) + '×';
@@ -1498,7 +1687,7 @@ function renderMacroChart() {
             title: {
               display: true,
               text: 'MSTR mNAV (倍数)',
-              color: '#818cf8',
+              color: colors.isLight ? '#4f46e5' : '#818cf8',
               font: { family: 'Inter', size: 10, weight: '500' }
             },
             suggestedMin: 0.5,
@@ -1509,10 +1698,10 @@ function renderMacroChart() {
             position: 'right',
             grid: {
               drawOnChartArea: false,
-              borderColor: 'rgba(59, 130, 246, 0.18)'
+              borderColor: colors.isLight ? 'rgba(37, 99, 235, 0.25)' : 'rgba(59, 130, 246, 0.18)'
             },
             ticks: {
-              color: '#60a5fa',
+              color: colors.isLight ? '#2563eb' : '#60a5fa',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: function(v) {
                 return '$' + v.toFixed(1) + 'T';
@@ -1521,7 +1710,7 @@ function renderMacroChart() {
             title: {
               display: true,
               text: 'Fed 净流动性 ($T)',
-              color: '#60a5fa',
+              color: colors.isLight ? '#2563eb' : '#60a5fa',
               font: { family: 'Inter', size: 10, weight: '500' }
             },
             suggestedMin: 4.8,
@@ -1764,7 +1953,7 @@ function renderCdriChart() {
   if (!elCdriEcharts || typeof echarts === 'undefined') return;
 
   if (!cdriChartInstance) {
-    cdriChartInstance = echarts.init(elCdriEcharts, null, { renderer: 'canvas' });
+    cdriChartInstance = echarts.init(elCdriEcharts, getEchartsTheme(), { renderer: 'canvas' });
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(() => {
         if (cdriChartInstance) cdriChartInstance.resize();
@@ -1775,6 +1964,8 @@ function renderCdriChart() {
 
   const { dates, values, prices } = getFilteredCdriPoints();
   if (!dates.length) return;
+
+  const colors = getChartThemeColors();
 
   const option = {
     backgroundColor: 'transparent',
@@ -1789,19 +1980,19 @@ function renderCdriChart() {
     tooltip: {
       trigger: 'axis',
       confine: true,
-      backgroundColor: 'rgba(18, 18, 24, 0.94)',
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
       borderWidth: 1,
       padding: [10, 14],
       textStyle: {
-        color: '#e4e4e7',
+        color: colors.tooltipText,
         fontFamily: 'JetBrains Mono',
         fontSize: 12
       },
       formatter: function(params) {
         if (!params || !params.length) return '';
         const date = params[0].name;
-        let html = `<div style="font-weight:600;margin-bottom:6px;color:#fafafa;">${date} (UTC+8)</div>`;
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${colors.tooltipTitle};">${date} (UTC+8)</div>`;
         params.forEach(p => {
           if (p.seriesName === 'CDRI') {
             const val = p.value;
@@ -1811,12 +2002,12 @@ function renderCdriChart() {
             else if (val > 60) { tier = '高风险'; col = '#ffc800'; }
             else if (val > 30) { tier = '中性波动'; col = '#93ea2a'; }
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
-              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};margin-right:6px;"></span>CDRI 风险指数:</span>
+              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};margin-right:6px;"></span>CDRI 风险指数:</span>
               <span style="font-weight:700;color:${col};">${val} (${tier})</span>
             </div>`;
           } else if (p.seriesName === 'BTC 现货') {
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
-              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:6px;"></span>BTC 现货价格:</span>
+              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:6px;"></span>BTC 现货价格:</span>
               <span style="font-weight:700;color:#38bdf8;">$${Number(p.value).toLocaleString()}</span>
             </div>`;
           }
@@ -1828,10 +2019,10 @@ function renderCdriChart() {
       type: 'category',
       data: dates,
       boundaryGap: false,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+      axisLine: { lineStyle: { color: colors.axisLine } },
       axisTick: { show: false },
       axisLabel: {
-        color: '#71717a',
+        color: colors.tickColor,
         fontFamily: 'JetBrains Mono',
         fontSize: 11
       }
@@ -1840,18 +2031,18 @@ function renderCdriChart() {
       {
         type: 'value',
         name: 'CDRI 指数',
-        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        nameTextStyle: { color: colors.tickColor, fontSize: 11 },
         min: 0,
         max: 100,
         interval: 20,
         axisLabel: {
-          color: '#71717a',
+          color: colors.tickColor,
           fontFamily: 'JetBrains Mono',
           formatter: '{value}'
         },
         splitLine: {
           lineStyle: {
-            color: 'rgba(255, 255, 255, 0.04)'
+            color: colors.splitLine
           }
         }
       },
@@ -2231,11 +2422,13 @@ function renderTermPremiumChart() {
   if (!elTpEcharts || !currentTermPremiumData || !currentTermPremiumData.series) return;
 
   if (!termPremiumChartInstance) {
-    termPremiumChartInstance = echarts.init(elTpEcharts, 'dark');
+    termPremiumChartInstance = echarts.init(elTpEcharts, getEchartsTheme());
   }
 
   let rawSeries = currentTermPremiumData.series;
   if (!rawSeries || !rawSeries.length) return;
+
+  const colors = getChartThemeColors();
 
   // Filter series by timeframe
   let sliced = rawSeries;
@@ -2468,7 +2661,7 @@ function renderTermPremiumChart() {
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
       label: {
-        backgroundColor: '#27272a',
+        backgroundColor: colors.axisPointerBg,
         fontFamily: 'JetBrains Mono',
         fontSize: 11
       }
@@ -2476,27 +2669,27 @@ function renderTermPremiumChart() {
     tooltip: {
       trigger: 'axis',
       confine: true,
-      backgroundColor: 'rgba(18, 18, 24, 0.94)',
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
       borderWidth: 1,
       padding: [10, 14],
       textStyle: {
-        color: '#e4e4e7',
+        color: colors.tooltipText,
         fontFamily: 'JetBrains Mono',
         fontSize: 12
       },
       formatter: function (params) {
         if (!params || !params.length) return '';
         const date = params[0].name;
-        let html = `<div style="font-weight:600;margin-bottom:6px;color:#fafafa;">${date}</div>`;
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${colors.tooltipTitle};">${date}</div>`;
 
         // Top grid items
         const topItems = params.filter(p => p.seriesId && p.seriesId.startsWith('top-'));
         if (topItems.length) {
-          html += `<div style="font-size:11px;color:#a1a1aa;margin-top:2px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:2px;">常数期限基差率 (APR):</div>`;
+          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:2px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">常数期限基差率 (APR):</div>`;
           topItems.forEach(p => {
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
-              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
+              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
               <span style="font-weight:700;color:${p.color};">${Number(p.value).toFixed(2)}%</span>
             </div>`;
           });
@@ -2505,13 +2698,13 @@ function renderTermPremiumChart() {
         // Bottom grid items
         const botItems = params.filter(p => p.seriesId && p.seriesId.startsWith('bot-'));
         if (botItems.length) {
-          html += `<div style="font-size:11px;color:#a1a1aa;margin-top:6px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:2px;">期限溢价利差 (Spreads):</div>`;
+          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:6px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">期限溢价利差 (Spreads):</div>`;
           botItems.forEach(p => {
             const val = Number(p.value);
             const sign = val >= 0 ? '+' : '';
             const col = val >= 0 ? '#38bdf8' : '#f43f5e';
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
-              <span style="color:#a1a1aa;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
+              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
               <span style="font-weight:700;color:${col};">${sign}${val.toFixed(2)}%</span>
             </div>`;
           });
@@ -2526,7 +2719,7 @@ function renderTermPremiumChart() {
         gridIndex: 0,
         data: dates,
         boundaryGap: false,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+        axisLine: { lineStyle: { color: colors.axisLine } },
         axisTick: { show: false },
         axisLabel: { show: false }
       },
@@ -2535,10 +2728,10 @@ function renderTermPremiumChart() {
         gridIndex: 1,
         data: dates,
         boundaryGap: false,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+        axisLine: { lineStyle: { color: colors.axisLine } },
         axisTick: { show: false },
         axisLabel: {
-          color: '#71717a',
+          color: colors.tickColor,
           fontFamily: 'JetBrains Mono',
           fontSize: 11,
           showMinLabel: true,
@@ -2551,28 +2744,28 @@ function renderTermPremiumChart() {
         type: 'value',
         gridIndex: 0,
         name: '基差 APR (%)',
-        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        nameTextStyle: { color: colors.tickColor, fontSize: 11 },
         axisLabel: {
-          color: '#71717a',
+          color: colors.tickColor,
           fontFamily: 'JetBrains Mono',
           formatter: '{value}%'
         },
         splitLine: {
-          lineStyle: { color: 'rgba(255, 255, 255, 0.04)' }
+          lineStyle: { color: colors.splitLine }
         }
       },
       {
         type: 'value',
         gridIndex: 1,
         name: '期限利差 (%)',
-        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        nameTextStyle: { color: colors.tickColor, fontSize: 11 },
         axisLabel: {
-          color: '#71717a',
+          color: colors.tickColor,
           fontFamily: 'JetBrains Mono',
           formatter: '{value}%'
         },
         splitLine: {
-          lineStyle: { color: 'rgba(255, 255, 255, 0.04)' }
+          lineStyle: { color: colors.splitLine }
         }
       }
     ],
@@ -2765,7 +2958,7 @@ function renderSsroChart() {
   if (!dom || !rawSsroData || !Array.isArray(rawSsroData.points)) return;
 
   if (!ssroChartInstance) {
-    ssroChartInstance = echarts.init(dom, 'dark');
+    ssroChartInstance = echarts.init(dom, getEchartsTheme());
   }
 
   let filtered = [...rawSsroData.points];
@@ -2787,6 +2980,8 @@ function renderSsroChart() {
   const minZ = validZ.length > 0 ? Math.min(-2.5, Math.floor(Math.min(...validZ) - 0.5)) : -3;
   const maxZ = validZ.length > 0 ? Math.max(2.5, Math.ceil(Math.max(...validZ) + 0.5)) : 3;
 
+  const colors = getChartThemeColors();
+
   const option = {
     backgroundColor: 'transparent',
     animation: true,
@@ -2795,13 +2990,13 @@ function renderSsroChart() {
       trigger: 'axis',
       axisPointer: {
         type: 'cross',
-        crossStyle: { color: '#64748b' },
-        lineStyle: { color: '#475569', type: 'dashed' }
+        crossStyle: { color: colors.crossColor },
+        lineStyle: { color: colors.crossColor, type: 'dashed' }
       },
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      borderColor: 'rgba(56, 189, 248, 0.3)',
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
       borderWidth: 1,
-      textStyle: { color: '#f8fafc', fontSize: 12 },
+      textStyle: { color: colors.tooltipText, fontSize: 12 },
       formatter: function(params) {
         if (!params || params.length === 0) return '';
         const idx = params[0].dataIndex;
@@ -2818,27 +3013,27 @@ function renderSsroChart() {
         }
 
         return `
-          <div style="font-weight:700; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; color:#94a3b8;">
+          <div style="font-weight:700; border-bottom: 1px solid ${colors.tooltipDivider}; padding-bottom:4px; margin-bottom:6px; color:${colors.tooltipTitle};">
             📅 ${pt.date}
           </div>
           <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
             <span style="color:#f59e0b;">🪙 BTC 现货价格:</span>
-            <strong style="color:#f8fafc;">$${Math.round(pt.btcPrice).toLocaleString()}</strong>
+            <strong style="color:${colors.tooltipTitle};">$${Math.round(pt.btcPrice).toLocaleString()}</strong>
           </div>
           <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
             <span style="color:#38bdf8;">💵 稳定币市值 (STABLE.C):</span>
-            <strong style="color:#f8fafc;">$${(pt.stableCap / 1e9).toFixed(2)}B</strong>
+            <strong style="color:${colors.tooltipTitle};">$${(pt.stableCap / 1e9).toFixed(2)}B</strong>
           </div>
           <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
             <span style="color:#a855f7;">📊 原始 SSR (BTC/STABLE):</span>
-            <strong style="color:#e2e8f0;">${pt.ssr?.toFixed(3) || '--'}</strong>
+            <strong style="color:${colors.textSecondary};">${pt.ssr?.toFixed(3) || '--'}</strong>
           </div>
           <div style="display:flex; justify-content:space-between; gap:16px; margin-bottom:4px;">
             <span style="color:${zoneColor};">⚡ SSRO Z-Score (len=${ssroLen}):</span>
             <strong style="color:${zoneColor};">${zVal !== null ? (zVal > 0 ? '+' : '') + zVal.toFixed(2) + 'σ' : '--'}</strong>
           </div>
-          <div style="display:flex; justify-content:space-between; gap:16px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1);">
-            <span style="color:#94a3b8;">🎯 流动性研判:</span>
+          <div style="display:flex; justify-content:space-between; gap:16px; padding-top:4px; border-top:1px dashed ${colors.tooltipDivider};">
+            <span style="color:${colors.textMuted};">🎯 流动性研判:</span>
             <strong style="color:${zoneColor};">${zoneText}</strong>
           </div>
         `;
@@ -2866,7 +3061,7 @@ function renderSsroChart() {
         type: 'category',
         gridIndex: 0,
         data: dates,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
+        axisLine: { lineStyle: { color: colors.axisLine } },
         axisLabel: { show: false },
         axisTick: { show: false }
       },
@@ -2874,8 +3069,8 @@ function renderSsroChart() {
         type: 'category',
         gridIndex: 1,
         data: dates,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.15)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 11 },
+        axisLine: { lineStyle: { color: colors.axisLine } },
+        axisLabel: { color: colors.tickColor, fontSize: 11 },
         axisTick: { alignWithLabel: true }
       }
     ],
@@ -2885,7 +3080,7 @@ function renderSsroChart() {
         gridIndex: 0,
         scale: true,
         axisLine: { show: false },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+        splitLine: { lineStyle: { color: colors.splitLine } },
         axisLabel: {
           color: '#f59e0b',
           fontSize: 11,
@@ -2899,7 +3094,7 @@ function renderSsroChart() {
         gridIndex: 1,
         min: minZ,
         max: maxZ,
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+        splitLine: { lineStyle: { color: colors.splitLine } },
         axisLabel: {
           color: '#38bdf8',
           fontSize: 11,
@@ -3231,7 +3426,7 @@ function renderCbDepthChart(data) {
   if (!elCbDepthEcharts || !data || !data.depthProfile) return;
 
   if (!cbDepthChartInstance) {
-    cbDepthChartInstance = echarts.init(elCbDepthEcharts, 'dark');
+    cbDepthChartInstance = echarts.init(elCbDepthEcharts, getEchartsTheme());
   }
 
   const tiers = [5, 10, 20, 50, 100, 200];
@@ -3239,20 +3434,22 @@ function renderCbDepthChart(data) {
   const bidUsdVals = tiers.map(t => -(data.depthProfile[t].bidUsdM || 0)); // negative for left bar
   const askUsdVals = tiers.map(t => (data.depthProfile[t].askUsdM || 0));   // positive for right bar
 
+  const colors = getChartThemeColors();
+
   const option = {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      backgroundColor: 'rgba(18, 18, 24, 0.94)',
-      borderColor: 'rgba(255, 255, 255, 0.12)',
-      textStyle: { color: '#e4e4e7', fontFamily: 'JetBrains Mono', fontSize: 12 },
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 12 },
       formatter: function(params) {
         if (!params || !params.length) return '';
         const tierName = params[0].name;
         const tierNum = parseInt(tierName.replace(/[^0-9]/g, ''), 10) || 5;
         const item = data.depthProfile[tierNum] || {};
-        return `<div style="font-weight:700;margin-bottom:6px;color:#fafafa;">Coinbase 深度切片: ${tierName}</div>
+        return `<div style="font-weight:700;margin-bottom:6px;color:${colors.tooltipTitle};">Coinbase 深度切片: ${tierName}</div>
           <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
             <span style="color:#10b981;">🟢 买单深度 (Bid):</span>
             <span style="font-weight:700;color:#10b981;">$${item.bidUsdM}M (${item.bidBtc} ₿)</span>
@@ -3261,7 +3458,7 @@ function renderCbDepthChart(data) {
             <span style="color:#f43f5e;">🔴 卖单深度 (Ask):</span>
             <span style="font-weight:700;color:#f43f5e;">$${item.askUsdM}M (${item.askBtc} ₿)</span>
           </div>
-          <div style="display:flex;justify-content:space-between;gap:16px;margin:4px 0 0 0;padding-top:4px;border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex;justify-content:space-between;gap:16px;margin:4px 0 0 0;padding-top:4px;border-top:1px solid ${colors.tooltipDivider};">
             <span style="color:#a855f7;">🟣 买单占比 (Bid %):</span>
             <span style="font-weight:700;color:${item.bidPct >= 50 ? '#10b981' : '#f43f5e'};">${item.bidPct}%</span>
           </div>`;
@@ -3280,24 +3477,24 @@ function renderCbDepthChart(data) {
         name: '买盘 ← 挂单金额 ($M) → 卖盘',
         nameLocation: 'middle',
         nameGap: 24,
-        nameTextStyle: { color: '#71717a', fontSize: 11 },
+        nameTextStyle: { color: colors.tickColor, fontSize: 11 },
         axisLabel: {
-          color: '#71717a',
+          color: colors.tickColor,
           fontFamily: 'JetBrains Mono',
           fontSize: 10,
           formatter: function(val) {
             return Math.abs(val) + 'M';
           }
         },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } }
+        splitLine: { lineStyle: { color: colors.splitLine } }
       }
     ],
     yAxis: {
       type: 'category',
       data: categories,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
+      axisLine: { lineStyle: { color: colors.axisLine } },
       axisTick: { show: false },
-      axisLabel: { color: '#a1a1aa', fontFamily: 'JetBrains Mono', fontSize: 11 }
+      axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', fontSize: 11 }
     },
     series: [
       {
@@ -3339,9 +3536,10 @@ function renderCbSlippageChart(data) {
   if (!elCbSlippageEcharts || !data || !Array.isArray(data.slippageSimulation)) return;
 
   if (!cbSlippageChartInstance) {
-    cbSlippageChartInstance = echarts.init(elCbSlippageEcharts, 'dark');
+    cbSlippageChartInstance = echarts.init(elCbSlippageEcharts, getEchartsTheme());
   }
 
+  const colors = getChartThemeColors();
   const sim = data.slippageSimulation;
   const labels = sim.map(s => s.sizeLabel);
   const buySlippage = sim.map(s => s.buy.slippageBps);
@@ -3351,16 +3549,16 @@ function renderCbSlippageChart(data) {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(18, 18, 24, 0.94)',
-      borderColor: 'rgba(255, 255, 255, 0.12)',
-      textStyle: { color: '#e4e4e7', fontFamily: 'JetBrains Mono', fontSize: 12 },
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 12 },
       formatter: function(params) {
         if (!params || !params.length) return '';
         const idx = params[0].dataIndex;
         const item = sim[idx];
         if (!item) return '';
 
-        return `<div style="font-weight:700;margin-bottom:6px;color:#fafafa;">市价冲击模拟规模: ${item.sizeLabel}</div>
+        return `<div style="font-weight:700;margin-bottom:6px;color:${colors.tooltipTitle};">市价冲击模拟规模: ${item.sizeLabel}</div>
           <div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;">
             <span style="color:#10b981;">🟢 买入滑点:</span>
             <span style="font-weight:700;color:#10b981;">+${item.buy.slippageBps} bps (均价 $${item.buy.avgPrice.toLocaleString()})</span>
@@ -3369,7 +3567,7 @@ function renderCbSlippageChart(data) {
             <span style="color:#f43f5e;">🔴 卖出滑点:</span>
             <span style="font-weight:700;color:#f43f5e;">+${item.sell.slippageBps} bps (均价 $${item.sell.avgPrice.toLocaleString()})</span>
           </div>
-          <div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#f59e0b;">
+          <div style="margin-top:4px;padding-top:4px;border-top:1px solid ${colors.tooltipDivider};font-size:11px;color:${colors.isLight ? '#b45309' : '#f59e0b'};">
             ⚠️ 下行惩罚比率: <strong>${item.asymmetryRatio}x</strong> (卖出比买入多承受 ${item.penaltyBps} bps 滑点)
           </div>`;
       }
@@ -3384,20 +3582,20 @@ function renderCbSlippageChart(data) {
     xAxis: {
       type: 'category',
       data: labels,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+      axisLine: { lineStyle: { color: colors.axisLine } },
       axisTick: { show: false },
-      axisLabel: { color: '#a1a1aa', fontFamily: 'JetBrains Mono', fontSize: 11 }
+      axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', fontSize: 11 }
     },
     yAxis: {
       type: 'value',
       name: '执行滑点 (bps)',
-      nameTextStyle: { color: '#71717a', fontSize: 11 },
+      nameTextStyle: { color: colors.tickColor, fontSize: 11 },
       axisLabel: {
-        color: '#71717a',
+        color: colors.tickColor,
         fontFamily: 'JetBrains Mono',
         formatter: '{value} bps'
       },
-      splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.04)' } }
+      splitLine: { lineStyle: { color: colors.gridLine } }
     },
     series: [
       {
@@ -3816,9 +4014,10 @@ function renderGoldChart() {
   if (!elGoldEcharts || !rawGoldData || !rawGoldData.series) return;
 
   if (!goldChartInstance) {
-    goldChartInstance = echarts.init(elGoldEcharts, 'dark');
+    goldChartInstance = echarts.init(elGoldEcharts, getEchartsTheme());
   }
 
+  const colors = getChartThemeColors();
   let seriesData = rawGoldData.series;
   if (currentGoldTimeframe === '30') seriesData = seriesData.slice(-30);
   else if (currentGoldTimeframe === '90') seriesData = seriesData.slice(-90);
@@ -3912,7 +4111,7 @@ function renderGoldChart() {
         lineStyle: { type: 'dashed', width: 1 },
         data: [
           { yAxis: 0.5, lineStyle: { color: 'rgba(16, 185, 129, 0.5)' }, label: { formatter: '+0.5 强共振', position: 'end', fontSize: 10, color: '#10b981' } },
-          { yAxis: 0, lineStyle: { color: 'rgba(255, 255, 255, 0.25)' }, label: { formatter: '0 脱钩线', position: 'end', fontSize: 10, color: '#94a3b8' } },
+          { yAxis: 0, lineStyle: { color: colors.gridLineStrong }, label: { formatter: '0 脱钩线', position: 'end', fontSize: 10, color: colors.tickColor } },
           { yAxis: -0.2, lineStyle: { color: 'rgba(244, 63, 94, 0.5)' }, label: { formatter: '-0.2 负相关轮动', position: 'end', fontSize: 10, color: '#f43f5e' } }
         ]
       }
@@ -3924,14 +4123,14 @@ function renderGoldChart() {
     animation: false,
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross', lineStyle: { color: 'rgba(255,255,255,0.2)' } },
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-      textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'monospace' },
+      axisPointer: { type: 'cross', lineStyle: { color: colors.crossColor } },
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.tooltipText, fontSize: 11, fontFamily: 'monospace' },
       formatter: function (params) {
         if (!params || !params.length) return '';
         let dateStr = params[0].axisValue || '';
-        let html = `<div style="font-weight:700; margin-bottom:4px; color:#e2e8f0;">${dateStr}</div>`;
+        let html = `<div style="font-weight:700; margin-bottom:4px; color:${colors.tooltipTitle};">${dateStr}</div>`;
         params.forEach(p => {
           let val = p.value;
           let label = p.seriesName;
@@ -3957,7 +4156,7 @@ function renderGoldChart() {
         type: 'category',
         data: dates,
         gridIndex: 0,
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        axisLine: { lineStyle: { color: colors.axisLine } },
         axisLabel: { show: false },
         axisTick: { show: false }
       },
@@ -3965,9 +4164,9 @@ function renderGoldChart() {
         type: 'category',
         data: dates,
         gridIndex: 1,
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.15)' } },
+        axisLine: { lineStyle: { color: colors.axisLine } },
         axisLabel: {
-          color: '#64748b',
+          color: colors.tickColor,
           fontSize: 10,
           fontFamily: 'monospace',
           formatter: v => v.slice(5)
@@ -3980,18 +4179,18 @@ function renderGoldChart() {
         type: 'value',
         gridIndex: 0,
         name: 'BTC/Gold Ratio (oz)',
-        nameTextStyle: { color: '#eab308', fontSize: 10, fontFamily: 'monospace' },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } },
-        axisLabel: { color: '#eab308', fontSize: 10, fontFamily: 'monospace', formatter: v => `${v.toFixed(1)} oz` }
+        nameTextStyle: { color: colors.isLight ? '#b45309' : '#eab308', fontSize: 10, fontFamily: 'monospace' },
+        splitLine: { lineStyle: { color: colors.gridLine } },
+        axisLabel: { color: colors.isLight ? '#b45309' : '#eab308', fontSize: 10, fontFamily: 'monospace', formatter: v => `${v.toFixed(1)} oz` }
       },
       // Y1: Top Grid, Right - USD Price
       {
         type: 'value',
         gridIndex: 0,
         name: 'USD Price',
-        nameTextStyle: { color: '#94a3b8', fontSize: 10, fontFamily: 'monospace' },
+        nameTextStyle: { color: colors.tickColor, fontSize: 10, fontFamily: 'monospace' },
         splitLine: { show: false },
-        axisLabel: { color: '#94a3b8', fontSize: 10, fontFamily: 'monospace', formatter: v => `$${Math.round(v)}` }
+        axisLabel: { color: colors.tickColor, fontSize: 10, fontFamily: 'monospace', formatter: v => `$${Math.round(v)}` }
       },
       // Y2: Bottom Grid - Correlation r
       {
@@ -4002,7 +4201,7 @@ function renderGoldChart() {
         max: 1.0,
         interval: 0.5,
         nameTextStyle: { color: '#10b981', fontSize: 10, fontFamily: 'monospace' },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } },
+        splitLine: { lineStyle: { color: colors.gridLine } },
         axisLabel: { color: '#10b981', fontSize: 10, fontFamily: 'monospace', formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` }
       }
     ],
@@ -4297,6 +4496,7 @@ function renderAiBtcTensionDashboard(data) {
  */
 function renderAiBtcTensionCharts() {
   if (!rawAiBtcTensionData) return;
+  const colors = getChartThemeColors();
   const { current, trajectory_180d, series, event_study } = rawAiBtcTensionData;
 
   // ----------------------------------------------------
@@ -4387,14 +4587,14 @@ function renderAiBtcTensionCharts() {
             title: {
               display: true,
               text: 'I_Compute / P_AI: 算力重估溢价指数 Z-Score (0 为中性, >0 为资本重估扩张)',
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { size: 11 }
             },
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.05)',
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : colors.gridLine,
               lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1
             },
-            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+            ticks: { color: colors.tickColor, font: { family: 'JetBrains Mono', size: 10 } },
             suggestedMin: -2.5,
             suggestedMax: 2.5
           },
@@ -4402,14 +4602,14 @@ function renderAiBtcTensionCharts() {
             title: {
               display: true,
               text: 'I_Crypto / P_BTC: 加密外生流动性压力指数 Z-Score (0 为中性, >0 为流动性承压)',
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { size: 11 }
             },
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.05)',
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : colors.gridLine,
               lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1
             },
-            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+            ticks: { color: colors.tickColor, font: { family: 'JetBrains Mono', size: 10 } },
             suggestedMin: -2.5,
             suggestedMax: 2.5
           }
@@ -4417,9 +4617,11 @@ function renderAiBtcTensionCharts() {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 },
             callbacks: {
@@ -4493,19 +4695,19 @@ function renderAiBtcTensionCharts() {
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            grid: { color: colors.gridLine },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 10 },
               maxTicksLimit: 8
             }
           },
           y: {
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.04)'
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : colors.gridLine
             },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 10 }
             }
           }
@@ -4514,12 +4716,14 @@ function renderAiBtcTensionCharts() {
           legend: {
             display: true,
             position: 'top',
-            labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } }
+            labels: { color: colors.textSecondary, boxWidth: 12, font: { size: 11 } }
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 }
           }
@@ -4578,9 +4782,9 @@ function renderAiBtcTensionCharts() {
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            grid: { color: colors.gridLine },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 10 },
               maxTicksLimit: 8
             }
@@ -4589,37 +4793,39 @@ function renderAiBtcTensionCharts() {
             type: 'linear',
             position: 'left',
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.04)'
+              color: ctx => ctx.tick.value === 0 ? (colors.isLight ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.3)') : colors.gridLine
             },
             ticks: {
-              color: '#34d399',
+              color: colors.isLight ? '#059669' : '#34d399',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: v => `${v}%`
             },
-            title: { display: true, text: '正交特异 Alpha 累计 (%)', color: '#34d399', font: { size: 11 } }
+            title: { display: true, text: '正交特异 Alpha 累计 (%)', color: colors.isLight ? '#059669' : '#34d399', font: { size: 11 } }
           },
           yPrice: {
             type: 'linear',
             position: 'right',
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#fbbf24',
+              color: colors.isLight ? '#b45309' : '#fbbf24',
               font: { family: 'JetBrains Mono', size: 10 },
               callback: v => `$${Math.round(v).toLocaleString()}`
             },
-            title: { display: true, text: 'BTC 价格 (USD)', color: '#fbbf24', font: { size: 11 } }
+            title: { display: true, text: 'BTC 价格 (USD)', color: colors.isLight ? '#b45309' : '#fbbf24', font: { size: 11 } }
           }
         },
         plugins: {
           legend: {
             display: true,
             position: 'top',
-            labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } }
+            labels: { color: colors.textSecondary, boxWidth: 12, font: { size: 11 } }
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 }
           }
@@ -4679,35 +4885,37 @@ function renderAiBtcTensionCharts() {
         animation: { duration: 400 },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            grid: { color: colors.gridLine },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 9 },
               maxRotation: 45
             }
           },
           y: {
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.04)'
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : colors.gridLine
             },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 10 },
               callback: v => `${v}%`
             },
-            title: { display: true, text: '超额异常收益 CAR (%)', color: '#94a3b8', font: { size: 10 } }
+            title: { display: true, text: '超额异常收益 CAR (%)', color: colors.tickColor, font: { size: 10 } }
           }
         },
         plugins: {
           legend: {
             display: true,
             position: 'top',
-            labels: { color: '#cbd5e1', boxWidth: 10, font: { size: 10 } }
+            labels: { color: colors.textSecondary, boxWidth: 10, font: { size: 10 } }
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 },
             callbacks: {
@@ -4927,6 +5135,7 @@ function renderMcClellanDashboard(data) {
  */
 function renderMcClellanCharts() {
   if (!rawMcClellanData || !rawMcClellanData.series) return;
+  const colors = getChartThemeColors();
   const series = rawMcClellanData.series;
 
   let filteredSeries = series;
@@ -5001,9 +5210,9 @@ function renderMcClellanCharts() {
         animation: { duration: 350 },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            grid: { color: colors.gridLine },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 9 },
               maxRotation: 0,
               maxTicksLimit: 8
@@ -5012,32 +5221,34 @@ function renderMcClellanCharts() {
           y: {
             position: 'left',
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.25)' : (Math.abs(ctx.tick.value) === 50 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.04)')
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : (Math.abs(ctx.tick.value) === 50 ? (colors.isLight ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)') : colors.gridLine)
             },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 9 },
               callback: v => `${v > 0 ? '+' : ''}${v}`
             },
-            title: { display: true, text: '振荡器 (EMA19 - EMA39) * 1000', color: '#94a3b8', font: { size: 9 } }
+            title: { display: true, text: '振荡器 (EMA19 - EMA39) * 1000', color: colors.tickColor, font: { size: 9 } }
           },
           yBtc: {
             position: 'right',
             grid: { display: false },
             ticks: {
-              color: '#d97706',
+              color: colors.isLight ? '#b45309' : '#d97706',
               font: { family: 'JetBrains Mono', size: 9 },
               callback: v => `$${Math.round(v / 1000)}k`
             },
-            title: { display: true, text: 'BTC (USD)', color: '#d97706', font: { size: 9 } }
+            title: { display: true, text: 'BTC (USD)', color: colors.isLight ? '#b45309' : '#d97706', font: { size: 9 } }
           }
         },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 },
             callbacks: {
@@ -5107,9 +5318,9 @@ function renderMcClellanCharts() {
         animation: { duration: 350 },
         scales: {
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+            grid: { color: colors.gridLine },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 9 },
               maxRotation: 0,
               maxTicksLimit: 8
@@ -5117,22 +5328,24 @@ function renderMcClellanCharts() {
           },
           y: {
             grid: {
-              color: ctx => ctx.tick.value === 0 ? 'rgba(255, 255, 255, 0.3)' : (ctx.tick.value === 40 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.04)')
+              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : (ctx.tick.value === 40 ? (colors.isLight ? 'rgba(217, 119, 6, 0.5)' : 'rgba(245, 158, 11, 0.4)') : colors.gridLine)
             },
             ticks: {
-              color: '#94a3b8',
+              color: colors.tickColor,
               font: { family: 'JetBrains Mono', size: 9 },
               callback: v => `${v > 0 ? '+' : ''}${v}`
             },
-            title: { display: true, text: '背离利差 Spread (阈值: 40)', color: '#94a3b8', font: { size: 9 } }
+            title: { display: true, text: '背离利差 Spread (阈值: 40)', color: colors.tickColor, font: { size: 9 } }
           }
         },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: colors.tooltipBg,
+            borderColor: colors.tooltipBorder,
             borderWidth: 1,
+            titleColor: colors.tooltipTitle,
+            bodyColor: colors.tooltipBody,
             titleFont: { family: 'JetBrains Mono' },
             bodyFont: { family: 'JetBrains Mono', size: 11 },
             callbacks: {
@@ -5195,6 +5408,7 @@ function initMcClellanEvents() {
 // ============================================================================
 // Application Startup Initialization
 // ============================================================================
+initThemeController();
 initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
