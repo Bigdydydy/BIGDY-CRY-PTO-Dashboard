@@ -129,6 +129,9 @@ function reloadAllChartsForTheme() {
   if (typeof renderMcClellanCharts === 'function' && typeof rawMcClellanData !== 'undefined' && rawMcClellanData) {
     renderMcClellanCharts();
   }
+  if (window.WaveRadarModule && typeof window.WaveRadarModule.updateTheme === 'function') {
+    window.WaveRadarModule.updateTheme();
+  }
 }
 
 /**
@@ -3662,6 +3665,7 @@ const VIEW_TITLES = {
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
   'view-ai-btc-tension': 'AI–BTC 融资张力指数与传导检验系统',
+  'view-wave-radar': '柳玉冬波浪理论智能研判 (4H)',
   'view-all': '全模块平铺画卷'
 };
 
@@ -3775,6 +3779,10 @@ function switchView(viewId, updateHash = true) {
       } else {
         loadAiBtcTensionData(false);
       }
+    }
+
+    if ((viewId === 'view-wave-radar' || viewId === 'view-all') && window.WaveRadarModule) {
+      window.WaveRadarModule.onViewActivated();
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -5418,6 +5426,9 @@ initGoldCorrelationEvents();
 initAiBtcTensionEvents();
 initMcClellanEvents();
 initNavigation();
+if (window.WaveRadarModule && typeof window.WaveRadarModule.init === 'function') {
+  window.WaveRadarModule.init();
+}
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);

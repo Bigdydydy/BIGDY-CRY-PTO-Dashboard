@@ -35954,7 +35954,23 @@
     },
     {
       "date": "2026-09-26",
-      "btcPrice": 84289.39,
+      "btcPrice": 84433.1,
+      "mstrCost": 75415.66,
+      "mstrHoldings": 845050,
+      "mstrBuyVelocity30d": 153.4,
+      "mnav": 1.055,
+      "us1y": 4.51,
+      "us10y": 5.18,
+      "yieldSpread": 0.67,
+      "fedWalcl": 6.748,
+      "fedTga": 0.977,
+      "fedRrp": 0.001,
+      "fedNetLiquidity": 5.77,
+      "fedNetLiqSma20": 5.8337
+    },
+    {
+      "date": "2026-09-27",
+      "btcPrice": 84998,
       "mstrCost": 75415.66,
       "mstrHoldings": 845050,
       "mstrBuyVelocity30d": 153.4,
@@ -35970,7 +35986,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 84289.39,
+    "currentBtc": 84998,
     "currentMstrCost": 75415.66,
     "currentMstrHoldings": 845050,
     "currentMstrVelocity30d": 153.4,
@@ -35983,7 +35999,7 @@
     "current10y": 5.18,
     "currentSpread": 0.67,
     "isCurveInverted": false,
-    "mstrProfitMultiplier": 1.12,
+    "mstrProfitMultiplier": 1.13,
     "currentFedNetLiquidity": 5.77,
     "currentFedNetLiqSma20": 5.8337,
     "currentFedWalcl": 6.748,
@@ -35991,12 +36007,12 @@
     "currentFedRrp": 0.001,
     "fedNetLiqDailyChange": 0,
     "fedNetLiqChange20d": 0.0014,
-    "totalPoints": 2248,
+    "totalPoints": 2249,
     "dateRange": {
       "start": "2020-08-01",
-      "end": "2026-09-26"
+      "end": "2026-09-27"
     },
-    "updatedAt": "2026-09-26T08:36:51.004Z"
+    "updatedAt": "2026-09-27T10:11:18.476Z"
   },
   "rawMstr": [
     {

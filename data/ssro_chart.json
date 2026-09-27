@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-09-26T08:36:50.854Z",
+  "updatedAt": "2026-09-27T10:11:18.578Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
-    "date": "2026-09-26",
-    "btcPrice": 84288,
-    "stableCap": 311754960204,
-    "stableCapBillions": "311.75",
-    "ssr": 5.427,
-    "ssro200": 2.041,
-    "ssro50": 1.189,
+    "date": "2026-09-27",
+    "btcPrice": 84997.99,
+    "stableCap": 311744906726,
+    "stableCapBillions": "311.74",
+    "ssr": 5.473,
+    "ssro200": 2.112,
+    "ssro50": 1.249,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": 0.045269141120222935,
-      "priceUsd": 311754960204
+      "change24h": -0.004303968470658696,
+      "priceUsd": 311744906726
     },
     "quantEvaluation": {
-      "zScore": 2.041,
+      "zScore": 2.112,
       "zone": "extreme_overbought",
       "label": "购买力衰竭 (顶部风险)",
       "colorClass": "text-red",
@@ -25,9 +25,9 @@
     }
   },
   "summary": {
-    "totalDays": 2095,
+    "totalDays": 2096,
     "startDate": "2021-01-01",
-    "endDate": "2026-09-26",
+    "endDate": "2026-09-27",
     "minSsro200": -3.193,
     "maxSsro200": 4.111
   },
@@ -29350,17 +29350,31 @@
     },
     {
       "date": "2026-09-26",
-      "btcPrice": 84288,
-      "stableCap": 311754960204,
-      "ssr": 5.427,
-      "ssro200": 2.041,
+      "btcPrice": 84433.1,
+      "stableCap": 311599586975,
+      "ssr": 5.439,
+      "ssro200": 2.068,
       "sma200": 4.549,
       "stdev200": 0.43,
       "upper2_200": 5.409,
       "lower2_200": 3.689,
-      "ssro50": 1.189,
+      "ssro50": 1.216,
       "sma50": 4.917,
-      "stdev50": 0.428
+      "stdev50": 0.429
+    },
+    {
+      "date": "2026-09-27",
+      "btcPrice": 84997.99,
+      "stableCap": 311744906726,
+      "ssr": 5.473,
+      "ssro200": 2.112,
+      "sma200": 4.554,
+      "stdev200": 0.435,
+      "upper2_200": 5.424,
+      "lower2_200": 3.684,
+      "ssro50": 1.249,
+      "sma50": 4.942,
+      "stdev50": 0.425
     }
   ]
 }

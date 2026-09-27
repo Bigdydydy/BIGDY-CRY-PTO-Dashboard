@@ -21,6 +21,7 @@ const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
+const { analyzeWaves } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -53,6 +54,71 @@ function parseJsonBody(req) {
 // Rate limiting & Single-flight locks
 const refreshRateLimitMap = new Map();
 let activeRefreshPromise = null;
+
+// Wave Engine API Rate Limiting & Kline Cache
+const waveRateLimitMap = new Map();
+const waveKlineCache = new Map();
+
+function checkWaveRateLimit(clientIp) {
+  const now = Date.now();
+  const windowMs = 60000;
+  const maxReq = 20; // Max 20 requests per minute per IP
+  let timestamps = waveRateLimitMap.get(clientIp) || [];
+  timestamps = timestamps.filter(t => now - t < windowMs);
+  if (timestamps.length >= maxReq) {
+    waveRateLimitMap.set(clientIp, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  waveRateLimitMap.set(clientIp, timestamps);
+  return true;
+}
+
+async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
+  const cacheKey = `${symbol}_${interval}_${limit}`;
+  const cached = waveKlineCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < 120000) {
+    return cached.data;
+  }
+
+  const urls = [
+    `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  ];
+
+  let rawData = null;
+  for (const apiUrl of urls) {
+    try {
+      const response = await fetch(apiUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (response.ok) {
+        rawData = await response.json();
+        break;
+      }
+    } catch (e) {
+      // try next
+    }
+  }
+
+  if (!rawData || !Array.isArray(rawData)) {
+    throw new Error('未能从公共行情源拉取到 4H K 线数据，请稍后重试');
+  }
+
+  const bars = rawData.map(b => ({
+    time: Math.floor(b[0] / 1000),
+    open: parseFloat(b[1]),
+    high: parseFloat(b[2]),
+    low: parseFloat(b[3]),
+    close: parseFloat(b[4]),
+    volume: parseFloat(b[5])
+  }));
+
+  waveKlineCache.set(cacheKey, { timestamp: now, data: bars });
+  return bars;
+}
 
 // MIME types for static serving
 const MIME_TYPES = {
@@ -424,6 +490,73 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] refresh:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/wave/klines (Module 9: Wave Kline Feed Proxy & Cache with IP Rate Limit)
+  if (pathname === '/api/wave/klines' && req.method === 'GET') {
+    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    if (!checkWaveRateLimit(clientIp)) {
+      sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
+      return;
+    }
+
+    const rawSymbol = (parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
+      return;
+    }
+
+    const interval = parsedUrl.query?.interval || '4h';
+    if (interval !== '4h') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判限定 4 小时 (4h) 时间框架' });
+      return;
+    }
+
+    const limit = Math.min(parseInt(parsedUrl.query?.limit, 10) || 1000, 1000);
+
+    try {
+      const bars = await fetchBinanceKlines(rawSymbol, interval, limit);
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        symbol: rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT',
+        interval,
+        count: bars.length,
+        bars
+      });
+    } catch (err) {
+      console.error('[API Error] wave-klines:', err);
+      sendJsonResponse(req, res, 502, { code: 502, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/wave/analysis (Module 9: Liu Yudong Elliott Wave Theory Analysis API)
+  if (pathname === '/api/wave/analysis' && req.method === 'GET') {
+    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    if (!checkWaveRateLimit(clientIp)) {
+      sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
+      return;
+    }
+
+    const rawSymbol = (parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
+      return;
+    }
+
+    try {
+      const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
+      const bars = await fetchBinanceKlines(rawSymbol, '4h', 1000);
+      const analysis = analyzeWaves(bars, displaySymbol);
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...analysis
+      });
+    } catch (err) {
+      console.error('[API Error] wave-analysis:', err);
+      sendJsonResponse(req, res, 502, { code: 502, error: err.message });
     }
     return;
   }

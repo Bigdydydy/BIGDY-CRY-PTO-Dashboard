@@ -233,6 +233,18 @@
               <span class="nav-desc">四象限相空间 · 正交因果剥离</span>
             </div>
           </button>
+
+          <button class="sidebar-nav-item" data-view="view-wave-radar" id="nav-item-wave-radar">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
+              </svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title"><span class="nav-index">09/</span>柳玉冬波浪研判</span>
+              <span class="nav-desc">4H 铁律检验 · 监测点 · 艾略特通道</span>
+            </div>
+          </button>
         </nav>
       </div>
 
@@ -2216,6 +2228,156 @@
         </div>
       </div> <!-- /#view-ai-btc-tension -->
 
+      <!-- Module 9: 柳玉冬波浪理论智能研判系统 (Wave Radar View) -->
+      <div class="view-panel" id="view-wave-radar">
+        <!-- Control & Indicator Bar -->
+        <div class="wave-control-bar">
+          <div class="wave-control-left">
+            <div class="wave-symbol-group" role="group" aria-label="选择标的">
+              <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
+              <button class="wave-symbol-btn" data-symbol="ETH/USDT">ETH / USDT</button>
+            </div>
+            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 周期: <strong>4H (4小时)</strong></span>
+            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 样本: <strong>1000 根 K线 (约166天)</strong></span>
+            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 计算架构: <strong>方案 A (纯客户端毫秒级执行)</strong></span>
+          </div>
+          <div class="wave-control-right">
+            <button class="btn-refresh" id="btn-scan-waves">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>智能扫描波浪</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Wave Layout: Left Chart + Right Quantitative Diagnostic -->
+        <div class="wave-grid-layout">
+          <!-- Left: Lightweight Charts View -->
+          <div class="bento-card wave-chart-card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <div class="card-title-group">
+                  <div class="card-icon" style="background: rgba(234, 88, 12, 0.12); color: var(--accent-primary);">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
+                    </svg>
+                  </div>
+                  <h3>4H 交互式 K 线图与波浪标引 (Lightweight Charts)</h3>
+                </div>
+                <p class="card-desc" id="wave-status-msg">● 正在拉取 4H 1000 根 K 线并加载柳玉冬波浪模型...</p>
+              </div>
+
+              <div class="chart-tools-group">
+                <button class="chart-tool-btn active" id="btn-toggle-markers" title="切换图表上的浪型标注 ①-⑤/(A)-(C)">浪型标引</button>
+                <button class="chart-tool-btn active" id="btn-toggle-zigzag" title="切换波浪分笔折线">分笔折线</button>
+                <button class="chart-tool-btn active" id="btn-toggle-invalidation" title="切换关键监测点与防守水平虚线">核心监测点</button>
+                <button class="chart-tool-btn active" id="btn-toggle-targets" title="切换斐波那契投射目标水平线">目标区间</button>
+              </div>
+            </div>
+
+            <!-- Lightweight Charts Container -->
+            <div id="wave-chart-container"></div>
+          </div>
+
+          <!-- Right: Diagnostic & Liu Yudong Quantitative Radar -->
+          <div class="wave-side-col">
+            <!-- 1. Wave Status & Iron Rules -->
+            <div class="bento-card">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>当前主浪型判定</h3>
+                  </div>
+                  <span class="card-badge" id="wave-regime-badge">识别中</span>
+                </div>
+              </div>
+              <div style="margin-top: 6px;">
+                <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="wave-regime-name">--</div>
+                <div style="font-size: 0.76rem; color: var(--accent-primary); margin-top: 4px; font-weight: 600;" id="wave-current-stage">--</div>
+
+                <div style="margin-top: 14px;">
+                  <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">柳玉冬波浪三大铁律核验</div>
+                  <div class="rule-check-list">
+                    <div class="rule-check-item">
+                      <div class="rule-check-left">
+                        <span class="rule-dot-pass" id="rule-dot-1"></span>
+                        <span>铁律 1: 浪2终点不能破浪1起点</span>
+                      </div>
+                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">100% 达标</span>
+                    </div>
+                    <div class="rule-check-item">
+                      <div class="rule-check-left">
+                        <span class="rule-dot-pass" id="rule-dot-2"></span>
+                        <span>铁律 2: 浪3不能是最短驱动浪</span>
+                      </div>
+                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">满足延伸</span>
+                    </div>
+                    <div class="rule-check-item">
+                      <div class="rule-check-left">
+                        <span class="rule-dot-pass" id="rule-dot-3"></span>
+                        <span>铁律 3: 浪4底绝不进入浪1顶 (无重叠)</span>
+                      </div>
+                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">严防死守</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Monitoring Pivot (柳玉冬核心实战法则) -->
+            <div class="bento-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>柳玉冬核心监测点 (防守位)</h3>
+                </div>
+              </div>
+              <div class="wave-pivot-highlight-box">
+                <div style="font-size: 0.7rem; color: var(--text-muted);">临界研判防守位 (突破/跌破即失效)</div>
+                <div class="wave-pivot-price" id="wave-pivot-price">$--,---</div>
+                <div class="wave-pivot-diff" id="wave-pivot-diff">计算中...</div>
+              </div>
+              <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; margin-top: 10px;" id="wave-pivot-desc">
+                监测点是柳玉冬实战体系的精髓所在。跌破或突破监测点即宣告原有波浪假设终结，转入反向或修正走势。
+              </p>
+            </div>
+
+            <!-- 3. Fibonacci Targets -->
+            <div class="bento-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>斐波那契目标位阶</h3>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px;" id="wave-targets-list">
+                <div class="wave-target-row">
+                  <span class="text-secondary">目标测算中...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Liu Yudong Commentary Box -->
+            <div class="bento-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>柳玉冬实战研判指南</h3>
+                </div>
+              </div>
+              <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.6; margin: 0;" id="wave-thesis-text">
+                正在根据 4H 走势生成权威研判...
+              </p>
+              <div style="margin-top: 10px; font-size: 0.73rem; color: var(--text-secondary); line-height: 1.5;" id="wave-bottom-signal">
+              </div>
+              <div class="liu-quote-box" id="wave-quote-text">
+                “愚昧无法战胜科学，波浪理论是科学。有了推动浪才有做底的可能，没有推动浪或引导楔形就完全没有可能做底。” —— 柳玉冬
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> <!-- /#view-wave-radar -->
+
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
 
@@ -2390,10 +2552,19 @@
       </svg>
       <span>AI-BTC张力</span>
     </button>
+    <button class="mob-nav-item" data-view="view-wave-radar" id="mob-nav-wave-radar">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
+      </svg>
+      <span>波浪研判</span>
+    </button>
   </nav>
 
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
+  <script src="/lightweight-charts.min.js"></script>
+  <script src="/wave_engine.js"></script>
+  <script src="/wave_ui.js"></script>
   <script src="/app.js?v=20260913_1"></script>
 </body>
 </html>
