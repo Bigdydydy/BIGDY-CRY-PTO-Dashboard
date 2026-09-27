@@ -124,6 +124,18 @@
         <div class="wave-hud-item"><span>低:</span> <strong id="hud-l">--</strong></div>
         <div class="wave-hud-item"><span>收:</span> <strong id="hud-c">--</strong></div>
       </div>
+      <div class="wave-pattern-badge" id="wave-pattern-badge" style="display:none;"></div>
+      <div class="wave-tv-hud" id="wave-tv-hud" style="display:none;">
+        <div class="wave-tv-header">
+          <div class="wave-tv-title">
+            <span class="wave-tv-dot"></span>
+            <span class="wave-tv-title-text">ELLIOTT WAVE · 柳玉冬实战体系</span>
+            <span class="wave-tv-mtf-badge" id="wave-tv-mtf-badge">MTF AUTO</span>
+          </div>
+          <button class="wave-tv-min-btn" id="btn-toggle-tv-hud" title="最小化/展开HUD">−</button>
+        </div>
+        <div class="wave-tv-body" id="wave-tv-hud-body"></div>
+      </div>
       <div id="chart-selection-overlay" class="chart-selection-overlay" style="display:none;">
         <div id="selection-range-box" class="selection-range-box"></div>
         <div id="selection-start-line" class="selection-v-line selection-start-line">
@@ -135,6 +147,17 @@
         <div id="selection-tooltip" class="selection-floating-tooltip"></div>
       </div>
     `;
+
+    // 绑定 HUD 最小化切换
+    const btnToggleHud = container.querySelector('#btn-toggle-tv-hud');
+    const tvHud = container.querySelector('#wave-tv-hud');
+    if (btnToggleHud && tvHud) {
+      btnToggleHud.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tvHud.classList.toggle('is-minimized');
+        btnToggleHud.textContent = tvHud.classList.contains('is-minimized') ? '+' : '−';
+      });
+    }
 
     const colors = getWaveChartColors();
     const chart = LightweightCharts.createChart(container, {
@@ -679,8 +702,12 @@
       activePriceLines = [];
     }
 
-    // 2. 隐藏选区横幅
+    // 2. 隐藏选区横幅与浮动组件
     updateRangeBanner(null, null);
+    const patternBadge = document.getElementById('wave-pattern-badge');
+    if (patternBadge) patternBadge.style.display = 'none';
+    const tvHud = document.getElementById('wave-tv-hud');
+    if (tvHud) tvHud.style.display = 'none';
 
     // 3. 重置顶部徽标与 5-KPI 看板
     const headerRegime = document.getElementById('wave-header-regime-pill');
@@ -799,7 +826,7 @@
   }
 
   /**
-   * 仅拉取行情并挂载 4H 裸 K 线图表，不执行任何初始波浪分析模板
+   * 抓取行情并挂载 K 线图表，启动实时自适应波浪理论解算
    */
   async function loadChartCandles(symbol = currentSymbol) {
     currentSymbol = symbol;
@@ -807,17 +834,17 @@
     const hudSym = document.getElementById('hud-sym');
     const statusMsg = document.getElementById('wave-status-msg');
     if (hudSym) hudSym.textContent = `${symbol} ${tfLabel}`;
-    if (statusMsg) statusMsg.textContent = `正在拉取 ${symbol} 最新 ${tfLabel} K 线走势...`;
+    if (statusMsg) statusMsg.textContent = `正在拉取 ${symbol} 最新 ${tfLabel} K 线走势并计算实时波浪...`;
 
     try {
-      const { bars } = await fetch4hKlines(symbol);
+      const { bars } = await fetch4hKlines(symbol, currentTf);
       currentBars = bars;
 
       if (!waveChart) {
         initChart();
       }
 
-      // 设置主图裸蜡烛 (无成交量，无初始波浪分析模板)
+      // 设置主图裸蜡烛 (无成交量副图，纯化主图视觉)
       const candleData = bars.map(b => ({
         time: b.time,
         open: b.open,
@@ -835,12 +862,9 @@
         });
       }
 
-      // 清除一切历史波浪图层，面板置为等待框选状态
-      clearWaveAnalysisState();
+      // 自动执行该标的与周期的波浪研判 (若有框选则研判选区，若无选区则全景研判)
+      await runWaveAnalysis(symbol, currentRange);
 
-      if (statusMsg) {
-        statusMsg.textContent = `● [${symbol} ${tfLabel}] 行情已就绪 · 请点击上方【🖱️ 框选分析模式】选择 2~750 根 K 线开始智能研判`;
-      }
     } catch (err) {
       console.error('[Wave Load Error]:', err);
       if (statusMsg) {
@@ -850,14 +874,9 @@
   }
 
   /**
-   * 执行波浪分析 (严格约束：仅当正确框选分析范围后才进行分析)
+   * 执行波浪分析 (支持全景实时解算与 2~750 根选区切片研判)
    */
   async function runWaveAnalysis(symbol = currentSymbol, rangeOptions = currentRange) {
-    // 关键规则：如果没有选定有效选区，绝不执行全量分析模板，只保持裸 K 线
-    if (!rangeOptions || !rangeOptions.startTime || !rangeOptions.endTime) {
-      return loadChartCandles(symbol);
-    }
-
     currentSymbol = symbol;
     currentRange = rangeOptions;
     const btnScan = document.getElementById('btn-scan-waves');
@@ -871,13 +890,17 @@
       const textSpan = btnScan.querySelector('span');
       if (textSpan) textSpan.textContent = '分析研判中...';
     }
+
+    const isCustomSlice = Boolean(rangeOptions && rangeOptions.startTime && rangeOptions.endTime);
     if (statusMsg) {
-      statusMsg.textContent = `正在分析选定区间 [${symbol} ${tfLabel}]...`;
+      statusMsg.textContent = isCustomSlice
+        ? `正在分析所选区间 [${symbol} ${tfLabel}]...`
+        : `正在实时解算 [${symbol} ${tfLabel}] 宏观多级别波浪走势...`;
     }
 
     try {
       if (!currentBars || currentBars.length === 0) {
-        const { bars } = await fetch4hKlines(symbol);
+        const { bars } = await fetch4hKlines(symbol, currentTf);
         currentBars = bars;
       }
 
@@ -894,15 +917,17 @@
       }));
       candleSeries.setData(candleData);
 
-      // 调用后端 API 或本地引擎执行选区分析
+      // 调用后端 API 或本地引擎执行波浪分析
       let analysis = null;
       try {
         const queryParams = new URLSearchParams({
           symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase(),
-          interval: currentTf,
-          startTime: rangeOptions.startTime,
-          endTime: rangeOptions.endTime
+          interval: currentTf
         });
+        if (isCustomSlice) {
+          queryParams.append('startTime', rangeOptions.startTime);
+          queryParams.append('endTime', rangeOptions.endTime);
+        }
         const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`);
         if (apiResp.ok) {
           analysis = await apiResp.json();
@@ -913,7 +938,12 @@
 
       if (!analysis || analysis.code !== 0) {
         if (!window.LiuWaveEngine) throw new Error('波浪计算引擎尚未就绪');
-        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, Object.assign({}, rangeOptions, { timeframe: currentTf }));
+        const opts = { timeframe: currentTf };
+        if (isCustomSlice) {
+          opts.startTime = rangeOptions.startTime;
+          opts.endTime = rangeOptions.endTime;
+        }
+        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, opts);
       }
 
       currentAnalysis = analysis;
@@ -926,15 +956,23 @@
       // 侧边栏各板块更新
       renderDiagnosticPanel(analysis);
 
-      // 缩放视野聚焦到选区
-      waveChart.timeScale().setVisibleRange({
-        from: rangeOptions.startTime,
-        to: rangeOptions.endTime
-      });
+      // 缩放视野聚焦
+      if (isCustomSlice) {
+        waveChart.timeScale().setVisibleRange({
+          from: rangeOptions.startTime,
+          to: rangeOptions.endTime
+        });
+      } else if (currentBars.length > 150) {
+        waveChart.timeScale().setVisibleLogicalRange({
+          from: currentBars.length - 150,
+          to: currentBars.length
+        });
+      }
 
       if (statusMsg) {
-        const barsCount = analysis.selectedRange?.barsCount || rangeOptions.barsCount || 0;
-        statusMsg.textContent = `● 已完成 [${symbol} ${tfLabel}] 选区 (${barsCount} 根 K 线) 深度研判 · 匹配出 ${analysis.candidates?.length || 0} 个合规浪型`;
+        const barsCount = analysis.selectedRange?.barsCount || (isCustomSlice ? rangeOptions.barsCount : currentBars.length);
+        const candCount = analysis.candidates?.length || 0;
+        statusMsg.textContent = `● [${symbol} ${tfLabel}] 研判就绪 (${barsCount} 根 K 线) · 识别出 ${candCount} 个合规浪型 · MTF: ${analysis.mtf?.alignmentLabel || '中性'}`;
       }
     } catch (err) {
       console.error('[Wave Engine Error]:', err);
@@ -950,33 +988,64 @@
     }
   }
 
+  const MOTIVE_CIRCLES = ['⓪', '①', '②', '③', '④', '⑤'];
+  const CORRECTIVE_CIRCLES = ['⓪', 'Ⓐ', 'Ⓑ', 'Ⓒ', 'Ⓓ', 'Ⓔ'];
+
   /**
-   * 应用当前激活的候选浪型到图表（折线、子浪、通道、价格线、标记）
+   * 应用当前激活的候选浪型到图表（折线、子浪、通道、价格线、标记、HUD、徽标）
    */
   function applyActiveCandidate(idx) {
-    if (!currentAnalysis || !currentAnalysis.candidates || currentAnalysis.candidates.length === 0) return;
+    if (!currentAnalysis || !currentAnalysis.candidates || currentAnalysis.candidates.length === 0) {
+      if (zigzagSeries) zigzagSeries.setData([]);
+      if (subwaveSeries) subwaveSeries.setData([]);
+      if (channelUpperSeries) channelUpperSeries.setData([]);
+      if (channelLowerSeries) channelLowerSeries.setData([]);
+      setChartMarkers(candleSeries, []);
+      renderPatternBadge(null, currentAnalysis);
+      renderTradingViewHUD(null, currentAnalysis);
+      return;
+    }
     activeCandidateIndex = Math.max(0, Math.min(idx, currentAnalysis.candidates.length - 1));
     const cand = currentAnalysis.candidates[activeCandidateIndex];
     if (!cand) return;
 
-    // 1. 绘制大级别宏观波浪折线 (Zigzag)
-    if (zigzagSeries && cand.pivots && cand.pivots.length > 0) {
-      const zData = cand.pivots.map(p => ({ time: p.time, value: p.price }));
-      zigzagSeries.setData(showZigzag ? zData : []);
+    const isMotive = cand.category?.includes('驱动') || cand.baseType === 'IMPULSE' || cand.baseType === 'DIAGONAL';
+    const isBull = cand.direction === 'BULLISH';
+
+    // 1. 动态自适应调整宏观波浪折线样式 (遵循 TradingView 规范：多头驱动深绿粗实线，空头驱动深红粗实线，调整浪明黄虚线)
+    if (zigzagSeries) {
+      const zColor = isMotive ? (isBull ? '#10b981' : '#ef4444') : '#f59e0b';
+      const zStyle = isMotive ? LightweightCharts.LineStyle.Solid : LightweightCharts.LineStyle.Dashed;
+      zigzagSeries.applyOptions({
+        color: zColor,
+        lineWidth: 2,
+        lineStyle: zStyle
+      });
+      if (cand.pivots && cand.pivots.length > 0) {
+        const zData = cand.pivots.map(p => ({ time: p.time, value: p.price }));
+        zigzagSeries.setData(showZigzag ? zData : []);
+      }
     }
 
-    // 2. 绘制大级别内部嵌套的小级别次级子浪 (Subwaves)
-    if (subwaveSeries && cand.subPivots && cand.subPivots.length > 0) {
-      const sData = cand.subPivots.map(p => ({ time: p.time, value: p.price }));
-      subwaveSeries.setData(showSubwaves ? sData : []);
-    } else if (subwaveSeries) {
-      subwaveSeries.setData([]);
+    // 2. 绘制大级别内部嵌套的小级别次级子浪 (Subwaves: 天蓝点虚线)
+    if (subwaveSeries) {
+      subwaveSeries.applyOptions({
+        color: '#06b6d4',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted
+      });
+      if (cand.subPivots && cand.subPivots.length > 0) {
+        const sData = cand.subPivots.map(p => ({ time: p.time, value: p.price }));
+        subwaveSeries.setData(showSubwaves ? sData : []);
+      } else {
+        subwaveSeries.setData([]);
+      }
     }
 
     // 3. 绘制艾略特通道模块
     applyChannel(cand.channel);
 
-    // 4. 绘制 Markers (大浪标签 + 嵌套小浪标签)
+    // 4. 绘制 Markers (大浪圆形标引 + 嵌套小浪次级标签)
     applyMarkers(cand);
 
     // 5. 绘制核心监测点与斐波那契目标线
@@ -988,6 +1057,10 @@
 
     // 7. 更新当前主浪型基本指标面板
     updateActiveMetrics(cand);
+
+    // 8. 更新图表居中浮动形态徽标与右上角 TradingView HUD
+    renderPatternBadge(cand, currentAnalysis);
+    renderTradingViewHUD(cand, currentAnalysis);
   }
 
   /**
@@ -1040,7 +1113,7 @@
   }
 
   /**
-   * 应用波浪标引 Markers (大浪 + 嵌套小浪)
+   * 应用波浪标引 Markers (大浪圆标 + 嵌套小浪标引)
    */
   function applyMarkers(cand) {
     if (!candleSeries) return;
@@ -1050,19 +1123,24 @@
     }
 
     const markers = [];
-    const colors = getWaveChartColors();
+    const isMotive = cand.category?.includes('驱动') || cand.baseType === 'IMPULSE' || cand.baseType === 'DIAGONAL';
+    const isBull = cand.direction === 'BULLISH';
+    const circleSymbols = isMotive ? MOTIVE_CIRCLES : CORRECTIVE_CIRCLES;
+    const motiveColor = isBull ? '#10b981' : '#ef4444';
+    const mainColor = isMotive ? motiveColor : '#f59e0b';
 
     // 宏观主浪标记
     cand.pivots.forEach((p, idx) => {
       const isHigh = p.type === 'high';
-      const label = cand.waveLabels ? cand.waveLabels[idx] : `${idx}`;
+      const rawLabel = cand.waveLabels ? cand.waveLabels[idx] : `${idx}`;
+      const circleLabel = circleSymbols[idx] || rawLabel;
       markers.push({
         time: p.time,
         position: isHigh ? 'aboveBar' : 'belowBar',
-        color: isHigh ? colors.zigzagColor : colors.upColor,
+        color: mainColor,
         shape: isHigh ? 'arrowDown' : 'arrowUp',
-        text: `浪 ${label} ($${p.price.toLocaleString()})`,
-        size: 1.3
+        text: `${circleLabel} $${Math.round(p.price).toLocaleString()}`,
+        size: 1.4
       });
     });
 
@@ -1071,10 +1149,10 @@
       cand.subPivots.forEach(sp => {
         markers.push({
           time: sp.time,
-          position: sp.label === 'b' || sp.label === 'ii' || sp.label === 'iv' ? 'belowBar' : 'aboveBar',
-          color: colors.subwaveColor,
+          position: sp.label === 'b' || sp.label === 'ii' || sp.label === 'iv' || sp.label === '2' || sp.label === '4' ? 'belowBar' : 'aboveBar',
+          color: '#06b6d4',
           shape: 'circle',
-          text: `${sp.label}`,
+          text: `(${sp.label})`,
           size: 0.8
         });
       });
@@ -1086,7 +1164,7 @@
   }
 
   /**
-   * 应用关键监测点与目标水平虚线
+   * 应用关键监测点与目标水平虚线 + 斐波那契回撤与拓展
    */
   function applyPriceLines(cand) {
     if (!candleSeries) return;
@@ -1099,20 +1177,55 @@
     const colors = getWaveChartColors();
     const pivot = cand.monitoringPivot;
 
+    // 1. 核心监测点 / 关键失效止损线 (醒目红色虚线，对齐手稿生命线原则)
     if (showMonitoring && pivot && pivot.price) {
       const pLine = candleSeries.createPriceLine({
         price: pivot.price,
-        color: colors.monitoringColor,
+        color: '#ef4444',
         lineWidth: 2,
         lineStyle: LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        title: `【核心监测点】$${pivot.price.toLocaleString()}`
+        title: `【失效防守】$${pivot.price.toLocaleString()}`
       });
       activePriceLines.push(pLine);
     }
 
+    // 2. 斐波那契回撤与拓展水平线 (TradingView 风格)
+    if (showTargets && cand.fibLevels) {
+      const { retracements, extensions } = cand.fibLevels;
+      // 选取核心回撤位 (0.382, 0.618)
+      if (Array.isArray(retracements)) {
+        retracements.filter(r => Math.abs(r.ratio - 0.382) < 0.01 || Math.abs(r.ratio - 0.618) < 0.01).forEach(fib => {
+          const fLine = candleSeries.createPriceLine({
+            price: fib.price,
+            color: '#f59e0b',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `Fib ${(fib.ratio * 100).toFixed(1)}%: $${fib.price.toLocaleString()}`
+          });
+          activePriceLines.push(fLine);
+        });
+      }
+      // 选取核心拓展位 (1.000x, 1.618x)
+      if (Array.isArray(extensions)) {
+        extensions.filter(e => Math.abs(e.ratio - 1.0) < 0.01 || Math.abs(e.ratio - 1.618) < 0.01).forEach(fib => {
+          const fLine = candleSeries.createPriceLine({
+            price: fib.price,
+            color: '#10b981',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `Fib ${fib.ratio.toFixed(3)}x: $${fib.price.toLocaleString()}`
+          });
+          activePriceLines.push(fLine);
+        });
+      }
+    }
+
+    // 3. 形态目标位
     if (showTargets && cand.targets && Array.isArray(cand.targets)) {
-      cand.targets.forEach(tgt => {
+      cand.targets.slice(0, 2).forEach(tgt => {
         const tLine = candleSeries.createPriceLine({
           price: tgt.price,
           color: colors.targetColor,
@@ -1287,6 +1400,109 @@
   }
 
   /**
+   * 渲染图表居中浮动形态徽标 (对齐 TradingView Pattern Badge)
+   */
+  function renderPatternBadge(cand, analysis) {
+    const badge = document.getElementById('wave-pattern-badge');
+    if (!badge) return;
+    if (!cand) {
+      badge.style.display = 'none';
+      return;
+    }
+    const isMotive = cand.category?.includes('驱动') || cand.baseType === 'IMPULSE' || cand.baseType === 'DIAGONAL';
+    const isBull = cand.direction === 'BULLISH';
+    const dirIcon = isMotive ? (isBull ? '▲ 驱动浪' : '▼ 驱动浪') : '◆ 调整浪';
+    const iconColor = isMotive ? (isBull ? 'var(--color-pos)' : 'var(--color-neg)') : 'var(--color-warning)';
+    const mtfTxt = analysis?.mtf?.alignmentLabel || 'MTF';
+
+    badge.innerHTML = `
+      <span class="badge-icon" style="color: ${iconColor};">${dirIcon}</span>
+      <span class="badge-name">${cand.name}</span>
+      <span class="badge-score">${cand.score}分</span>
+      <span class="badge-rules">${cand.currentWave || '进行中'}</span>
+      <span class="badge-mtf">MTF: ${mtfTxt}</span>
+    `;
+    badge.style.display = 'flex';
+  }
+
+  /**
+   * 渲染右上角 TradingView 风格浮动 HUD 信息面板
+   */
+  function renderTradingViewHUD(cand, analysis) {
+    const hud = document.getElementById('wave-tv-hud');
+    const hudBody = document.getElementById('wave-tv-hud-body');
+    const mtfBadge = document.getElementById('wave-tv-mtf-badge');
+    if (!hud || !hudBody) return;
+    if (!cand || !analysis) {
+      hud.style.display = 'none';
+      return;
+    }
+
+    const mtf = analysis.mtf || {};
+    const forecast = analysis.forecast || {};
+    const isMotive = cand.category?.includes('驱动') || cand.baseType === 'IMPULSE' || cand.baseType === 'DIAGONAL';
+    const isBull = cand.direction === 'BULLISH';
+
+    if (mtfBadge) {
+      mtfBadge.textContent = mtf.alignmentLabel || 'MTF AUTO';
+      mtfBadge.className = `wave-tv-mtf-badge ${mtf.alignment === 'ALIGNED' ? 'badge-pos' : mtf.alignment === 'CONFLICTING' ? 'badge-neg' : 'badge-warn'}`;
+    }
+
+    const pivotP = cand.monitoringPivot?.price;
+    const t1 = cand.targets && cand.targets[0] ? cand.targets[0].price : null;
+    const t2 = cand.targets && cand.targets[1] ? cand.targets[1].price : null;
+
+    const actionClass = forecast.action === 'BUY' ? 'action-buy' : forecast.action === 'SELL' ? 'action-sell' : 'action-wait';
+
+    hudBody.innerHTML = `
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">标的 · 周期</span>
+        <span class="wave-tv-val" style="font-weight:700;">${analysis.symbol} · ${analysis.timeframe.toUpperCase()}</span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">最优浪型</span>
+        <span class="wave-tv-val" style="color: ${isMotive ? (isBull ? 'var(--color-pos)' : 'var(--color-neg)') : 'var(--color-warning)'}; font-weight:700;">${cand.name}</span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">形态属性</span>
+        <span class="wave-tv-val">
+          <span class="wave-action-tag ${isBull ? 'action-buy' : 'action-sell'}">${cand.category}</span>
+          <span style="font-size:0.68rem; margin-left:4px; opacity:0.8;">(${cand.score}分)</span>
+        </span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">当前阶段</span>
+        <span class="wave-tv-val" style="color:var(--text-primary); font-size:0.70rem;">${cand.currentWave}</span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">大势共振</span>
+        <span class="wave-tv-val" style="font-size:0.70rem; color:${mtf.alignment === 'ALIGNED' ? 'var(--color-pos)' : mtf.alignment === 'CONFLICTING' ? 'var(--color-neg)' : 'var(--text-secondary)'};">
+          ${mtf.htf1?.label || '--'} · <strong>${mtf.alignmentLabel || '中性'}</strong>
+        </span>
+      </div>
+      <div class="wave-tv-divider">── 监测防守 & 斐波目标 ──</div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">失效防守</span>
+        <span class="wave-tv-val" style="color:var(--color-neg); font-weight:700;">$${pivotP ? pivotP.toLocaleString() : '--'}</span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">目标 1 / 2</span>
+        <span class="wave-tv-val" style="color:var(--accent-primary); font-weight:600;">$${t1 ? t1.toLocaleString() : '--'} / $${t2 ? t2.toLocaleString() : '--'}</span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">推演指引</span>
+        <span class="wave-tv-val">
+          <span class="wave-action-tag ${actionClass}">
+            ${forecast.nextWave || '观望确认'}
+          </span>
+          <span class="wave-tv-stars" style="margin-left:4px;">${forecast.stars || ''}</span>
+        </span>
+      </div>
+    `;
+    hud.style.display = 'block';
+  }
+
+  /**
    * 渲染右侧综合研判面板 (出身、阻碍诊断、情景推演)
    */
   function renderDiagnosticPanel(analysis) {
@@ -1352,7 +1568,7 @@
    * 初始化事件监听器 (标的切换、图表工具开关、框选交互)
    */
   function initEvents() {
-    // 标的切换 (BTC / ETH) - 仅加载对应标的的裸 K 线，等待用户选区
+    // 标的切换 (BTC / ETH) - 切换标的并触发实时波浪解算
     const symbolBtns = document.querySelectorAll('.wave-symbol-btn:not(.wave-tf-btn)');
     symbolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1360,12 +1576,14 @@
         if (sym && sym !== currentSymbol) {
           symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
           cancelRangeSelection();
+          currentRange = null;
+          updateRangeBanner(null, null);
           loadChartCandles(sym);
         }
       });
     });
 
-    // 周期切换 (15m / 1H / 4H / 1D) - 重新拉取对应周期 K 线，等待用户选区
+    // 周期切换 (15m / 1H / 4H / 1D) - 重新拉取周期 K 线并实时重新解算波浪
     const tfBtns = document.querySelectorAll('.wave-tf-btn');
     tfBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1376,27 +1594,18 @@
           const tfLabelEl = document.getElementById('wave-tf-label');
           if (tfLabelEl) tfLabelEl.textContent = tf === '1d' ? '1D (日线)' : tf === '15m' ? '15m (15分钟)' : tf === '1h' ? '1H (1小时)' : '4H (4小时)';
           cancelRangeSelection();
+          currentRange = null;
+          updateRangeBanner(null, null);
           loadChartCandles(currentSymbol);
         }
       });
     });
 
-    // 重新扫描按钮
+    // 智能扫描按钮 (有选区扫选区，无选区扫全量当前周期走势)
     const btnScan = document.getElementById('btn-scan-waves');
     if (btnScan) {
       btnScan.addEventListener('click', () => {
-        if (currentRange && currentRange.startTime && currentRange.endTime) {
-          runWaveAnalysis(currentSymbol, currentRange);
-        } else {
-          const btnDrag = document.getElementById('btn-drag-range');
-          if (btnDrag && !isSelectingRange) {
-            btnDrag.click();
-          }
-          const statusMsg = document.getElementById('wave-status-msg');
-          if (statusMsg) {
-            statusMsg.textContent = `💡 提示：请先在 ${currentTf.toUpperCase()} 图表上单击起点与终点框选 2~750 根 K 线后再启动扫描研判`;
-          }
-        }
+        runWaveAnalysis(currentSymbol, currentRange);
       });
     }
 
@@ -1420,7 +1629,7 @@
           }
           const statusMsg = document.getElementById('wave-status-msg');
           if (statusMsg) {
-            statusMsg.textContent = '🖱️ 选区模式：请在 4H 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc 取消）';
+            statusMsg.textContent = `🖱️ 选区模式：请在 ${currentTf.toUpperCase()} 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc 取消）`;
           }
         }
       });
@@ -1435,12 +1644,14 @@
       }
     });
 
-    // 重置全量分析按钮 - 重置回裸 K 线待选区状态
+    // 恢复全景按钮 - 清除选区并恢复全量自动波浪研判
     const btnResetRange = document.getElementById('btn-reset-range');
     if (btnResetRange) {
       btnResetRange.addEventListener('click', () => {
         cancelRangeSelection();
-        loadChartCandles(currentSymbol);
+        currentRange = null;
+        updateRangeBanner(null, null);
+        runWaveAnalysis(currentSymbol, null);
       });
     }
 
@@ -1448,7 +1659,9 @@
     if (btnCancelRange) {
       btnCancelRange.addEventListener('click', () => {
         cancelRangeSelection();
-        loadChartCandles(currentSymbol);
+        currentRange = null;
+        updateRangeBanner(null, null);
+        runWaveAnalysis(currentSymbol, null);
       });
     }
 

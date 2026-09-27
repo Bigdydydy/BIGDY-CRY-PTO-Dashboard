@@ -1021,6 +1021,48 @@
     return (M[type] && M[type][n]) || '演化中';
   }
 
+  function buildFibLevels(type, g, status) {
+    const p = g.p, l = g.l, d = g.d, n = p.length;
+    const retracements = [];
+    const extensions = [];
+    const isMotive = type === 'IMPULSE' || type === 'DIAGONAL';
+    const isBull = d > 0;
+
+    if (isMotive) {
+      // 驱动浪：回撤参考段（浪3或浪1）
+      const refLen = n >= 4 ? l[2] : (l[0] || 1);
+      const refEnd = n >= 4 ? p[3].price : (p[1] ? p[1].price : p[0].price);
+      [0.236, 0.382, 0.500, 0.618, 0.786].forEach(r => {
+        const pr = isBull ? refEnd - r * refLen : refEnd + r * refLen;
+        retracements.push({ ratio: r, price: Number(pr.toFixed(2)), label: `Fib ${(r * 100).toFixed(1)}%` });
+      });
+
+      // 扩展参考段（浪1起点与终点）
+      const baseLen = l[0] || 1;
+      const startP = n >= 3 ? p[2].price : p[0].price;
+      [1.000, 1.272, 1.618, 2.000, 2.618].forEach(r => {
+        const pr = isBull ? startP + r * baseLen : startP - r * baseLen;
+        extensions.push({ ratio: r, price: Number(pr.toFixed(2)), label: `${r.toFixed(3)}x 目标` });
+      });
+    } else {
+      // 调整浪：a浪回撤与c浪扩展
+      const aLen = l[0] || 1;
+      const aEnd = p[1] ? p[1].price : p[0].price;
+      [0.382, 0.500, 0.618, 0.786].forEach(r => {
+        const pr = isBull ? aEnd - r * aLen : aEnd + r * aLen;
+        retracements.push({ ratio: r, price: Number(pr.toFixed(2)), label: `b浪回撤 ${(r * 100).toFixed(1)}%` });
+      });
+
+      const bEnd = n >= 3 ? p[2].price : (p[1] ? p[1].price : p[0].price);
+      [0.900, 1.000, 1.272, 1.618].forEach(r => {
+        const pr = isBull ? bEnd + r * aLen : bEnd - r * aLen;
+        extensions.push({ ratio: r, price: Number(pr.toFixed(2)), label: `c浪目标 ${r.toFixed(3)}x` });
+      });
+    }
+
+    return { retracements, extensions };
+  }
+
   function buildCandidate(h, evalRes, ev, pivs) {
     const def = PATTERNS[h.type];
     const g = evalRes.g;
@@ -1069,6 +1111,7 @@
     }
 
     const levels = buildLevels(h.type, g, h.status, ev);
+    const fibLevels = buildFibLevels(h.type, g, h.status);
 
     // 子浪拐点: 仅使用真实检测到的更细级别拐点 (无数据则为空, 不编造)
     const subPivots = [];
@@ -1100,6 +1143,7 @@
       monitoringPivot: levels.monitoringPivot,
       secondaryPivot: levels.secondaryPivot,
       targets: levels.targets,
+      fibLevels,
       span
     };
   }
@@ -1143,6 +1187,166 @@
     }));
   }
 
+  const MTF_MAP = {
+    '15m': { htf1: '1h', htf2: '4h', label: '15m (15分钟)' },
+    '30m': { htf1: '2h', htf2: '4h', label: '30m (30分钟)' },
+    '1h':  { htf1: '4h', htf2: '1d', label: '1H (1小时)' },
+    '2h':  { htf1: '6h', htf2: '1d', label: '2H (2小时)' },
+    '4h':  { htf1: '1d', htf2: '1w', label: '4H (4小时)' },
+    '6h':  { htf1: '1d', htf2: '1w', label: '6H (6小时)' },
+    '12h': { htf1: '1d', htf2: '1w', label: '12H (12小时)' },
+    '1d':  { htf1: '1w', htf2: '1M', label: '1D (日线)' }
+  };
+
+  function analyzeHTFTrend(bars) {
+    if (!bars || bars.length < 10) return { trend: 'NEUTRAL', phase: 'unknown', confidence: 0.3, label: '数据平缓' };
+    const len = bars.length;
+    const p0 = bars[0].close, pLast = bars[len - 1].close;
+    const highs = bars.map(b => b.high), lows = bars.map(b => b.low);
+    const win = Math.min(25, Math.floor(len / 3));
+    const recentHigh = Math.max(...highs.slice(-win));
+    const recentLow = Math.min(...lows.slice(-win));
+    const prevHigh = Math.max(...highs.slice(-win * 2, -win));
+    const prevLow = Math.min(...lows.slice(-win * 2, -win));
+
+    let isBull = recentHigh > prevHigh && recentLow > prevLow;
+    let isBear = recentHigh < prevHigh && recentLow < prevLow;
+
+    if (!isBull && !isBear) {
+      isBull = pLast >= p0;
+      isBear = pLast < p0;
+    }
+
+    const netChangePct = (pLast - p0) / (p0 || 1);
+    const isMotive = Math.abs(netChangePct) > 0.03;
+
+    return {
+      trend: isBull ? 'BULLISH' : 'BEARISH',
+      phase: isMotive ? 'motive' : 'corrective',
+      confidence: Math.min(0.95, 0.45 + Math.abs(netChangePct) * 2),
+      label: isBull ? (isMotive ? '多头主升驱动' : '多头高位整理') : (isMotive ? '空头主跌驱动' : '超跌反弹整理')
+    };
+  }
+
+  function analyzeMTF(mainCand, timeframe, htfBarsMap, currentBars) {
+    const mtfConfig = MTF_MAP[timeframe] || { htf1: '1d', htf2: '1w', label: `${timeframe}` };
+    htfBarsMap = htfBarsMap || {};
+    const htf1Bars = htfBarsMap[mtfConfig.htf1] || null;
+    const htf2Bars = htfBarsMap[mtfConfig.htf2] || null;
+
+    const h1 = analyzeHTFTrend(htf1Bars || currentBars);
+    const h2 = htf2Bars ? analyzeHTFTrend(htf2Bars) : h1;
+
+    let alignment = 'NEUTRAL';
+    let alignmentScore = 0.5;
+    let alignmentText = '多周期结构中性';
+
+    if (!mainCand) {
+      return {
+        enabled: true,
+        currentTf: timeframe,
+        htf1: { tf: mtfConfig.htf1, label: `${mtfConfig.htf1.toUpperCase()} (${h1.label})`, trend: h1.trend, phase: h1.phase },
+        htf2: { tf: mtfConfig.htf2, label: `${mtfConfig.htf2.toUpperCase()} (${h2.label})`, trend: h2.trend, phase: h2.phase },
+        alignment: 'NEUTRAL',
+        alignmentScore: 0.5,
+        alignmentLabel: '待定',
+        alignmentText: '等待合规形态确立',
+        forecast: { nextWave: '—', scenario: '等待形态确认', action: 'WAIT', grade: 1, stars: '★☆☆☆☆' }
+      };
+    }
+
+    const candBull = mainCand.direction === 'BULLISH';
+    const isMotive = mainCand.baseType === 'IMPULSE' || mainCand.baseType === 'DIAGONAL';
+
+    if (isMotive) {
+      if ((candBull && h1.trend === 'BULLISH') || (!candBull && h1.trend === 'BEARISH')) {
+        alignment = 'ALIGNED';
+        alignmentScore = 0.85;
+        alignmentText = `高低周期共振顺势：当前 ${timeframe.toUpperCase()} 驱动浪与 ${mtfConfig.htf1.toUpperCase()} 大趋势同向，顺势推进可靠度高。`;
+      } else {
+        alignment = 'CONFLICTING';
+        alignmentScore = -0.35;
+        alignmentText = `逆大级别趋势：当前 ${timeframe.toUpperCase()} 试图形成逆向驱动，但受 ${mtfConfig.htf1.toUpperCase()} 大级别压制，谨防诱多/诱空。`;
+      }
+    } else {
+      if (h1.trend === 'BULLISH' && !candBull) {
+        alignment = 'PARTIAL';
+        alignmentScore = 0.65;
+        alignmentText = `牛市良性回撤：大趋势看涨背景下的次级调整，手稿P34明示“回撤不改大趋势”，关注调整到位做底。`;
+      } else if (h1.trend === 'BEARISH' && candBull) {
+        alignment = 'PARTIAL';
+        alignmentScore = 0.40;
+        alignmentText = `熊市超跌反弹：大级别偏空背景下的次级反弹，手稿P213明示“反弹性质清楚，过不去监测点仍将下行”。`;
+      } else {
+        alignment = 'NEUTRAL';
+        alignmentScore = 0.50;
+        alignmentText = `箱型横向整理：高低周期处于中继震荡，维持箱型外观（手稿P50），上下轨之间高抛低吸。`;
+      }
+    }
+
+    // 构建 Forecast
+    let nextWave = '—';
+    let action = 'WAIT';
+    let targetHigh = null, targetLow = null;
+
+    if (mainCand.targets && mainCand.targets.length > 0) {
+      targetHigh = Math.max(...mainCand.targets.map(t => t.price));
+      targetLow = Math.min(...mainCand.targets.map(t => t.price));
+    }
+    const stopLevel = mainCand.monitoringPivot ? mainCand.monitoringPivot.price : null;
+
+    if (isMotive) {
+      if (mainCand.status === 'COMPLETED') {
+        nextWave = candBull ? '同级别 ABC 调整浪回撤' : '同级别 ABC 反弹浪展开';
+        action = candBull ? 'TAKE PROFIT (减仓止盈)' : 'COVER SHORT (空头平仓)';
+      } else if (mainCand.currentWave && mainCand.currentWave.includes('3浪')) {
+        nextWave = '4浪次级回撤（常规 0.236~0.382）';
+        action = candBull ? 'BUY ZONE (持多待冲刺)' : 'SELL ZONE (顺势做空)';
+      } else if (mainCand.currentWave && mainCand.currentWave.includes('4浪')) {
+        nextWave = '5浪终结冲顶（目标超越浪3）';
+        action = candBull ? 'BUY ZONE (逢低布局5浪)' : 'SELL ZONE (逢高做空)';
+      } else {
+        nextWave = '延续驱动推进';
+        action = candBull ? 'BUY ZONE (逢低做多)' : 'SELL ZONE (逢高做空)';
+      }
+    } else {
+      if (mainCand.status === 'COMPLETED') {
+        nextWave = candBull ? '调整结束·恢复原上升主升' : '反弹结束·恢复原下跌主跌';
+        action = candBull ? 'BUY ZONE (做底完成)' : 'SELL ZONE (反弹见顶)';
+      } else if (mainCand.currentWave && mainCand.currentWave.includes('b浪')) {
+        nextWave = 'c浪展开（最低要求 0.9×b浪）';
+        action = candBull ? 'WAIT (等待c浪低点)' : 'WAIT (等待c浪高点)';
+      } else {
+        nextWave = '调整浪末段演化中';
+        action = 'WAIT (观望等待)';
+      }
+    }
+
+    const starsNum = Math.max(1, Math.min(5, Math.round((mainCand.score || 70) / 20)));
+    const stars = '★'.repeat(starsNum) + '☆'.repeat(5 - starsNum);
+
+    return {
+      enabled: true,
+      currentTf: timeframe,
+      htf1: { tf: mtfConfig.htf1, label: `${mtfConfig.htf1.toUpperCase()} (${h1.label})`, trend: h1.trend, phase: h1.phase },
+      htf2: { tf: mtfConfig.htf2, label: `${mtfConfig.htf2.toUpperCase()} (${h2.label})`, trend: h2.trend, phase: h2.phase },
+      alignment,
+      alignmentScore,
+      alignmentLabel: alignment === 'ALIGNED' ? '共振顺势' : alignment === 'PARTIAL' ? '局部中继' : alignment === 'CONFLICTING' ? '逆势冲突' : '中性震荡',
+      alignmentText,
+      forecast: {
+        nextWave,
+        scenario: `${mainCand.name} · ${alignmentText}`,
+        action,
+        targetHigh,
+        targetLow,
+        stopLevel,
+        grade: starsNum,
+        stars
+      }
+    };
+  }
+
   function generateLiuCommentary(pattern, currentPrice, symbol, timeframe, analysis) {
     const tf = (timeframe || '4h').toUpperCase();
     const quote = '「愚昧无法战胜科学，波浪理论是科学。有推动浪才有做底的可能，没有推动浪或引导楔形就完全没有可能做底。」—— 柳玉冬波浪理论实战体系';
@@ -1168,7 +1372,8 @@
       ruleTxt = `该形态 ${hard.length} 条手稿硬性规则全部通过；指引符合度 ${pattern.guidePct || '--'}%。`;
     }
     const pendingTxt = pattern.pendingCount ? `另有 ${pattern.pendingCount} 条最低要求因末浪未确认而待验证。` : '';
-    const thesis = `${symbol} ${tf}：首选计数为「${pattern.name}」。${ruleTxt}${pendingTxt}`;
+    const mtfTxt = analysis?.mtf ? `【MTF大势联动: ${analysis.mtf.alignmentLabel} (${analysis.mtf.htf1.label})】` : '';
+    const thesis = `${symbol} ${tf}：首选计数为「${pattern.name}」。${mtfTxt}${ruleTxt}${pendingTxt}`;
 
     let bottomTopSignal;
     if (pattern.monitoringPivot) {
@@ -1223,12 +1428,15 @@
       allPivots: degrees.main ? degrees.main.pivots : [],
       candidates: [], blockers: [], scenarios: [],
       pattern: null, originAnalysis: null, commentary: null,
+      mtf: null, forecast: null,
       rulebookNote: '规则依据手稿P1-378（驱动浪基础/通道/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
 
     const main = degrees.main;
     if (!main || main.pivots.length < 4) {
       result.blockers.push('自适应 Zigzag 未提取到足够的有效拐点，无法匹配任何手稿浪型');
+      result.mtf = analyzeMTF(null, timeframe, options.htfBars, slice);
+      result.forecast = result.mtf.forecast;
       result.commentary = generateLiuCommentary(null, currentPrice, symbol, timeframe, result);
       return result;
     }
@@ -1277,6 +1485,8 @@
 
     result.scenarios = buildScenarios(final);
     result.originAnalysis = final[0] ? analyzeOrigin(final[0], ev) : null;
+    result.mtf = analyzeMTF(final[0], timeframe, Object.assign({}, options.htfBars || {}, subMap), slice);
+    result.forecast = result.mtf.forecast;
     result.commentary = generateLiuCommentary(final[0], currentPrice, symbol, timeframe, result);
     return result;
   }
@@ -1320,6 +1530,8 @@
     evaluatePattern,
     generateLiuCommentary,
     analyzeOrigin,
+    analyzeMTF,
+    buildFibLevels,
     PATTERNS,
     _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots }
   };

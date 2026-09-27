@@ -60,7 +60,7 @@ const waveRateLimitMap = new Map();
 const waveKlineCache = new Map();
 
 // Module 9 波浪引擎支持的研判周期，以及各周期用于子浪结构验证的更低周期
-const WAVE_INTERVALS = ['15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d'];
+const WAVE_INTERVALS = ['15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w'];
 const WAVE_SUB_INTERVALS = {
   '15m': ['5m', '1m'],
   '30m': ['5m', '15m'],
@@ -69,7 +69,18 @@ const WAVE_SUB_INTERVALS = {
   '4h': ['15m', '1h'],
   '6h': ['1h', '2h'],
   '12h': ['2h', '4h'],
-  '1d': ['4h', '12h']
+  '1d': ['4h', '12h'],
+  '1w': ['1d', '3d']
+};
+const WAVE_HTF_INTERVALS = {
+  '15m': ['1h', '4h'],
+  '30m': ['2h', '4h'],
+  '1h': ['4h', '1d'],
+  '2h': ['6h', '1d'],
+  '4h': ['1d', '1w'],
+  '6h': ['1d', '1w'],
+  '12h': ['1d', '1w'],
+  '1d': ['1w']
 };
 
 function checkWaveRateLimit(clientIp) {
@@ -594,11 +605,23 @@ async function handleApiRequest(req, res, parsedUrl) {
         }
       }
 
+      // 更高周期K线用于 MTF 跨周期共振验证 (如 4H 联动 1D/1W, 15m 联动 1H/4H)
+      const htfBars = {};
+      const htfTfs = (WAVE_HTF_INTERVALS[interval] || []).slice(0, 2);
+      for (const tf of htfTfs) {
+        try {
+          htfBars[tf] = await fetchBinanceKlines(rawSymbol, tf, 200);
+        } catch (e) {
+          // 高周期源不可用时跳过
+        }
+      }
+
       const analysis = analyzeWaves(mainBars, displaySymbol, {
         startTime,
         endTime,
         timeframe: interval,
-        subBars
+        subBars,
+        htfBars
       });
 
       sendJsonResponse(req, res, 200, {
