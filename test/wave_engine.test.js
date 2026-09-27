@@ -155,11 +155,11 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
           const jsonInvalid = await resInvalid.json();
           assert.ok(jsonInvalid.error.includes('仅限定 BTC/USDT 与 ETH/USDT'));
 
-          // 非 4h 周期应被拒绝 400
-          const resBadInterval = await fetch(`http://127.0.0.1:${port}/api/wave/klines?symbol=BTCUSDT&interval=1h`);
+          // 非 4h/1h/15m 周期应被拒绝 400
+          const resBadInterval = await fetch(`http://127.0.0.1:${port}/api/wave/klines?symbol=BTCUSDT&interval=1m`);
           assert.strictEqual(resBadInterval.status, 400);
           const jsonBadInterval = await resBadInterval.json();
-          assert.ok(jsonBadInterval.error.includes('限定 4 小时 (4h)'));
+          assert.ok(jsonBadInterval.error.includes('限定 4h, 1h, 15m'));
         } finally {
           server.close(resolve);
         }
@@ -167,7 +167,7 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     });
   });
 
-  it('HTTP API: GET /api/wave/analysis 返回符合柳玉冬规范的波浪分析数据', async () => {
+  it('HTTP API: GET /api/wave/analysis 返回符合柳玉冬规范的波浪分析数据与候选集', async () => {
     await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', async () => {
         const port = server.address().port;
@@ -179,6 +179,8 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
           assert.strictEqual(data.timeframe, '4h');
           assert.ok(data.pattern);
           assert.ok(data.pattern.monitoringPivot);
+          assert.ok(Array.isArray(data.candidates), '应包含并列候选浪型数组');
+          assert.ok(Array.isArray(data.scenarios), '应包含发展情景推演数组');
           assert.ok(data.commentary);
           assert.ok(data.commentary.quote.includes('柳玉冬'));
         } finally {
@@ -186,5 +188,54 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
         }
       });
     });
+  });
+
+  it('Wave Engine: 平台形调整浪 (Flat a-b-c) 满足 B 浪 >= 70% a 浪手稿铁律', () => {
+    // 构造平台形：0: 100(高) -> a: 60(低, drop 40) -> b: 92(高, rise 32, 80% retrace) -> c: 55(低)
+    const bars = [];
+    // Leg 0->A (100 -> 60)
+    for (let i = 0; i <= 10; i++) {
+      const p = 100 - (40 / 10) * i;
+      bars.push({ time: 1700000000 + i * 14400, open: p, high: p + 1, low: p - 1, close: p, volume: 100 });
+    }
+    // Leg A->B (60 -> 92)
+    for (let i = 1; i <= 10; i++) {
+      const p = 60 + (32 / 10) * i;
+      bars.push({ time: 1700000000 + (10 + i) * 14400, open: p, high: p + 1, low: p - 1, close: p, volume: 100 });
+    }
+    // Leg B->C (92 -> 55)
+    for (let i = 1; i <= 10; i++) {
+      const p = 92 - (37 / 10) * i;
+      bars.push({ time: 1700000000 + (20 + i) * 14400, open: p, high: p + 1, low: p - 1, close: p, volume: 100 });
+    }
+
+    const res = analyzeWaves(bars, 'BTC/USDT');
+    assert.ok(res.candidates.length > 0);
+    const flatCandidate = res.candidates.find(c => c.type.includes('FLAT'));
+    assert.ok(flatCandidate, '应识别出平台形候选');
+    assert.ok(flatCandidate.metrics.retrace_B >= 0.70, 'B浪回撤必须 >= 70%');
+  });
+
+  it('Wave Engine: 选区切片分析与“出身决定命运”微观校验', () => {
+    const bars = [];
+    for (let i = 0; i < 50; i++) {
+      const p = 50000 + Math.sin(i / 3) * 2000;
+      bars.push({
+        time: 1720000000 + i * 14400,
+        open: p,
+        high: p + 100,
+        low: p - 100,
+        close: p + 20,
+        volume: 1000
+      });
+    }
+
+    const tStart = bars[10].time;
+    const tEnd = bars[35].time;
+    const res = analyzeWaves(bars, 'BTC/USDT', { startTime: tStart, endTime: tEnd });
+    assert.strictEqual(res.selectedRange.barsCount, 26);
+    assert.ok(res.originAnalysis);
+    assert.ok(res.originAnalysis.originType);
+    assert.ok(res.candidates.length > 0);
   });
 });

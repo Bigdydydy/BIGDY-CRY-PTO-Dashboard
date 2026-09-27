@@ -2239,7 +2239,7 @@
             </div>
             <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 周期: <strong>4H (4小时)</strong></span>
             <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 样本: <strong>1000 根 K线 (约166天)</strong></span>
-            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 计算架构: <strong>方案 A (纯客户端毫秒级执行)</strong></span>
+            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 计算架构: <strong>方案 B (币安合约 4H/1H/15m 全量+选区研判)</strong></span>
           </div>
           <div class="wave-control-right">
             <button class="btn-refresh" id="btn-scan-waves">
@@ -2271,11 +2271,24 @@
               </div>
 
               <div class="chart-tools-group">
+                <button class="chart-tool-btn" id="btn-drag-range" title="激活鼠标直接在图表上拖拽框选任意两点分析">🖱️ 框选分析模式</button>
+                <button class="chart-tool-btn" id="btn-reset-range" title="重置并分析全量 4H 宏观走势">↺ 重置全量4H</button>
+                <button class="chart-tool-btn active" id="btn-toggle-subwaves" title="切换大级别波浪内部嵌套的小级别次级子浪">大浪嵌套小浪</button>
+                <button class="chart-tool-btn active" id="btn-toggle-channel" title="切换艾略特平行/收敛通道模块">艾略特通道</button>
                 <button class="chart-tool-btn active" id="btn-toggle-markers" title="切换图表上的浪型标注 ①-⑤/(A)-(C)">浪型标引</button>
                 <button class="chart-tool-btn active" id="btn-toggle-zigzag" title="切换波浪分笔折线">分笔折线</button>
                 <button class="chart-tool-btn active" id="btn-toggle-invalidation" title="切换关键监测点与防守水平虚线">核心监测点</button>
                 <button class="chart-tool-btn active" id="btn-toggle-targets" title="切换斐波那契投射目标水平线">目标区间</button>
               </div>
+            </div>
+
+            <!-- Range Selection Banner -->
+            <div id="wave-range-banner" class="wave-range-banner" style="display: none;">
+              <div class="range-banner-left">
+                <span class="range-pulse-dot"></span>
+                <span>当前选定分析区间：<strong id="wave-range-text">--</strong></span>
+              </div>
+              <button class="chart-tool-btn btn-sm" id="btn-cancel-range" title="恢复全量分析">退出选区并重置</button>
             </div>
 
             <!-- Lightweight Charts Container -->
@@ -2284,12 +2297,42 @@
 
           <!-- Right: Diagnostic & Liu Yudong Quantitative Radar -->
           <div class="wave-side-col">
-            <!-- 1. Wave Status & Iron Rules -->
+            <!-- 0. Parallel Candidate Waves Selector -->
+            <div class="bento-card" id="card-wave-candidates">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>并列候选浪型判定 (点击切换图表)</h3>
+                  </div>
+                  <span class="card-badge" id="candidate-count-badge">扫描中</span>
+                </div>
+              </div>
+              <div id="wave-candidates-list" class="wave-candidates-list" style="margin-top: 10px;">
+                <div class="text-secondary" style="font-size: 0.72rem;">正在并行扫描符合手稿六维指标的全部候选形态...</div>
+              </div>
+            </div>
+
+            <!-- 1. Origin Analysis ("出身决定命运") -->
+            <div class="bento-card" id="card-wave-origin">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>“出身决定命运”微观校验 (1H/15m)</h3>
+                  </div>
+                  <span class="card-badge" id="wave-origin-badge">穿透检验中</span>
+                </div>
+              </div>
+              <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.5; margin: 8px 0 0 0;" id="wave-origin-text">
+                正在穿透微观周期检验起步第一段是否走出清晰五浪推动...
+              </p>
+            </div>
+
+            <!-- 2. Active Wave Status & Iron Rules -->
             <div class="bento-card">
               <div class="card-header">
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                   <div class="card-title-group">
-                    <h3>当前主浪型判定</h3>
+                    <h3>当前选中主浪型详情</h3>
                   </div>
                   <span class="card-badge" id="wave-regime-badge">识别中</span>
                 </div>
@@ -2327,7 +2370,7 @@
               </div>
             </div>
 
-            <!-- 2. Monitoring Pivot (柳玉冬核心实战法则) -->
+            <!-- 3. Monitoring Pivot (柳玉冬核心实战法则) -->
             <div class="bento-card">
               <div class="card-header">
                 <div class="card-title-group">
@@ -2344,7 +2387,34 @@
               </p>
             </div>
 
-            <!-- 3. Fibonacci Targets -->
+            <!-- 4. Blocker Diagnostics (说明哪里阻止了浪型判断) -->
+            <div class="bento-card" id="card-wave-blockers" style="display: none;">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3 style="color: var(--color-neg);">🔍 浪型阻碍诊断器 (规则排查)</h3>
+                  </div>
+                  <span class="card-badge badge-bear">铁律排除</span>
+                </div>
+              </div>
+              <p style="font-size: 0.71rem; color: var(--text-muted); margin: 4px 0 8px 0;">说明当前行情结构为何被排除某些经典浪型：</p>
+              <div id="wave-blockers-list" class="wave-blockers-list"></div>
+            </div>
+
+            <!-- 5. Scenario Projections (浪型发展可能性讨论) -->
+            <div class="bento-card" id="card-wave-scenarios">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>📈 浪型发展可能性推演 (情景分析)</h3>
+                  </div>
+                  <span class="card-badge badge-bull">多重推演</span>
+                </div>
+              </div>
+              <div id="wave-scenarios-list" class="wave-scenarios-list" style="margin-top: 10px;"></div>
+            </div>
+
+            <!-- 6. Fibonacci Targets -->
             <div class="bento-card">
               <div class="card-header">
                 <div class="card-title-group">
@@ -2358,7 +2428,7 @@
               </div>
             </div>
 
-            <!-- 4. Liu Yudong Commentary Box -->
+            <!-- 7. Liu Yudong Commentary Box -->
             <div class="bento-card">
               <div class="card-header">
                 <div class="card-title-group">

@@ -82,7 +82,9 @@ async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
     return cached.data;
   }
 
+  // 优先采用币安 Futures 合约行情通道 (fapi.binance.com)，降级回退至公共现货源
   const urls = [
+    `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
     `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
     `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
   ];
@@ -104,7 +106,7 @@ async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
   }
 
   if (!rawData || !Array.isArray(rawData)) {
-    throw new Error('未能从公共行情源拉取到 4H K 线数据，请稍后重试');
+    throw new Error(`未能从币安行情源拉取到 ${interval} K 线数据，请稍后重试`);
   }
 
   const bars = rawData.map(b => ({
@@ -509,8 +511,8 @@ async function handleApiRequest(req, res, parsedUrl) {
     }
 
     const interval = parsedUrl.query?.interval || '4h';
-    if (interval !== '4h') {
-      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判限定 4 小时 (4h) 时间框架' });
+    if (!['4h', '1h', '15m'].includes(interval)) {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判限定 4h, 1h, 15m 时间框架' });
       return;
     }
 
@@ -532,24 +534,57 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // GET /api/wave/analysis (Module 9: Liu Yudong Elliott Wave Theory Analysis API)
-  if (pathname === '/api/wave/analysis' && req.method === 'GET') {
+  // GET / POST /api/wave/analysis (Module 9: Liu Yudong Elliott Wave Theory Analysis API)
+  if (pathname === '/api/wave/analysis' && (req.method === 'GET' || req.method === 'POST')) {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
     if (!checkWaveRateLimit(clientIp)) {
       sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
       return;
     }
 
-    const rawSymbol = (parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    let payload = {};
+    if (req.method === 'POST') {
+      try {
+        payload = await parseJsonBody(req);
+      } catch (e) {
+        sendJsonResponse(req, res, 400, { code: 400, error: 'Invalid JSON request payload' });
+        return;
+      }
+    }
+
+    const rawSymbol = ((payload.symbol || parsedUrl.query?.symbol) || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
     if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
       sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
     }
 
+    const startTime = payload.startTime || parsedUrl.query?.startTime || null;
+    const endTime = payload.endTime || parsedUrl.query?.endTime || null;
+
     try {
       const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
-      const bars = await fetchBinanceKlines(rawSymbol, '4h', 1000);
-      const analysis = analyzeWaves(bars, displaySymbol);
+      const bars4h = await fetchBinanceKlines(rawSymbol, '4h', 1000);
+      
+      let bars1h = [];
+      let bars15m = [];
+      try {
+        bars1h = await fetchBinanceKlines(rawSymbol, '1h', 1000);
+      } catch (e) {
+        // Fallback gracefully if 1h rate-limited
+      }
+      try {
+        bars15m = await fetchBinanceKlines(rawSymbol, '15m', 1000);
+      } catch (e) {
+        // Fallback gracefully if 15m rate-limited
+      }
+
+      const analysis = analyzeWaves(bars4h, displaySymbol, {
+        startTime,
+        endTime,
+        bars_1h: bars1h,
+        bars_15m: bars15m
+      });
+
       sendJsonResponse(req, res, 200, {
         code: 0,
         ...analysis
