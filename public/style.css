@@ -5165,6 +5165,115 @@ body {
   padding: 4px 8px;
 }
 
+/* --- Wave Range Two-Click Selection Overlay --- */
+.chart-selection-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 18;
+  overflow: hidden;
+}
+
+.selection-range-box {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(234, 88, 12, 0.12);
+  border-left: 2px dashed #ea580c;
+  border-right: 2px dashed #ea580c;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  pointer-events: none;
+}
+
+.selection-range-box.is-capped {
+  background: rgba(244, 63, 94, 0.16);
+  border-left-color: #f43f5e;
+  border-right-color: #f43f5e;
+}
+
+.selection-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ea580c;
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.7);
+  z-index: 20;
+  display: none;
+  pointer-events: none;
+}
+
+.selection-v-line.visible {
+  display: block;
+}
+
+.selection-start-line {
+  background: #ea580c;
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.8);
+}
+
+.selection-end-line {
+  background: #0284c7;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.8);
+}
+
+.selection-end-line.is-capped {
+  background: #f43f5e;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.9);
+}
+
+.selection-pill {
+  position: absolute;
+  top: 10px;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+  box-shadow: var(--shadow-sm);
+}
+
+.start-pill {
+  background: #ea580c;
+  color: #fff;
+}
+
+.end-pill {
+  background: #0284c7;
+  color: #fff;
+}
+
+.selection-end-line.is-capped .end-pill {
+  background: #f43f5e;
+  color: #fff;
+}
+
+.selection-floating-tooltip {
+  position: absolute;
+  top: 42px;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--accent-primary-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  z-index: 25;
+  display: none;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  text-align: center;
+}
+
 .wave-candidates-list {
   display: flex;
   flex-direction: column;

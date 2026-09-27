@@ -8,7 +8,6 @@
 (function () {
   let waveChart = null;
   let candleSeries = null;
-  let volumeSeries = null;
   let zigzagSeries = null;
   let subwaveSeries = null;
   let channelUpperSeries = null;
@@ -19,7 +18,7 @@
   let currentAnalysis = null;
   let activeCandidateIndex = 0;
   let activePriceLines = [];
-  let currentRange = null; // { startTime, endTime }
+  let currentRange = null; // { startTime, endTime, barsCount }
 
   // 图表可见性控制开关
   let showMarkers = true;
@@ -28,7 +27,12 @@
   let showChannel = true;
   let showMonitoring = true;
   let showTargets = true;
-  let isDragSelectMode = false;
+
+  // 两步点击选区研判模式状态 (上限 750 根 K 线)
+  const MAX_SELECTION_BARS = 750;
+  let isSelectingRange = false;
+  let selectionStartPoint = null; // { bar, index, time }
+  let selectionHoverPoint = null; // { bar, index, time, count, isCapped }
 
   /**
    * 获取当前 Studio K95 日夜双模配色
@@ -110,7 +114,7 @@
 
     chartMarkersPrimitive = null;
 
-    // 清空历史容器
+    // 清空历史容器 (移除非必要的成交量副图，纯化波浪画廊视觉)
     container.innerHTML = `
       <div class="wave-hud-legend" id="wave-hud-legend">
         <div class="wave-hud-item"><span>标的:</span> <strong id="hud-sym">BTC/USDT 4H</strong></div>
@@ -118,9 +122,17 @@
         <div class="wave-hud-item"><span>高:</span> <strong id="hud-h">--</strong></div>
         <div class="wave-hud-item"><span>低:</span> <strong id="hud-l">--</strong></div>
         <div class="wave-hud-item"><span>收:</span> <strong id="hud-c">--</strong></div>
-        <div class="wave-hud-item"><span>量:</span> <strong id="hud-v">--</strong></div>
       </div>
-      <div id="chart-selection-box" style="display:none; position:absolute; top:0; bottom:0; background:rgba(234, 88, 12, 0.16); border-left:2px dashed #ea580c; border-right:2px dashed #ea580c; pointer-events:none; z-index:15;"></div>
+      <div id="chart-selection-overlay" class="chart-selection-overlay" style="display:none;">
+        <div id="selection-range-box" class="selection-range-box"></div>
+        <div id="selection-start-line" class="selection-v-line selection-start-line">
+          <div class="selection-pill start-pill">起点</div>
+        </div>
+        <div id="selection-end-line" class="selection-v-line selection-end-line">
+          <div class="selection-pill end-pill">终点</div>
+        </div>
+        <div id="selection-tooltip" class="selection-floating-tooltip"></div>
+      </div>
     `;
 
     const colors = getWaveChartColors();
@@ -156,7 +168,7 @@
         borderColor: colors.borderColor,
         scaleMargins: {
           top: 0.08,
-          bottom: 0.22
+          bottom: 0.08
         }
       },
       timeScale: {
@@ -174,14 +186,6 @@
       borderDownColor: colors.downColor,
       wickUpColor: colors.upColor,
       wickDownColor: colors.downColor
-    });
-
-    // 成交量副图 (位于底部)
-    const volume = safeCreateSeries(chart, 'Histogram', {
-      color: colors.volUpColor,
-      priceFormat: { type: 'volume' },
-      priceScaleId: '', // overlay
-      scaleMargins: { top: 0.82, bottom: 0 }
     });
 
     // 艾略特通道模块轨线 (上轨与下轨)
@@ -229,7 +233,6 @@
       const hudH = document.getElementById('hud-h');
       const hudL = document.getElementById('hud-l');
       const hudC = document.getElementById('hud-c');
-      const hudV = document.getElementById('hud-v');
 
       if (!param || !param.time || !param.seriesData) {
         if (currentBars.length > 0) {
@@ -238,21 +241,16 @@
           if (hudH) hudH.textContent = last.high.toLocaleString();
           if (hudL) hudL.textContent = last.low.toLocaleString();
           if (hudC) hudC.textContent = last.close.toLocaleString();
-          if (hudV) hudV.textContent = last.volume ? Math.round(last.volume).toLocaleString() : '--';
         }
         return;
       }
 
       const cData = param.seriesData.get(candles);
-      const vData = param.seriesData.get(volume);
       if (cData) {
         if (hudO) hudO.textContent = cData.open?.toLocaleString() || '--';
         if (hudH) hudH.textContent = cData.high?.toLocaleString() || '--';
         if (hudL) hudL.textContent = cData.low?.toLocaleString() || '--';
         if (hudC) hudC.textContent = cData.close?.toLocaleString() || '--';
-      }
-      if (vData && hudV) {
-        hudV.textContent = Math.round(vData.value || 0).toLocaleString();
       }
     });
 
@@ -268,83 +266,297 @@
 
     waveChart = chart;
     candleSeries = candles;
-    volumeSeries = volume;
     zigzagSeries = zigzag;
     subwaveSeries = subwave;
     channelUpperSeries = channelUpper;
     channelLowerSeries = channelLower;
 
-    // 安装交互式拖拽选区监听器
-    setupDragSelection(container);
+    // 安装两步点击选区监听器
+    setupTwoClickSelection(container);
+  }
+
+  function formatBarTime(timestamp) {
+    return new Date(timestamp * 1000).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function getBarByTime(time) {
+    if (!currentBars || currentBars.length === 0) return null;
+    let low = 0, high = currentBars.length - 1;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (currentBars[mid].time === time) {
+        return { bar: currentBars[mid], index: mid, time: currentBars[mid].time };
+      }
+      if (currentBars[mid].time < time) low = mid + 1;
+      else high = mid - 1;
+    }
+    return null;
+  }
+
+  function getBarFromCoordinate(x) {
+    if (!waveChart || !currentBars || currentBars.length === 0) return null;
+    const timeScale = waveChart.timeScale();
+
+    // 1. 尝试 coordinateToTime
+    const t = timeScale.coordinateToTime(x);
+    if (t !== null && t !== undefined) {
+      const exact = getBarByTime(t);
+      if (exact) return exact;
+      let low = 0, high = currentBars.length - 1;
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (currentBars[mid].time < t) low = mid + 1;
+        else high = mid - 1;
+      }
+      low = Math.max(0, Math.min(currentBars.length - 1, low));
+      high = Math.max(0, Math.min(currentBars.length - 1, high));
+      const diffLow = Math.abs(currentBars[low].time - t);
+      const diffHigh = Math.abs(currentBars[high].time - t);
+      const bestIdx = diffLow < diffHigh ? low : high;
+      return { bar: currentBars[bestIdx], index: bestIdx, time: currentBars[bestIdx].time };
+    }
+
+    // 2. 降级尝试 coordinateToLogical
+    const logical = timeScale.coordinateToLogical(x);
+    if (logical !== null && logical !== undefined && !isNaN(logical)) {
+      const idx = Math.max(0, Math.min(currentBars.length - 1, Math.round(logical)));
+      return { bar: currentBars[idx], index: idx, time: currentBars[idx].time };
+    }
+
+    return null;
+  }
+
+  function cancelRangeSelection() {
+    isSelectingRange = false;
+    selectionStartPoint = null;
+    selectionHoverPoint = null;
+
+    const overlay = document.getElementById('chart-selection-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    const btnDrag = document.getElementById('btn-drag-range');
+    if (btnDrag) {
+      btnDrag.classList.remove('active');
+      btnDrag.innerHTML = '🖱️ 框选分析模式';
+      btnDrag.title = '两步点击框选任意区间分析 (最大750根K线)';
+    }
+
+    const container = document.getElementById('wave-chart-container');
+    if (container) {
+      container.style.cursor = 'default';
+    }
+  }
+
+  function updateSelectionVisuals() {
+    const overlay = document.getElementById('chart-selection-overlay');
+    const box = document.getElementById('selection-range-box');
+    const startLine = document.getElementById('selection-start-line');
+    const endLine = document.getElementById('selection-end-line');
+    const tooltip = document.getElementById('selection-tooltip');
+    if (!overlay || !box || !startLine || !endLine || !tooltip || !waveChart) return;
+
+    if (!isSelectingRange || !selectionStartPoint) {
+      overlay.style.display = 'none';
+      return;
+    }
+
+    overlay.style.display = 'block';
+    const timeScale = waveChart.timeScale();
+
+    let startX = timeScale.timeToCoordinate(selectionStartPoint.time);
+    if (startX === null || startX === undefined) {
+      startX = timeScale.logicalToCoordinate(selectionStartPoint.index);
+    }
+
+    if (startX === null || startX === undefined) {
+      startLine.classList.remove('visible');
+      return;
+    }
+
+    startLine.classList.add('visible');
+    startLine.style.left = `${startX}px`;
+
+    // 尚未移动鼠标或未有有效预览点
+    if (!selectionHoverPoint) {
+      box.style.display = 'none';
+      endLine.classList.remove('visible');
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${startX}px`;
+      tooltip.innerHTML = `
+        <span>起点: <strong>${formatBarTime(selectionStartPoint.time)}</strong></span>
+        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">移动鼠标预览终点 (上限 750 根)</span>
+      `;
+      return;
+    }
+
+    let endX = timeScale.timeToCoordinate(selectionHoverPoint.time);
+    if (endX === null || endX === undefined) {
+      endX = timeScale.logicalToCoordinate(selectionHoverPoint.index);
+    }
+
+    if (endX === null || endX === undefined) return;
+
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const width = Math.max(1, maxX - minX);
+
+    box.style.display = 'block';
+    box.style.left = `${minX}px`;
+    box.style.width = `${width}px`;
+
+    endLine.classList.add('visible');
+    endLine.style.left = `${endX}px`;
+
+    const isCapped = selectionHoverPoint.isCapped;
+    box.classList.toggle('is-capped', isCapped);
+    endLine.classList.toggle('is-capped', isCapped);
+
+    const midX = minX + width / 2;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${midX}px`;
+
+    if (isCapped) {
+      tooltip.innerHTML = `
+        <span style="color:var(--color-neg); font-weight:700;">⚠️ 选区已达最大上限 750 根 K 线 (${750 * 4}H)</span>
+        <span style="display:block; font-size:0.68rem; color:var(--text-secondary); margin-top:2px;">再次点击即可完成该 750 根选区研判</span>
+      `;
+    } else {
+      tooltip.innerHTML = `
+        <span>选区预览: <strong>${selectionHoverPoint.count}</strong> 根 K 线 (${selectionHoverPoint.count * 4}H)</span>
+        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">点击完成选择 · Esc 取消</span>
+      `;
+    }
+  }
+
+  function onSelectionPointClicked(barInfo) {
+    if (!isSelectingRange) return;
+
+    if (!selectionStartPoint) {
+      // 第一次点击：锁定起点，垂直线高亮
+      selectionStartPoint = barInfo;
+      selectionHoverPoint = null;
+      updateSelectionVisuals();
+
+      const btnDrag = document.getElementById('btn-drag-range');
+      if (btnDrag) {
+        btnDrag.innerHTML = '🏁 移动预览并点击终点 (Esc 取消)';
+        btnDrag.classList.add('active');
+      }
+      const statusMsg = document.getElementById('wave-status-msg');
+      if (statusMsg) {
+        statusMsg.textContent = `📍 已锁定起点 [${formatBarTime(barInfo.time)}]，请移动鼠标预览选区并点击第二下确定终点 (最多 750 根 K 线)`;
+      }
+    } else {
+      // 第二次点击：选择结束
+      const rawDiff = barInfo.index - selectionStartPoint.index;
+      let targetIdx = barInfo.index;
+
+      // 限制选择范围最大 750 根 K 线
+      if (Math.abs(rawDiff) + 1 > MAX_SELECTION_BARS) {
+        targetIdx = rawDiff > 0
+          ? Math.min(currentBars.length - 1, selectionStartPoint.index + (MAX_SELECTION_BARS - 1))
+          : Math.max(0, selectionStartPoint.index - (MAX_SELECTION_BARS - 1));
+      }
+
+      const count = Math.abs(targetIdx - selectionStartPoint.index) + 1;
+      if (count < 2) {
+        const statusMsg = document.getElementById('wave-status-msg');
+        if (statusMsg) {
+          statusMsg.textContent = '⚠️ 起点与终点不能相同，请选择包含至少 2 根 K 线的有效区间';
+        }
+        return;
+      }
+
+      const endBar = currentBars[targetIdx];
+      const startTime = Math.min(selectionStartPoint.time, endBar.time);
+      const endTime = Math.max(selectionStartPoint.time, endBar.time);
+
+      cancelRangeSelection();
+
+      currentRange = { startTime, endTime, barsCount: count };
+      updateRangeBanner(startTime, endTime, count);
+      runWaveAnalysis(currentSymbol, currentRange);
+    }
   }
 
   /**
-   * 鼠标拖拽框选任意 K 线区域交互监听
+   * 两步点击选区机制：
+   * 第一次点击在图表上高亮垂直线作为起点，鼠标移动时实时预览选区 (上限 750 根 K 线)，第二次点击选区结束
    */
-  function setupDragSelection(container) {
-    let isDragging = false;
-    let startX = 0;
-    const box = document.getElementById('chart-selection-box');
+  function setupTwoClickSelection(container) {
+    let mouseDownPos = null;
 
     container.addEventListener('mousedown', e => {
-      // 当处于框选模式或者按住 Shift 键时触发框选
-      if (!isDragSelectMode && !e.shiftKey) return;
-      if (e.button !== 0) return; // 仅左键
-
-      const rect = container.getBoundingClientRect();
-      startX = e.clientX - rect.left;
-      isDragging = true;
-      if (box) {
-        box.style.left = `${startX}px`;
-        box.style.width = '0px';
-        box.style.display = 'block';
+      if (e.button === 0) {
+        mouseDownPos = { x: e.clientX, y: e.clientY };
       }
-      e.preventDefault();
     });
 
-    window.addEventListener('mousemove', e => {
-      if (!isDragging || !box) return;
+    container.addEventListener('mouseup', e => {
+      if (!isSelectingRange || !mouseDownPos) return;
+      const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+      mouseDownPos = null;
+      if (dist > 6) {
+        // 用户在平移或缩放图表，忽略非单击行为
+        return;
+      }
+
       const rect = container.getBoundingClientRect();
-      const currentX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const left = Math.min(startX, currentX);
-      const width = Math.abs(currentX - startX);
-      box.style.left = `${left}px`;
-      box.style.width = `${width}px`;
+      const x = e.clientX - rect.left;
+      const clicked = getBarFromCoordinate(x);
+      if (clicked) {
+        onSelectionPointClicked(clicked);
+      }
     });
 
-    window.addEventListener('mouseup', e => {
-      if (!isDragging) return;
-      isDragging = false;
-      if (!box) return;
-
+    container.addEventListener('mousemove', e => {
+      if (!isSelectingRange || !selectionStartPoint) return;
       const rect = container.getBoundingClientRect();
-      const endX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const width = Math.abs(endX - startX);
-      box.style.display = 'none';
+      const x = e.clientX - rect.left;
+      const hovered = getBarFromCoordinate(x);
+      if (!hovered) return;
 
-      // 选区有效宽度阈值 (至少拖动超过 20 像素)
-      if (width >= 20 && waveChart) {
-        const leftX = Math.min(startX, endX);
-        const rightX = Math.max(startX, endX);
+      const rawDiff = hovered.index - selectionStartPoint.index;
+      let targetIdx = hovered.index;
+      let isCapped = false;
 
-        let time1 = waveChart.timeScale().coordinateToTime(leftX);
-        let time2 = waveChart.timeScale().coordinateToTime(rightX);
+      if (Math.abs(rawDiff) + 1 > MAX_SELECTION_BARS) {
+        isCapped = true;
+        targetIdx = rawDiff > 0
+          ? Math.min(currentBars.length - 1, selectionStartPoint.index + (MAX_SELECTION_BARS - 1))
+          : Math.max(0, selectionStartPoint.index - (MAX_SELECTION_BARS - 1));
+      }
 
-        if (!time1 && currentBars && currentBars.length > 0) time1 = currentBars[0].time;
-        if (!time2 && currentBars && currentBars.length > 0) time2 = currentBars[currentBars.length - 1].time;
+      const count = Math.abs(targetIdx - selectionStartPoint.index) + 1;
+      const endBar = currentBars[targetIdx];
 
-        if (time1 && time2) {
-          const startTime = Math.min(time1, time2);
-          const endTime = Math.max(time1, time2);
-          currentRange = { startTime, endTime };
-          updateRangeBanner(startTime, endTime);
-          runWaveAnalysis(currentSymbol, currentRange);
+      selectionHoverPoint = {
+        bar: endBar,
+        index: targetIdx,
+        time: endBar.time,
+        count: count,
+        isCapped: isCapped
+      };
+
+      updateSelectionVisuals();
+    });
+
+    // 视口平移缩放同步
+    if (waveChart) {
+      waveChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        if (isSelectingRange && selectionStartPoint) {
+          updateSelectionVisuals();
         }
-      }
-    });
+      });
+    }
   }
 
-  function updateRangeBanner(startTime, endTime) {
+  function updateRangeBanner(startTime, endTime, barsCount) {
     const banner = document.getElementById('wave-range-banner');
     const rangeText = document.getElementById('wave-range-text');
     if (!banner || !rangeText) return;
@@ -352,7 +564,8 @@
     if (startTime && endTime) {
       const d1 = new Date(startTime * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const d2 = new Date(endTime * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      rangeText.textContent = `${d1} 至 ${d2}`;
+      const countLabel = barsCount ? ` · 共 ${barsCount} 根 K 线 (${barsCount * 4}小时)` : '';
+      rangeText.textContent = `${d1} 至 ${d2}${countLabel}`;
       banner.style.display = 'flex';
     } else {
       banner.style.display = 'none';
@@ -470,7 +683,7 @@
         initChart();
       }
 
-      // 1. 设置主图蜡烛与量能
+      // 1. 设置主图蜡烛 (不显示成交量，提升画廊级研判纯粹度)
       const candleData = bars.map(b => ({
         time: b.time,
         open: b.open,
@@ -479,14 +692,6 @@
         close: b.close
       }));
       candleSeries.setData(candleData);
-
-      const colors = getWaveChartColors();
-      const volData = bars.map(b => ({
-        time: b.time,
-        value: b.volume,
-        color: b.close >= b.open ? colors.volUpColor : colors.volDownColor
-      }));
-      volumeSeries.setData(volData);
 
       // 2. 调用后端或本地引擎执行全量与选区分析
       let analysis = null;
@@ -955,6 +1160,7 @@
         const sym = btn.dataset.symbol;
         if (sym && sym !== currentSymbol) {
           symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
+          cancelRangeSelection();
           currentRange = null;
           updateRangeBanner(null, null);
           runWaveAnalysis(sym, null);
@@ -966,27 +1172,51 @@
     const btnScan = document.getElementById('btn-scan-waves');
     if (btnScan) {
       btnScan.addEventListener('click', () => {
+        cancelRangeSelection();
         runWaveAnalysis(currentSymbol, currentRange);
       });
     }
 
-    // 框选分析模式开关
+    // 框选分析模式开关 (两步点击选区：第一次点设起点，移动预览，第二次点结束，上限750根K线)
     const btnDrag = document.getElementById('btn-drag-range');
     const container = document.getElementById('wave-chart-container');
     if (btnDrag) {
       btnDrag.addEventListener('click', () => {
-        isDragSelectMode = !isDragSelectMode;
-        btnDrag.classList.toggle('active', isDragSelectMode);
-        if (container) {
-          container.style.cursor = isDragSelectMode ? 'crosshair' : 'default';
+        if (isSelectingRange) {
+          cancelRangeSelection();
+          const statusMsg = document.getElementById('wave-status-msg');
+          if (statusMsg) statusMsg.textContent = '已退出框选分析模式';
+        } else {
+          isSelectingRange = true;
+          selectionStartPoint = null;
+          selectionHoverPoint = null;
+          btnDrag.classList.add('active');
+          btnDrag.innerHTML = '📍 点击图表设定起点';
+          if (container) {
+            container.style.cursor = 'crosshair';
+          }
+          const statusMsg = document.getElementById('wave-status-msg');
+          if (statusMsg) {
+            statusMsg.textContent = '🖱️ 选区模式：请在 4H 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc 取消）';
+          }
         }
       });
     }
+
+    // Esc 快捷键取消正在进行的选区操作
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && isSelectingRange) {
+        cancelRangeSelection();
+        const statusMsg = document.getElementById('wave-status-msg');
+        if (statusMsg) statusMsg.textContent = '已取消选区操作';
+      }
+    });
 
     // 重置全量分析按钮
     const btnResetRange = document.getElementById('btn-reset-range');
     if (btnResetRange) {
       btnResetRange.addEventListener('click', () => {
+        cancelRangeSelection();
         currentRange = null;
         updateRangeBanner(null, null);
         runWaveAnalysis(currentSymbol, null);
@@ -996,6 +1226,7 @@
     const btnCancelRange = document.getElementById('btn-cancel-range');
     if (btnCancelRange) {
       btnCancelRange.addEventListener('click', () => {
+        cancelRangeSelection();
         currentRange = null;
         updateRangeBanner(null, null);
         runWaveAnalysis(currentSymbol, null);
