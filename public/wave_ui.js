@@ -54,7 +54,9 @@
       subwaveColor: isLight ? '#0284c7' : '#38bdf8',
       channelColor: isLight ? 'rgba(234, 88, 12, 0.5)' : 'rgba(255, 87, 34, 0.45)',
       monitoringColor: isLight ? '#dc2626' : '#f43f5e',
-      targetColor: isLight ? '#059669' : '#10b981'
+      targetColor: isLight ? '#059669' : '#10b981',
+      confirmColor: isLight ? '#0284c7' : '#38bdf8',
+      defenseColor: isLight ? '#d97706' : '#fbbf24'
     };
   }
 
@@ -1102,9 +1104,36 @@
         lineWidth: 2,
         lineStyle: LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        title: `【核心监测点】$${pivot.price.toLocaleString()}`
+        title: `【失效点】$${pivot.price.toLocaleString()}`
       });
       activePriceLines.push(pLine);
+    }
+
+    // 确认点：突破后宣告浪型成立 (柳玉冬三点位：失效/确认/防守)
+    if (showMonitoring && cand.confirmPivot && cand.confirmPivot.price) {
+      const cLine = candleSeries.createPriceLine({
+        price: cand.confirmPivot.price,
+        color: colors.confirmColor,
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: `【确认点】$${cand.confirmPivot.price.toLocaleString()}`
+      });
+      activePriceLines.push(cLine);
+    }
+
+    // 防守点：次级风控线
+    const defense = cand.secondaryPivot || cand.defense;
+    if (showMonitoring && defense && defense.price) {
+      const dLine = candleSeries.createPriceLine({
+        price: defense.price,
+        color: colors.defenseColor,
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.LargeDashed,
+        axisLabelVisible: true,
+        title: `【防守点】$${defense.price.toLocaleString()}`
+      });
+      activePriceLines.push(dLine);
     }
 
     if (showTargets && cand.targets && Array.isArray(cand.targets)) {
@@ -1145,7 +1174,7 @@
           <span class="candidate-score-badge">${c.score} 分</span>
         </div>
         <div class="candidate-sub-desc">${c.category} · ${c.currentWave}</div>
-        <div class="candidate-pivot-line">监测点: $${c.monitoringPivot?.price?.toLocaleString() || '--'} (${c.monitoringPivot?.levelName || '生命线'})</div>
+        <div class="candidate-pivot-line">失效点: $${c.monitoringPivot?.price?.toLocaleString() || '--'}${c.confirmPivot?.price ? ` · 确认点: $${c.confirmPivot.price.toLocaleString()}` : ''}</div>
       </div>
     `).join('');
 

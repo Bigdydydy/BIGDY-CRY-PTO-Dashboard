@@ -238,4 +238,62 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     assert.ok(res.originAnalysis.originType);
     assert.ok(res.candidates.length > 0);
   });
+
+  // 折线路径构造器：在拐点间线性插值，每腿 24 根 K 线
+  function mkSwingBars(points, baseTime = 1730000000) {
+    const bars = [];
+    let t = baseTime;
+    for (let s = 0; s < points.length - 1; s++) {
+      const sp = points[s];
+      const ep = points[s + 1];
+      const n = 24;
+      for (let i = (s === 0 ? 0 : 1); i <= n; i++) {
+        const p = sp + (ep - sp) * (i / n);
+        bars.push({ time: t, open: p, high: p + 0.5, low: p - 0.5, close: p, volume: 300 + (s % 2) * 100 });
+        t += 14400;
+      }
+    }
+    return bars;
+  }
+
+  it('Wave Engine: 收缩三角形 a-b-c-d-e 满足柳玉冬 0.5-0.5-0.5-0.25 口诀', () => {
+    // 100H -> 80L -> 95H -> 82L -> 90H -> 84L：逐腿递减且高低点收敛
+    const bars = mkSwingBars([100, 80, 95, 82, 90, 84]);
+    const res = analyzeWaves(bars, 'BTC/USDT');
+    const tri = res.candidates.find(c => c.family === 'TRIANGLE');
+    assert.ok(tri, '应识别出三角形调整浪候选');
+    assert.strictEqual(tri.type, 'CONTRACTING_TRIANGLE');
+    assert.ok(tri.monitoringPivot && tri.monitoringPivot.price > 0);
+    assert.ok(Array.isArray(tri.targets) && tri.targets.length >= 1);
+  });
+
+  it('Wave Engine: 终结/引导楔形（对角线驱动浪）浪4重叠且逐腿收敛', () => {
+    // 50L -> 80H -> 65L -> 88H -> 76L -> 84H：浪4 切入浪1 领地、浪腿收缩
+    const bars = mkSwingBars([50, 80, 65, 88, 76, 84]);
+    const res = analyzeWaves(bars, 'BTC/USDT');
+    const diag = res.candidates.find(c => c.family === 'DIAGONAL');
+    assert.ok(diag, '应识别出楔形（对角线）候选');
+    assert.ok(diag.category.includes('驱动'));
+    assert.ok(diag.invalidation && diag.invalidation.price > 0);
+  });
+
+  it('Wave Engine: 双锯齿 W-X-Y 复式调整浪识别', () => {
+    // 100H -> 85L -> 95H -> 75L (W) -> 90H (X) -> 82L -> 86H -> 70L (Y)
+    const bars = mkSwingBars([100, 85, 95, 75, 90, 82, 86, 70]);
+    const res = analyzeWaves(bars, 'BTC/USDT');
+    const dz = res.candidates.find(c => c.family === 'DOUBLE_ZIGZAG');
+    assert.ok(dz, '应识别出双锯齿 W-X-Y 复式调整浪候选');
+    assert.ok(dz.metrics && dz.metrics.x_retrace_of_W > 0.2 && dz.metrics.x_retrace_of_W < 0.95);
+  });
+
+  it('Wave Engine: 下跌推动浪（空头方向）完整识别', () => {
+    // 100H -> 75L -> 88H -> 60L -> 70H -> 50L：空头 1-2-3-4-5
+    const bars = mkSwingBars([100, 75, 88, 60, 70, 50]);
+    const res = analyzeWaves(bars, 'BTC/USDT');
+    const imp = res.candidates.find(c => c.family === 'IMPULSE');
+    assert.ok(imp, '应识别出下跌推动浪候选');
+    assert.strictEqual(imp.direction, 'BEARISH');
+    assert.ok(imp.rules && imp.rules.passedAll !== false);
+    assert.ok(imp.monitoringPivot && imp.monitoringPivot.price > 0);
+  });
 });
