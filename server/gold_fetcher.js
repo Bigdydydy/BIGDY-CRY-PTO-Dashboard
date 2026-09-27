@@ -1,12 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchWithTimeout } = require('./http_client');
+const { fetchBinanceSpot } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'gold_correlation.json');
 const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Approx $18.5T for ~212,500 tonnes of global above-ground gold
 const BTC_CIRCULATING_SUPPLY = 19.8e6;     // Approx 19.8M circulating BTC in 2026
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 let inMemoryCache = null;
+let lastFetchTime = 0;
 let currentFetchPromise = null;
 
 /**
@@ -132,8 +135,8 @@ function classifyCorrelationRegime(r, btcGoldRatio, btcMarketCapShare) {
  */
 async function fetchGoldCorrelationFromSource() {
   const [paxgResp, btcResp] = await Promise.all([
-    fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000'),
-    fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000')
+    fetchBinanceSpot('/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000'),
+    fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000')
   ]);
 
   if (!paxgResp.ok) throw new Error(`Binance PAXG HTTP ${paxgResp.status}`);
@@ -227,7 +230,8 @@ async function fetchGoldCorrelationFromSource() {
       date: latest.date
     },
     regime,
-    series
+    series,
+    updatedAt: new Date().toISOString()
   };
 }
 
@@ -235,7 +239,7 @@ async function fetchGoldCorrelationFromSource() {
  * Public getter with memory caching, single-flight fetching, and disk fallback
  */
 async function getGoldCorrelationData(forceRefresh = false) {
-  if (!forceRefresh && inMemoryCache) {
+  if (!forceRefresh && inMemoryCache && (Date.now() - lastFetchTime < CACHE_TTL_MS)) {
     return inMemoryCache;
   }
 
@@ -248,6 +252,7 @@ async function getGoldCorrelationData(forceRefresh = false) {
       console.log('[GoldFetcher] Fetching real-time PAXG and BTC klines from Binance...');
       const result = await fetchGoldCorrelationFromSource();
       inMemoryCache = result;
+      lastFetchTime = Date.now();
 
       // Persist to disk
       try {
@@ -260,6 +265,8 @@ async function getGoldCorrelationData(forceRefresh = false) {
       return result;
     } catch (err) {
       console.warn('[GoldFetcher] Live fetch failed:', err.message);
+      lastFetchTime = Date.now();
+      if (inMemoryCache) return inMemoryCache;
 
       // Fallback to disk cache if available
       if (fs.existsSync(CACHE_FILE)) {

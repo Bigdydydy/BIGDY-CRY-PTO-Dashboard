@@ -20,6 +20,7 @@ const { getCachedTrades } = require('./trade_store');
 const { fetchWithTimeout } = require('./http_client');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
+const DEFAULT_MAX_AGE_SECONDS = 5 * 60;
 
 /**
  * Probe upstream endpoints latency
@@ -112,7 +113,8 @@ async function getSystemAuditData(doProbe = false) {
       isRealtime: true,
       recordCount: macroData?.points?.length || 2245,
       mstrPurchasesCount: macroData?.mstrPurchases?.length || 118,
-      lastUpdated: macroData?.summary?.updatedAt || cache.lastSyncCheckTime || serverTimeUTC,
+      lastUpdated: macroData?.summary?.updatedAt || null,
+      maxAgeSeconds: 30 * 60,
       provenanceSignatures: [
         'FRED_DGS1_1Y_YIELD',
         'FRED_DGS10_10Y_YIELD',
@@ -264,7 +266,8 @@ async function getSystemAuditData(doProbe = false) {
       updateInterval: '30s 自动轮询',
       isRealtime: true,
       recordCount: goldData?.series?.length || 1000,
-      lastUpdated: goldData?.updatedAt || cache.lastSyncCheckTime || serverTimeUTC,
+      lastUpdated: goldData?.updatedAt || goldData?.current?.timestamp || null,
+      maxAgeSeconds: 30 * 60,
       provenanceSignatures: [
         'BINANCE_PAXGUSDT_1000D_DAILY_KLINES',
         'PEARSON_ROLLING_30D_90D_180D_MATRIX'
@@ -285,7 +288,8 @@ async function getSystemAuditData(doProbe = false) {
       updateInterval: '日频 / 手动强制刷新',
       isRealtime: true,
       recordCount: ssroData?.points?.length || 3221,
-      lastUpdated: ssroData?.summary?.updatedAt || cache.lastSyncCheckTime || serverTimeUTC,
+      lastUpdated: ssroData?.updatedAt || null,
+      maxAgeSeconds: 60 * 60,
       provenanceSignatures: [
         'DEFILLAMA_ALL_STABLECOIN_SUPPLY',
         '200DMA_BOLLINGER_BANDS_OSCILLATOR'
@@ -303,7 +307,8 @@ async function getSystemAuditData(doProbe = false) {
       updateInterval: '30s 监听更新',
       isRealtime: true,
       recordCount: mcData?.series?.length || 1000,
-      lastUpdated: mcData?.refresh_status?.updated_at || cache.lastSyncCheckTime || serverTimeUTC,
+      lastUpdated: mcData?.metadata?.benchmark_date || null,
+      maxAgeSeconds: 2 * 86400,
       provenanceSignatures: [
         'RAMO_LIQUIDITY_PENALTY_BOUNDS',
         'CORE_FRONTIER_DUAL_TRACK_SPREAD'
@@ -321,7 +326,8 @@ async function getSystemAuditData(doProbe = false) {
       updateInterval: '30s 监听更新',
       isRealtime: true,
       recordCount: aiData?.series?.length || 250,
-      lastUpdated: aiData?.refresh_status?.updated_at || cache.lastSyncCheckTime || serverTimeUTC,
+      lastUpdated: aiData?.metadata?.last_updated || null,
+      maxAgeSeconds: 2 * 86400,
       provenanceSignatures: [
         'OLS_MACRO_ORTHOGONAL_REGRESSION',
         'PHASE_SPACE_4_QUADRANT_MACHINE',
@@ -337,21 +343,28 @@ async function getSystemAuditData(doProbe = false) {
     const elapsed = getElapsedMetrics(mod.lastUpdated);
     mod.updatedSecondsAgo = elapsed.secondsAgo;
     mod.updatedTimeDisplay = elapsed.display;
+    const maxAge = mod.maxAgeSeconds || DEFAULT_MAX_AGE_SECONDS;
+    mod.freshnessStatus = elapsed.secondsAgo === null ? 'UNKNOWN' : (elapsed.secondsAgo <= maxAge ? 'FRESH' : 'STALE');
   }
 
   // Count active modules
   const allModulesList = Object.values(modules);
   const onlineCount = allModulesList.filter(m => m.healthStatus === 'ONLINE').length;
   const totalCount = allModulesList.length;
+  const staleModules = allModulesList.filter(m => m.freshnessStatus !== 'FRESH').map(m => m.id);
+  const allOnline = onlineCount === totalCount;
 
   const auditReport = {
     code: 0,
     serverTimeUTC,
     serverUptimeSeconds: uptimeQuantized,
-    overallHealth: onlineCount === totalCount ? 'HEALTHY' : (onlineCount >= 8 ? 'DEGRADED' : 'CRITICAL'),
-    summary: `全系统 ${totalCount} 大量化板块与微观子模块运行中，${onlineCount}/${totalCount} 处于在线就绪状态。`,
+    overallHealth: allOnline && staleModules.length === 0 ? 'HEALTHY' : (onlineCount >= 8 ? 'DEGRADED' : 'CRITICAL'),
+    summary: `全系统 ${totalCount} 大量化板块与微观子模块运行中，${onlineCount}/${totalCount} 处于在线就绪状态，${totalCount - staleModules.length}/${totalCount} 数据处于新鲜窗口内。`
+      + (staleModules.length ? ` 数据过期: ${staleModules.join(', ')}。` : ''),
     modulesCount: totalCount,
     onlineModulesCount: onlineCount,
+    staleModulesCount: staleModules.length,
+    staleModules,
     modules
   };
 
