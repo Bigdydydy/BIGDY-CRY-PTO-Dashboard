@@ -5058,6 +5058,14 @@ body {
   box-shadow: 0 0 6px var(--color-neg);
 }
 
+.rule-dot-idle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+
 .wave-pivot-highlight-box {
   background: linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, var(--bg-surface-elevated) 100%);
   border: 1px solid var(--accent-primary-border);
@@ -5280,6 +5288,35 @@ body {
   gap: 8px;
   max-height: 280px;
   overflow-y: auto;
+}
+
+.wave-idle-prompt {
+  padding: 24px 16px;
+  text-align: center;
+  background: var(--bg-surface-elevated);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.wave-idle-prompt .idle-icon {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.wave-idle-prompt .idle-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.wave-idle-prompt .idle-desc {
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .candidate-card {

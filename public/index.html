@@ -2239,7 +2239,7 @@
             </div>
             <div class="header-controls">
               <div class="tp-header-badges">
-                <span class="tp-regime-pill" id="wave-header-regime-pill">-- 扫描中</span>
+                <span class="tp-regime-pill" id="wave-header-regime-pill">-- 待选区</span>
                 <span class="tp-score-pill" id="wave-header-score-pill">最高匹配: --分</span>
                 <span class="tz-badge" id="wave-update-time">更新中... (UTC+8)</span>
               </div>
@@ -2253,10 +2253,10 @@
               <div class="bento-card wave-kpi-card">
                 <div class="kpi-card-header">
                   <span class="kpi-label">最优主导浪型</span>
-                  <span class="kpi-badge" id="kpi-wave-primary-badge">研判中</span>
+                  <span class="kpi-badge" id="kpi-wave-primary-badge">待选区</span>
                 </div>
-                <div class="kpi-main-val" id="kpi-wave-primary-name" style="font-size: 1.12rem; font-weight: 700;">--</div>
-                <div class="kpi-sub-meta" id="kpi-wave-primary-cat">形态与演进阶段</div>
+                <div class="kpi-main-val" id="kpi-wave-primary-name" style="font-size: 1.12rem; font-weight: 700;">待选区研判</div>
+                <div class="kpi-sub-meta" id="kpi-wave-primary-cat">请点击【🖱️ 框选分析模式】选取 2~750 根 K 线</div>
               </div>
 
               <!-- KPI 2: Composite Score -->
@@ -2267,7 +2267,7 @@
                 </div>
                 <div class="kpi-main-val text-pos" id="kpi-wave-primary-score">-- 分</div>
                 <div class="kpi-meter-bar">
-                  <div class="kpi-meter-fill" id="kpi-wave-score-bar" style="width: 50%;"></div>
+                  <div class="kpi-meter-fill" id="kpi-wave-score-bar" style="width: 0%;"></div>
                 </div>
                 <div class="kpi-sub-meta">铁律50% + 出身15% + 斐波15% + 通道10% + 对称10%</div>
               </div>
@@ -2279,7 +2279,7 @@
                   <span class="kpi-badge" style="color: var(--accent-primary);">做底/反转基准</span>
                 </div>
                 <div class="kpi-main-val text-highlight" id="kpi-wave-pivot-price">$--,---</div>
-                <div class="kpi-sub-meta" id="kpi-wave-pivot-status">跌破或突破即宣布原浪型终结</div>
+                <div class="kpi-sub-meta" id="kpi-wave-pivot-status">等待框选区间</div>
               </div>
 
               <!-- KPI 4: Micro Origin Verification -->
@@ -2288,8 +2288,8 @@
                   <span class="kpi-label">“出身决定命运”微观校验</span>
                   <span class="kpi-badge">1H/15m 穿透</span>
                 </div>
-                <div class="kpi-main-val" id="kpi-wave-origin-status" style="font-size: 1.05rem;">--</div>
-                <div class="kpi-sub-meta" id="kpi-wave-origin-desc">起步第一笔内部微观结构判定</div>
+                <div class="kpi-main-val" id="kpi-wave-origin-status" style="font-size: 1.05rem;">待框选检测</div>
+                <div class="kpi-sub-meta" id="kpi-wave-origin-desc">选取波段后穿透微观 1H/15m 结构</div>
               </div>
 
               <!-- KPI 5: Primary Scenario Probability -->
@@ -2299,7 +2299,7 @@
                   <span class="kpi-badge">推演倾向</span>
                 </div>
                 <div class="kpi-main-val text-cyan" id="kpi-wave-scenario-prob">--%</div>
-                <div class="kpi-sub-meta" id="kpi-wave-scenario-name">主推方案演进倾向</div>
+                <div class="kpi-sub-meta" id="kpi-wave-scenario-name">等待选区确认</div>
               </div>
             </div>
 
@@ -2377,11 +2377,17 @@
                   <div class="card-title-group">
                     <h3>并列候选浪型判定 (点击切换图表)</h3>
                   </div>
-                  <span class="card-badge" id="candidate-count-badge">扫描中</span>
+                  <span class="card-badge" id="candidate-count-badge">待选区</span>
                 </div>
               </div>
               <div id="wave-candidates-list" class="wave-candidates-list" style="margin-top: 10px;">
-                <div class="text-secondary" style="font-size: 0.72rem;">正在并行扫描符合手稿六维指标的全部候选形态...</div>
+                <div class="wave-idle-prompt">
+                  <span class="idle-icon">🎯</span>
+                  <div class="idle-title">等待框选分析</div>
+                  <p class="idle-desc">
+                    请点击上方 <strong>【🖱️ 框选分析模式】</strong>，在 4H 图表中单击起点并移动至终点（2 ~ 750 根 K 线），系统将对所选范围执行三大铁律与并列形态研判。
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -2392,11 +2398,11 @@
                   <div class="card-title-group">
                     <h3>“出身决定命运”微观校验 (1H/15m)</h3>
                   </div>
-                  <span class="card-badge" id="wave-origin-badge">穿透检验中</span>
+                  <span class="card-badge badge-neutral" id="wave-origin-badge">待选区</span>
                 </div>
               </div>
               <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.5; margin: 8px 0 0 0;" id="wave-origin-text">
-                正在穿透微观周期检验起步第一段是否走出清晰五浪推动...
+                尚未选取分析区间。点击图表上方【🖱️ 框选分析模式】选取 K 线范围后，将穿透检验起点第一笔的微观 1H/15m 驱动结构。
               </p>
             </div>
 
@@ -2407,36 +2413,36 @@
                   <div class="card-title-group">
                     <h3>当前选中主浪型详情</h3>
                   </div>
-                  <span class="card-badge" id="wave-regime-badge">识别中</span>
+                  <span class="card-badge badge-neutral" id="wave-regime-badge">待选区</span>
                 </div>
               </div>
               <div style="margin-top: 6px;">
                 <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="wave-regime-name">--</div>
-                <div style="font-size: 0.76rem; color: var(--accent-primary); margin-top: 4px; font-weight: 600;" id="wave-current-stage">--</div>
+                <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 4px; font-weight: 600;" id="wave-current-stage">请先在图表中框选行情范围</div>
 
                 <div style="margin-top: 14px;">
                   <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">柳玉冬波浪三大铁律核验</div>
                   <div class="rule-check-list">
                     <div class="rule-check-item">
                       <div class="rule-check-left">
-                        <span class="rule-dot-pass" id="rule-dot-1"></span>
+                        <span class="rule-dot-idle" id="rule-dot-1"></span>
                         <span>铁律 1: 浪2终点不能破浪1起点</span>
                       </div>
-                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">100% 达标</span>
+                      <span class="text-secondary" id="rule-status-1" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
                     </div>
                     <div class="rule-check-item">
                       <div class="rule-check-left">
-                        <span class="rule-dot-pass" id="rule-dot-2"></span>
+                        <span class="rule-dot-idle" id="rule-dot-2"></span>
                         <span>铁律 2: 浪3不能是最短驱动浪</span>
                       </div>
-                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">满足延伸</span>
+                      <span class="text-secondary" id="rule-status-2" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
                     </div>
                     <div class="rule-check-item">
                       <div class="rule-check-left">
-                        <span class="rule-dot-pass" id="rule-dot-3"></span>
+                        <span class="rule-dot-idle" id="rule-dot-3"></span>
                         <span>铁律 3: 浪4底绝不进入浪1顶 (无重叠)</span>
                       </div>
-                      <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.72rem;">严防死守</span>
+                      <span class="text-secondary" id="rule-status-3" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
                     </div>
                   </div>
                 </div>
@@ -2453,10 +2459,10 @@
               <div class="wave-pivot-highlight-box">
                 <div style="font-size: 0.7rem; color: var(--text-muted);">临界研判防守位 (突破/跌破即失效)</div>
                 <div class="wave-pivot-price" id="wave-pivot-price">$--,---</div>
-                <div class="wave-pivot-diff" id="wave-pivot-diff">计算中...</div>
+                <div class="wave-pivot-diff" id="wave-pivot-diff">等待选区...</div>
               </div>
               <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; margin-top: 10px;" id="wave-pivot-desc">
-                监测点是柳玉冬实战体系的精髓所在。跌破或突破监测点即宣告原有波浪假设终结，转入反向或修正走势。
+                选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。
               </p>
             </div>
 
@@ -2484,7 +2490,9 @@
                   <span class="card-badge badge-bull">多重推演</span>
                 </div>
               </div>
-              <div id="wave-scenarios-list" class="wave-scenarios-list" style="margin-top: 10px;"></div>
+              <div id="wave-scenarios-list" class="wave-scenarios-list" style="margin-top: 10px;">
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 12px 0;">框选分析后将输出第一、第二情景推演</div>
+              </div>
             </div>
 
             <!-- 6. Fibonacci Targets -->
@@ -2496,7 +2504,7 @@
               </div>
               <div style="display: flex; flex-direction: column; gap: 6px;" id="wave-targets-list">
                 <div class="wave-target-row">
-                  <span class="text-secondary">目标测算中...</span>
+                  <span class="text-secondary">等待选区测算...</span>
                 </div>
               </div>
             </div>
@@ -2509,7 +2517,7 @@
                 </div>
               </div>
               <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.6; margin: 0;" id="wave-thesis-text">
-                正在根据 4H 走势生成权威研判...
+                请使用【🖱️ 框选分析模式】选择 4H K 线行情走势区间以生成柳玉冬实战研判结论。
               </p>
               <div style="margin-top: 10px; font-size: 0.73rem; color: var(--text-secondary); line-height: 1.5;" id="wave-bottom-signal">
               </div>

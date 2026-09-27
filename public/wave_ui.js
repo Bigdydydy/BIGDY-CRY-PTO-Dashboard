@@ -657,10 +657,207 @@
   }
 
   /**
-   * 执行波浪分析 (支持全量与自定义选区)
+   * 清除波浪图层与面板状态，恢复为待框选状态
+   */
+  function clearWaveAnalysisState() {
+    currentAnalysis = null;
+    activeCandidateIndex = 0;
+    currentRange = null;
+
+    // 1. 清空图表上的所有波浪图层
+    if (zigzagSeries) zigzagSeries.setData([]);
+    if (subwaveSeries) subwaveSeries.setData([]);
+    if (channelUpperSeries) channelUpperSeries.setData([]);
+    if (channelLowerSeries) channelLowerSeries.setData([]);
+    setChartMarkers(candleSeries, []);
+
+    if (activePriceLines.length > 0 && candleSeries) {
+      activePriceLines.forEach(pl => {
+        try { candleSeries.removePriceLine(pl); } catch (e) {}
+      });
+      activePriceLines = [];
+    }
+
+    // 2. 隐藏选区横幅
+    updateRangeBanner(null, null);
+
+    // 3. 重置顶部徽标与 5-KPI 看板
+    const headerRegime = document.getElementById('wave-header-regime-pill');
+    const headerScore = document.getElementById('wave-header-score-pill');
+    if (headerRegime) headerRegime.textContent = '-- 待选区';
+    if (headerScore) headerScore.textContent = '最高匹配: --分';
+
+    const kpiName = document.getElementById('kpi-wave-primary-name');
+    const kpiBadge = document.getElementById('kpi-wave-primary-badge');
+    const kpiCat = document.getElementById('kpi-wave-primary-cat');
+    if (kpiName) kpiName.textContent = '待选区研判';
+    if (kpiBadge) {
+      kpiBadge.textContent = '待选区';
+      kpiBadge.className = 'kpi-badge';
+    }
+    if (kpiCat) kpiCat.textContent = '请点击【🖱️ 框选分析模式】选取 2~750 根 K 线';
+
+    const kpiScore = document.getElementById('kpi-wave-primary-score');
+    const kpiScoreBar = document.getElementById('kpi-wave-score-bar');
+    if (kpiScore) kpiScore.textContent = '-- 分';
+    if (kpiScoreBar) kpiScoreBar.style.width = '0%';
+
+    const kpiPivotPrice = document.getElementById('kpi-wave-pivot-price');
+    const kpiPivotStatus = document.getElementById('kpi-wave-pivot-status');
+    if (kpiPivotPrice) kpiPivotPrice.textContent = '$--,---';
+    if (kpiPivotStatus) kpiPivotStatus.textContent = '等待框选区间';
+
+    const kpiOriginStatus = document.getElementById('kpi-wave-origin-status');
+    const kpiOriginDesc = document.getElementById('kpi-wave-origin-desc');
+    if (kpiOriginStatus) {
+      kpiOriginStatus.textContent = '待框选检测';
+      kpiOriginStatus.style.color = 'var(--text-secondary)';
+    }
+    if (kpiOriginDesc) kpiOriginDesc.textContent = '选取波段后穿透微观 1H/15m 结构';
+
+    const kpiScenProb = document.getElementById('kpi-wave-scenario-prob');
+    const kpiScenName = document.getElementById('kpi-wave-scenario-name');
+    if (kpiScenProb) kpiScenProb.textContent = '--%';
+    if (kpiScenName) kpiScenName.textContent = '等待选区确认';
+
+    // 4. 重置右侧各面板
+    const countBadge = document.getElementById('candidate-count-badge');
+    if (countBadge) countBadge.textContent = '待选区';
+
+    const candList = document.getElementById('wave-candidates-list');
+    if (candList) {
+      candList.innerHTML = `
+        <div class="wave-idle-prompt">
+          <span class="idle-icon">🎯</span>
+          <div class="idle-title">等待框选分析</div>
+          <p class="idle-desc">
+            请点击上方 <strong>【🖱️ 框选分析模式】</strong>，在 4H 图表中单击起点并移动至终点（2 ~ 750 根 K 线），系统将对所选范围执行三大铁律与并列形态研判。
+          </p>
+        </div>
+      `;
+    }
+
+    const originBadge = document.getElementById('wave-origin-badge');
+    const originText = document.getElementById('wave-origin-text');
+    if (originBadge) {
+      originBadge.textContent = '待选区';
+      originBadge.className = 'card-badge badge-neutral';
+    }
+    if (originText) {
+      originText.textContent = '尚未选取分析区间。点击图表上方【🖱️ 框选分析模式】选取 K 线范围后，将穿透检验起点第一笔的微观 1H/15m 驱动结构。';
+    }
+
+    const waveRegimeName = document.getElementById('wave-regime-name');
+    const waveRegimeBadge = document.getElementById('wave-regime-badge');
+    const waveCurrentStage = document.getElementById('wave-current-stage');
+    if (waveRegimeName) waveRegimeName.textContent = '--';
+    if (waveCurrentStage) waveCurrentStage.textContent = '请先在图表中框选行情范围';
+    if (waveRegimeBadge) {
+      waveRegimeBadge.textContent = '待选区';
+      waveRegimeBadge.className = 'card-badge badge-neutral';
+    }
+
+    const r1 = document.getElementById('rule-dot-1');
+    const r2 = document.getElementById('rule-dot-2');
+    const r3 = document.getElementById('rule-dot-3');
+    if (r1) r1.className = 'rule-dot-idle';
+    if (r2) r2.className = 'rule-dot-idle';
+    if (r3) r3.className = 'rule-dot-idle';
+
+    const rs1 = document.getElementById('rule-status-1');
+    const rs2 = document.getElementById('rule-status-2');
+    const rs3 = document.getElementById('rule-status-3');
+    if (rs1) rs1.textContent = '待检测';
+    if (rs2) rs2.textContent = '待检测';
+    if (rs3) rs3.textContent = '待检测';
+
+    const pivotPrice = document.getElementById('wave-pivot-price');
+    const pivotDiff = document.getElementById('wave-pivot-diff');
+    const pivotDesc = document.getElementById('wave-pivot-desc');
+    if (pivotPrice) pivotPrice.textContent = '$--,---';
+    if (pivotDiff) pivotDiff.textContent = '等待选区...';
+    if (pivotDesc) pivotDesc.textContent = '选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。';
+
+    const cardBlockers = document.getElementById('card-wave-blockers');
+    if (cardBlockers) cardBlockers.style.display = 'none';
+
+    const scenariosList = document.getElementById('wave-scenarios-list');
+    if (scenariosList) {
+      scenariosList.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 12px 0;">框选分析后将输出第一、第二情景推演</div>`;
+    }
+
+    const tgtContainer = document.getElementById('wave-targets-list');
+    if (tgtContainer) {
+      tgtContainer.innerHTML = `<div class="wave-target-row"><span class="text-secondary">等待选区测算...</span></div>`;
+    }
+
+    const thesisText = document.getElementById('wave-thesis-text');
+    const bottomSignal = document.getElementById('wave-bottom-signal');
+    if (thesisText) thesisText.textContent = '请使用【🖱️ 框选分析模式】选择 4H K 线行情走势区间以生成柳玉冬实战研判结论。';
+    if (bottomSignal) bottomSignal.textContent = '';
+  }
+
+  /**
+   * 仅拉取行情并挂载 4H 裸 K 线图表，不执行任何初始波浪分析模板
+   */
+  async function loadChartCandles(symbol = currentSymbol) {
+    currentSymbol = symbol;
+    const hudSym = document.getElementById('hud-sym');
+    const statusMsg = document.getElementById('wave-status-msg');
+    if (hudSym) hudSym.textContent = `${symbol} 4H`;
+    if (statusMsg) statusMsg.textContent = `正在拉取 ${symbol} 最新 4H K 线走势...`;
+
+    try {
+      const { bars } = await fetch4hKlines(symbol);
+      currentBars = bars;
+
+      if (!waveChart) {
+        initChart();
+      }
+
+      // 设置主图裸蜡烛 (无成交量，无初始波浪分析模板)
+      const candleData = bars.map(b => ({
+        time: b.time,
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close
+      }));
+      candleSeries.setData(candleData);
+
+      // 缩放聚焦至最新 150 根 K 线
+      if (bars.length > 150) {
+        waveChart.timeScale().setVisibleLogicalRange({
+          from: bars.length - 150,
+          to: bars.length
+        });
+      }
+
+      // 清除一切历史波浪图层，面板置为等待框选状态
+      clearWaveAnalysisState();
+
+      if (statusMsg) {
+        statusMsg.textContent = `● [${symbol} 4H] 行情已就绪 · 请点击上方【🖱️ 框选分析模式】选择 2~750 根 K 线开始智能研判`;
+      }
+    } catch (err) {
+      console.error('[Wave Load Error]:', err);
+      if (statusMsg) {
+        statusMsg.textContent = `❌ 行情加载失败: ${err.message || '网络连接超时'}`;
+      }
+    }
+  }
+
+  /**
+   * 执行波浪分析 (严格约束：仅当正确框选分析范围后才进行分析)
    */
   async function runWaveAnalysis(symbol = currentSymbol, rangeOptions = currentRange) {
+    // 关键规则：如果没有选定有效选区，绝不执行全量分析模板，只保持裸 K 线
+    if (!rangeOptions || !rangeOptions.startTime || !rangeOptions.endTime) {
+      return loadChartCandles(symbol);
+    }
+
     currentSymbol = symbol;
+    currentRange = rangeOptions;
     const btnScan = document.getElementById('btn-scan-waves');
     const statusMsg = document.getElementById('wave-status-msg');
     const hudSym = document.getElementById('hud-sym');
@@ -672,19 +869,20 @@
       if (textSpan) textSpan.textContent = '分析研判中...';
     }
     if (statusMsg) {
-      statusMsg.textContent = rangeOptions ? `正在分析选定区间 [${symbol} 4H]...` : `正在拉取 ${symbol} 最新 4H K线并执行柳玉冬波浪模型...`;
+      statusMsg.textContent = `正在分析选定区间 [${symbol} 4H]...`;
     }
 
     try {
-      const { bars, source } = await fetch4hKlines(symbol);
-      currentBars = bars;
+      if (!currentBars || currentBars.length === 0) {
+        const { bars } = await fetch4hKlines(symbol);
+        currentBars = bars;
+      }
 
       if (!waveChart) {
         initChart();
       }
 
-      // 1. 设置主图蜡烛 (不显示成交量，提升画廊级研判纯粹度)
-      const candleData = bars.map(b => ({
+      const candleData = currentBars.map(b => ({
         time: b.time,
         open: b.open,
         high: b.high,
@@ -693,16 +891,14 @@
       }));
       candleSeries.setData(candleData);
 
-      // 2. 调用后端或本地引擎执行全量与选区分析
+      // 调用后端 API 或本地引擎执行选区分析
       let analysis = null;
       try {
         const queryParams = new URLSearchParams({
-          symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase()
+          symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase(),
+          startTime: rangeOptions.startTime,
+          endTime: rangeOptions.endTime
         });
-        if (rangeOptions?.startTime && rangeOptions?.endTime) {
-          queryParams.append('startTime', rangeOptions.startTime);
-          queryParams.append('endTime', rangeOptions.endTime);
-        }
         const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`);
         if (apiResp.ok) {
           analysis = await apiResp.json();
@@ -713,35 +909,28 @@
 
       if (!analysis || analysis.code !== 0) {
         if (!window.LiuWaveEngine) throw new Error('波浪计算引擎尚未就绪');
-        analysis = window.LiuWaveEngine.analyzeWaves(bars, symbol, rangeOptions || {});
+        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, rangeOptions);
       }
 
       currentAnalysis = analysis;
       activeCandidateIndex = 0;
 
-      // 3. 渲染候选浪型并上图展示
+      // 渲染候选浪型并上图展示
       renderCandidatesList(analysis);
       applyActiveCandidate(0);
 
-      // 4. 侧边栏各板块更新
-      renderDiagnosticPanel(analysis, source);
+      // 侧边栏各板块更新
+      renderDiagnosticPanel(analysis);
 
-      // 5. 缩放视野：若有选区则聚焦到选区，否则聚焦最近 150 根
-      if (rangeOptions?.startTime && rangeOptions?.endTime) {
-        waveChart.timeScale().setVisibleRange({
-          from: rangeOptions.startTime,
-          to: rangeOptions.endTime
-        });
-      } else if (bars.length > 150) {
-        waveChart.timeScale().setVisibleLogicalRange({
-          from: bars.length - 150,
-          to: bars.length
-        });
-      }
+      // 缩放视野聚焦到选区
+      waveChart.timeScale().setVisibleRange({
+        from: rangeOptions.startTime,
+        to: rangeOptions.endTime
+      });
 
       if (statusMsg) {
-        const rangeDesc = rangeOptions ? `选定区间 (${analysis.selectedRange?.barsCount || 0} 根K线)` : '全量宏观';
-        statusMsg.textContent = `● 已完成 [${symbol} 4H] ${rangeDesc} 深度扫描 · 匹配出 ${analysis.candidates?.length || 0} 个合规浪型`;
+        const barsCount = analysis.selectedRange?.barsCount || rangeOptions.barsCount || 0;
+        statusMsg.textContent = `● 已完成 [${symbol} 4H] 选区 (${barsCount} 根 K 线) 深度研判 · 匹配出 ${analysis.candidates?.length || 0} 个合规浪型`;
       }
     } catch (err) {
       console.error('[Wave Engine Error]:', err);
@@ -1044,10 +1233,16 @@
     const r1 = document.getElementById('rule-dot-1');
     const r2 = document.getElementById('rule-dot-2');
     const r3 = document.getElementById('rule-dot-3');
+    const rs1 = document.getElementById('rule-status-1');
+    const rs2 = document.getElementById('rule-status-2');
+    const rs3 = document.getElementById('rule-status-3');
     if (cand.rules) {
       if (r1) r1.className = cand.rules.rule1_wave2_retrace !== false ? 'rule-dot-pass' : 'rule-dot-fail';
       if (r2) r2.className = cand.rules.rule2_wave3_not_shortest !== false ? 'rule-dot-pass' : 'rule-dot-fail';
       if (r3) r3.className = cand.rules.rule3_wave4_no_overlap !== false ? 'rule-dot-pass' : 'rule-dot-fail';
+      if (rs1) rs1.textContent = cand.rules.rule1_wave2_retrace !== false ? '100% 达标' : '破位违规';
+      if (rs2) rs2.textContent = cand.rules.rule2_wave3_not_shortest !== false ? '满足延伸' : '最短驱动违规';
+      if (rs3) rs3.textContent = cand.rules.rule3_wave4_no_overlap !== false ? '严防死守' : '浪4底穿透浪1顶';
     }
 
     // 核心监测点
@@ -1153,7 +1348,7 @@
    * 初始化事件监听器 (标的切换、图表工具开关、框选交互)
    */
   function initEvents() {
-    // 标的切换 (BTC / ETH)
+    // 标的切换 (BTC / ETH) - 仅加载对应标的的裸 K 线，等待用户选区
     const symbolBtns = document.querySelectorAll('.wave-symbol-btn');
     symbolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1161,9 +1356,7 @@
         if (sym && sym !== currentSymbol) {
           symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
           cancelRangeSelection();
-          currentRange = null;
-          updateRangeBanner(null, null);
-          runWaveAnalysis(sym, null);
+          loadChartCandles(sym);
         }
       });
     });
@@ -1172,8 +1365,18 @@
     const btnScan = document.getElementById('btn-scan-waves');
     if (btnScan) {
       btnScan.addEventListener('click', () => {
-        cancelRangeSelection();
-        runWaveAnalysis(currentSymbol, currentRange);
+        if (currentRange && currentRange.startTime && currentRange.endTime) {
+          runWaveAnalysis(currentSymbol, currentRange);
+        } else {
+          const btnDrag = document.getElementById('btn-drag-range');
+          if (btnDrag && !isSelectingRange) {
+            btnDrag.click();
+          }
+          const statusMsg = document.getElementById('wave-status-msg');
+          if (statusMsg) {
+            statusMsg.textContent = '💡 提示：请先在 4H 图表上单击起点与终点框选 2~750 根 K 线后再启动扫描研判';
+          }
+        }
       });
     }
 
@@ -1212,14 +1415,12 @@
       }
     });
 
-    // 重置全量分析按钮
+    // 重置全量分析按钮 - 重置回裸 K 线待选区状态
     const btnResetRange = document.getElementById('btn-reset-range');
     if (btnResetRange) {
       btnResetRange.addEventListener('click', () => {
         cancelRangeSelection();
-        currentRange = null;
-        updateRangeBanner(null, null);
-        runWaveAnalysis(currentSymbol, null);
+        loadChartCandles(currentSymbol);
       });
     }
 
@@ -1227,9 +1428,7 @@
     if (btnCancelRange) {
       btnCancelRange.addEventListener('click', () => {
         cancelRangeSelection();
-        currentRange = null;
-        updateRangeBanner(null, null);
-        runWaveAnalysis(currentSymbol, null);
+        loadChartCandles(currentSymbol);
       });
     }
 
@@ -1296,17 +1495,19 @@
     init: function () {
       initEvents();
       if (window.location.hash === '#wave-radar' || document.getElementById('view-wave-radar')?.classList.contains('active')) {
-        runWaveAnalysis(currentSymbol, currentRange);
+        loadChartCandles(currentSymbol);
       }
     },
     runAnalysis: runWaveAnalysis,
+    loadCandles: loadChartCandles,
+    clearState: clearWaveAnalysisState,
     updateTheme: updateTheme,
     onViewActivated: function () {
       if (!waveChart) {
         initChart();
       }
       if (currentBars.length === 0) {
-        runWaveAnalysis(currentSymbol, currentRange);
+        loadChartCandles(currentSymbol);
       } else {
         const container = document.getElementById('wave-chart-container');
         if (container && waveChart) {
