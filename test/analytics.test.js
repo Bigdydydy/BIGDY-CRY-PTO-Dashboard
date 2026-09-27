@@ -148,6 +148,29 @@ describe('Module 2: Dynamic GEX Engine', () => {
     assert.equal(sepExp.putWall, 65000);
     assert.ok(sepExp.totalGex > 0);
   });
+
+  test('Rolls front-month focus to next month end after current month expiry passes', () => {
+    const rollData = {
+      index_price: 77250,
+      by_expiry: {
+        '2OCT26': [{ strike: 78000, number: 1000000 }],
+        '30OCT26': [
+          { strike: 85000, number: 9000000 },
+          { strike: 70000, number: -6000000 }
+        ],
+        '27NOV26': [{ strike: 90000, number: 2000000 }],
+        '25DEC26': [{ strike: 100000, number: 5000000 }]
+      }
+    };
+    const result = analyzeDynamicGex(rollData, new Date('2026-09-27T09:00:00Z'));
+    const focused = result.focusedExpiries.map(e => e.expiry);
+    assert.ok(focused.includes('30OCT26'));
+    assert.ok(!focused.includes('2OCT26'));
+    assert.ok(!focused.includes('27NOV26'));
+    const oct = result.focusedExpiries.find(e => e.expiry === '30OCT26');
+    assert.equal(oct.categoryTag, '次月月底交割');
+    assert.equal(oct.callWall, 85000);
+  });
 });
 
 describe('Module 3: Block Trades & Iceberg Clustering', () => {
