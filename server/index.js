@@ -59,6 +59,19 @@ let activeRefreshPromise = null;
 const waveRateLimitMap = new Map();
 const waveKlineCache = new Map();
 
+// Module 9 波浪引擎支持的研判周期，以及各周期用于子浪结构验证的更低周期
+const WAVE_INTERVALS = ['15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d'];
+const WAVE_SUB_INTERVALS = {
+  '15m': ['5m', '1m'],
+  '30m': ['5m', '15m'],
+  '1h': ['5m', '15m'],
+  '2h': ['30m', '1h'],
+  '4h': ['15m', '1h'],
+  '6h': ['1h', '2h'],
+  '12h': ['2h', '4h'],
+  '1d': ['4h', '12h']
+};
+
 function checkWaveRateLimit(clientIp) {
   const now = Date.now();
   const windowMs = 60000;
@@ -511,8 +524,8 @@ async function handleApiRequest(req, res, parsedUrl) {
     }
 
     const interval = parsedUrl.query?.interval || '4h';
-    if (!['4h', '1h', '15m'].includes(interval)) {
-      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判限定 4h, 1h, 15m 时间框架' });
+    if (!WAVE_INTERVALS.includes(interval)) {
+      sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
       return;
     }
 
@@ -560,29 +573,32 @@ async function handleApiRequest(req, res, parsedUrl) {
 
     const startTime = payload.startTime || parsedUrl.query?.startTime || null;
     const endTime = payload.endTime || parsedUrl.query?.endTime || null;
+    const interval = (payload.interval || parsedUrl.query?.interval || '4h');
+    if (!WAVE_INTERVALS.includes(interval)) {
+      sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
+      return;
+    }
 
     try {
       const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
-      const bars4h = await fetchBinanceKlines(rawSymbol, '4h', 1000);
-      
-      let bars1h = [];
-      let bars15m = [];
-      try {
-        bars1h = await fetchBinanceKlines(rawSymbol, '1h', 1000);
-      } catch (e) {
-        // Fallback gracefully if 1h rate-limited
-      }
-      try {
-        bars15m = await fetchBinanceKlines(rawSymbol, '15m', 1000);
-      } catch (e) {
-        // Fallback gracefully if 15m rate-limited
+      const mainBars = await fetchBinanceKlines(rawSymbol, interval, 1000);
+
+      // 更低周期K线用于验证子浪内部结构（5浪/3浪），失败则降级为同周期细察
+      const subBars = {};
+      const subTfs = (WAVE_SUB_INTERVALS[interval] || []).slice(0, 2);
+      for (const tf of subTfs) {
+        try {
+          subBars[tf] = await fetchBinanceKlines(rawSymbol, tf, 1000);
+        } catch (e) {
+          // 低周期源不可用时跳过
+        }
       }
 
-      const analysis = analyzeWaves(bars4h, displaySymbol, {
+      const analysis = analyzeWaves(mainBars, displaySymbol, {
         startTime,
         endTime,
-        bars_1h: bars1h,
-        bars_15m: bars15m
+        timeframe: interval,
+        subBars
       });
 
       sendJsonResponse(req, res, 200, {

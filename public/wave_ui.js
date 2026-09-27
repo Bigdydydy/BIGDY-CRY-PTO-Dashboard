@@ -14,6 +14,7 @@
   let channelLowerSeries = null;
 
   let currentSymbol = 'BTC/USDT';
+  let currentTf = '4h';
   let currentBars = [];
   let currentAnalysis = null;
   let activeCandidateIndex = 0;
@@ -617,15 +618,15 @@
   }
 
   /**
-   * 抓取 4H 1000 根 K线 (优先币安 Futures 合约源)
+   * 抓取指定周期 1000 根 K线 (优先币安 Futures 合约源)
    */
-  async function fetch4hKlines(symbol) {
+  async function fetch4hKlines(symbol, tf = currentTf) {
     const cleanSymbol = symbol.replace(/[\/\-_]/g, '').toUpperCase();
     const urls = [
-      `/api/wave/klines?symbol=${cleanSymbol}&interval=4h&limit=1000`,
-      `https://fapi.binance.com/fapi/v1/klines?symbol=${cleanSymbol}&interval=4h&limit=1000`,
-      `https://data-api.binance.vision/api/v3/klines?symbol=${cleanSymbol}&interval=4h&limit=1000`,
-      `https://api.binance.com/api/v3/klines?symbol=${cleanSymbol}&interval=4h&limit=1000`
+      `/api/wave/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
+      `https://fapi.binance.com/fapi/v1/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
+      `https://data-api.binance.vision/api/v3/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
+      `https://api.binance.com/api/v3/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`
     ];
 
     let lastError = null;
@@ -793,7 +794,7 @@
 
     const thesisText = document.getElementById('wave-thesis-text');
     const bottomSignal = document.getElementById('wave-bottom-signal');
-    if (thesisText) thesisText.textContent = '请使用【🖱️ 框选分析模式】选择 4H K 线行情走势区间以生成柳玉冬实战研判结论。';
+    if (thesisText) thesisText.textContent = `请使用【🖱️ 框选分析模式】选择 ${currentTf.toUpperCase()} K 线行情走势区间以生成柳玉冬实战研判结论。`;
     if (bottomSignal) bottomSignal.textContent = '';
   }
 
@@ -802,10 +803,11 @@
    */
   async function loadChartCandles(symbol = currentSymbol) {
     currentSymbol = symbol;
+    const tfLabel = currentTf.toUpperCase();
     const hudSym = document.getElementById('hud-sym');
     const statusMsg = document.getElementById('wave-status-msg');
-    if (hudSym) hudSym.textContent = `${symbol} 4H`;
-    if (statusMsg) statusMsg.textContent = `正在拉取 ${symbol} 最新 4H K 线走势...`;
+    if (hudSym) hudSym.textContent = `${symbol} ${tfLabel}`;
+    if (statusMsg) statusMsg.textContent = `正在拉取 ${symbol} 最新 ${tfLabel} K 线走势...`;
 
     try {
       const { bars } = await fetch4hKlines(symbol);
@@ -837,7 +839,7 @@
       clearWaveAnalysisState();
 
       if (statusMsg) {
-        statusMsg.textContent = `● [${symbol} 4H] 行情已就绪 · 请点击上方【🖱️ 框选分析模式】选择 2~750 根 K 线开始智能研判`;
+        statusMsg.textContent = `● [${symbol} ${tfLabel}] 行情已就绪 · 请点击上方【🖱️ 框选分析模式】选择 2~750 根 K 线开始智能研判`;
       }
     } catch (err) {
       console.error('[Wave Load Error]:', err);
@@ -862,14 +864,15 @@
     const statusMsg = document.getElementById('wave-status-msg');
     const hudSym = document.getElementById('hud-sym');
 
-    if (hudSym) hudSym.textContent = `${symbol} 4H`;
+    const tfLabel = currentTf.toUpperCase();
+    if (hudSym) hudSym.textContent = `${symbol} ${tfLabel}`;
     if (btnScan) {
       btnScan.classList.add('loading');
       const textSpan = btnScan.querySelector('span');
       if (textSpan) textSpan.textContent = '分析研判中...';
     }
     if (statusMsg) {
-      statusMsg.textContent = `正在分析选定区间 [${symbol} 4H]...`;
+      statusMsg.textContent = `正在分析选定区间 [${symbol} ${tfLabel}]...`;
     }
 
     try {
@@ -896,6 +899,7 @@
       try {
         const queryParams = new URLSearchParams({
           symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase(),
+          interval: currentTf,
           startTime: rangeOptions.startTime,
           endTime: rangeOptions.endTime
         });
@@ -909,7 +913,7 @@
 
       if (!analysis || analysis.code !== 0) {
         if (!window.LiuWaveEngine) throw new Error('波浪计算引擎尚未就绪');
-        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, rangeOptions);
+        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, Object.assign({}, rangeOptions, { timeframe: currentTf }));
       }
 
       currentAnalysis = analysis;
@@ -930,7 +934,7 @@
 
       if (statusMsg) {
         const barsCount = analysis.selectedRange?.barsCount || rangeOptions.barsCount || 0;
-        statusMsg.textContent = `● 已完成 [${symbol} 4H] 选区 (${barsCount} 根 K 线) 深度研判 · 匹配出 ${analysis.candidates?.length || 0} 个合规浪型`;
+        statusMsg.textContent = `● 已完成 [${symbol} ${tfLabel}] 选区 (${barsCount} 根 K 线) 深度研判 · 匹配出 ${analysis.candidates?.length || 0} 个合规浪型`;
       }
     } catch (err) {
       console.error('[Wave Engine Error]:', err);
@@ -1349,7 +1353,7 @@
    */
   function initEvents() {
     // 标的切换 (BTC / ETH) - 仅加载对应标的的裸 K 线，等待用户选区
-    const symbolBtns = document.querySelectorAll('.wave-symbol-btn');
+    const symbolBtns = document.querySelectorAll('.wave-symbol-btn:not(.wave-tf-btn)');
     symbolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const sym = btn.dataset.symbol;
@@ -1357,6 +1361,22 @@
           symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
           cancelRangeSelection();
           loadChartCandles(sym);
+        }
+      });
+    });
+
+    // 周期切换 (15m / 1H / 4H / 1D) - 重新拉取对应周期 K 线，等待用户选区
+    const tfBtns = document.querySelectorAll('.wave-tf-btn');
+    tfBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tf = btn.dataset.interval;
+        if (tf && tf !== currentTf) {
+          currentTf = tf;
+          tfBtns.forEach(b => b.classList.toggle('active', b === btn));
+          const tfLabelEl = document.getElementById('wave-tf-label');
+          if (tfLabelEl) tfLabelEl.textContent = tf === '1d' ? '1D (日线)' : tf === '15m' ? '15m (15分钟)' : tf === '1h' ? '1H (1小时)' : '4H (4小时)';
+          cancelRangeSelection();
+          loadChartCandles(currentSymbol);
         }
       });
     });
@@ -1374,7 +1394,7 @@
           }
           const statusMsg = document.getElementById('wave-status-msg');
           if (statusMsg) {
-            statusMsg.textContent = '💡 提示：请先在 4H 图表上单击起点与终点框选 2~750 根 K 线后再启动扫描研判';
+            statusMsg.textContent = `💡 提示：请先在 ${currentTf.toUpperCase()} 图表上单击起点与终点框选 2~750 根 K 线后再启动扫描研判`;
           }
         }
       });

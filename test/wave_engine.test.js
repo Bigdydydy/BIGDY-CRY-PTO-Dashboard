@@ -4,9 +4,12 @@ const {
   findPivots,
   validateImpulseRules,
   analyzeWaves,
+  evaluatePattern,
   generateLiuCommentary
 } = require('../server/wave_engine');
 const { server } = require('../server/index');
+
+const P = (idx, price, type) => ({ idx, time: idx, price, type, confirmed: true });
 
 describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave Theory Engine)', () => {
 
@@ -72,6 +75,79 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     const overlap = validateImpulseRules(p0, p1, p2, p3, p4_overlap, null, true);
     assert.strictEqual(overlap.rule3_wave4_no_overlap, false);
     assert.strictEqual(overlap.passedAll, false);
+  });
+
+  it('手稿边界: 浪2回撤恰好100% (价格相等) 也否决 — P32', () => {
+    const exact = validateImpulseRules(
+      { price: 100, type: 'low' }, { price: 200, type: 'high' },
+      { price: 100, type: 'low' }, { price: 300, type: 'high' },
+      { price: 250, type: 'low' }, null, true);
+    assert.strictEqual(exact.rule1_wave2_retrace, false);
+    assert.strictEqual(exact.passedAll, false);
+  });
+
+  it('手稿硬规则: 浪3必须超过浪1终点 — P32/P40', () => {
+    // 浪3终点 180 未越过浪1终点 200
+    const res = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(10, 200, 'high'), P(20, 150, 'low'), P(30, 180, 'high')
+    ], null);
+    assert.ok(res.hardFails.some(f => f.id === 'M3'));
+  });
+
+  it('手稿硬规则: 浪4时间超过浪3的2倍即否决 — P43', () => {
+    const res = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(5, 200, 'high'), P(10, 150, 'low'),
+      P(15, 400, 'high'), P(40, 350, 'low')
+    ], null);
+    assert.ok(res.hardFails.some(f => f.id === 'M8'));
+  });
+
+  it('手稿硬规则: 平台形 b浪总量须≥a浪70% — P234', () => {
+    // a=40, b=20 (50% < 70%)
+    const res = evaluatePattern('FLAT', [
+      P(0, 100, 'high'), P(10, 60, 'low'), P(20, 80, 'high'), P(30, 55, 'low')
+    ], null);
+    assert.ok(res.hardFails.some(f => f.id === 'F1'));
+  });
+
+  it('手稿硬规则: 单锯齿 c浪须≥0.9×b浪, b浪不得越a起点 — P213', () => {
+    const shortC = evaluatePattern('ZIGZAG', [
+      P(0, 100, 'high'), P(10, 70, 'low'), P(20, 85, 'high'), P(30, 80, 'low')
+    ], null);
+    assert.ok(shortC.hardFails.some(f => f.id === 'Z3')); // c=5 < 0.9*15
+
+    const overB = evaluatePattern('ZIGZAG', [
+      P(0, 100, 'high'), P(10, 70, 'low'), P(20, 105, 'high'), P(30, 60, 'low')
+    ], null);
+    assert.ok(overB.hardFails.some(f => f.id === 'Z2')); // b越过a起点
+  });
+
+  it('手稿硬规则: 收缩三角形 c浪不得大于b浪 — P302', () => {
+    const res = evaluatePattern('TRIANGLE', [
+      P(0, 50, 'low'), P(10, 100, 'high'), P(20, 70, 'low'),
+      P(30, 105, 'high'), P(40, 75, 'low'), P(45, 90, 'high')
+    ], null);
+    assert.ok(res.hardFails.some(f => f.id === 'T4'));
+  });
+
+  it('手稿硬规则: 双锯齿 x浪终点不得越w浪起点, y浪>0.9×w — P362/P372', () => {
+    const badX = evaluatePattern('DOUBLE_ZIGZAG', [
+      P(0, 100, 'high'), P(10, 60, 'low'), P(20, 105, 'high'), P(30, 40, 'low')
+    ], null);
+    assert.ok(badX.hardFails.some(f => f.id === 'W2'));
+    const shortY = evaluatePattern('DOUBLE_ZIGZAG', [
+      P(0, 100, 'high'), P(10, 60, 'low'), P(20, 85, 'high'), P(30, 75, 'low')
+    ], null);
+    assert.ok(shortY.hardFails.some(f => f.id === 'W4')); // y=10 < 0.9*40
+  });
+
+  it('合规推动浪五段全部硬规则通过', () => {
+    const res = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(10, 200, 'high'), P(20, 150, 'low'),
+      P(35, 400, 'high'), P(45, 350, 'low'), P(60, 500, 'high')
+    ], null);
+    assert.strictEqual(res.hardFails.length, 0);
+    assert.ok(res.complete);
   });
 
   it('Pivot Finder: 生成严格交替的高低拐点序列并包含边界锚点', () => {
@@ -159,7 +235,7 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
           const resBadInterval = await fetch(`http://127.0.0.1:${port}/api/wave/klines?symbol=BTCUSDT&interval=1m`);
           assert.strictEqual(resBadInterval.status, 400);
           const jsonBadInterval = await resBadInterval.json();
-          assert.ok(jsonBadInterval.error.includes('限定 4h, 1h, 15m'));
+          assert.ok(jsonBadInterval.error.includes('时间框架'));
         } finally {
           server.close(resolve);
         }
@@ -230,12 +306,73 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
       });
     }
 
-    const tStart = bars[10].time;
+    const tStart = bars[0].time;
     const tEnd = bars[35].time;
     const res = analyzeWaves(bars, 'BTC/USDT', { startTime: tStart, endTime: tEnd });
-    assert.strictEqual(res.selectedRange.barsCount, 26);
+    assert.strictEqual(res.selectedRange.barsCount, 36);
     assert.ok(res.originAnalysis);
     assert.ok(res.originAnalysis.originType);
     assert.ok(res.candidates.length > 0);
+  });
+
+  it('Wave Engine 诚实性: 不编造子浪拐点，subPivots 全部来自真实K线时间', () => {
+    const bars = [];
+    const points = [100, 70, 88, 65];
+    let t = 1700000000;
+    for (let s = 0; s < points.length - 1; s++) {
+      for (let i = 0; i < 25; i++) {
+        const p = points[s] + (points[s + 1] - points[s]) * (i / 25);
+        bars.push({ time: t, open: p, high: p + 1, low: p - 1, close: p + 0.2, volume: 200 });
+        t += 14400;
+      }
+    }
+    const times = new Set(bars.map(b => b.time));
+    const res = analyzeWaves(bars, 'ETH/USDT');
+    for (const c of res.candidates) {
+      for (const sp of (c.subPivots || [])) {
+        assert.ok(times.has(sp.time), '子浪拐点必须来自真实K线，不允许按比例插值生成');
+      }
+    }
+  });
+
+  it('联合形(P50): x浪必须回撤w浪70%以上，运行总量不得超过1.5倍', () => {
+    const w = [P(0, 100, 'high'), P(10, 60, 'low')]; // w = 40
+    const tooSmall = evaluatePattern('COMBINATION', [w[0], w[1], P(20, 78, 'high'), P(30, 55, 'low')], null); // x=18=0.45w
+    assert.ok(tooSmall.hardFails.some(r => r.id === 'C1'), 'x浪仅回撤45%应违反P50的70%铁律');
+
+    const tooBig = evaluatePattern('COMBINATION', [w[0], w[1], P(20, 124, 'high'), P(30, 58, 'low')], null); // x=64=1.6w
+    assert.ok(tooBig.hardFails.some(r => r.id === 'C2'), 'x浪运行总量超1.5倍w应违反P301');
+
+    const valid = evaluatePattern('COMBINATION', [w[0], w[1], P(20, 92, 'high'), P(30, 58, 'low')], null); // x=32=0.8w
+    assert.strictEqual(valid.hardFails.length, 0, 'x浪0.8倍回撤应通过全部硬规则');
+  });
+
+  it('联合形(P297): x浪时间超过w浪10倍即否决', () => {
+    const res = evaluatePattern('COMBINATION',
+      [P(0, 100, 'high'), P(2, 60, 'low'), P(25, 92, 'high'), P(30, 58, 'low')], null); // x时间23 > 2×10
+    assert.ok(res.hardFails.some(r => r.id === 'C3'), 'x浪时间超限应违反时间铁律');
+  });
+
+  it('三重横向整理(P51): xx浪必须回撤y浪70%以上', () => {
+    const bad = evaluatePattern('TRIPLE_COMBINATION',
+      [P(0, 100, 'high'), P(10, 60, 'low'), P(20, 95, 'high'), P(30, 55, 'low'), P(40, 80, 'high'), P(45, 58, 'low')], null); // xx=25=0.625y
+    assert.ok(bad.hardFails.some(r => r.id === 'C5'), 'xx浪仅回撤62.5%应违反P51');
+
+    const ok = evaluatePattern('TRIPLE_COMBINATION',
+      [P(0, 100, 'high'), P(10, 60, 'low'), P(20, 95, 'high'), P(30, 55, 'low'), P(40, 92, 'high'), P(45, 60, 'low')], null); // xx=37=0.925y
+    assert.strictEqual(ok.hardFails.length, 0, 'xx浪92.5%回撤应通过全部硬规则');
+  });
+
+  it('联合形指引(P50/P131): y≈w且箱型外观得分更高，不进入blockers', () => {
+    const boxy = evaluatePattern('COMBINATION', [P(0, 100, 'high'), P(10, 60, 'low'), P(20, 95, 'high'), P(30, 62, 'low')], null);
+    const drifted = evaluatePattern('COMBINATION', [P(0, 100, 'high'), P(10, 60, 'low'), P(20, 95, 'high'), P(30, 20, 'low')], null);
+    assert.ok(boxy.guide.weightGot > drifted.guide.weightGot, '箱型外观+y≈w应获得更高指引分');
+    assert.ok(drifted.guide.fail > 0 && drifted.hardFails.length === 0, '指引失败不应升级为硬规则否决');
+  });
+
+  it('收缩三角形(P299): c浪等于b浪也不允许（须严格小于）', () => {
+    const eq = evaluatePattern('TRIANGLE',
+      [P(0, 100, 'low'), P(10, 160, 'high'), P(20, 80, 'low'), P(30, 160, 'high'), P(40, 85, 'low'), P(50, 140, 'high')], null); // c=80=b
+    assert.ok(eq.hardFails.some(r => r.id === 'T4'), 'c浪等于b浪应按P299否决');
   });
 });
