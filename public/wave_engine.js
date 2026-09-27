@@ -619,26 +619,39 @@
     return true;
   }
 
-  /** 在交替拐点序列 zp 上寻找覆盖全段的合规五浪计数 (允许跳点) */
+  /** 在交替拐点序列 zp 上寻找覆盖全段的合规五浪计数 (允许跳点，严控防爆搜预算) */
   function findMotiveCount(zp) {
     const N = zp.length;
     if (N < 6) return false;
-    const last = N - 1;
+    let arr = zp;
+    if (N > 24) {
+      const inner = zp.slice(1, N - 1);
+      inner.sort((a, b) => Math.abs(b.price - zp[0].price) - Math.abs(a.price - zp[0].price));
+      const chosen = [zp[0]].concat(inner.slice(0, 22)).concat([zp[N - 1]]);
+      chosen.sort((a, b) => a.time - b.time);
+      arr = chosen;
+    }
+    const len = arr.length;
+    const last = len - 1;
     const path = [0];
+    let budget = 2000;
+
     function rec(cur) {
+      if (--budget <= 0) return false;
       if (path.length === 5) {
         if (((last - cur) & 1) === 0) return false;
-        const pts = path.concat([last]).map(i => zp[i]);
+        const pts = path.concat([last]).map(i => arr[i]);
         return motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL');
       }
       for (let j = cur + 1; j < last; j++) {
         if (((j - cur) & 1) === 0) continue;
         path.push(j);
-        const pts = path.map(i => zp[i]);
+        const pts = path.map(i => arr[i]);
         if (motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL')) {
           if (rec(j)) return true;
         }
         path.pop();
+        if (budget <= 0) return false;
       }
       return false;
     }

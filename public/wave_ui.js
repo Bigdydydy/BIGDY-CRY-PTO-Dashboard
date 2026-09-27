@@ -928,12 +928,14 @@
           queryParams.append('startTime', rangeOptions.startTime);
           queryParams.append('endTime', rangeOptions.endTime);
         }
-        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`);
+        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, {
+          signal: AbortSignal.timeout(8000)
+        });
         if (apiResp.ok) {
           analysis = await apiResp.json();
         }
       } catch (e) {
-        // 后端若不可用则降级至客户端 UMD 引擎
+        // 后端若超时或不可用则降级至客户端 UMD 引擎 (极速稳定，绝不卡死页面)
       }
 
       if (!analysis || analysis.code !== 0) {
@@ -1583,7 +1585,7 @@
       });
     });
 
-    // 周期切换 (15m / 1H / 4H / 1D) - 重新拉取周期 K 线并实时重新解算波浪
+    // 周期切换 (15m / 1H / 4H) - 重新拉取周期 K 线并实时重新解算波浪
     const tfBtns = document.querySelectorAll('.wave-tf-btn');
     tfBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1592,7 +1594,7 @@
           currentTf = tf;
           tfBtns.forEach(b => b.classList.toggle('active', b === btn));
           const tfLabelEl = document.getElementById('wave-tf-label');
-          if (tfLabelEl) tfLabelEl.textContent = tf === '1d' ? '1D (日线)' : tf === '15m' ? '15m (15分钟)' : tf === '1h' ? '1H (1小时)' : '4H (4小时)';
+          if (tfLabelEl) tfLabelEl.textContent = tf === '15m' ? '15m (15分钟)' : tf === '1h' ? '1H (1小时)' : '4H (4小时)';
           cancelRangeSelection();
           currentRange = null;
           updateRangeBanner(null, null);

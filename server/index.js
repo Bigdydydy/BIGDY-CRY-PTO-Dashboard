@@ -59,28 +59,17 @@ let activeRefreshPromise = null;
 const waveRateLimitMap = new Map();
 const waveKlineCache = new Map();
 
-// Module 9 波浪引擎支持的研判周期，以及各周期用于子浪结构验证的更低周期
-const WAVE_INTERVALS = ['15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w'];
+// Module 9 波浪引擎支持的研判周期，严格限定为 15m / 1h / 4h (方案 B 主路径)
+const WAVE_INTERVALS = ['15m', '1h', '4h'];
 const WAVE_SUB_INTERVALS = {
-  '15m': ['5m', '1m'],
-  '30m': ['5m', '15m'],
-  '1h': ['5m', '15m'],
-  '2h': ['30m', '1h'],
-  '4h': ['15m', '1h'],
-  '6h': ['1h', '2h'],
-  '12h': ['2h', '4h'],
-  '1d': ['4h', '12h'],
-  '1w': ['1d', '3d']
+  '15m': [],
+  '1h': ['15m'],
+  '4h': ['1h', '15m']
 };
 const WAVE_HTF_INTERVALS = {
   '15m': ['1h', '4h'],
-  '30m': ['2h', '4h'],
   '1h': ['4h', '1d'],
-  '2h': ['6h', '1d'],
-  '4h': ['1d', '1w'],
-  '6h': ['1d', '1w'],
-  '12h': ['1d', '1w'],
-  '1d': ['1w']
+  '4h': ['1d', '1w']
 };
 
 function checkWaveRateLimit(clientIp) {
@@ -592,29 +581,20 @@ async function handleApiRequest(req, res, parsedUrl) {
 
     try {
       const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
-      const mainBars = await fetchBinanceKlines(rawSymbol, interval, 1000);
-
-      // 更低周期K线用于验证子浪内部结构（5浪/3浪），失败则降级为同周期细察
-      const subBars = {};
       const subTfs = (WAVE_SUB_INTERVALS[interval] || []).slice(0, 2);
-      for (const tf of subTfs) {
-        try {
-          subBars[tf] = await fetchBinanceKlines(rawSymbol, tf, 1000);
-        } catch (e) {
-          // 低周期源不可用时跳过
-        }
-      }
-
-      // 更高周期K线用于 MTF 跨周期共振验证 (如 4H 联动 1D/1W, 15m 联动 1H/4H)
-      const htfBars = {};
       const htfTfs = (WAVE_HTF_INTERVALS[interval] || []).slice(0, 2);
-      for (const tf of htfTfs) {
-        try {
-          htfBars[tf] = await fetchBinanceKlines(rawSymbol, tf, 200);
-        } catch (e) {
-          // 高周期源不可用时跳过
-        }
-      }
+
+      // 并发并行抓取主周期 + 子周期 + 宏观高周期 K 线，防止串行请求导致延迟累加
+      const [mainBars, subResults, htfResults] = await Promise.all([
+        fetchBinanceKlines(rawSymbol, interval, 1000),
+        Promise.all(subTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 1000).catch(() => null))),
+        Promise.all(htfTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 200).catch(() => null)))
+      ]);
+
+      const subBars = {};
+      subTfs.forEach((tf, i) => { if (subResults[i]) subBars[tf] = subResults[i]; });
+      const htfBars = {};
+      htfTfs.forEach((tf, i) => { if (htfResults[i]) htfBars[tf] = htfResults[i]; });
 
       const analysis = analyzeWaves(mainBars, displaySymbol, {
         startTime,
