@@ -2230,8 +2230,81 @@
 
       <!-- Module 9: 柳玉冬波浪理论智能研判系统 (Wave Radar View) -->
       <div class="view-panel" id="view-wave-radar">
-        <!-- Control & Indicator Bar -->
-        <div class="wave-control-bar">
+        <section class="bento-card wave-hero-card" id="module-wave-radar">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-module-tag">09 ELLIOTT WAVE THEORY &amp; LIU YUDONG RADAR</span>
+              <h2>柳玉冬波浪理论智能研判系统 (4H 基准 · 币安合约)</h2>
+              <span class="card-subtitle-inline">三大铁律严格核验 • “出身决定命运”微观穿透 (1H/15m) • 艾略特通道 • 关键监测点 • 并列候选浪型推演</span>
+            </div>
+            <div class="header-controls">
+              <div class="tp-header-badges">
+                <span class="tp-regime-pill" id="wave-header-regime-pill">-- 扫描中</span>
+                <span class="tp-score-pill" id="wave-header-score-pill">最高匹配: --分</span>
+                <span class="tz-badge" id="wave-update-time">更新中... (UTC+8)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- 5-KPI Top Scorecard Grid -->
+            <div class="wave-kpi-grid">
+              <!-- KPI 1: Primary Pattern -->
+              <div class="bento-card wave-kpi-card">
+                <div class="kpi-card-header">
+                  <span class="kpi-label">最优主导浪型</span>
+                  <span class="kpi-badge" id="kpi-wave-primary-badge">研判中</span>
+                </div>
+                <div class="kpi-main-val" id="kpi-wave-primary-name" style="font-size: 1.12rem; font-weight: 700;">--</div>
+                <div class="kpi-sub-meta" id="kpi-wave-primary-cat">形态与演进阶段</div>
+              </div>
+
+              <!-- KPI 2: Composite Score -->
+              <div class="bento-card wave-kpi-card">
+                <div class="kpi-card-header">
+                  <span class="kpi-label">综合匹配得分</span>
+                  <span class="kpi-badge">六维置信度</span>
+                </div>
+                <div class="kpi-main-val text-pos" id="kpi-wave-primary-score">-- 分</div>
+                <div class="kpi-meter-bar">
+                  <div class="kpi-meter-fill" id="kpi-wave-score-bar" style="width: 50%;"></div>
+                </div>
+                <div class="kpi-sub-meta">铁律50% + 出身15% + 斐波15% + 通道10% + 对称10%</div>
+              </div>
+
+              <!-- KPI 3: Key Monitoring Pivot -->
+              <div class="bento-card wave-kpi-card">
+                <div class="kpi-card-header">
+                  <span class="kpi-label">核心监测点生命线</span>
+                  <span class="kpi-badge" style="color: var(--accent-primary);">做底/反转基准</span>
+                </div>
+                <div class="kpi-main-val text-highlight" id="kpi-wave-pivot-price">$--,---</div>
+                <div class="kpi-sub-meta" id="kpi-wave-pivot-status">跌破或突破即宣布原浪型终结</div>
+              </div>
+
+              <!-- KPI 4: Micro Origin Verification -->
+              <div class="bento-card wave-kpi-card">
+                <div class="kpi-card-header">
+                  <span class="kpi-label">“出身决定命运”微观校验</span>
+                  <span class="kpi-badge">1H/15m 穿透</span>
+                </div>
+                <div class="kpi-main-val" id="kpi-wave-origin-status" style="font-size: 1.05rem;">--</div>
+                <div class="kpi-sub-meta" id="kpi-wave-origin-desc">起步第一笔内部微观结构判定</div>
+              </div>
+
+              <!-- KPI 5: Primary Scenario Probability -->
+              <div class="bento-card wave-kpi-card">
+                <div class="kpi-card-header">
+                  <span class="kpi-label">第一情景推演概率</span>
+                  <span class="kpi-badge">推演倾向</span>
+                </div>
+                <div class="kpi-main-val text-cyan" id="kpi-wave-scenario-prob">--%</div>
+                <div class="kpi-sub-meta" id="kpi-wave-scenario-name">主推方案演进倾向</div>
+              </div>
+            </div>
+
+            <!-- Control & Indicator Bar -->
+            <div class="wave-control-bar">
           <div class="wave-control-left">
             <div class="wave-symbol-group" role="group" aria-label="选择标的">
               <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
@@ -2445,8 +2518,9 @@
               </div>
             </div>
           </div>
-        </div>
-      </div> <!-- /#view-wave-radar -->
+        </div> <!-- /.card-body -->
+      </section> <!-- /#module-wave-radar -->
+    </div> <!-- /#view-wave-radar -->
 
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->

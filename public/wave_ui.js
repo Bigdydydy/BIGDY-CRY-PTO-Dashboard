@@ -54,12 +54,61 @@
     };
   }
 
+  let chartMarkersPrimitive = null;
+
+  /**
+   * 兼容 LightweightCharts v4 (chart.addCandlestickSeries) 与 v5 (chart.addSeries(CandlestickSeries))
+   */
+  function safeCreateSeries(chart, typeName, options) {
+    if (!chart || !window.LightweightCharts) return null;
+    // 1. 若支持 v4 快捷直接方法
+    if (typeName === 'Candlestick' && typeof chart.addCandlestickSeries === 'function') {
+      return chart.addCandlestickSeries(options);
+    }
+    if (typeName === 'Histogram' && typeof chart.addHistogramSeries === 'function') {
+      return chart.addHistogramSeries(options);
+    }
+    if (typeName === 'Line' && typeof chart.addLineSeries === 'function') {
+      return chart.addLineSeries(options);
+    }
+
+    // 2. 支持 v5 统一 addSeries(Constructor, options) 规范
+    const SeriesConstructor = window.LightweightCharts[`${typeName}Series`];
+    if (SeriesConstructor && typeof chart.addSeries === 'function') {
+      return chart.addSeries(SeriesConstructor, options);
+    }
+
+    console.warn(`[Wave UI] Unable to add series type ${typeName}`);
+    return null;
+  }
+
+  /**
+   * 兼容 LightweightCharts v4 (series.setMarkers) 与 v5 (createSeriesMarkers)
+   */
+  function setChartMarkers(series, markers) {
+    if (!series) return;
+    const m = markers || [];
+    if (typeof series.setMarkers === 'function') {
+      series.setMarkers(m);
+      return;
+    }
+    if (window.LightweightCharts && typeof window.LightweightCharts.createSeriesMarkers === 'function') {
+      if (!chartMarkersPrimitive) {
+        chartMarkersPrimitive = window.LightweightCharts.createSeriesMarkers(series, m);
+      } else {
+        chartMarkersPrimitive.setMarkers(m);
+      }
+    }
+  }
+
   /**
    * 初始化 Lightweight Charts 实例
    */
   function initChart() {
     const container = document.getElementById('wave-chart-container');
     if (!container || !window.LightweightCharts) return;
+
+    chartMarkersPrimitive = null;
 
     // 清空历史容器
     container.innerHTML = `
@@ -118,7 +167,7 @@
     });
 
     // 烛台主图
-    const candles = chart.addCandlestickSeries({
+    const candles = safeCreateSeries(chart, 'Candlestick', {
       upColor: colors.upColor,
       downColor: colors.downColor,
       borderUpColor: colors.upColor,
@@ -128,7 +177,7 @@
     });
 
     // 成交量副图 (位于底部)
-    const volume = chart.addHistogramSeries({
+    const volume = safeCreateSeries(chart, 'Histogram', {
       color: colors.volUpColor,
       priceFormat: { type: 'volume' },
       priceScaleId: '', // overlay
@@ -136,7 +185,7 @@
     });
 
     // 艾略特通道模块轨线 (上轨与下轨)
-    const channelUpper = chart.addLineSeries({
+    const channelUpper = safeCreateSeries(chart, 'Line', {
       color: colors.channelColor,
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Solid,
@@ -145,7 +194,7 @@
       crosshairMarkerVisible: false
     });
 
-    const channelLower = chart.addLineSeries({
+    const channelLower = safeCreateSeries(chart, 'Line', {
       color: colors.channelColor,
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Solid,
@@ -155,7 +204,7 @@
     });
 
     // 次级嵌套子浪折线 (细虚线，天蓝色)
-    const subwave = chart.addLineSeries({
+    const subwave = safeCreateSeries(chart, 'Line', {
       color: colors.subwaveColor,
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -165,7 +214,7 @@
     });
 
     // 大级别宏观波浪分笔折线 (主折线，亮橙色)
-    const zigzag = chart.addLineSeries({
+    const zigzag = safeCreateSeries(chart, 'Line', {
       color: colors.zigzagColor,
       lineWidth: 2,
       lineStyle: LightweightCharts.LineStyle.Solid,
@@ -598,7 +647,7 @@
   function applyMarkers(cand) {
     if (!candleSeries) return;
     if (!showMarkers || !cand || !cand.pivots) {
-      candleSeries.setMarkers([]);
+      setChartMarkers(candleSeries, []);
       return;
     }
 
@@ -635,7 +684,7 @@
 
     // 按时间排序
     markers.sort((a, b) => a.time - b.time);
-    candleSeries.setMarkers(markers);
+    setChartMarkers(candleSeries, markers);
   }
 
   /**
@@ -720,6 +769,60 @@
    */
   function updateActiveMetrics(cand) {
     const curP = currentAnalysis?.currentPrice || 0;
+
+    // 1. 同步顶部 Header 徽章与状态
+    const headerRegime = document.getElementById('wave-header-regime-pill');
+    const headerScore = document.getElementById('wave-header-score-pill');
+    const headerTime = document.getElementById('wave-update-time');
+
+    if (headerRegime) headerRegime.textContent = `${cand.name} (${cand.category})`;
+    if (headerScore) headerScore.textContent = `匹配得分: ${cand.score}分`;
+    if (headerTime) {
+      headerTime.textContent = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (UTC+8)';
+    }
+
+    // 2. 同步顶部 5-KPI 标准看板 (对齐 Studio K95 设计规范)
+    const kpiName = document.getElementById('kpi-wave-primary-name');
+    const kpiBadge = document.getElementById('kpi-wave-primary-badge');
+    const kpiCat = document.getElementById('kpi-wave-primary-cat');
+    if (kpiName) kpiName.textContent = cand.name;
+    if (kpiBadge) kpiBadge.textContent = cand.category || '形态已确认';
+    if (kpiCat) kpiCat.textContent = cand.currentWave || '波浪演化中';
+
+    const kpiScore = document.getElementById('kpi-wave-primary-score');
+    const kpiScoreBar = document.getElementById('kpi-wave-score-bar');
+    if (kpiScore) kpiScore.textContent = `${cand.score} 分`;
+    if (kpiScoreBar) kpiScoreBar.style.width = `${Math.min(100, Math.max(10, cand.score))}%`;
+
+    const kpiPivotPrice = document.getElementById('kpi-wave-pivot-price');
+    const kpiPivotStatus = document.getElementById('kpi-wave-pivot-status');
+    if (cand.monitoringPivot) {
+      if (kpiPivotPrice) kpiPivotPrice.textContent = `$${cand.monitoringPivot.price.toLocaleString()}`;
+      if (kpiPivotStatus) kpiPivotStatus.textContent = cand.monitoringPivot.levelName || '关键生命线';
+    }
+
+    const kpiOriginStatus = document.getElementById('kpi-wave-origin-status');
+    const kpiOriginDesc = document.getElementById('kpi-wave-origin-desc');
+    if (currentAnalysis?.originAnalysis) {
+      const orig = currentAnalysis.originAnalysis;
+      if (kpiOriginStatus) {
+        kpiOriginStatus.textContent = orig.originType === 'IMPULSE_5W' ? '纯正五浪推动' : '调整浪折返';
+        kpiOriginStatus.style.color = orig.isImpulse ? 'var(--color-pos)' : 'var(--text-secondary)';
+      }
+      if (kpiOriginDesc) {
+        kpiOriginDesc.textContent = orig.isImpulse ? '微观五浪分笔完备 · 驱动基因' : '微观为三浪修正 · 防假突破洗盘';
+      }
+    }
+
+    const kpiScenProb = document.getElementById('kpi-wave-scenario-prob');
+    const kpiScenName = document.getElementById('kpi-wave-scenario-name');
+    if (currentAnalysis?.scenarios && currentAnalysis.scenarios.length > 0) {
+      const topScen = currentAnalysis.scenarios[0];
+      if (kpiScenProb) kpiScenProb.textContent = `概率 ${topScen.probability}%`;
+      if (kpiScenName) kpiScenName.textContent = topScen.name;
+    }
+
+    // 3. 更新右侧主浪型卡片详情
     const elWaveName = document.getElementById('wave-regime-name');
     const elWaveBadge = document.getElementById('wave-regime-badge');
     const elWaveCur = document.getElementById('wave-current-stage');

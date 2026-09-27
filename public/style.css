@@ -4812,6 +4812,48 @@ body {
    Module 9: 柳玉冬波浪理论智能研判系统 (Wave Radar & Lightweight Charts)
    ========================================================================== */
 
+.wave-hero-card {
+  margin-bottom: 24px;
+}
+
+.wave-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1200px) {
+  .wave-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .wave-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wave-kpi-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 125px;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.wave-kpi-card:hover {
+  border-color: var(--accent-primary-border);
+  transform: translateY(-1px);
+}
+
 .wave-control-bar {
   display: flex;
   align-items: center;
