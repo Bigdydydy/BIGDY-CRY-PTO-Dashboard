@@ -1410,6 +1410,10 @@
       }
     }
 
+    cand.rawScore = s;
+    cand.coveragePct = Math.min(100, Math.round((cand.span / (sliceLen || 1)) * 100));
+    cand.degreeLabel = cand.coveragePct >= 60 ? '宏观主浪' : (cand.coveragePct >= 35 ? '中波段' : '末段次浪');
+
     return Math.max(1, Math.min(99, Math.round(s)));
   }
 
@@ -1780,12 +1784,36 @@
       cands.push(cand);
     }
 
-    cands.sort((a, b) => (b.score - a.score) || (b.span - a.span));
+    cands.sort((a, b) => {
+      // 1. 显示分数优先
+      if (b.score !== a.score) return b.score - a.score;
+      // 2. 磁吸在真实极值锚点者绝对优先 (真底胜过假底)
+      if (!!b.snappedToExtreme !== !!a.snappedToExtreme) return b.snappedToExtreme ? 1 : -1;
+      // 3. 顺应选区主导方向者优先 (例如多头主导下上升推动优先)
+      if (rangeExtrema && rangeExtrema.dominantDirection) {
+        const bDirMatch = b.direction === rangeExtrema.dominantDirection;
+        const aDirMatch = a.direction === rangeExtrema.dominantDirection;
+        if (bDirMatch !== aDirMatch) return bDirMatch ? 1 : -1;
+      }
+      // 4. rawScore (含未封顶的指引加成与背景契合分)
+      if (Math.abs((b.rawScore || 0) - (a.rawScore || 0)) > EPS) return (b.rawScore || 0) - (a.rawScore || 0);
+      // 5. 跨度覆盖
+      return b.span - a.span;
+    });
+
+    // 指纹去重: 同名形态且首尾端点一致的孪生形态进行合并，避免挤占并列候选席位
+    const seenSignatures = new Set();
     const perType = {};
     const final = [];
     for (const c of cands) {
+      const p0Time = c.pivots[0]?.time;
+      const pEndTime = c.pivots[c.pivots.length - 1]?.time;
+      const sig = `${c.name}|${p0Time}|${pEndTime}`;
+      if (seenSignatures.has(sig)) continue;
+      seenSignatures.add(sig);
+
       perType[c.baseType] = (perType[c.baseType] || 0) + 1;
-      if (perType[c.baseType] <= 3 && final.length < 8) final.push(c);
+      if (perType[c.baseType] <= 2 && final.length < 8) final.push(c);
     }
     result.candidates = final;
     result.pattern = final[0] || null;

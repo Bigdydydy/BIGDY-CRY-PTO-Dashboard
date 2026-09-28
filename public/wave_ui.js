@@ -1282,16 +1282,20 @@
       return;
     }
 
-    container.innerHTML = cands.map((c, i) => `
+    container.innerHTML = cands.map((c, i) => {
+      const snapTag = c.snappedToExtreme ? '<span class="candidate-snap-tag" style="color:var(--accent-primary);font-size:0.65rem;font-weight:700;margin-left:4px;">🎯极值磁吸</span>' : '';
+      const covTag = c.degreeLabel ? `<span class="candidate-cov-tag" style="font-size:0.65rem;color:var(--text-muted);margin-left:4px;">[${c.degreeLabel}·${c.coveragePct}%]</span>` : '';
+      return `
       <div class="candidate-card ${i === activeCandidateIndex ? 'active' : ''}" data-idx="${i}">
         <div class="candidate-card-header">
-          <span>${c.name}</span>
+          <span style="font-weight:600;">${c.name}</span>
           <span class="candidate-score-badge">${c.score} 分</span>
         </div>
-        <div class="candidate-sub-desc">${c.category} · ${c.currentWave}</div>
+        <div class="candidate-sub-desc">${c.category} · ${c.currentWave} ${covTag} ${snapTag}</div>
         <div class="candidate-pivot-line">监测点: $${c.monitoringPivot?.price?.toLocaleString() || '--'} (${c.monitoringPivot?.levelName || '生命线'})</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // 点击卡片切换图表与详情
     container.querySelectorAll('.candidate-card').forEach(el => {
@@ -1423,6 +1427,35 @@
           </div>
         `;
       }).join('');
+    }
+
+    // 4. 同步更新底部柳玉冬实战研判解读与监测点信号
+    if (window.LiuWaveEngine && typeof window.LiuWaveEngine.generateLiuCommentary === 'function') {
+      const activeCommentary = window.LiuWaveEngine.generateLiuCommentary(
+        cand,
+        curP,
+        currentAnalysis?.symbol || currentSymbol,
+        currentAnalysis?.timeframe || currentTf,
+        currentAnalysis
+      );
+      const elThesis = document.getElementById('wave-thesis-text');
+      const elBottomSignal = document.getElementById('wave-bottom-signal');
+      if (elThesis && activeCommentary) elThesis.textContent = activeCommentary.thesis;
+      if (elBottomSignal && activeCommentary) elBottomSignal.textContent = activeCommentary.bottomTopSignal;
+    }
+
+    // 5. 动态穿透检测选中候选首浪的出身
+    if (window.LiuWaveEngine && typeof window.LiuWaveEngine.analyzeOrigin === 'function' && currentBars && currentBars.length > 0) {
+      const activeOrig = window.LiuWaveEngine.analyzeOrigin(cand, { bars: currentBars });
+      const originBadge = document.getElementById('wave-origin-badge');
+      const originText = document.getElementById('wave-origin-text');
+      if (activeOrig) {
+        if (originBadge) {
+          originBadge.textContent = activeOrig.originType === 'IMPULSE_5W' ? '纯正五浪推动' : '调整浪折返';
+          originBadge.className = `card-badge ${activeOrig.isImpulse ? 'badge-bull' : 'badge-neutral'}`;
+        }
+        if (originText) originText.textContent = activeOrig.text || '';
+      }
     }
   }
 
