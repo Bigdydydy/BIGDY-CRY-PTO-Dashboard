@@ -488,10 +488,10 @@
       }
 
       const count = Math.abs(targetIdx - selectionStartPoint.index) + 1;
-      if (count < 2) {
+      if (count < 10) {
         const statusMsg = document.getElementById('wave-status-msg');
         if (statusMsg) {
-          statusMsg.textContent = '⚠️ 起点与终点不能相同，请选择包含至少 2 根 K 线的有效区间';
+          statusMsg.textContent = '⚠️ 选区过短，请框选至少 10 根 K 线的区间（引擎需足够上下文识别浪位）';
         }
         return;
       }
@@ -723,7 +723,7 @@
       kpiBadge.textContent = '待选区';
       kpiBadge.className = 'kpi-badge';
     }
-    if (kpiCat) kpiCat.textContent = '请点击【🖱️ 框选分析模式】选取 2~750 根 K 线';
+    if (kpiCat) kpiCat.textContent = '请点击【🖱️ 框选分析模式】选取 10~750 根 K 线';
 
     const kpiScore = document.getElementById('kpi-wave-primary-score');
     const kpiScoreBar = document.getElementById('kpi-wave-score-bar');
@@ -759,7 +759,7 @@
           <span class="idle-icon">🎯</span>
           <div class="idle-title">等待框选分析</div>
           <p class="idle-desc">
-            请点击上方 <strong>【🖱️ 框选分析模式】</strong>，在 4H 图表中单击起点并移动至终点（2 ~ 750 根 K 线），系统将对所选范围执行三大铁律与并列形态研判。
+            请点击上方 <strong>【🖱️ 框选分析模式】</strong>，在图表中单击起点并移动至终点（10 ~ 750 根 K 线）。选区是观察窗口而非浪的边界——引擎会自动向左扩展上下文研判浪位。
           </p>
         </div>
       `;
@@ -862,8 +862,12 @@
         });
       }
 
-      // 自动执行该标的与周期的波浪研判 (若有框选则研判选区，若无选区则全景研判)
-      await runWaveAnalysis(symbol, currentRange);
+      // 入场不自动数浪：浪的起点应由用户意图决定——
+      // 「框选」后按选区研判，或点「智能研判」解算全量当前浪位
+      clearWaveAnalysisState();
+      if (statusMsg) {
+        statusMsg.textContent = `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 开启「框选分析」指定区间，或点击「智能研判」解算全量浪位`;
+      }
 
     } catch (err) {
       console.error('[Wave Load Error]:', err);
@@ -973,8 +977,10 @@
 
       if (statusMsg) {
         const barsCount = analysis.selectedRange?.barsCount || (isCustomSlice ? rangeOptions.barsCount : currentBars.length);
+        const ctxBars = analysis.selectedRange?.contextBars || 0;
         const candCount = analysis.candidates?.length || 0;
-        statusMsg.textContent = `● [${symbol} ${tfLabel}] 研判就绪 (${barsCount} 根 K 线) · 识别出 ${candCount} 个合规浪型 · MTF: ${analysis.mtf?.alignmentLabel || '中性'}`;
+        const ctxNote = ctxBars > 0 ? `+左扩${ctxBars}根上下文` : '';
+        statusMsg.textContent = `● [${symbol} ${tfLabel}] 研判就绪 (${barsCount} 根 K 线${ctxNote}) · 识别出 ${candCount} 个合规浪型 · MTF: ${analysis.mtf?.alignmentLabel || '中性'}`;
       }
     } catch (err) {
       console.error('[Wave Engine Error]:', err);

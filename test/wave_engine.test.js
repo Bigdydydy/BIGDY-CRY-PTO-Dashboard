@@ -310,9 +310,43 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     const tEnd = bars[35].time;
     const res = analyzeWaves(bars, 'BTC/USDT', { startTime: tStart, endTime: tEnd });
     assert.strictEqual(res.selectedRange.barsCount, 36);
+    assert.strictEqual(res.selectedRange.contextBars, 0);
     assert.ok(res.originAnalysis);
     assert.ok(res.originAnalysis.originType);
     assert.ok(res.candidates.length > 0);
+  });
+
+  it('Wave Engine: 选区为观察窗口——向左扩展上下文，浪型起点可早于选区', () => {
+    const bars = [];
+    for (let i = 0; i < 200; i++) {
+      const p = 50000 + Math.sin(i / 4) * 3000 + i * 30;
+      bars.push({
+        time: 1720000000 + i * 14400,
+        open: p, high: p + 150, low: p - 150, close: p + 30, volume: 1000
+      });
+    }
+    // 选取中段 [100..170]，共 71 根 → 左扩 36 根，切片应自 bar 64 起
+    const res = analyzeWaves(bars, 'BTC/USDT', { startTime: bars[100].time, endTime: bars[170].time });
+    assert.strictEqual(res.selectedRange.barsCount, 71, 'barsCount 应为用户选区根数');
+    assert.strictEqual(res.selectedRange.contextBars, 36, '应向左扩展 0.5×选区长度的上下文');
+    assert.ok(res.barsCount > res.selectedRange.barsCount, '实际分析切片应包含上下文');
+    // 所有候选终点仍锚定选区右缘附近（最后一个拐点时间在选区内）
+    for (const c of res.candidates) {
+      const lastPv = c.pivots[c.pivots.length - 1];
+      assert.ok(lastPv.time <= bars[170].time, '候选浪型终点不得越过选区右缘');
+    }
+    assert.ok(res.candidates.length > 0);
+  });
+
+  it('Wave Engine: 选区过短 (<10根) 抛出中文异常', () => {
+    const bars = [];
+    for (let i = 0; i < 60; i++) {
+      const p = 50000 + i * 10;
+      bars.push({ time: 1720000000 + i * 14400, open: p, high: p + 50, low: p - 50, close: p, volume: 100 });
+    }
+    assert.throws(() => {
+      analyzeWaves(bars, 'BTC/USDT', { startTime: bars[20].time, endTime: bars[25].time });
+    }, /选区过短/);
   });
 
   it('Wave Engine 诚实性: 不编造子浪拐点，subPivots 全部来自真实K线时间', () => {

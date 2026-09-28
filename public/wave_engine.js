@@ -1410,11 +1410,32 @@
     }
     const timeframe = options.timeframe || '4h';
     let slice = bars;
+    let userSel = null;
     if (options.startTime || options.endTime) {
-      slice = bars.filter(b => (!options.startTime || b.time >= options.startTime) && (!options.endTime || b.time <= options.endTime));
+      let iS = 0, iE = bars.length - 1;
+      if (options.startTime) {
+        iS = bars.findIndex(b => b.time >= options.startTime);
+        if (iS < 0) iS = bars.length;
+      }
+      if (options.endTime) {
+        while (iE >= 0 && bars[iE].time > options.endTime) iE--;
+      }
+      const selLen = iE - iS + 1;
+      if (selLen < 10) {
+        throw new Error(`选区过短（仅 ${Math.max(0, selLen)} 根K线），请框选至少 10 根 K 线的区间`);
+      }
+      // 选区是「观察窗口」而非浪的边界：向左扩展上下文，
+      // 使浪型起点允许早于选区、终点仍锚定选区右缘
+      const margin = Math.min(300, Math.max(30, Math.round(selLen * 0.5)));
+      const extStart = Math.max(0, iS - margin);
+      userSel = {
+        startTime: bars[iS].time, endTime: bars[iE].time,
+        barsCount: selLen, contextBars: iS - extStart
+      };
+      slice = bars.slice(extStart, iE + 1);
     }
     if (slice.length < 25) {
-      throw new Error(`K线数据不足（选区仅 ${slice.length} 根），无法进行波浪理论数浪研判`);
+      throw new Error(`K线数据不足（仅 ${slice.length} 根），无法进行波浪理论数浪研判`);
     }
 
     const degrees = buildPivotDegrees(slice);
@@ -1436,7 +1457,7 @@
       symbol, timeframe, engineVersion: VERSION,
       barsCount: slice.length, currentPrice,
       analysisTime: new Date().toISOString(),
-      selectedRange: { startTime: slice[0].time, endTime: slice[slice.length - 1].time, barsCount: slice.length },
+      selectedRange: userSel || { startTime: slice[0].time, endTime: slice[slice.length - 1].time, barsCount: slice.length, contextBars: 0 },
       pivotDegrees: degrees.levels.map(l => ({ atrMult: l.mult, threshold: Math.round(l.thr * 100) / 100, pivotCount: l.count, isMain: l === degrees.main })),
       allPivots: degrees.main ? degrees.main.pivots : [],
       candidates: [], blockers: [], scenarios: [],
