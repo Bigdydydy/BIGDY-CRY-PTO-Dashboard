@@ -580,7 +580,7 @@
     }
   }
 
-  function updateRangeBanner(startTime, endTime, barsCount) {
+  function updateRangeBanner(startTime, endTime, barsCount, extrema) {
     const banner = document.getElementById('wave-range-banner');
     const rangeText = document.getElementById('wave-range-text');
     if (!banner || !rangeText) return;
@@ -588,8 +588,13 @@
     if (startTime && endTime) {
       const d1 = new Date(startTime * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const d2 = new Date(endTime * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      const countLabel = barsCount ? ` · 共 ${barsCount} 根 K 线 (${barsCount * 4}小时)` : '';
-      rangeText.textContent = `${d1} 至 ${d2}${countLabel}`;
+      const countLabel = barsCount ? ` · 共 ${barsCount} 根 K 线` : '';
+      let extLabel = '';
+      if (extrema) {
+        const dir = extrema.dominantDirection === 'BULLISH' ? '多头主导' : extrema.dominantDirection === 'BEARISH' ? '空头主导' : '震荡';
+        extLabel = ` · 极值磁吸: L $${Number(extrema.minPrice.toFixed(1)).toLocaleString()} / H $${Number(extrema.maxPrice.toFixed(1)).toLocaleString()} (${dir})`;
+      }
+      rangeText.textContent = `${d1} 至 ${d2}${countLabel}${extLabel}`;
       banner.style.display = 'flex';
     } else {
       banner.style.display = 'none';
@@ -775,6 +780,16 @@
       originText.textContent = '尚未选取分析区间。点击图表上方【🖱️ 框选分析模式】选取 K 线范围后，将穿透检验起点第一笔的微观 1H/15m 驱动结构。';
     }
 
+    const precBadge = document.getElementById('wave-preceding-badge');
+    const precText = document.getElementById('wave-preceding-text');
+    if (precBadge) {
+      precBadge.textContent = '观当下必先审前身';
+      precBadge.className = 'card-badge badge-neutral';
+    }
+    if (precText) {
+      precText.textContent = '尚未选取分析区间。选取波段后，引擎将自动穿透选区前序同级别与大级别行情的驱动/调整性质，确立当前波段的顺势与反弹属性。';
+    }
+
     const waveRegimeName = document.getElementById('wave-regime-name');
     const waveRegimeBadge = document.getElementById('wave-regime-badge');
     const waveCurrentStage = document.getElementById('wave-current-stage');
@@ -954,6 +969,10 @@
 
       currentAnalysis = analysis;
       activeCandidateIndex = 0;
+
+      if (isCustomSlice) {
+        updateRangeBanner(rangeOptions.startTime, rangeOptions.endTime, analysis.selectedRange?.barsCount || rangeOptions.barsCount, analysis.rangeExtrema);
+      }
 
       // 渲染候选浪型并上图展示
       renderCandidatesList(analysis);
@@ -1422,6 +1441,7 @@
     const dirIcon = isMotive ? (isBull ? '▲ 驱动浪' : '▼ 驱动浪') : '◆ 调整浪';
     const iconColor = isMotive ? (isBull ? 'var(--color-pos)' : 'var(--color-neg)') : 'var(--color-warning)';
     const mtfTxt = analysis?.mtf?.alignmentLabel || 'MTF';
+    const snapBadge = cand.snappedToExtreme ? `<span class="badge-snap" style="color:var(--accent-primary);font-weight:700;margin-left:4px;">🎯 极值磁吸</span>` : '';
 
     badge.innerHTML = `
       <span class="badge-icon" style="color: ${iconColor};">${dirIcon}</span>
@@ -1429,6 +1449,7 @@
       <span class="badge-score">${cand.score}分</span>
       <span class="badge-rules">${cand.currentWave || '进行中'}</span>
       <span class="badge-mtf">MTF: ${mtfTxt}</span>
+      ${snapBadge}
     `;
     badge.style.display = 'flex';
   }
@@ -1479,6 +1500,18 @@
         </span>
       </div>
       <div class="wave-tv-row">
+        <span class="wave-tv-label">选区极值</span>
+        <span class="wave-tv-val" style="font-size:0.68rem;">
+          ${analysis.rangeExtrema ? `L $${Number(analysis.rangeExtrema.minPrice.toFixed(0)).toLocaleString()} / H $${Number(analysis.rangeExtrema.maxPrice.toFixed(0)).toLocaleString()} <strong style="color:var(--accent-primary);">(${analysis.rangeExtrema.dominantDirection === 'BULLISH' ? '多' : '空'})</strong>` : '全图极值'}
+        </span>
+      </div>
+      <div class="wave-tv-row">
+        <span class="wave-tv-label">前序承接</span>
+        <span class="wave-tv-val" style="font-size:0.68rem; color:var(--text-secondary);">
+          ${analysis.precedingContext?.hasPrecedingData ? `${analysis.precedingContext.character || '前序'} · ${analysis.precedingContext.dominantTrend === 'BEARISH' ? '顺跌反弹' : analysis.precedingContext.dominantTrend === 'BULLISH' ? '顺涨洗盘' : '箱体'}` : '首段起点'}
+        </span>
+      </div>
+      <div class="wave-tv-row">
         <span class="wave-tv-label">当前阶段</span>
         <span class="wave-tv-val" style="color:var(--text-primary); font-size:0.70rem;">${cand.currentWave}</span>
       </div>
@@ -1524,6 +1557,29 @@
         originBadge.className = `card-badge ${isPure ? 'badge-bull' : 'badge-neutral'}`;
       }
       if (originText) originText.textContent = analysis.originAnalysis.text || '';
+    }
+
+    // 1.5 前序浪型大级别脉络卡片 (观当下必先审前身)
+    const precBadge = document.getElementById('wave-preceding-badge');
+    const precText = document.getElementById('wave-preceding-text');
+    if (analysis.precedingContext && analysis.precedingContext.hasPrecedingData) {
+      const ctx = analysis.precedingContext;
+      if (precBadge) {
+        precBadge.textContent = ctx.dominantTrend === 'BEARISH' ? '承接顺跌' : ctx.dominantTrend === 'BULLISH' ? '承接顺涨' : '承接震荡';
+        precBadge.className = `card-badge ${ctx.dominantTrend === 'BULLISH' ? 'badge-bull' : ctx.dominantTrend === 'BEARISH' ? 'badge-bear' : 'badge-neutral'}`;
+      }
+      if (precText) {
+        const resTxt = ctx.keyResistance ? `$${Math.round(ctx.keyResistance).toLocaleString()}` : '--';
+        const supTxt = ctx.keySupport ? `$${Math.round(ctx.keySupport).toLocaleString()}` : '--';
+        precText.innerHTML = `
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.71rem; color:var(--text-muted);">
+            <span>性质: <strong style="color:var(--text-primary);">${ctx.character}</strong></span>
+            <span>前序振幅: <strong style="color:var(--text-primary);">${ctx.amplitudePct}%</strong></span>
+            <span>关键参照: <strong>${resTxt} / ${supTxt}</strong></span>
+          </div>
+          <div style="line-height:1.5;">${ctx.liuDeduction}</div>
+        `;
+      }
     }
 
     // 2. 阻碍诊断卡片 (为什么排除？)

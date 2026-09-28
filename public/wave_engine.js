@@ -1161,11 +1161,255 @@
     };
   }
 
-  function scoreCandidate(cand, evalRes, sliceLen) {
+  // ---------------------------------------------------------------------------
+  // 7.1 选区内极值识别与磁吸锚定 (消除人工截取边界误差)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 自动探测选区范围（及边界容差）内的全局真实最高点与最低点，
+   * 消除人工手动点击选区时起始点/终点未落在极值波峰波谷带来的偏差。
+   */
+  function identifyRangeExtrema(bars, iS, iE) {
+    if (!bars || bars.length === 0) return null;
+    const len = bars.length;
+    let s = Math.max(0, Math.min(len - 1, iS !== undefined && iS !== null ? iS : 0));
+    let e = Math.max(0, Math.min(len - 1, iE !== undefined && iE !== null ? iE : len - 1));
+    if (s > e) { const tmp = s; s = e; e = tmp; }
+
+    const selLen = e - s + 1;
+    // 边界容差 (至少 3 根 K 线，最多延伸至选区长度的 8% 或 8 根)，捕捉刚刚好落在选区边缘外 2~3 根的真实大极值
+    const boundaryTol = Math.max(3, Math.min(8, Math.round(selLen * 0.08)));
+    const searchS = Math.max(0, s - boundaryTol);
+    const searchE = Math.min(len - 1, e + boundaryTol);
+
+    let minPrice = Infinity, minIdx = s, minTime = bars[s].time;
+    let maxPrice = -Infinity, maxIdx = s, maxTime = bars[s].time;
+
+    for (let i = s; i <= e; i++) {
+      const b = bars[i];
+      if (b.low < minPrice) { minPrice = b.low; minIdx = i; minTime = b.time; }
+      if (b.high > maxPrice) { maxPrice = b.high; maxIdx = i; maxTime = b.time; }
+    }
+
+    // 亦探测含容差的极值 (以防人工点击刚好漏掉了 1 根极值蜡烛)
+    let tolMinPrice = minPrice, tolMinIdx = minIdx, tolMinTime = minTime;
+    let tolMaxPrice = maxPrice, tolMaxIdx = maxIdx, tolMaxTime = maxTime;
+    for (let i = searchS; i <= searchE; i++) {
+      const b = bars[i];
+      if (b.low < tolMinPrice) { tolMinPrice = b.low; tolMinIdx = i; tolMinTime = b.time; }
+      if (b.high > tolMaxPrice) { tolMaxPrice = b.high; tolMaxIdx = i; tolMaxTime = b.time; }
+    }
+
+    const priceSpan = Math.round(Math.abs(maxPrice - minPrice) * 100) / 100;
+    const priceSpanPct = minPrice > 0 ? Math.round((priceSpan / minPrice) * 10000) / 100 : 0;
+    const isTroughFirst = minIdx < maxIdx;
+    const dominantDirection = isTroughFirst ? 'BULLISH' : (maxIdx < minIdx ? 'BEARISH' : 'NEUTRAL');
+
+    const primaryAnchor = isTroughFirst
+      ? { type: 'low', price: minPrice, time: minTime, idx: minIdx, label: '最低谷底起跑点' }
+      : { type: 'high', price: maxPrice, time: maxTime, idx: maxIdx, label: '最高见顶发端点' };
+
+    const secondaryAnchor = isTroughFirst
+      ? { type: 'high', price: maxPrice, time: maxTime, idx: maxIdx, label: '波段最高冲刺点' }
+      : { type: 'low', price: minPrice, time: minTime, idx: minIdx, label: '波段最低下探点' };
+
+    return {
+      minPrice, minTime, minIdx,
+      maxPrice, maxTime, maxIdx,
+      tolMinPrice, tolMinIdx, tolMinTime,
+      tolMaxPrice, tolMaxIdx, tolMaxTime,
+      isBoundaryExtended: (tolMinIdx !== minIdx || tolMaxIdx !== maxIdx),
+      priceSpan, priceSpanPct,
+      timeSpanBars: Math.abs(maxIdx - minIdx),
+      isTroughFirst,
+      dominantDirection,
+      primaryAnchor,
+      secondaryAnchor,
+      summary: `选区内已探测全局极值：最低点 $${fmtNum(minPrice)} (Bar ${minIdx})，最高点 $${fmtNum(maxPrice)} (Bar ${maxIdx})，结构方向偏${dominantDirection === 'BULLISH' ? '多' : '空'}，落差 ${priceSpanPct}%`
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7.2 前序浪型脉络与大级别背景衔接 (柳玉冬：观当下必先审前身)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 考察选区起点之前（或全图前段）的历史行情脉络与同级别/大级别浪型，
+   * 遵循柳玉冬“判断调整还是驱动浪不能脱离前序浪型”的实战核心方法论。
+   */
+  function analyzePrecedingContext(bars, iS, mainPivots, timeframe, htfBars) {
+    if (!bars || bars.length < 10) {
+      return {
+        hasPrecedingData: false,
+        dominantTrend: 'NEUTRAL',
+        character: 'CONSOLIDATION',
+        liuDeduction: '前序数据不足，以当前选区独立结构为主要研判基准。',
+        favoredWaveTypes: ['IMPULSE', 'ZIGZAG', 'FLAT']
+      };
+    }
+
+    // 取选区起点之前的 K 线窗口 (最多往前看 300 根，最少 8 根)
+    const endIdx = iS !== undefined && iS !== null && iS > 8 ? iS : Math.floor(bars.length * 0.4);
+    const startIdx = Math.max(0, endIdx - 300);
+    const precBars = bars.slice(startIdx, endIdx);
+
+    if (precBars.length < 8) {
+      return {
+        hasPrecedingData: false,
+        precedingBarsCount: precBars.length,
+        dominantTrend: 'NEUTRAL',
+        character: 'CONSOLIDATION',
+        liuDeduction: '选区起点距历史开端较近，前序形态未展，重点聚焦选区内微观结构。',
+        favoredWaveTypes: ['IMPULSE', 'ZIGZAG', 'FLAT']
+      };
+    }
+
+    const pFirst = precBars[0].close;
+    const pLast = precBars[precBars.length - 1].close;
+    const netChangePct = pFirst > 0 ? ((pLast - pFirst) / pFirst) * 100 : 0;
+
+    let swingHigh = { price: -Infinity, idx: startIdx, time: precBars[0].time };
+    let swingLow = { price: Infinity, idx: startIdx, time: precBars[0].time };
+
+    for (let i = 0; i < precBars.length; i++) {
+      const b = precBars[i];
+      if (b.high > swingHigh.price) { swingHigh = { price: b.high, idx: startIdx + i, time: b.time }; }
+      if (b.low < swingLow.price) { swingLow = { price: b.low, idx: startIdx + i, time: b.time }; }
+    }
+
+    const amplitudePct = swingLow.price > 0 ? ((swingHigh.price - swingLow.price) / swingLow.price) * 100 : 0;
+
+    // 前序趋势定性
+    let dominantTrend = 'NEUTRAL';
+    if (netChangePct > 2.0) dominantTrend = 'BULLISH';
+    else if (netChangePct < -2.0) dominantTrend = 'BEARISH';
+    else {
+      // 若首尾变动不大，但高低点落差显著，考察最后阶段斜率
+      const tailBars = precBars.slice(-Math.min(20, Math.floor(precBars.length / 2)));
+      const tailChange = ((tailBars[tailBars.length - 1].close - tailBars[0].close) / tailBars[0].close) * 100;
+      if (tailChange > 2.0) dominantTrend = 'BULLISH';
+      else if (tailChange < -2.0) dominantTrend = 'BEARISH';
+    }
+
+    // 前序走势性质 (是急跌/急升驱动，还是重叠震荡调整)
+    let character = 'CONSOLIDATION';
+    const isSteep = Math.abs(netChangePct) > 6.0 || amplitudePct > 10.0;
+    if (dominantTrend === 'BEARISH') {
+      character = isSteep ? 'IMPULSE_DOWN' : 'CORRECTIVE_DOWN';
+    } else if (dominantTrend === 'BULLISH') {
+      character = isSteep ? 'IMPULSE_UP' : 'CORRECTIVE_UP';
+    }
+
+    // 柳玉冬核心理论推导与承接判语
+    let liuDeduction = '';
+    let favoredWaveTypes = [];
+    let cautions = '';
+
+    if (dominantTrend === 'BEARISH') {
+      favoredWaveTypes = ['ZIGZAG', 'FLAT', 'COMBINATION', 'IMPULSE'];
+      if (character === 'IMPULSE_DOWN') {
+        liuDeduction = `前序为大级别顺势下跌驱动（区间跌幅 ${Math.abs(netChangePct).toFixed(1)}%，波峰 $${fmtNum(swingHigh.price)}）。柳玉冬体系指出：“观当下必先审前身”，在一段完备的下跌驱动之后，当前所选行情若向上展开，首要假设是次级调整浪（反弹B浪或X浪），不可盲目将其预设为主升推动浪。若要确立为新一轮牛市浪1起点，首段必须满足“有推动浪才有做底可能”，即微观能数出不重叠的五浪推动。`;
+        cautions = `逢反弹受前序波峰 $${fmtNum(swingHigh.price)} 及 0.382/0.618 斐波那契回撤强烈压制；未见合规五浪前只按反弹对待。`;
+      } else {
+        liuDeduction = `前序为震荡下行调整。当前选区若出现向上发力，存在调整结束并孕育反转驱动浪的契机。`;
+        cautions = `关注前序低点 $${fmtNum(swingLow.price)} 是否形成双底或头肩底支撑防线。`;
+      }
+    } else if (dominantTrend === 'BULLISH') {
+      favoredWaveTypes = ['IMPULSE', 'FLAT', 'TRIANGLE', 'ZIGZAG'];
+      if (character === 'IMPULSE_UP') {
+        liuDeduction = `前序为大级别顺势上涨主升（区间涨幅 +${netChangePct.toFixed(1)}%，波谷 $${fmtNum(swingLow.price)}）。柳玉冬体系强调：“顺势而为，前序驱动定性后，次级波段绝大概率属于良性洗盘”。若当前选区为回落或横向整理，首选定性为第4浪或高位ABC调整；一旦选区内出现止跌信号，后市极易迎来爆发性冲顶或第5浪延续。`;
+        cautions = `只要价格不有效击穿前序关键起涨点 $${fmtNum(swingLow.price)}，多头大格局未遭破坏。`;
+      } else {
+        liuDeduction = `前序为震荡攀升阶段，多头动能有所放缓，当前选区需警惕顶部收敛或衰竭楔形。`;
+        cautions = `注意防范多头衰竭，关注量价背离与浪5不创新高的失败形态。`;
+      }
+    } else {
+      favoredWaveTypes = ['COMBINATION', 'FLAT', 'TRIANGLE'];
+      liuDeduction = `前序行情处于箱型横向密集整理（震荡振幅 ${amplitudePct.toFixed(1)}%）。依据手稿P50-52联合形指引，当前浪型以箱型震荡对待，重点防范上下假突破，等待有效突破箱体确立单边波浪方向。`;
+      cautions = `箱体上轨 $${fmtNum(swingHigh.price)} 与下轨 $${fmtNum(swingLow.price)} 为核心多空分水岭。`;
+    }
+
+    return {
+      hasPrecedingData: true,
+      precedingBarsCount: precBars.length,
+      precedingTimeRange: { start: precBars[0].time, end: precBars[precBars.length - 1].time },
+      dominantTrend,
+      character,
+      netChangePct: Math.round(netChangePct * 100) / 100,
+      amplitudePct: Math.round(amplitudePct * 100) / 100,
+      swingHigh,
+      swingLow,
+      liuDeduction,
+      favoredWaveTypes,
+      cautions,
+      keyResistance: swingHigh.price,
+      keySupport: swingLow.price
+    };
+  }
+
+  function scoreCandidate(cand, evalRes, sliceLen, rangeExtrema, precedingContext) {
     const guideScore = evalRes.guide.weight ? evalRes.guide.weightGot / evalRes.guide.weight : 0.5;
     let s = 45 + 50 * guideScore + 8 * Math.min(1, cand.span / sliceLen * 1.6);
     s -= 2.5 * evalRes.pending.length;
     if (cand.status === 'COMPLETED') s += 2;
+
+    // 1. 选区极值磁吸锚定加分 (消除人工选区边界误差)
+    if (rangeExtrema && cand.pivots && cand.pivots.length > 0) {
+      const p0 = cand.pivots[0];
+      const isBull = cand.direction === 'BULLISH';
+      // 多头首选起点锚定最低谷底，空头首选起点锚定最高峰顶
+      const targetExtremePrice = isBull ? rangeExtrema.minPrice : rangeExtrema.maxPrice;
+      const targetExtremeTime = isBull ? rangeExtrema.minTime : rangeExtrema.maxTime;
+      const targetExtremeIdx = isBull ? rangeExtrema.minIdx : rangeExtrema.maxIdx;
+
+      const isExactMatch = (p0.time === targetExtremeTime) || (Math.abs(p0.price - targetExtremePrice) <= EPS);
+      const isNearMatch = !isExactMatch && Math.abs((p0.idx || 0) - targetExtremeIdx) <= 2;
+
+      if (isExactMatch) {
+        s += 10;
+        cand.snappedToExtreme = true;
+        cand.extremeAnchor = isBull ? 'MIN_TROUGH' : 'MAX_PEAK';
+      } else if (isNearMatch) {
+        s += 5;
+        cand.snappedToExtreme = true;
+        cand.extremeAnchor = 'NEAR_EXTREME';
+      }
+    }
+
+    // 2. 前序浪型脉络与大级别背景契合度加分 (承前启后·柳玉冬实战)
+    if (precedingContext && precedingContext.hasPrecedingData) {
+      const candMotive = cand.baseType === 'IMPULSE' || cand.baseType === 'DIAGONAL';
+      const candBull = cand.direction === 'BULLISH';
+
+      if (precedingContext.dominantTrend === 'BEARISH') {
+        if (!candMotive && candBull) {
+          // 前序大跌后向上反弹：次级调整浪(反弹B浪/X浪)高度契合柳玉冬手稿逻辑
+          s += 6;
+          cand.contextAffinity = 'BEARISH_REBOUND_CORRECTIVE';
+        } else if (candMotive && candBull) {
+          // 前序大跌后直接反转推动：适度加分
+          s += 2;
+          cand.contextAffinity = 'BEARISH_REVERSAL_IMPULSE';
+        }
+      } else if (precedingContext.dominantTrend === 'BULLISH') {
+        if (candMotive && candBull) {
+          // 前序大涨后顺势驱动延续：强趋势顺应加分
+          s += 6;
+          cand.contextAffinity = 'BULLISH_TREND_CONTINUATION';
+        } else if (!candMotive && !candBull) {
+          // 前序大涨后次回调：良性调整形态加分
+          s += 5;
+          cand.contextAffinity = 'BULLISH_PULLBACK_CORRECTIVE';
+        }
+      } else if (precedingContext.dominantTrend === 'NEUTRAL') {
+        if (!candMotive) {
+          // 震荡背景下调整浪优先
+          s += 4;
+          cand.contextAffinity = 'BOX_CONSOLIDATION_FIT';
+        }
+      }
+    }
+
     return Math.max(1, Math.min(99, Math.round(s)));
   }
 
@@ -1386,7 +1630,21 @@
     }
     const pendingTxt = pattern.pendingCount ? `另有 ${pattern.pendingCount} 条最低要求因末浪未确认而待验证。` : '';
     const mtfTxt = analysis?.mtf ? `【MTF大势联动: ${analysis.mtf.alignmentLabel} (${analysis.mtf.htf1.label})】` : '';
-    const thesis = `${symbol} ${tf}：首选计数为「${pattern.name}」。${mtfTxt}${ruleTxt}${pendingTxt}`;
+
+    // 智能极值与前序脉络实战解析 (消除手动选区偏差，承前启后)
+    let extremaTxt = '';
+    if (analysis?.rangeExtrema) {
+      const ext = analysis.rangeExtrema;
+      const snapTxt = pattern.snappedToExtreme ? '已自动磁吸锚定至波段结构极值点' : '锚定于选区主拐点';
+      extremaTxt = `【极值磁吸】选区波谷 $${fmtNum(ext.minPrice)} / 波峰 $${fmtNum(ext.maxPrice)}，${snapTxt}，有效过滤手动划选误差。`;
+    }
+    let contextTxt = '';
+    if (analysis?.precedingContext?.hasPrecedingData) {
+      const ctx = analysis.precedingContext;
+      contextTxt = `【承前启后·大级别脉络】前序呈${ctx.dominantTrend === 'BEARISH' ? '顺势下跌' : ctx.dominantTrend === 'BULLISH' ? '顺势上涨' : '箱型震荡'}（振幅 ${ctx.amplitudePct}%）。${ctx.liuDeduction} `;
+    }
+
+    const thesis = `${symbol} ${tf}：首选计数为「${pattern.name}」。${mtfTxt}${extremaTxt}${contextTxt}${ruleTxt}${pendingTxt}`;
 
     let bottomTopSignal;
     if (pattern.monitoringPivot) {
@@ -1411,6 +1669,9 @@
     const timeframe = options.timeframe || '4h';
     let slice = bars;
     let userSel = null;
+    let rangeExtrema = null;
+    let precedingContext = null;
+
     if (options.startTime || options.endTime) {
       let iS = 0, iE = bars.length - 1;
       if (options.startTime) {
@@ -1424,15 +1685,25 @@
       if (selLen < 10) {
         throw new Error(`选区过短（仅 ${Math.max(0, selLen)} 根K线），请框选至少 10 根 K 线的区间`);
       }
+      // 1. 自动探测选区范围内部全局真实极值并建立磁吸锚点
+      rangeExtrema = identifyRangeExtrema(bars, iS, iE);
+
+      // 2. 结合同级别与更大级别前序浪型脉络（观当下必先审前身）
+      precedingContext = analyzePrecedingContext(bars, iS, null, timeframe, options.htfBars);
+
       // 选区是「观察窗口」而非浪的边界：向左扩展上下文，
       // 使浪型起点允许早于选区、终点仍锚定选区右缘
       const margin = Math.min(300, Math.max(30, Math.round(selLen * 0.5)));
       const extStart = Math.max(0, iS - margin);
       userSel = {
         startTime: bars[iS].time, endTime: bars[iE].time,
-        barsCount: selLen, contextBars: iS - extStart
+        barsCount: selLen, contextBars: iS - extStart,
+        rangeExtrema
       };
       slice = bars.slice(extStart, iE + 1);
+    } else {
+      rangeExtrema = identifyRangeExtrema(bars, 0, bars.length - 1);
+      precedingContext = analyzePrecedingContext(bars, Math.floor(bars.length * 0.5), null, timeframe, options.htfBars);
     }
     if (slice.length < 25) {
       throw new Error(`K线数据不足（仅 ${slice.length} 根），无法进行波浪理论数浪研判`);
@@ -1457,7 +1728,13 @@
       symbol, timeframe, engineVersion: VERSION,
       barsCount: slice.length, currentPrice,
       analysisTime: new Date().toISOString(),
-      selectedRange: userSel || { startTime: slice[0].time, endTime: slice[slice.length - 1].time, barsCount: slice.length, contextBars: 0 },
+      selectedRange: userSel || {
+        startTime: slice[0].time, endTime: slice[slice.length - 1].time,
+        barsCount: slice.length, contextBars: 0,
+        rangeExtrema
+      },
+      rangeExtrema,
+      precedingContext,
       pivotDegrees: degrees.levels.map(l => ({ atrMult: l.mult, threshold: Math.round(l.thr * 100) / 100, pivotCount: l.count, isMain: l === degrees.main })),
       allPivots: degrees.main ? degrees.main.pivots : [],
       candidates: [], blockers: [], scenarios: [],
@@ -1499,7 +1776,7 @@
         continue;
       }
       const cand = buildCandidate(h, evalRes, ev, main.pivots);
-      cand.score = scoreCandidate(cand, evalRes, slice.length);
+      cand.score = scoreCandidate(cand, evalRes, slice.length, rangeExtrema, precedingContext);
       cands.push(cand);
     }
 
@@ -1566,7 +1843,9 @@
     analyzeOrigin,
     analyzeMTF,
     buildFibLevels,
+    identifyRangeExtrema,
+    analyzePrecedingContext,
     PATTERNS,
-    _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots }
+    _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext }
   };
 });

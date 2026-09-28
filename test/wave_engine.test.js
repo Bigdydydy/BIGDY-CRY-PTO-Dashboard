@@ -5,7 +5,9 @@ const {
   validateImpulseRules,
   analyzeWaves,
   evaluatePattern,
-  generateLiuCommentary
+  generateLiuCommentary,
+  identifyRangeExtrema,
+  analyzePrecedingContext
 } = require('../server/wave_engine');
 const { server } = require('../server/index');
 
@@ -408,5 +410,91 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     const eq = evaluatePattern('TRIANGLE',
       [P(0, 100, 'low'), P(10, 160, 'high'), P(20, 80, 'low'), P(30, 160, 'high'), P(40, 85, 'low'), P(50, 140, 'high')], null); // c=80=b
     assert.ok(eq.hardFails.some(r => r.id === 'T4'), 'c浪等于b浪应按P299否决');
+  });
+
+  it('Wave Engine: 选区极值智能识别与磁吸锚定 (消除人工截取边界误差)', () => {
+    // 构造一段行情：真实谷底在 bar 15 (price 50000)，真实波峰在 bar 35 (price 68000)
+    // 模拟真人点击：用户在 bar 18 (price 52500) 点下起点，在 bar 38 (price 66000) 点下终点
+    const bars = [];
+    for (let i = 0; i < 60; i++) {
+      let p;
+      if (i <= 15) p = 60000 - (10000 / 15) * i; // 60000 -> 50000
+      else if (i <= 35) p = 50000 + (18000 / 20) * (i - 15); // 50000 -> 68000
+      else p = 68000 - (8000 / 24) * (i - 35); // 68000 -> 60000
+      bars.push({
+        time: 1720000000 + i * 14400,
+        open: p, high: p + 100, low: p - 100, close: p + 10, volume: 100
+      });
+    }
+
+    // 用户框选 [18, 38]（人手无法绝对精准落在15或35）
+    const ext = identifyRangeExtrema(bars, 18, 38);
+    assert.ok(ext);
+    // 选区内部的极值
+    assert.ok(ext.minPrice <= 53000);
+    assert.ok(ext.maxPrice >= 67900);
+    assert.strictEqual(ext.dominantDirection, 'BULLISH', '谷底在波峰之前，主导结构应为多头');
+    assert.strictEqual(ext.isTroughFirst, true);
+    assert.strictEqual(ext.primaryAnchor.type, 'low');
+
+    // 边界容差探测：bar 15 就在 bar 18 往前 3 根之内，tolMinPrice 应探测到真正的全局底 50000
+    assert.ok(ext.tolMinPrice < 50500, '边界容差应捕捉到落在边缘 3 根内的真实谷底');
+    assert.strictEqual(ext.tolMinIdx, 15);
+  });
+
+  it('Wave Engine: 承前启后·大级别前序浪型脉络与传承 (柳玉冬“观当下必先审前身”)', () => {
+    // 构造前序大幅顺势下跌驱动（从 70000 跌至 52000），随后在 52000 展开反弹
+    const bars = [];
+    for (let i = 0; i < 40; i++) {
+      // 0..25: 前序大跌 (70000 -> 52000)
+      // 26..39: 选区反弹 (52000 -> 58000)
+      let p;
+      if (i <= 25) p = 70000 - (18000 / 25) * i;
+      else p = 52000 + (6000 / 14) * (i - 25);
+      bars.push({
+        time: 1720000000 + i * 14400,
+        open: p, high: p + 150, low: p - 150, close: p, volume: 500
+      });
+    }
+
+    // 选取 [26, 39] 进行分析
+    const ctx = analyzePrecedingContext(bars, 26, null, '4h', null);
+    assert.strictEqual(ctx.hasPrecedingData, true);
+    assert.strictEqual(ctx.dominantTrend, 'BEARISH');
+    assert.strictEqual(ctx.character, 'IMPULSE_DOWN');
+    assert.ok(ctx.amplitudePct > 20);
+    assert.ok(ctx.liuDeduction.includes('观当下必先审前身'));
+    assert.ok(ctx.liuDeduction.includes('次级调整浪'));
+    assert.ok(ctx.keyResistance >= 69000);
+    assert.ok(ctx.favoredWaveTypes.includes('ZIGZAG'));
+  });
+
+  it('Wave Engine: 选区综合研判无缝集成极值磁吸、前序脉络与柳玉冬实战文风报告', () => {
+    const bars = [];
+    // 构造前序下跌 + 选区内平台/锯齿反弹走势
+    for (let i = 0; i < 80; i++) {
+      let p = 60000;
+      if (i < 30) p = 60000 - i * 300; // 0..29: drop to 51300
+      else {
+        // 30..79: multi-swing bounce
+        const offset = i - 30;
+        p = 51300 + Math.sin(offset / 3) * 1500 + offset * 80;
+      }
+      bars.push({
+        time: 1720000000 + i * 14400,
+        open: p, high: p + 100, low: p - 100, close: p + 20, volume: 800
+      });
+    }
+
+    const res = analyzeWaves(bars, 'BTC/USDT', { startTime: bars[30].time, endTime: bars[70].time });
+    assert.ok(res.rangeExtrema, '应输出选区极值数据结构');
+    assert.ok(res.rangeExtrema.minPrice > 0);
+    assert.ok(res.rangeExtrema.maxPrice > 0);
+    assert.ok(res.precedingContext, '应输出前序浪型脉络');
+    assert.strictEqual(res.precedingContext.hasPrecedingData, true);
+    assert.strictEqual(res.selectedRange.rangeExtrema.minPrice, res.rangeExtrema.minPrice);
+    assert.ok(res.commentary);
+    assert.ok(res.commentary.thesis.includes('【极值磁吸】'), '报告中应包含极值磁吸说明');
+    assert.ok(res.commentary.thesis.includes('【承前启后·大级别脉络】'), '报告中应包含前序脉络说明');
   });
 });
