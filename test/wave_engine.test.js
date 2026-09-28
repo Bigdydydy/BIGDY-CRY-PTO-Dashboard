@@ -1,5 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
 const {
   findPivots,
   validateImpulseRules,
@@ -7,7 +9,8 @@ const {
   evaluatePattern,
   generateLiuCommentary,
   identifyRangeExtrema,
-  analyzePrecedingContext
+  analyzePrecedingContext,
+  PATTERNS
 } = require('../server/wave_engine');
 const { server } = require('../server/index');
 
@@ -496,5 +499,115 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     assert.ok(res.commentary);
     assert.ok(res.commentary.thesis.includes('【极值磁吸】'), '报告中应包含极值磁吸说明');
     assert.ok(res.commentary.thesis.includes('【承前启后·大级别脉络】'), '报告中应包含前序脉络说明');
+  });
+
+  it('回归: 真实ETH 4H选区应产出自然五浪推动计数及三类画法候选', () => {
+    const bars = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    const res = analyzeWaves(bars, 'ETH/USDT', {
+      timeframe: '4h',
+      startTime: Date.UTC(2026, 5, 26) / 1000,
+      endTime: Date.UTC(2026, 8, 22) / 1000
+    });
+
+    // 自然五浪计数 (UTC): 0=06-26 00:00, 1=07-27 04:00, 2=08-01 16:00,
+    // 3=09-11 12:00, 4=09-15 16:00, 5=09-21 20:00
+    const expectTimes = [
+      Date.UTC(2026, 5, 26, 0) / 1000,
+      Date.UTC(2026, 6, 27, 4) / 1000,
+      Date.UTC(2026, 7, 1, 16) / 1000,
+      Date.UTC(2026, 8, 11, 12) / 1000,
+      Date.UTC(2026, 8, 15, 16) / 1000,
+      Date.UTC(2026, 8, 21, 20) / 1000
+    ];
+    const natural = res.candidates.find(c => c.baseType === 'IMPULSE' &&
+      c.pivots.length === 6 && c.pivots.every((p, i) => p.time === expectTimes[i]));
+    assert.ok(natural, '自然五浪计数应出现在最终候选中。实际候选: ' + JSON.stringify(
+      res.candidates.map(c => ({
+        t: c.baseType, n: c.pivots.length, s: c.score,
+        p: c.pivots.map(p => new Date(p.time * 1000).toISOString())
+      }))));
+
+    const developing = res.candidates.find(c => c.baseType === 'IMPULSE' && c.pivots.length === 4);
+    assert.ok(developing, '应包含4点推动浪候选（浪3运行中·五浪画法）');
+    const corrective = res.candidates.find(c => PATTERNS[c.baseType].category !== '驱动浪');
+    assert.ok(corrective, '应包含调整浪候选（ABC画法/三浪画法）');
+  });
+
+  it('同级别比例硬规则: 第4段用时不得少于第3段的8% (L4)', () => {
+    const bad = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(50, 200, 'high'), P(60, 160, 'low'),
+      P(160, 400, 'high'), P(161, 350, 'low'), P(200, 500, 'high')
+    ], null);
+    assert.ok(bad.hardFails.some(f => f.id === 'L4'), '浪4仅1根vs浪3共100根应触发L4否决');
+
+    const ok = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(50, 200, 'high'), P(60, 160, 'low'),
+      P(160, 400, 'high'), P(180, 350, 'low'), P(200, 500, 'high')
+    ], null);
+    assert.ok(!ok.hardFails.some(f => f.id === 'L4'), '浪4共20根(20%)不应触发L4');
+  });
+
+  it('未评估指引按中性计分: 发展中计数 guide.weight 覆盖全部软规则', () => {
+    const res = evaluatePattern('IMPULSE', [
+      P(0, 100, 'low'), P(50, 200, 'high'), P(60, 160, 'low'), P(160, 400, 'high')
+    ], null);
+    const expected = PATTERNS.IMPULSE.rules.filter(r => !r.hard).reduce((s, r) => s + r.w, 0);
+    assert.strictEqual(res.guide.weight, expected, '未评估的非硬规则应以0.5中性计入权重');
+  });
+
+  it('同级别显著性指引(G8): 驱动浪内部回撤不得大于相邻调整浪', () => {
+    // 合成K线：浪5内部藏有一次大于浪4幅度的逆向回撤 → G8判不过；干净形态 → 通过
+    const mkBars = (withDip) => {
+      const path = [];
+      for (let i = 0; i <= 90; i++) {
+        let p;
+        if (i <= 20) p = 100 + 5 * i;                            // 浪1: 100->200
+        else if (i <= 30) p = 200 - 4 * (i - 20);                // 浪2: 200->160 (40)
+        else if (i <= 60) p = 160 + 8 * (i - 30);                // 浪3: 160->400
+        else if (i <= 70) p = 400 - 6 * (i - 60);                // 浪4: 400->340 (60)
+        else if (withDip && i <= 80) p = 340 + 16 * (i - 70);    // 浪5冲至500
+        else if (withDip && i <= 85) p = 500 - 14 * (i - 80);    // 内部逆撤至430 (70>60)
+        else if (withDip) p = 430 + 18 * (i - 85);               // 收回520
+        else p = 340 + 9 * (i - 70);                             // 干净浪5: 340->520
+        path.push(p);
+      }
+      return path.map((p, i) => ({ time: 1700000000 + i * 14400, open: p, high: p + 2, low: p - 2, close: p, volume: 100 }));
+    };
+    const pts = [P(0, 100, 'low'), P(20, 200, 'high'), P(30, 160, 'low'),
+      P(60, 400, 'high'), P(70, 340, 'low'), P(90, 520, 'high')];
+    const evOf = bars => ({ highs: bars.map(b => b.high), lows: bars.map(b => b.low) });
+
+    const badG8 = evaluatePattern('IMPULSE', pts, evOf(mkBars(true))).checks.find(c => c.id === 'G8');
+    assert.ok(badG8 && badG8.pass === false, '浪5内回撤70>浪4(60)应违反G8: ' + (badG8 && badG8.detail));
+
+    const goodG8 = evaluatePattern('IMPULSE', pts, evOf(mkBars(false))).checks.find(c => c.id === 'G8');
+    assert.ok(goodG8 && goodG8.pass === true, '内部回撤均小于相邻调整浪应通过G8: ' + (goodG8 && goodG8.detail));
+  });
+
+  it('边界稳健性: 数据左缘10-24根选区不抛异常且标注contextShortfall', () => {
+    const bars = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    for (const [s, e] of [[0, 9], [0, 14], [0, 24]]) {
+      const res = analyzeWaves(bars, 'ETH/USDT', {
+        timeframe: '4h', startTime: bars[s].time, endTime: bars[e].time
+      });
+      assert.ok(res && Array.isArray(res.candidates), `选区[${s}..${e}]应返回结果`);
+      assert.strictEqual(res.selectedRange.contextShortfall, true, `选区[${s}..${e}]应标注上下文不足`);
+      assert.ok(res.blockers.some(b => b.includes('前序上下文仅')),
+        `选区[${s}..${e}]应在blockers中提示左缘上下文不足`);
+    }
+    const mid = analyzeWaves(bars, 'ETH/USDT', {
+      timeframe: '4h', startTime: bars[400].time, endTime: bars[409].time
+    });
+    assert.strictEqual(mid.selectedRange.contextShortfall, false, '中段选区不应标注上下文不足');
+  });
+
+  it('结构复核规则仅检查首段出身 (legs=[0])', () => {
+    for (const type of Object.keys(PATTERNS)) {
+      for (const r of PATTERNS[type].rules) {
+        if (r.struct) assert.deepStrictEqual(r.legs, [0], `${type}/${r.id} 应仅检验首段出身`);
+      }
+    }
   });
 });

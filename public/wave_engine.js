@@ -237,8 +237,8 @@
       g => ({ pass: g.t[1] <= 9 * g.t[0], detail: `浪2用时 ${g.t[1]} vs 浪1×9=${9 * g.t[0]}` })),
     rg('M8', C_TIME, true, null, 5, 'P43', '浪4时间超过浪3的2倍则否决原数浪', 1,
       g => ({ pass: g.t[3] <= 2 * g.t[2], detail: `浪4用时 ${g.t[3]} vs 浪3×2=${2 * g.t[2]}` })),
-    rg('M9', C_STRUCT, false, null, 6, 'P9-16', '子浪结构：浪1/3/5应为五浪，浪2/4应为调整浪（浪4不能为三角形）', 2, null,
-      { struct: true, legs: [0, 1, 2, 3, 4], expect: ['5', '3', '5', '3', '5'] }),
+    rg('M9', C_STRUCT, false, null, 2, 'P9-16', '出身检验：浪1内部应为五浪（驱动浪或引导楔形）', 2, null,
+      { struct: true, legs: [0], expect: ['5'] }),
     rg('G1', C_G_RATIO, false, null, 3, 'P34/P94', '浪2常见回撤为浪1的0.382~0.618倍', 1,
       g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.3 && r <= 0.7, detail: `回撤 ${fmtPct(r)}` }; }),
     rg('G2', C_G_RATIO, false, null, 3, 'P34', '浪2回撤超过浪1的80%则存疑', 1,
@@ -253,6 +253,42 @@
       g => {
         const rail = lineVal(g.p[0].idx, g.p[0].price, g.p[2].idx, g.p[2].price, g.p[1].idx, g.p[1].price, g.p[4].idx);
         return { pass: Math.abs(g.p[4].price - rail) <= 0.15 * g.l[2], detail: `浪4终点 ${fmtNum(g.p[4].price)} vs 下轨 ${fmtNum(rail)}` };
+      }),
+    rg('G8', C_G_PAT, false, null, 3, '通用（EWI同级别显著性/right look）', '同级别显著性：驱动浪内部的逆向回撤不应大于相邻的同级别调整浪（浪2/浪4）', 1.5,
+      (g, ev) => {
+        if (!ev || !ev.highs || !ev.lows) return { pass: true, neutral: true, detail: '无K线数据未验' };
+        const parts = [];
+        let allPass = true, anyEval = false;
+        for (const k of [0, 2, 4]) {
+          if (k >= g.l.length) continue;
+          const neigh = [k - 1, k + 1].filter(j => j >= 0 && j < g.l.length);
+          if (!neigh.length) continue;
+          anyEval = true;
+          const neighMax = Math.max.apply(null, neigh.map(j => g.l[j]));
+          const i0 = g.p[k].idx, i1 = g.p[k + 1].idx;
+          const up = g.p[k + 1].price > g.p[k].price;
+          let inner = 0;
+          if (up) {
+            let runHigh = ev.highs[i0];
+            for (let i = i0; i <= i1 && i < ev.highs.length; i++) {
+              if (ev.highs[i] > runHigh) runHigh = ev.highs[i];
+              const dd = runHigh - ev.lows[i];
+              if (dd > inner) inner = dd;
+            }
+          } else {
+            let runLow = ev.lows[i0];
+            for (let i = i0; i <= i1 && i < ev.lows.length; i++) {
+              if (ev.lows[i] < runLow) runLow = ev.lows[i];
+              const dd = ev.highs[i] - runLow;
+              if (dd > inner) inner = dd;
+            }
+          }
+          const ok = inner <= neighMax + EPS;
+          if (!ok) allPass = false;
+          parts.push(`浪${k + 1}内回撤${fmtNum(inner)}${ok ? '≤' : '>'}${fmtNum(neighMax)}${ok ? '' : '✗'}`);
+        }
+        if (!anyEval) return { pass: true, neutral: true, detail: '无K线数据未验' };
+        return { pass: allPass, detail: parts.join(' · ') };
       })
   ];
 
@@ -298,8 +334,8 @@
   ];
 
   const ZIGZAG_RULES = [
-    rg('Z0', C_STRUCT, false, null, 4, 'P216', '子浪结构：a为驱动/引导楔形、b为调整浪、c为驱动/终结楔形', 2, null,
-      { struct: true, legs: [0, 1, 2], expect: ['5', '3', '5'] }),
+    rg('Z0', C_STRUCT, false, null, 2, 'P216', '出身检验：浪a内部应为五浪（驱动浪或引导楔形）', 2, null,
+      { struct: true, legs: [0], expect: ['5'] }),
     rg('Z1', C_PRICE, true, 'min', 3, 'P213', 'b浪不小于a浪的20%', 1,
       g => ({ pass: g.l[1] >= 0.2 * g.l[0] - EPS, detail: `b/a=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('Z2', C_PRICE, true, null, 3, 'P213', 'b浪不能超过a浪起点', 1,
@@ -333,8 +369,8 @@
   ];
 
   const FLAT_RULES = [
-    rg('F0', C_STRUCT, false, null, 4, 'P236/P251/P158', '子浪结构：a、b为调整浪(a可为平台形或联合形，b不能为三角形)，c为驱动浪或终结楔形', 2, null,
-      { struct: true, legs: [0, 1, 2], expect: ['3', '3', '5'] }),
+    rg('F0', C_STRUCT, false, null, 2, 'P236/P251/P158', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
     rg('F1', C_PRICE, true, 'min', 3, 'P234-235', 'b浪运行总量回撤不少于a浪运行总量的70%', 1,
       g => ({ pass: g.l[1] >= 0.7 * g.l[0] - EPS, detail: `b总量/a总量=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('F2', C_PRICE, true, null, 3, 'P235', 'b浪运行总量小于a浪运行总量的2倍', 1,
@@ -368,8 +404,8 @@
   ];
 
   const TRIANGLE_RULES = [
-    rg('T0', C_STRUCT, false, null, 6, 'P272-276/P303', '子浪结构3-3-3-3-3：a仅锯齿/平台，b仅锯齿，c、d为锯齿/平台/联合形(非三角形)，e仅锯齿/三角形(非平台/联合形)', 2, null,
-      { struct: true, legs: [0, 1, 2, 3, 4], expect: ['3', '3', '3', '3', '3'] }),
+    rg('T0', C_STRUCT, false, null, 2, 'P272-276/P303', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
     rg('T1', C_PRICE, true, 'min', 3, 'P302', 'b浪不小于a浪的50%', 1,
       g => ({ pass: g.l[1] >= 0.5 * g.l[0] - EPS, detail: `b/a=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('T2', C_PRICE, true, null, 3, 'P302/P310', 'b浪不大于a浪的1.5倍', 1,
@@ -446,8 +482,8 @@
   ];
 
   const DOUBLE_ZIGZAG_RULES = [
-    rg('W0', C_STRUCT, false, null, 4, 'P362', '子浪结构：w、y为锯齿形调整浪，x为调整浪（非联合形）', 2, null,
-      { struct: true, legs: [0, 1, 2], expect: ['3', '3', '3'] }),
+    rg('W0', C_STRUCT, false, null, 2, 'P362', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
     rg('W1', C_PRICE, true, 'min', 3, 'P362', 'x浪不小于w浪的20%', 1,
       g => ({ pass: g.l[1] >= 0.2 * g.l[0] - EPS, detail: `x/w=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('W2', C_PRICE, true, null, 3, 'P362', 'x浪终点不能超过w浪起点', 1,
@@ -497,8 +533,8 @@
 
   // 联合形（横向整理）— 手稿 P50-52/P131-132/P158/P297/P301 散见条文
   const COMBINATION_RULES = [
-    rg('C0', C_STRUCT, false, null, 4, 'P50/P158', '子浪结构3-3-3：w、x、y均为简单调整浪（x不能是三角形）', 2, null,
-      { struct: true, legs: [0, 1, 2], expect: ['3', '3', '3'] }),
+    rg('C0', C_STRUCT, false, null, 2, 'P50/P158', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
     rg('C1', C_PRICE, true, 'min', 3, 'P50', 'x浪必须回撤w浪的70%以上', 1,
       g => ({ pass: g.l[1] >= 0.7 * g.l[0] - EPS, detail: `x/w=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('C2', C_PRICE, true, null, 3, 'P301', 'x浪运行总量不得超过w浪的1.5倍', 1,
@@ -514,8 +550,8 @@
   ];
 
   const TRIPLE_COMBINATION_RULES = [
-    rg('C0', C_STRUCT, false, null, 6, 'P51/P158', '子浪结构3-3-3-3-3：各单元均为简单调整浪（x、xx不能是三角形）', 2, null,
-      { struct: true, legs: [0, 1, 2, 3, 4], expect: ['3', '3', '3', '3', '3'] }),
+    rg('C0', C_STRUCT, false, null, 2, 'P51/P158', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
     rg('C1', C_PRICE, true, 'min', 3, 'P51', 'x浪必须回撤w浪的70%以上', 1,
       g => ({ pass: g.l[1] >= 0.7 * g.l[0] - EPS, detail: `x/w=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('C2', C_PRICE, true, null, 3, 'P301', 'x浪运行总量不得超过w浪的1.5倍', 1,
@@ -539,8 +575,6 @@
   ];
 
   const TRIPLE_ZIGZAG_RULES = DOUBLE_ZIGZAG_RULES.concat([
-    rg('X0', C_STRUCT, false, null, 6, 'P385', '子浪结构：xx、z均为调整浪（z为锯齿形）', 2, null,
-      { struct: true, legs: [3, 4], expect: ['3', '3'] }),
     rg('X1', C_PRICE, true, 'min', 5, 'P385', 'xx浪不小于y浪的20%', 1,
       g => ({ pass: g.l[3] >= 0.2 * g.l[2] - EPS, detail: `xx/y=${fmtPct(g.l[3] / g.l[2])}` })),
     rg('X2', C_PRICE, true, null, 5, 'P385', 'xx浪终点不能超过y浪起点', 1,
@@ -582,6 +616,26 @@
     COMBINATION: { pts: 4, minDev: 3, name: '双重横向整理', category: '联合调整', rules: COMBINATION_RULES, labels: ['0', 'w', 'x', 'y'] },
     TRIPLE_COMBINATION: { pts: 6, minDev: 5, name: '三重横向整理', category: '联合调整', rules: TRIPLE_COMBINATION_RULES, labels: ['0', 'w', 'x', 'y', 'xx', 'z'] }
   };
+
+  /**
+   * 同级别比例硬规则（各浪型通用）：
+   * 反向腿（第2/4段：浪2/浪4、b/d、x/xx）用时不得少于前一同向腿的8%，否则视为级别错配。
+   * pending='min': 末端拐点未确认(open)时暂不否决。
+   */
+  function degreeRules(pts) {
+    const rules = [];
+    for (const k of [1, 3]) {
+      if (pts <= k + 1) continue;
+      rules.push(rg(`L${k + 1}`, C_TIME, true, 'min', k + 2, '通用（EWI同级别比例）',
+        `同级别比例：第${k + 1}段用时不得少于前一段的8%（级别错配）`, 1,
+        g => ({ pass: g.t[k] >= 0.08 * g.t[k - 1], detail: `第${k + 1}段用时 ${g.t[k]}根 vs 前段 ${g.t[k - 1]}根（${fmtPct(g.t[k] / g.t[k - 1])}）` })));
+    }
+    return rules;
+  }
+  for (const type of Object.keys(PATTERNS)) {
+    const def = PATTERNS[type];
+    def.rules = def.rules.concat(degreeRules(def.pts));
+  }
 
   // ---------------------------------------------------------------------------
   // 4. 子浪结构判定: 某段腿内部是「5」还是「3」
@@ -735,7 +789,11 @@
     const lastOpen = !!points[points.length - 1].open;
 
     for (const r of def.rules) {
-      if (points.length < r.need) continue;
+      if (points.length < r.need) {
+        // 未评估指引按中性计分（避免发展中计数因检验项少而获得偏高指引分）
+        if (!r.hard) { guide.weight += r.w; guide.weightGot += 0.5 * r.w; }
+        continue;
+      }
       let res;
       if (r.struct) res = evalStructRule(r, g, ev || {});
       else if (r.manual) res = { pass: true, neutral: true, detail: '人工指引项，自动判定从略' };
@@ -1667,7 +1725,7 @@
 
   function analyzeWaves(bars, symbol, options) {
     options = options || {};
-    if (!bars || bars.length < 30) {
+    if (!bars || bars.length < 10) {
       throw new Error('K线数据不足，无法进行波浪理论数浪研判');
     }
     const timeframe = options.timeframe || '4h';
@@ -1675,6 +1733,7 @@
     let userSel = null;
     let rangeExtrema = null;
     let precedingContext = null;
+    let selMargin = 0;
 
     if (options.startTime || options.endTime) {
       let iS = 0, iE = bars.length - 1;
@@ -1697,11 +1756,12 @@
 
       // 选区是「观察窗口」而非浪的边界：向左扩展上下文，
       // 使浪型起点允许早于选区、终点仍锚定选区右缘
-      const margin = Math.min(300, Math.max(30, Math.round(selLen * 0.5)));
-      const extStart = Math.max(0, iS - margin);
+      selMargin = Math.min(300, Math.max(30, Math.round(selLen * 0.5)));
+      const extStart = Math.max(0, iS - selMargin);
       userSel = {
         startTime: bars[iS].time, endTime: bars[iE].time,
         barsCount: selLen, contextBars: iS - extStart,
+        contextShortfall: (iS - extStart) < selMargin,
         rangeExtrema
       };
       slice = bars.slice(extStart, iE + 1);
@@ -1709,7 +1769,7 @@
       rangeExtrema = identifyRangeExtrema(bars, 0, bars.length - 1);
       precedingContext = analyzePrecedingContext(bars, Math.floor(bars.length * 0.5), null, timeframe, options.htfBars);
     }
-    if (slice.length < 25) {
+    if (slice.length < 10) {
       throw new Error(`K线数据不足（仅 ${slice.length} 根），无法进行波浪理论数浪研判`);
     }
 
@@ -1734,7 +1794,7 @@
       analysisTime: new Date().toISOString(),
       selectedRange: userSel || {
         startTime: slice[0].time, endTime: slice[slice.length - 1].time,
-        barsCount: slice.length, contextBars: 0,
+        barsCount: slice.length, contextBars: 0, contextShortfall: false,
         rangeExtrema
       },
       rangeExtrema,
@@ -1746,6 +1806,10 @@
       mtf: null, forecast: null,
       rulebookNote: '规则依据手稿P1-378（驱动浪基础/通道/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
+
+    if (userSel && userSel.contextShortfall) {
+      result.blockers.push(`选区靠近已加载数据左端，前序上下文仅 ${userSel.contextBars} 根（期望 ${selMargin} 根），起点判断可信度降低`);
+    }
 
     const main = degrees.main;
     if (!main || main.pivots.length < 4) {
@@ -1784,7 +1848,7 @@
       cands.push(cand);
     }
 
-    cands.sort((a, b) => {
+    const candCmp = (a, b) => {
       // 1. 显示分数优先
       if (b.score !== a.score) return b.score - a.score;
       // 2. 磁吸在真实极值锚点者绝对优先 (真底胜过假底)
@@ -1799,28 +1863,51 @@
       if (Math.abs((b.rawScore || 0) - (a.rawScore || 0)) > EPS) return (b.rawScore || 0) - (a.rawScore || 0);
       // 5. 跨度覆盖
       return b.span - a.span;
-    });
+    };
+    cands.sort(candCmp);
 
     // 指纹去重: 同名形态且首尾端点一致的孪生形态进行合并，避免挤占并列候选席位
     const seenSignatures = new Set();
-    const perType = {};
-    const final = [];
+    const deduped = [];
     for (const c of cands) {
       const p0Time = c.pivots[0]?.time;
       const pEndTime = c.pivots[c.pivots.length - 1]?.time;
       const sig = `${c.name}|${p0Time}|${pEndTime}`;
       if (seenSignatures.has(sig)) continue;
       seenSignatures.add(sig);
-
-      perType[c.baseType] = (perType[c.baseType] || 0) + 1;
-      if (perType[c.baseType] <= 2 && final.length < 8) final.push(c);
+      deduped.push(c);
     }
+
+    // 席位分配: 按「浪型×浪位数」两轮选取 —— 首轮每个键一席保证计数多样性，
+    // 次轮以排序顺序补足剩余席位 (同一键至多两席)
+    const seatKey = c => `${c.baseType}|${c.pivots.length}`;
+    const keyCount = {};
+    const taken = new Set();
+    const final = [];
+    for (const c of deduped) {
+      if (final.length >= 8) break;
+      const key = seatKey(c);
+      if (keyCount[key]) continue;
+      keyCount[key] = 1;
+      taken.add(c);
+      final.push(c);
+    }
+    for (const c of deduped) {
+      if (final.length >= 8) break;
+      if (taken.has(c)) continue;
+      const key = seatKey(c);
+      if ((keyCount[key] || 0) >= 2) continue;
+      keyCount[key]++;
+      taken.add(c);
+      final.push(c);
+    }
+    final.sort(candCmp);
     result.candidates = final;
     result.pattern = final[0] || null;
 
-    result.blockers = Array.from(blockMap.values())
+    result.blockers.push.apply(result.blockers, Array.from(blockMap.values())
       .sort((a, b) => b.span - a.span).slice(0, 8)
-      .map(b => `「${b.pattern}」被否决：${b.rule.text}（${CAT_NAMES[b.rule.cat] || '硬规则'}·手稿${b.rule.page}）${b.detail ? ' — ' + b.detail : ''}`);
+      .map(b => `「${b.pattern}」被否决：${b.rule.text}（${CAT_NAMES[b.rule.cat] || '硬规则'}·手稿${b.rule.page}）${b.detail ? ' — ' + b.detail : ''}`));
 
     result.scenarios = buildScenarios(final);
     result.originAnalysis = final[0] ? analyzeOrigin(final[0], ev) : null;

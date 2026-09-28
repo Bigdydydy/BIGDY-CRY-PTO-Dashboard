@@ -24,7 +24,7 @@
   // 图表可见性控制开关
   let showMarkers = true;
   let showZigzag = true;
-  let showSubwaves = true;
+  let showSubwaves = false;
   let showChannel = true;
   let showMonitoring = true;
   let showTargets = true;
@@ -1179,7 +1179,7 @@
           position: sp.label === 'b' || sp.label === 'ii' || sp.label === 'iv' || sp.label === '2' || sp.label === '4' ? 'belowBar' : 'aboveBar',
           color: '#06b6d4',
           shape: 'circle',
-          text: `(${sp.label})`,
+          text: sp.label ? `(${sp.label})` : '',
           size: 0.8
         });
       });
