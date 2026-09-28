@@ -1275,7 +1275,12 @@
     if (!container) return;
 
     const cands = analysis.candidates || [];
-    if (badge) badge.textContent = `${cands.length} 个候选方案`;
+    const decLvl = { HIGH: '高', MEDIUM: '中', LOW: '低' }[(analysis.decisiveness || {}).level];
+    if (badge) {
+      badge.textContent = decLvl
+        ? `${analysis.decisiveness.shown} 个方案 · 决断度${decLvl}`
+        : `${cands.length} 个候选方案`;
+    }
 
     if (cands.length === 0) {
       container.innerHTML = '<div class="text-secondary" style="font-size:0.72rem;">当前选区暂无合规标准浪型，请查看下方阻碍诊断。</div>';
@@ -1285,11 +1290,12 @@
     container.innerHTML = cands.map((c, i) => {
       const snapTag = c.snappedToExtreme ? '<span class="candidate-snap-tag" style="color:var(--accent-primary);font-size:0.65rem;font-weight:700;margin-left:4px;">🎯极值磁吸</span>' : '';
       const covTag = c.degreeLabel ? `<span class="candidate-cov-tag" style="font-size:0.65rem;color:var(--text-muted);margin-left:4px;">[${c.degreeLabel}·${c.coveragePct}%]</span>` : '';
+      const probTag = c.probability !== undefined ? `<span class="candidate-prob-tag" style="font-size:0.65rem;color:var(--accent-primary);font-weight:700;margin-left:6px;">相对权重 ${c.probability}%</span>` : '';
       return `
       <div class="candidate-card ${i === activeCandidateIndex ? 'active' : ''}" data-idx="${i}">
         <div class="candidate-card-header">
           <span style="font-weight:600;">${c.name}</span>
-          <span class="candidate-score-badge">${c.score} 分</span>
+          <span class="candidate-score-badge">${c.score} 分</span>${probTag}
         </div>
         <div class="candidate-sub-desc">${c.category} · ${c.currentWave} ${covTag} ${snapTag}</div>
         <div class="candidate-pivot-line">监测点: $${c.monitoringPivot?.price?.toLocaleString() || '--'} (${c.monitoringPivot?.levelName || '生命线'})</div>

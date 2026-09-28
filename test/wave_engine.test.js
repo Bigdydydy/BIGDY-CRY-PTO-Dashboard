@@ -290,7 +290,7 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
       bars.push({ time: 1700000000 + (20 + i) * 14400, open: p, high: p + 1, low: p - 1, close: p, volume: 100 });
     }
 
-    const res = analyzeWaves(bars, 'BTC/USDT');
+    const res = analyzeWaves(bars, 'BTC/USDT', { ranking: { maxCands: 99, minRel: 0 } });
     assert.ok(res.candidates.length > 0);
     const flatCandidate = res.candidates.find(c => c.type.includes('FLAT'));
     assert.ok(flatCandidate, '应识别出平台形候选');
@@ -504,11 +504,12 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
   it('回归: 真实ETH 4H选区应产出自然五浪推动计数及三类画法候选', () => {
     const bars = JSON.parse(fs.readFileSync(
       path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
-    const res = analyzeWaves(bars, 'ETH/USDT', {
+    const opts = {
       timeframe: '4h',
       startTime: Date.UTC(2026, 5, 26) / 1000,
       endTime: Date.UTC(2026, 8, 22) / 1000
-    });
+    };
+    const res = analyzeWaves(bars, 'ETH/USDT', opts);
 
     // 自然五浪计数 (UTC): 0=06-26 00:00, 1=07-27 04:00, 2=08-01 16:00,
     // 3=09-11 12:00, 4=09-15 16:00, 5=09-21 20:00
@@ -520,18 +521,57 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
       Date.UTC(2026, 8, 15, 16) / 1000,
       Date.UTC(2026, 8, 21, 20) / 1000
     ];
-    const natural = res.candidates.find(c => c.baseType === 'IMPULSE' &&
-      c.pivots.length === 6 && c.pivots.every((p, i) => p.time === expectTimes[i]));
-    assert.ok(natural, '自然五浪计数应出现在最终候选中。实际候选: ' + JSON.stringify(
-      res.candidates.map(c => ({
-        t: c.baseType, n: c.pivots.length, s: c.score,
-        p: c.pivots.map(p => new Date(p.time * 1000).toISOString())
-      }))));
+    assert.ok(res.candidates.length >= 1 && res.candidates.length <= 5,
+      `默认排名下候选数应在1-5之间，实际 ${res.candidates.length}`);
+    const top = res.candidates[0];
+    assert.ok(top.baseType === 'IMPULSE' && top.pivots.length === 6 &&
+      top.pivots.every((p, i) => p.time === expectTimes[i]),
+      '自然五浪计数应为首选候选。实际候选: ' + JSON.stringify(
+        res.candidates.map(c => ({
+          t: c.baseType, n: c.pivots.length, s: c.score,
+          p: c.pivots.map(p => new Date(p.time * 1000).toISOString())
+        }))));
 
-    const developing = res.candidates.find(c => c.baseType === 'IMPULSE' && c.pivots.length === 4);
-    assert.ok(developing, '应包含4点推动浪候选（浪3运行中·五浪画法）');
-    const corrective = res.candidates.find(c => PATTERNS[c.baseType].category !== '驱动浪');
-    assert.ok(corrective, '应包含调整浪候选（ABC画法/三浪画法）');
+    // 全集视角（评估harness放宽排名参数）：4点五浪画法与调整浪画法仍应存在
+    const full = analyzeWaves(bars, 'ETH/USDT',
+      Object.assign({}, opts, { ranking: { maxCands: 99, minRel: 0 } }));
+    assert.ok(full.candidates.some(c => c.baseType === 'IMPULSE' && c.pivots.length === 4),
+      '全集中应包含4点推动浪候选（浪3运行中·五浪画法）');
+    assert.ok(full.candidates.some(c => PATTERNS[c.baseType].category !== '驱动浪'),
+      '全集中应包含调整浪候选（ABC画法/三浪画法）');
+  });
+
+  it('可变候选: 相对权重、概率和与决断度字段完备', () => {
+    const bars = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    const res = analyzeWaves(bars, 'ETH/USDT', {
+      timeframe: '4h',
+      startTime: Date.UTC(2026, 5, 26) / 1000,
+      endTime: Date.UTC(2026, 8, 22) / 1000
+    });
+    assert.ok(res.candidates.length > 0);
+    assert.strictEqual(res.candidates[0].relWeight, 1, '首选候选 relWeight 应为 1');
+    for (const c of res.candidates) {
+      assert.ok(c.relWeight >= 0.15, `${c.name} relWeight ${c.relWeight} 应 >= minRel`);
+    }
+    const probSum = res.candidates.reduce((s, c) => s + c.probability, 0);
+    assert.ok(Math.abs(probSum - 100) <= 2, `probability 合计应在 100±2，实际 ${probSum}`);
+    assert.ok(['HIGH', 'MEDIUM', 'LOW', 'NONE'].includes(res.decisiveness.level),
+      `决断度应为 HIGH/MEDIUM/LOW/NONE，实际 ${res.decisiveness.level}`);
+    assert.strictEqual(res.decisiveness.shown, res.candidates.length);
+  });
+
+  it('可变候选: ranking.maxCands=1 时仅保留单一方案', () => {
+    const bars = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    const res = analyzeWaves(bars, 'ETH/USDT', {
+      timeframe: '4h',
+      startTime: Date.UTC(2026, 5, 26) / 1000,
+      endTime: Date.UTC(2026, 8, 22) / 1000,
+      ranking: { maxCands: 1 }
+    });
+    assert.strictEqual(res.candidates.length, 1);
+    assert.strictEqual(res.decisiveness.level, 'HIGH', '单一方案决断度应为HIGH');
   });
 
   it('同级别比例硬规则: 第4段用时不得少于第3段的8% (L4)', () => {

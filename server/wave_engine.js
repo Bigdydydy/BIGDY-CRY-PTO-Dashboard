@@ -47,6 +47,9 @@
 
   const TF_SEC = { '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '2h': 7200, '4h': 14400, '6h': 21600, '8h': 28800, '12h': 43200, '1d': 86400, '3d': 259200, '1w': 604800 };
 
+  // 候选排序/裁剪配置: 数据驱动的可变候选数 (可被 options.ranking 浅覆盖)
+  const RANKING = { temperature: 5, minRel: 0.15, maxCands: 5, minCands: 1 };
+
   function fmtNum(n) {
     if (n === null || n === undefined || isNaN(n)) return '--';
     return Number(n.toFixed(2)).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -1494,11 +1497,10 @@
 
   function buildScenarios(cands) {
     const top = cands.slice(0, 3);
-    const wsum = top.reduce((s, c) => s + c.score * c.score, 0) || 1;
     return top.map((c, i) => ({
       rank: i + 1,
       name: c.name,
-      probability: Math.round(100 * c.score * c.score / wsum),
+      probability: c.probability || 0,
       weightNote: '相对权重（按手稿指引符合度折算，非统计概率）',
       rationale: `硬规则全部通过${c.pendingCount ? `（${c.pendingCount}条待确认）` : ''}；指引符合度 ${c.guidePct}%；状态：${c.currentWave}`,
       confirmTrigger: (c.secondaryPivot && c.secondaryPivot.price) || (c.targets[0] && c.targets[0].price) || null,
@@ -1728,6 +1730,7 @@
     if (!bars || bars.length < 10) {
       throw new Error('K线数据不足，无法进行波浪理论数浪研判');
     }
+    const ranking = Object.assign({}, RANKING, options.ranking || {});
     const timeframe = options.timeframe || '4h';
     let slice = bars;
     let userSel = null;
@@ -1803,6 +1806,7 @@
       allPivots: degrees.main ? degrees.main.pivots : [],
       candidates: [], blockers: [], scenarios: [],
       pattern: null, originAnalysis: null, commentary: null,
+      decisiveness: { level: 'NONE', topShare: 0, shown: 0, text: '无合规浪型' },
       mtf: null, forecast: null,
       rulebookNote: '规则依据手稿P1-378（驱动浪基础/通道/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
@@ -1849,8 +1853,8 @@
     }
 
     const candCmp = (a, b) => {
-      // 1. 显示分数优先
-      if (b.score !== a.score) return b.score - a.score;
+      // 1. rawScore 优先 (未封顶的指引加成与背景契合分；显示分已封顶不作排序键)
+      if (Math.abs((b.rawScore || 0) - (a.rawScore || 0)) > EPS) return (b.rawScore || 0) - (a.rawScore || 0);
       // 2. 磁吸在真实极值锚点者绝对优先 (真底胜过假底)
       if (!!b.snappedToExtreme !== !!a.snappedToExtreme) return b.snappedToExtreme ? 1 : -1;
       // 3. 顺应选区主导方向者优先 (例如多头主导下上升推动优先)
@@ -1859,9 +1863,7 @@
         const aDirMatch = a.direction === rangeExtrema.dominantDirection;
         if (bDirMatch !== aDirMatch) return bDirMatch ? 1 : -1;
       }
-      // 4. rawScore (含未封顶的指引加成与背景契合分)
-      if (Math.abs((b.rawScore || 0) - (a.rawScore || 0)) > EPS) return (b.rawScore || 0) - (a.rawScore || 0);
-      // 5. 跨度覆盖
+      // 4. 跨度覆盖
       return b.span - a.span;
     };
     cands.sort(candCmp);
@@ -1878,32 +1880,57 @@
       deduped.push(c);
     }
 
-    // 席位分配: 按「浪型×浪位数」两轮选取 —— 首轮每个键一席保证计数多样性，
-    // 次轮以排序顺序补足剩余席位 (同一键至多两席)
+    // 相对权重: 以首选为锚按温度指数缩放 (softmax 相对权重，非统计概率)
+    const topRaw = deduped.length ? (deduped[0].rawScore || 0) : 0;
+    for (const c of deduped) {
+      c.relWeight = Math.exp(((c.rawScore || 0) - topRaw) / ranking.temperature);
+    }
+    const eligible = deduped.filter(c => c.relWeight >= ranking.minRel);
+
+    // 席位分配: 仅在权重达标候选上按「浪型×浪位数」两轮选取 ——
+    // 首轮每个键一席保证计数多样性，次轮同键至多两席，总数不超过 maxCands
     const seatKey = c => `${c.baseType}|${c.pivots.length}`;
     const keyCount = {};
     const taken = new Set();
     const final = [];
-    for (const c of deduped) {
-      if (final.length >= 8) break;
-      const key = seatKey(c);
-      if (keyCount[key]) continue;
-      keyCount[key] = 1;
+    const take = c => {
+      keyCount[seatKey(c)] = (keyCount[seatKey(c)] || 0) + 1;
       taken.add(c);
       final.push(c);
+    };
+    for (const c of eligible) {
+      if (final.length >= ranking.maxCands) break;
+      if (keyCount[seatKey(c)]) continue;
+      take(c);
     }
+    for (const c of eligible) {
+      if (final.length >= ranking.maxCands) break;
+      if (taken.has(c) || (keyCount[seatKey(c)] || 0) >= 2) continue;
+      take(c);
+    }
+    // 保底: 达标候选不足时以排序顺序补足 minCands
     for (const c of deduped) {
-      if (final.length >= 8) break;
+      if (final.length >= ranking.minCands) break;
       if (taken.has(c)) continue;
-      const key = seatKey(c);
-      if ((keyCount[key] || 0) >= 2) continue;
-      keyCount[key]++;
-      taken.add(c);
-      final.push(c);
+      take(c);
     }
     final.sort(candCmp);
     result.candidates = final;
     result.pattern = final[0] || null;
+
+    // 相对概率与决断度
+    const relSum = final.reduce((s, c) => s + c.relWeight, 0) || 1;
+    for (const c of final) c.probability = Math.round(100 * c.relWeight / relSum);
+    if (final.length) {
+      const topShare = (final[0].probability || 0) / 100;
+      const shown = final.length;
+      const level = (shown === 1 || topShare >= 0.6) ? 'HIGH' : (topShare < 0.35 ? 'LOW' : 'MEDIUM');
+      const lvlTxt = level === 'HIGH' ? '高' : level === 'LOW' ? '低' : '中';
+      result.decisiveness = {
+        level, topShare, shown,
+        text: `决断度${lvlTxt}：主方案占相对权重 ${final[0].probability}%，共 ${shown} 个方案`
+      };
+    }
 
     result.blockers.push.apply(result.blockers, Array.from(blockMap.values())
       .sort((a, b) => b.span - a.span).slice(0, 8)
@@ -1960,6 +1987,7 @@
     buildFibLevels,
     identifyRangeExtrema,
     analyzePrecedingContext,
+    RANKING,
     PATTERNS,
     _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext }
   };
