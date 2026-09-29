@@ -1722,6 +1722,181 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 8.5 对偶情境 (跨级别推演): 以首选计数起点O与方向极值X为锚，
+  //     推演「新趋势起点(A)」与「逆势反弹(B)」两种解释并给出仲裁价位
+  // ---------------------------------------------------------------------------
+
+  /** 按 R=Slen/D (当前段/前段腿) 给出逆势反弹可容纳的调整浪角色 */
+  function counterRolesForR(R) {
+    if (R === null || R === undefined || isNaN(R)) return [];
+    if (R < 0.2 || R >= 2) return [];
+    if (R < 0.7) return [
+      { role: '单锯齿b浪', rules: 'Z1/Z2' },
+      { role: '双锯齿x浪', rules: 'W1/W2' }
+    ];
+    if (R < 1) return [
+      { role: '单锯齿b浪', rules: 'Z1/Z2' },
+      { role: '双锯齿x浪', rules: 'W1/W2' },
+      { role: '平台形b浪', rules: 'F1' },
+      { role: '联合形x浪', rules: 'C1' }
+    ];
+    if (R < 1.5) return [
+      { role: '扩散平台形b浪', rules: 'F1/F2' },
+      { role: '联合形x浪', rules: 'C1/C2' }
+    ];
+    return [{ role: '扩散平台形b浪', rules: 'F2' }];
+  }
+
+  function buildDualScenario(ctx) {
+    const { cands, top, slice } = ctx || {};
+    if (!top || !top.pivots || !top.pivots.length || !slice || !slice.length) return null;
+    const d = top.direction === 'BULLISH' ? 1 : -1;
+    const O = top.pivots[0];
+
+    // X: 方向极值 (d=1 取最高 high；d=-1 取最低 low)
+    let X = null;
+    for (let i = O.idx; i < slice.length; i++) {
+      const v = d > 0 ? slice[i].high : slice[i].low;
+      if (!X || v * d > X.price * d) X = { price: v, time: slice[i].time, idx: i };
+    }
+    const Slen = Math.abs(X.price - O.price);
+    if (!(Slen > 0)) return null;
+
+    // 前段腿: 自O左邻向左扫描最后一根逆向越过O价位的K线，其右至O为前段腿区间
+    let k = -1;
+    for (let i = O.idx - 1; i >= 0; i--) {
+      const beyond = d > 0 ? slice[i].low < O.price : slice[i].high > O.price;
+      if (beyond) { k = i; break; }
+    }
+    const priorTruncated = k < 0;
+    const segS = priorTruncated ? 0 : k + 1;
+    const segE = O.idx - 1;
+
+    let prior = null, H0 = null, D = null, R = null;
+    if (segE >= segS) {
+      for (let i = segS; i <= segE; i++) {
+        const v = d > 0 ? slice[i].high : slice[i].low;
+        if (!H0 || v * d > H0.price * d) H0 = { price: v, time: slice[i].time, idx: i };
+      }
+      if (H0) {
+        prior = { H0 };
+        D = Math.abs(H0.price - O.price);
+        R = Slen / D;
+      }
+    }
+
+    const motiveExists = (cands || []).some(c =>
+      (c.baseType === 'IMPULSE' || c.baseType === 'DIAGONAL') &&
+      c.direction === top.direction && c.pivots[0] && c.pivots[0].time === O.time);
+
+    // 情境A: 新趋势起点
+    const w2a = X.price - d * 0.618 * Slen, w2b = X.price - d * 0.382 * Slen;
+    const scenA = {
+      label: d > 0 ? '新一轮上升的第1浪（3-1浪）' : '新一轮下跌的第1浪',
+      allowed: motiveExists,
+      reason: motiveExists
+        ? '以O为起点存在合规推动浪/楔形计数（有推动浪才有做底/做顶的可能）'
+        : '以O为起点不存在合规推动浪计数——出身不合法，没有推动浪就没有做底/做顶的可能',
+      expect: {
+        wave2Zone: { lo: Math.min(w2a, w2b), hi: Math.max(w2a, w2b) },
+        wave3Must: X.price,
+        note: '浪2常见回撤0.382~0.618(G1)且不得触及O(M1)；浪3须越过S极值(M3)，常见为S的1~2.618倍(G3)'
+      },
+      invalidation: { price: O.price, rule: 'M1', text: `触及/${d > 0 ? '跌破' : '涨破'}O则浪2回撤达100%，情境A失效` },
+      confirmation: { price: X.price, text: '浪2守住后越过S极值，确认浪3展开' }
+    };
+
+    // 情境B: 逆势反弹/回调
+    const roles = counterRolesForR(R);
+    const allowedB = !!prior && roles.length > 0;
+    let bReason;
+    if (!prior) {
+      bReason = 'O之前无可用前段腿，无法衡量逆势反弹的级别';
+    } else if (!roles.length) {
+      bReason = R < 0.2
+        ? `R=${R.toFixed(2)}<0.2：反弹段相对前段腿过短，不足本级调整浪讨论的级别`
+        : `R=${R.toFixed(2)}≥2：反弹段已超平台形b浪上限(F2)，逆势反弹解释不成立`;
+    } else {
+      bReason = `R=${R.toFixed(2)}，可解释为：${roles.map(r => `${r.role}(${r.rules})`).join('、')}`;
+    }
+    const ceilings = prior ? [
+      { price: H0.price, dies: '锯齿/双锯齿解释（Z2/W2）' },
+      { price: O.price + d * 1.5 * D, dies: '联合形x解释（C2）' },
+      { price: O.price + d * 2 * D, dies: '平台形b解释（F2），情境B整体' }
+    ] : [];
+    const uncrossed = ceilings
+      .filter(c => (X.price - c.price) * d < 0)
+      .sort((a, b) => ((a.price - X.price) * d) - ((b.price - X.price) * d));
+    const scenB = {
+      label: d > 0 ? '上一级别下跌中的反弹（b/x浪）' : '上一级别上涨中的回调（b/x浪）',
+      allowed: allowedB,
+      roles,
+      reason: bReason,
+      expect: {
+        nextLegMin: X.price - d * 0.9 * Slen,
+        dzYMin: prior ? X.price - d * 0.9 * D : null,
+        note: 'c浪最低要求0.9×b(Z3)；双锯齿y浪须大于0.9×w(W4)'
+      },
+      invalidation: uncrossed.length
+        ? { price: uncrossed[0].price, text: `${d > 0 ? '升破' : '跌破'}${fmtNum(uncrossed[0].price)}则${uncrossed[0].dies}被否决` }
+        : null,
+      confirmation: { price: O.price, text: `${d > 0 ? '跌破' : '涨破'}O确认${d > 0 ? '反弹' : '回调'}结束，c/y浪展开` }
+    };
+
+    // 仲裁价位
+    const arb = [
+      { price: O.price, effect: '否决情境A（M1）；确认情境B', rule: 'M1', soft: false, crossed: false },
+      { price: X.price - d * 0.618 * Slen, effect: '情境A存疑（浪2回撤过深，G1/G2）', rule: 'G1/G2', soft: true, crossed: false }
+    ];
+    if (prior) {
+      arb.push(
+        { price: H0.price, effect: '否决情境B的锯齿/双锯齿解释（Z2/W2）', rule: 'Z2/W2', soft: false, crossed: (X.price - H0.price) * d >= 0 },
+        { price: O.price + d * 1.5 * D, effect: '否决联合形x解释（C2）', rule: 'C2', soft: false, crossed: (X.price - (O.price + d * 1.5 * D)) * d >= 0 },
+        { price: O.price + d * 2 * D, effect: '否决平台形b解释，情境B不成立（F2）', rule: 'F2', soft: false, crossed: (X.price - (O.price + d * 2 * D)) * d >= 0 }
+      );
+    }
+    arb.sort((a, b) => a.price - b.price);
+
+    const stance = scenA.allowed && scenB.allowed ? 'BOTH'
+      : scenA.allowed ? 'A_ONLY' : scenB.allowed ? 'B_ONLY' : 'NEITHER';
+
+    let lean = null;
+    if (stance === 'A_ONLY') lean = { A: 100, B: 0, validated: 'rule', text: '仅情境A成立' };
+    else if (stance === 'B_ONLY') lean = { A: 0, B: 100, validated: 'rule', text: '仅情境B成立' };
+    else if (stance === 'BOTH') lean = { A: null, B: null, validated: 'rule', text: '两可，由分水岭裁决' };
+
+    const dirVerb = d > 0 ? '跌破' : '涨破';
+    let summary;
+    if (stance === 'BOTH') {
+      const parts = [`${dirVerb}O(${fmtNum(O.price)})否决情境A（M1）、确认情境B`];
+      if (scenB.invalidation) parts.push(scenB.invalidation.text);
+      summary = `两种情境并存：${parts.join('；')}`;
+    } else if (stance === 'A_ONLY') {
+      summary = `以新趋势情境为主：${dirVerb}O(${fmtNum(O.price)})即否决情境A（M1铁律）`;
+    } else if (stance === 'B_ONLY') {
+      const bTxt = scenB.invalidation ? `；${scenB.invalidation.text}` : '';
+      summary = `以逆势${d > 0 ? '反弹' : '回调'}情境为主：${dirVerb}O(${fmtNum(O.price)})确认结束${bTxt}`;
+    } else {
+      summary = '两种情境均不成立：O点出身不合法且逆势反弹级别不符';
+    }
+
+    return {
+      direction: top.direction,
+      anchors: {
+        O: { price: O.price, time: O.time },
+        X: { price: X.price, time: X.time },
+        H0: prior ? { price: H0.price, time: H0.time } : null,
+        priorTruncated
+      },
+      Slen, D, R,
+      motiveExists,
+      scenarios: { A: scenA, B: scenB },
+      arbitration: arb,
+      stance, lean, summary
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // 9. 主入口
   // ---------------------------------------------------------------------------
 
@@ -1807,6 +1982,7 @@
       candidates: [], blockers: [], scenarios: [],
       pattern: null, originAnalysis: null, commentary: null,
       decisiveness: { level: 'NONE', topShare: 0, shown: 0, text: '无合规浪型' },
+      dualScenario: null,
       mtf: null, forecast: null,
       rulebookNote: '规则依据手稿P1-378（驱动浪基础/通道/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
@@ -1817,6 +1993,7 @@
 
     const main = degrees.main;
     if (!main || main.pivots.length < 4) {
+      result.dualScenario = null;
       result.blockers.push('自适应 Zigzag 未提取到足够的有效拐点，无法匹配任何手稿浪型');
       result.mtf = analyzeMTF(null, timeframe, options.htfBars, slice);
       result.forecast = result.mtf.forecast;
@@ -1939,6 +2116,9 @@
     result.scenarios = buildScenarios(final);
     result.originAnalysis = final[0] ? analyzeOrigin(final[0], ev) : null;
     result.mtf = analyzeMTF(final[0], timeframe, Object.assign({}, options.htfBars || {}, subMap), slice);
+    result.dualScenario = final.length
+      ? buildDualScenario({ cands, top: final[0], slice, precedingContext, mtf: result.mtf })
+      : null;
     result.forecast = result.mtf.forecast;
     result.commentary = generateLiuCommentary(final[0], currentPrice, symbol, timeframe, result);
     return result;
@@ -1989,6 +2169,6 @@
     analyzePrecedingContext,
     RANKING,
     PATTERNS,
-    _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext }
+    _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });

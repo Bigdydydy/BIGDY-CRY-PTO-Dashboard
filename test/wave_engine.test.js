@@ -10,7 +10,8 @@ const {
   generateLiuCommentary,
   identifyRangeExtrema,
   analyzePrecedingContext,
-  PATTERNS
+  PATTERNS,
+  _internal
 } = require('../server/wave_engine');
 const { server } = require('../server/index');
 
@@ -649,5 +650,114 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
         if (r.struct) assert.deepStrictEqual(r.legs, [0], `${type}/${r.id} 应仅检验首段出身`);
       }
     }
+  });
+
+  it('对偶情境: counterRolesForR 按R比值边界分档', () => {
+    const { counterRolesForR } = _internal;
+    assert.deepStrictEqual(counterRolesForR(0.1), []);
+    assert.strictEqual(counterRolesForR(0.5).length, 2);
+    assert.strictEqual(counterRolesForR(0.8).length, 4);
+    const mid = counterRolesForR(1.2);
+    assert.strictEqual(mid.length, 2);
+    assert.ok(mid.some(r => r.role === '扩散平台形b浪'));
+    assert.strictEqual(counterRolesForR(1.7).length, 1);
+    assert.deepStrictEqual(counterRolesForR(2.5), []);
+    assert.deepStrictEqual(counterRolesForR(null), []);
+  });
+
+  it('对偶情境: ETH真实选区锚点 O/X/H0 与 R>2 → A_ONLY', () => {
+    const bars = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    const startTime = Date.UTC(2026, 5, 26) / 1000;
+    const endTime = Date.UTC(2026, 8, 22) / 1000;
+    const res = analyzeWaves(bars, 'ETH/USDT', { timeframe: '4h', startTime, endTime });
+
+    const ds = res.dualScenario;
+    assert.ok(ds, '应输出对偶情境');
+    assert.strictEqual(ds.direction, 'BULLISH');
+    assert.strictEqual(ds.anchors.O.price, 1510.87);
+    assert.strictEqual(ds.anchors.X.price, 2806.76);
+
+    // 按同一定义在夹具上复算 H0：slice=选区左扩后的K线，扫描O左侧最后一根 low<O.price 的K线，
+    // 其右至O之间取最大 high（预期命中 2026-06-15 高点 1848.78，因 06-06 低点 1503.6 < O）
+    let iS = bars.findIndex(b => b.time >= startTime);
+    let iE = bars.length - 1;
+    while (iE >= 0 && bars[iE].time > endTime) iE--;
+    const margin = Math.min(300, Math.max(30, Math.round((iE - iS + 1) * 0.5)));
+    const slice = bars.slice(Math.max(0, iS - margin), iE + 1);
+    const iO = slice.findIndex(b => b.time === startTime);
+    const oPrice = 1510.87;
+    let k = -1;
+    for (let i = iO - 1; i >= 0; i--) {
+      if (slice[i].low < oPrice) { k = i; break; }
+    }
+    let expH0 = -Infinity;
+    for (let i = k + 1; i <= iO - 1; i++) expH0 = Math.max(expH0, slice[i].high);
+    assert.strictEqual(expH0, 1848.78, '复算H0应为06-15高点1848.78');
+    assert.strictEqual(ds.anchors.H0.price, expH0);
+
+    assert.ok(ds.R > 2, `R=${ds.R} 应大于2`);
+    assert.strictEqual(ds.stance, 'A_ONLY');
+    assert.strictEqual(ds.lean.A, 100);
+    assert.ok(ds.arbitration.some(a => a.price === oPrice && a.rule === 'M1'),
+      '仲裁价位应包含 O 位的 M1 否决线');
+  });
+
+  it('对偶情境: 合成slice+B_ONLY/BOTH/空头镜像', () => {
+    const { buildDualScenario } = _internal;
+    const t0 = 1700000000;
+    const mk = (i, p, h, l) => ({ time: t0 + i * 14400, open: p, high: h !== undefined ? h : p + 1, low: l !== undefined ? l : p - 1, close: p, volume: 10 });
+    // 多头切片: 前置腿 140->100, 当前段 100->120 (Slen=20, D=40, R=0.5)
+    const bull = [
+      mk(0, 95, 96, 94), mk(1, 95, 96, 94), mk(2, 139, 140, 138),
+      mk(3, 135), mk(4, 130), mk(5, 125), mk(6, 118), mk(7, 110), mk(8, 104),
+      mk(9, 100, 105, 100),
+      mk(10, 102), mk(11, 105), mk(12, 108), mk(13, 110), mk(14, 112),
+      mk(15, 114), mk(16, 116), mk(17, 117), mk(18, 118), mk(19, 119, 120, 118)
+    ];
+    const topBull = { direction: 'BULLISH', baseType: 'ZIGZAG', pivots: [{ price: 100, time: bull[9].time, idx: 9 }] };
+    const zzBull = [{ baseType: 'ZIGZAG', direction: 'BULLISH', pivots: [{ time: bull[9].time }] }];
+
+    // (a) 仅锯齿计数 → 情境A出身不合法，B_ONLY
+    const a = buildDualScenario({ cands: zzBull, top: topBull, slice: bull, precedingContext: null, mtf: null });
+    assert.ok(a);
+    assert.strictEqual(a.anchors.H0.price, 140);
+    assert.ok(Math.abs(a.R - 0.5) < 1e-9, `R=${a.R} 应为0.5`);
+    assert.strictEqual(a.stance, 'B_ONLY');
+    assert.strictEqual(a.scenarios.A.allowed, false);
+    assert.strictEqual(a.scenarios.B.allowed, true);
+
+    // (b) 叠加推动浪计数 → BOTH + 启发式lean
+    const impStub = { baseType: 'IMPULSE', direction: 'BULLISH', pivots: [{ time: bull[9].time }] };
+    const b = buildDualScenario({ cands: zzBull.concat([impStub]), top: topBull, slice: bull, precedingContext: null, mtf: null });
+    assert.strictEqual(b.stance, 'BOTH');
+    assert.strictEqual(b.lean.A, null);
+    assert.strictEqual(b.lean.B, null);
+    assert.strictEqual(b.lean.validated, 'rule');
+    assert.match(b.lean.text, /分水岭/);
+
+    // (c) 空头镜像 → direction BEARISH + B_ONLY
+    const bear = [
+      mk(0, 145, 146, 144), mk(1, 145, 146, 144), mk(2, 101, 102, 100),
+      mk(3, 105), mk(4, 110), mk(5, 115), mk(6, 122), mk(7, 130), mk(8, 136),
+      mk(9, 140, 140, 135),
+      mk(10, 138), mk(11, 135), mk(12, 132), mk(13, 130), mk(14, 128),
+      mk(15, 126), mk(16, 124), mk(17, 123), mk(18, 122), mk(19, 121, 122, 120)
+    ];
+    const topBear = { direction: 'BEARISH', baseType: 'ZIGZAG', pivots: [{ price: 140, time: bear[9].time, idx: 9 }] };
+    const zzBear = [{ baseType: 'ZIGZAG', direction: 'BEARISH', pivots: [{ time: bear[9].time }] }];
+    const c = buildDualScenario({ cands: zzBear, top: topBear, slice: bear, precedingContext: null, mtf: null });
+    assert.ok(c);
+    assert.strictEqual(c.direction, 'BEARISH');
+    assert.strictEqual(c.stance, 'B_ONLY');
+    assert.strictEqual(c.anchors.H0.price, 100);
+  });
+
+  it('对偶情境: 拐点不足早退路径 dualScenario 为 null', () => {
+    const flat = Array.from({ length: 30 }, (_, i) => ({
+      time: 1700000000 + i * 14400, open: 100, high: 100, low: 100, close: 100, volume: 10
+    }));
+    const res = analyzeWaves(flat, 'BTC/USDT');
+    assert.strictEqual(res.dualScenario, null);
   });
 });
