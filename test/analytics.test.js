@@ -6,7 +6,8 @@ const {
   analyzeDynamicGex,
   analyzeBlockTrades,
   calcGreeks,
-  parseInstrument
+  parseInstrument,
+  identifyInstitutionalStrategy
 } = require('../server/analytics_engine');
 
 const { sendJsonResponse } = require('../server/index');
@@ -1177,6 +1178,130 @@ describe('System Audit & Data Provenance Verification Engine', () => {
   });
 });
 
+describe('Module 3: Deribit Section 12 Advanced Multi-Leg Strategy Suite', () => {
+  const S = 77000;
 
+  test('Accurately identifies 4-Leg Iron Condor with defined risk and inverse profile', () => {
+    // Buy Put 70k, Sell Put 72k, Sell Call 82k, Buy Call 85k
+    const legs = [
+      { instrument: 'BTC-26DEC26-70000-P', direction: 'buy', amount: 50, price: 0.02, strike: 70000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-72000-P', direction: 'sell', amount: 50, price: 0.035, strike: 72000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-82000-C', direction: 'sell', amount: 50, price: 0.04, strike: 82000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-85000-C', direction: 'buy', amount: 50, price: 0.022, strike: 85000, expiryStr: '26DEC26' }
+    ];
+    const res = identifyInstitutionalStrategy(legs, 0, -1500, 3200, 40000000);
+    assert.equal(res.strategyType, 'IRON_CONDOR');
+    assert.equal(res.strategyNameZh, '经典铁鹰策略 (Iron Condor / 4-Leg Strangle Credit)');
+    assert.equal(res.intentBadgeClass, 'badge-vol-sell');
+    assert.ok(res.riskProfile.inverseCurvature.includes('Deribit 反向合约'));
+    assert.ok(res.theoreticalPointers.some(p => p.includes('Fully Defined Risk')));
+  });
 
+  test('Accurately identifies 4-Leg Iron Butterfly with ATM straddle short', () => {
+    // Buy Put 72k, Sell Put 77k, Sell Call 77k, Buy Call 82k
+    const legs = [
+      { instrument: 'BTC-26DEC26-72000-P', direction: 'buy', amount: 30, price: 0.025, strike: 72000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-77000-P', direction: 'sell', amount: 30, price: 0.055, strike: 77000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-77000-C', direction: 'sell', amount: 30, price: 0.058, strike: 77000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-82000-C', direction: 'buy', amount: 30, price: 0.028, strike: 82000, expiryStr: '26DEC26' }
+    ];
+    const res = identifyInstitutionalStrategy(legs, 0, -2500, 4800, 35000000);
+    assert.equal(res.strategyType, 'IRON_BUTTERFLY');
+    assert.equal(res.strategyNameZh, '经典铁蝶策略 (Iron Butterfly / ATM Straddle Protection)');
+    assert.ok(res.theoreticalPointers.some(p => p.includes('Pin Risk')));
+  });
 
+  test('Accurately identifies 1x2 Ratio Call Backspread (Lecture 12.11)', () => {
+    // Sell 1 low Call @ 78k, Buy 2 high Calls @ 85k
+    const legs = [
+      { instrument: 'BTC-26DEC26-78000-C', direction: 'sell', amount: 100, price: 0.06, strike: 78000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-85000-C', direction: 'buy', amount: 200, price: 0.025, strike: 85000, expiryStr: '26DEC26' }
+    ];
+    const res = identifyInstitutionalStrategy(legs, 5000000, 3500, -2800, 50000000);
+    assert.equal(res.strategyType, 'RATIO_CALL_BACKSPREAD');
+    assert.equal(res.strategyNameZh, '看涨反比例价差 (1x2 Call Backspread)');
+    assert.equal(res.intentBadgeClass, 'badge-vol-buy');
+    assert.ok(res.riskProfile.inverseCurvature.includes('1.0 BTC'));
+    assert.ok(res.theoreticalPointers.some(p => p.includes('Long Volatility & Gamma')));
+  });
+
+  test('Accurately identifies 1x2 Ratio Call Front Spread (Lecture 12.11)', () => {
+    // Buy 1 low Call @ 78k, Sell 2 high Calls @ 85k
+    const legs = [
+      { instrument: 'BTC-26DEC26-78000-C', direction: 'buy', amount: 100, price: 0.06, strike: 78000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-85000-C', direction: 'sell', amount: 200, price: 0.025, strike: 85000, expiryStr: '26DEC26' }
+    ];
+    const res = identifyInstitutionalStrategy(legs, -2000000, -3500, 2800, 50000000);
+    assert.equal(res.strategyType, 'RATIO_CALL_FRONT_SPREAD');
+    assert.equal(res.strategyNameZh, '看涨正比例价差 (1x2 Call Front Spread)');
+    assert.equal(res.intentBadgeClass, 'badge-vol-sell');
+    assert.ok(res.theoreticalPointers.some(p => p.includes('收割偏度溢价')));
+  });
+
+  test('Accurately identifies 1x2 Ratio Put Backspread (Lecture 12.12)', () => {
+    // Buy 2 low Puts @ 68k, Sell 1 high Put @ 75k
+    const legs = [
+      { instrument: 'BTC-26DEC26-68000-P', direction: 'buy', amount: 200, price: 0.02, strike: 68000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-75000-P', direction: 'sell', amount: 100, price: 0.05, strike: 75000, expiryStr: '26DEC26' }
+    ];
+    const res = identifyInstitutionalStrategy(legs, -5000000, 3000, -2200, 45000000);
+    assert.equal(res.strategyType, 'RATIO_PUT_BACKSPREAD');
+    assert.equal(res.strategyNameZh, '看跌反比例价差 (1x2 Put Backspread)');
+    assert.equal(res.intentBadgeClass, 'badge-vol-buy');
+  });
+
+  test('Accurately identifies Symmetric Put Butterfly and Broken Wing Butterfly (Lecture 12.14)', () => {
+    // Symmetric Put Butterfly: Buy 1 @ 70k, Sell 2 @ 75k, Buy 1 @ 80k
+    const putFlyLegs = [
+      { instrument: 'BTC-26DEC26-70000-P', direction: 'buy', amount: 50, price: 0.015, strike: 70000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-75000-P', direction: 'sell', amount: 100, price: 0.04, strike: 75000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-80000-P', direction: 'buy', amount: 50, price: 0.08, strike: 80000, expiryStr: '26DEC26' }
+    ];
+    const resSymm = identifyInstitutionalStrategy(putFlyLegs, 0, -800, 1500, 30000000);
+    assert.equal(resSymm.strategyType, 'LONG_PUT_BUTTERFLY');
+    assert.equal(resSymm.strategyNameZh, '对称多头看跌蝶式 (Long Put Butterfly 1-2-1)');
+
+    // Broken Wing Butterfly: Buy 1 @ 70k, Sell 2 @ 75k, Buy 1 @ 85k (d1=5k != d2=10k)
+    const bwbLegs = [
+      { instrument: 'BTC-26DEC26-70000-C', direction: 'buy', amount: 50, price: 0.12, strike: 70000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-75000-C', direction: 'sell', amount: 100, price: 0.08, strike: 75000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-85000-C', direction: 'buy', amount: 50, price: 0.03, strike: 85000, expiryStr: '26DEC26' }
+    ];
+    const resBwb = identifyInstitutionalStrategy(bwbLegs, 1000000, -400, 900, 32000000);
+    assert.equal(resBwb.strategyType, 'BROKEN_WING_BUTTERFLY');
+    assert.equal(resBwb.strategyNameZh, '折翅非对称蝶式 (Broken Wing Butterfly / Skip Strike)');
+  });
+
+  test('Accurately identifies Synthetic Long & Short Future (Lecture 12.16)', () => {
+    // Synthetic Long: Buy Call 77k + Sell Put 77k
+    const synthLongLegs = [
+      { instrument: 'BTC-26DEC26-77000-C', direction: 'buy', amount: 200, price: 0.06, strike: 77000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-77000-P', direction: 'sell', amount: 200, price: 0.055, strike: 77000, expiryStr: '26DEC26' }
+    ];
+    const resLong = identifyInstitutionalStrategy(synthLongLegs, 15400000, 0, 0, 30800000);
+    assert.equal(resLong.strategyType, 'SYNTHETIC_LONG_FUTURE');
+    assert.equal(resLong.strategyNameZh, '合成标的多头 (Synthetic Long Future / Parity Replication)');
+    assert.ok(resLong.theoreticalPointers.some(p => p.includes('Put-Call Parity')));
+
+    // Synthetic Short: Sell Call 77k + Buy Put 77k
+    const synthShortLegs = [
+      { instrument: 'BTC-26DEC26-77000-C', direction: 'sell', amount: 200, price: 0.06, strike: 77000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-77000-P', direction: 'buy', amount: 200, price: 0.055, strike: 77000, expiryStr: '26DEC26' }
+    ];
+    const resShort = identifyInstitutionalStrategy(synthShortLegs, -15400000, 0, 0, 30800000);
+    assert.equal(resShort.strategyType, 'SYNTHETIC_SHORT_FUTURE');
+    assert.equal(resShort.strategyNameZh, '合成标的空头 (Synthetic Short Future)');
+  });
+
+  test('Injects Module 4 Smile / Skew Alignment insight when smileContext provided', () => {
+    const legs = [
+      { instrument: 'BTC-26DEC26-72000-P', direction: 'sell', amount: 100, price: 0.03, strike: 72000, expiryStr: '26DEC26' },
+      { instrument: 'BTC-26DEC26-85000-C', direction: 'buy', amount: 100, price: 0.03, strike: 85000, expiryStr: '26DEC26' }
+    ];
+    const smileContext = { skew25d: -3.8 };
+    const res = identifyInstitutionalStrategy(legs, 8000000, 1000, -500, 40000000, smileContext);
+    assert.ok(res.smileAlphaRating);
+    assert.ok(res.smileAlphaRating.rating.includes('偏度套利高效'));
+    assert.ok(res.smileAlphaRating.comment.includes('Put 相对 Call 显著高估'));
+  });
+});

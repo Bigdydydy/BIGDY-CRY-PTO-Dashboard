@@ -318,6 +318,7 @@ const mStrategyName = document.getElementById('m-strategy-name');
 const mMaxProfit = document.getElementById('m-max-profit');
 const mMaxLoss = document.getElementById('m-max-loss');
 const mBreakEven = document.getElementById('m-break-even');
+const mInverseCurvature = document.getElementById('m-inverse-curvature');
 const mPointersList = document.getElementById('m-pointers-list');
 
 /**
@@ -914,6 +915,7 @@ window.openWhaleDetail = function(idx) {
   if (mMaxProfit) mMaxProfit.textContent = b.riskProfile?.maxProfit || '--';
   if (mMaxLoss) mMaxLoss.textContent = b.riskProfile?.maxLoss || '--';
   if (mBreakEven) mBreakEven.textContent = b.riskProfile?.breakEven || '--';
+  if (mInverseCurvature) mInverseCurvature.textContent = b.riskProfile?.inverseCurvature || '以结算币种波动率曲面损益模型计量';
 
   if (mPointersList) {
     const pointers = b.theoreticalPointers || [];
@@ -982,6 +984,7 @@ window.openIcebergDetail = function(idx) {
   if (mMaxProfit) mMaxProfit.textContent = c.riskProfile?.maxProfit || '--';
   if (mMaxLoss) mMaxLoss.textContent = c.riskProfile?.maxLoss || '--';
   if (mBreakEven) mBreakEven.textContent = c.riskProfile?.breakEven || '--';
+  if (mInverseCurvature) mInverseCurvature.textContent = c.riskProfile?.inverseCurvature || '以结算币种波动率曲面损益模型计量';
 
   if (mPointersList) {
     const pointers = c.theoreticalPointers || [];

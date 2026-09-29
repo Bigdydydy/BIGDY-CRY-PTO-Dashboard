@@ -4,44 +4,44 @@
     "name": "CATE / SOL",
     "chain": "solana",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 2.012,
-    "volume_24h": 2050718.78946968,
-    "liquidity_usd": 3297998.5974,
-    "fdv_usd": 73590914.40196
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -0.107,
+    "volume_24h": 2038490.14586983,
+    "liquidity_usd": 3275865.2342,
+    "fdv_usd": 72705430.9948004
   },
   "solana_PAID": {
     "symbol": "PAID",
     "name": "PAID / SOL",
     "chain": "solana",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -52.885,
-    "volume_24h": 9372442.92957943,
-    "liquidity_usd": 805974.7506,
-    "fdv_usd": 11731721.5178255
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -56.301,
+    "volume_24h": 9343110.45911209,
+    "liquidity_usd": 785522.0754,
+    "fdv_usd": 11218726.1133822
   },
   "solana_STONK": {
     "symbol": "STONK",
     "name": "STONK / SPYx",
     "chain": "solana",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -1.081,
-    "volume_24h": 6570821.05977985,
-    "liquidity_usd": 2633580.2068,
-    "fdv_usd": 204323319.960538
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -1.318,
+    "volume_24h": 6640731.62689312,
+    "liquidity_usd": 2604512.7512,
+    "fdv_usd": 202050674.517455
   },
   "solana_PUMP": {
     "symbol": "PUMP",
     "name": "PUMP / USDC",
     "chain": "solana",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 12.359,
-    "volume_24h": 16074342.6154966,
-    "liquidity_usd": 27628990.508,
-    "fdv_usd": 4877205281.63667
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 7.846,
+    "volume_24h": 16422596.311124,
+    "liquidity_usd": 27135197.9901,
+    "fdv_usd": 4686695775.53622
   },
   "solana_USELESS": {
     "symbol": "USELESS",
@@ -70,11 +70,11 @@
     "name": "VVV / WETH",
     "chain": "base",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -2.594,
-    "volume_24h": 2211750.99741,
-    "liquidity_usd": 18074605.7759,
-    "fdv_usd": 2225012510.81258
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -2.508,
+    "volume_24h": 2219346.86876709,
+    "liquidity_usd": 18028204.8691,
+    "fdv_usd": 2218267318.22002
   },
   "base_DRV": {
     "symbol": "DRV",
@@ -92,33 +92,33 @@
     "name": "AERO / USDC",
     "chain": "base",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 4.281,
-    "volume_24h": 11612927.0867585,
-    "liquidity_usd": 1787035.3276,
-    "fdv_usd": 1641745698.10701
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 4.347,
+    "volume_24h": 11565480.307213,
+    "liquidity_usd": 1778347.3593,
+    "fdv_usd": 1628174829.75145
   },
   "base_SOL": {
     "symbol": "SOL",
     "name": "SOL / USDC 0.021%",
     "chain": "base",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 0.408,
-    "volume_24h": 8113704.29594016,
-    "liquidity_usd": 705380.0241,
-    "fdv_usd": 29222194.3342393
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 0.671,
+    "volume_24h": 8112804.23960018,
+    "liquidity_usd": 711443.8403,
+    "fdv_usd": 29071856.5177214
   },
   "bsc_AKE": {
     "symbol": "AKE",
     "name": "AKE / WBNB 0.01%",
     "chain": "bsc",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -3.824,
-    "volume_24h": 3837172.40081236,
-    "liquidity_usd": 2699316.0196,
-    "fdv_usd": 3059830240.93721
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -3.778,
+    "volume_24h": 3755694.30933362,
+    "liquidity_usd": 2704917.849,
+    "fdv_usd": 3088149740.92737
   },
   "bsc_CNPY": {
     "symbol": "CNPY",
@@ -137,8 +137,8 @@
     "chain": "bsc",
     "first_seen": 1789791510.8937361,
     "retention_until": 1790781319.2946963,
-    "price_change_24h": 1.773,
-    "volume_24h": 5960305.6900505,
+    "price_change_24h": 1.533,
+    "volume_24h": 6259779.69095109,
     "liquidity_usd": 447087.6093,
     "fdv_usd": 29568629.1454684
   },
@@ -147,22 +147,22 @@
     "name": "ARK / USDT",
     "chain": "bsc",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 1.333,
-    "volume_24h": 2690669.69159249,
-    "liquidity_usd": 57780306.156,
-    "fdv_usd": 228282550.976247
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 1.589,
+    "volume_24h": 2684014.40616793,
+    "liquidity_usd": 57442330.6031,
+    "fdv_usd": 226945411.216384
   },
   "bsc_\u9f99\u867e": {
     "symbol": "\u9f99\u867e",
     "name": "\u9f99\u867e / WBNB",
     "chain": "bsc",
     "first_seen": 1789791510.8937361,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 3.668,
-    "volume_24h": 4324853.03945852,
-    "liquidity_usd": 2474481.7398,
-    "fdv_usd": 71812741.9792213
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 4.045,
+    "volume_24h": 4336633.94853349,
+    "liquidity_usd": 2467521.9102,
+    "fdv_usd": 71398641.340725
   },
   "bsc_PIEVERSE": {
     "symbol": "PIEVERSE",
@@ -181,8 +181,8 @@
     "chain": "bsc",
     "first_seen": 1789791510.8937361,
     "retention_until": 1790781319.2946963,
-    "price_change_24h": -3.988,
-    "volume_24h": 617150.088098676,
+    "price_change_24h": -3.735,
+    "volume_24h": 617349.859007262,
     "liquidity_usd": 1672670.9531,
     "fdv_usd": 22519876.6054043
   },
@@ -191,11 +191,11 @@
     "name": "MarsCoin / USDT 0.25%",
     "chain": "bsc",
     "first_seen": 1789799681.189406,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -5.581,
-    "volume_24h": 4466044.61197107,
-    "liquidity_usd": 523581.9714,
-    "fdv_usd": 147216086.788577
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 2.07,
+    "volume_24h": 4324209.61094423,
+    "liquidity_usd": 532020.3174,
+    "fdv_usd": 151731425.495092
   },
   "base_MORPHO": {
     "symbol": "MORPHO",
@@ -235,33 +235,33 @@
     "name": "$BANANA / WBNB 0.01%",
     "chain": "bsc",
     "first_seen": 1789889698.5422356,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -0.156,
-    "volume_24h": 1608535.30418811,
-    "liquidity_usd": 4282291.753,
-    "fdv_usd": 77861821.099598
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 0.5,
+    "volume_24h": 1594707.20868765,
+    "liquidity_usd": 4278230.8805,
+    "fdv_usd": 77877497.5602786
   },
   "bsc_COLLECT": {
     "symbol": "COLLECT",
     "name": "COLLECT / BNB 0.007%",
     "chain": "bsc",
     "first_seen": 1789889698.5422356,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 3.864,
-    "volume_24h": 1796915.23531892,
-    "liquidity_usd": 2510945.5687,
-    "fdv_usd": 55477263.1375276
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 4.403,
+    "volume_24h": 1794899.44760765,
+    "liquidity_usd": 2505178.1759,
+    "fdv_usd": 55392660.1975466
   },
   "bsc_KII": {
     "symbol": "KII",
     "name": "KII / USDT 0.007%",
     "chain": "bsc",
     "first_seen": 1789889698.5422356,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 12.169,
-    "volume_24h": 71216356.6738571,
-    "liquidity_usd": 2115824.3587,
-    "fdv_usd": 23031164.4859
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 10.694,
+    "volume_24h": 70956269.1380668,
+    "liquidity_usd": 2182631.902,
+    "fdv_usd": 22932961.1698052
   },
   "solana_FARTCOIN": {
     "symbol": "FARTCOIN",
@@ -302,8 +302,8 @@
     "chain": "solana",
     "first_seen": 1790150055.8605478,
     "retention_until": 1790781319.2946963,
-    "price_change_24h": 8.73,
-    "volume_24h": 728168.01,
+    "price_change_24h": 8.28,
+    "volume_24h": 727912.94,
     "liquidity_usd": 423454.03,
     "fdv_usd": 320399495.0
   },
@@ -346,8 +346,8 @@
     "chain": "bsc",
     "first_seen": 1790150055.8605478,
     "retention_until": 1791016612.9247131,
-    "price_change_24h": -0.346,
-    "volume_24h": 607923.742756325,
+    "price_change_24h": 0.506,
+    "volume_24h": 601303.426867061,
     "liquidity_usd": 2900134.3288,
     "fdv_usd": 52998462.7813452
   },
@@ -467,8 +467,8 @@
     "chain": "solana",
     "first_seen": 1790411812.9247131,
     "retention_until": 1791183621.942123,
-    "price_change_24h": 4.376,
-    "volume_24h": 9114410.23124571,
+    "price_change_24h": -6.438,
+    "volume_24h": 9058873.78638216,
     "liquidity_usd": 579865.8023,
     "fdv_usd": 11595886.7364442
   },
@@ -489,8 +489,8 @@
     "chain": "bsc",
     "first_seen": 1790411812.9247131,
     "retention_until": 1791016612.9247131,
-    "price_change_24h": -15.917,
-    "volume_24h": 542319.42326736,
+    "price_change_24h": -20.916,
+    "volume_24h": 580536.92022193,
     "liquidity_usd": 960180.7029,
     "fdv_usd": 12544940.7036451
   },
@@ -533,8 +533,8 @@
     "chain": "base",
     "first_seen": 1790503362.2940483,
     "retention_until": 1791116707.6698508,
-    "price_change_24h": -18.562,
-    "volume_24h": 682979.369901082,
+    "price_change_24h": -8.065,
+    "volume_24h": 284377.406352048,
     "liquidity_usd": 783394.5196,
     "fdv_usd": 137857018.577837
   },
@@ -543,11 +543,11 @@
     "name": "Q / USDT 0.01%",
     "chain": "bsc",
     "first_seen": 1790503362.2940483,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -5.147,
-    "volume_24h": 8371326.7740474,
-    "liquidity_usd": 1013722.3789,
-    "fdv_usd": 124350578.25147
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 0.244,
+    "volume_24h": 8368910.12643426,
+    "liquidity_usd": 1024492.9279,
+    "fdv_usd": 129598975.582194
   },
   "solana_FONE": {
     "symbol": "FONE",
@@ -555,8 +555,8 @@
     "chain": "solana",
     "first_seen": 1790511907.6698508,
     "retention_until": 1791116707.6698508,
-    "price_change_24h": -11.242,
-    "volume_24h": 1399337.47246741,
+    "price_change_24h": -6.268,
+    "volume_24h": 1399011.95938918,
     "liquidity_usd": 826011.1536,
     "fdv_usd": 10859151.654266
   },
@@ -598,43 +598,43 @@
     "name": "CARDS / USDC",
     "chain": "solana",
     "first_seen": 1790684141.618435,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": 22.522,
-    "volume_24h": 13708058.7555497,
-    "liquidity_usd": 3863560.1413,
-    "fdv_usd": 447450296.865537
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 22.247,
+    "volume_24h": 13754196.7053689,
+    "liquidity_usd": 3870030.3254,
+    "fdv_usd": 446535636.245254
   },
   "solana_SI": {
     "symbol": "SI",
     "name": "SI / NVDAx",
     "chain": "solana",
     "first_seen": 1790684141.618435,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -18.746,
-    "volume_24h": 1674069.69539246,
-    "liquidity_usd": 615258.4939,
-    "fdv_usd": 20305229.61
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -25.829,
+    "volume_24h": 2511910.10925389,
+    "liquidity_usd": 576882.7125,
+    "fdv_usd": 17301608.31
   },
   "base_XDP": {
     "symbol": "XDP",
     "name": "xdp / USDC 0.01%",
     "chain": "base",
     "first_seen": 1790684141.618435,
-    "retention_until": 1791294310.98149,
-    "price_change_24h": -32.268,
-    "volume_24h": 167357557.877789,
-    "liquidity_usd": 1851153.0078,
-    "fdv_usd": 247162869.599982
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": -15.13,
+    "volume_24h": 171490749.948935,
+    "liquidity_usd": 1854189.746,
+    "fdv_usd": 246788838.499982
   },
   "bsc_QQQB": {
     "symbol": "QQQB",
     "name": "QQQB / WBNB 0.05%",
     "chain": "bsc",
     "first_seen": 1790684141.618435,
-    "retention_until": 1791291908.040951,
-    "price_change_24h": -0.186,
-    "volume_24h": 6243179.81586949,
-    "liquidity_usd": 820233.5601,
-    "fdv_usd": 58089924.0323194
+    "retention_until": 1791295716.0794427,
+    "price_change_24h": 0.015,
+    "volume_24h": 6210943.260057,
+    "liquidity_usd": 822429.1678,
+    "fdv_usd": 58007808.8397991
   }
 }
