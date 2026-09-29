@@ -11410,5 +11410,41 @@
     "carryScore": -8.9,
     "btcPrice": 84089,
     "isRealData": true
+  },
+  {
+    "date": "2026-09-27",
+    "timestamp": 1790467200000,
+    "apr7d": 5.15,
+    "apr30d": 5.08,
+    "apr60d": 4.99,
+    "apr90d": 4.9,
+    "apr180d": 4.55,
+    "spread90d7d": -0.25,
+    "spread30d7d": -0.07,
+    "spread60d30d": -0.09,
+    "spread180d30d": -0.53,
+    "excessReturn": -2.92,
+    "excessOverTBill": 0.58,
+    "carryScore": -6.1,
+    "btcPrice": 84420,
+    "isRealData": true
+  },
+  {
+    "date": "2026-09-28",
+    "timestamp": 1790553600000,
+    "apr7d": 4.78,
+    "apr30d": 4.84,
+    "apr60d": 4.92,
+    "apr90d": 5.01,
+    "apr180d": 5.31,
+    "spread90d7d": 0.23,
+    "spread30d7d": 0.06,
+    "spread60d30d": 0.08,
+    "spread180d30d": 0.47,
+    "excessReturn": -3.16,
+    "excessOverTBill": 0.34,
+    "carryScore": -7.4,
+    "btcPrice": 84458,
+    "isRealData": true
   }
 ]

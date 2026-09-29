@@ -171,21 +171,51 @@ async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
 }
 
 /**
+ * Fetch daily MSTR stock close history from Yahoo Finance (for post-snapshot mNAV estimation)
+ */
+async function fetchMstrStockPrices() {
+  try {
+    const resp = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/MSTR?range=5y&interval=1d', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }
+    });
+    if (!resp.ok) throw new Error('Yahoo HTTP ' + resp.status);
+    const json = await resp.json();
+    const res = json.chart?.result?.[0];
+    const ts = res?.timestamp;
+    const closes = res?.indicators?.quote?.[0]?.close;
+    const map = new Map();
+    if (Array.isArray(ts) && Array.isArray(closes)) {
+      for (let i = 0; i < ts.length; i++) {
+        const c = closes[i];
+        if (typeof c === 'number' && c > 0) {
+          map.set(new Date(ts[i] * 1000).toISOString().slice(0, 10), c);
+        }
+      }
+    }
+    return map;
+  } catch (err) {
+    console.error('[MacroFetcher] Error fetching Yahoo MSTR stock prices:', err.message);
+    return new Map();
+  }
+}
+
+/**
  * Fetch and build fully aligned macro dataset
  */
 async function fetchAndBuildMacroData() {
   console.log('[MacroFetcher] Starting data fetch for Macro Chart...');
-  const [mstrList, fred1y, fred10y, fredWalcl, fredWtregen, fredRrp, btcMap] = await Promise.all([
+  const [mstrList, fred1y, fred10y, fredWalcl, fredWtregen, fredRrp, btcMap, mstrStockMap] = await Promise.all([
     fetchMstrCost(),
     fetchFredSeries('DGS1'),
     fetchFredSeries('DGS10'),
     fetchFredSeries('WALCL'),
     fetchFredSeries('WTREGEN'),
     fetchFredSeries('RRPONTSYD'),
-    fetchBtcDailyPrices('2020-08-01')
+    fetchBtcDailyPrices('2020-08-01'),
+    fetchMstrStockPrices()
   ]);
 
-  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', WALCL=' + fredWalcl.size + ', WTREGEN=' + fredWtregen.size + ', RRP=' + fredRrp.size + ', BTC=' + btcMap.size + ' days');
+  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', WALCL=' + fredWalcl.size + ', WTREGEN=' + fredWtregen.size + ', RRP=' + fredRrp.size + ', BTC=' + btcMap.size + ' days, MSTR stock=' + mstrStockMap.size + ' days');
 
   // Load authoritative bitcointreasuries.net data
   const btData = loadBitcoinTreasuriesStrategy();
@@ -226,10 +256,39 @@ async function fetchAndBuildMacroData() {
   let curHoldings = 21454;
   let curVelocity = 0;
   let curMnav = 1.05;
-  let purchaseIdx = 0;
-  let mstrIdx = 0;
+  let mstrEventIdx = 0;
   let last1y = null;
   let last10y = null;
+
+  // Merge official snapshot purchases with live Coinglass records that postdate the snapshot,
+  // so cost/holdings keep updating after the static export's coverage ends
+  const lastOfficialPurchaseTs = btPurchases.length ? btPurchases[btPurchases.length - 1].timestamp : -Infinity;
+  const mergedMstrEvents = [
+    ...btPurchases.map(p => ({ timestamp: p.timestamp, cost: p.avgCostUSD, holdings: p.balance })),
+    ...effectiveMstrList
+      .filter(m => m.timestamp > lastOfficialPurchaseTs)
+      .map(m => ({ timestamp: m.timestamp, cost: m.microStrategyCost, holdings: m.totalBitcoin }))
+  ].sort((a, b) => a.timestamp - b.timestamp);
+  console.log('[MacroFetcher] MSTR events: ' + btPurchases.length + ' official purchases + ' + (mergedMstrEvents.length - btPurchases.length) + ' live Coinglass records');
+
+  // mNAV anchor: last snapshot dailyData point, used to estimate mNAV beyond snapshot coverage
+  // via market-cap/BTC-NAV ratio scaling with live MSTR stock price
+  const stockDates = Array.from(mstrStockMap.keys()).sort();
+  let stockIdx = 0;
+  let lastMstrPx = null;
+  let mnavAnchor = null;
+  if (btData && Array.isArray(btData.dailyData) && btData.dailyData.length) {
+    const anchorDaily = btData.dailyData.reduce((a, b) => (a.date > b.date ? a : b));
+    const anchorBtc = btcMap.get(anchorDaily.date);
+    let anchorPx = null;
+    for (let k = stockDates.length - 1; k >= 0; k--) {
+      if (stockDates[k] <= anchorDaily.date) { anchorPx = mstrStockMap.get(stockDates[k]); break; }
+    }
+    if (anchorDaily.mnav && anchorDaily.holdings && anchorBtc && anchorPx) {
+      mnavAnchor = { mnav: anchorDaily.mnav, nav: anchorDaily.holdings * anchorBtc, px: anchorPx };
+      console.log('[MacroFetcher] mNAV anchor @ ' + anchorDaily.date + ': mnav=' + anchorDaily.mnav + ' mstrPx=' + anchorPx.toFixed(2) + ' btc=' + anchorBtc);
+    }
+  }
 
   // Initialize Fed Liquidity with last known values before allDates[0]
   let lastWalcl = null;
@@ -245,20 +304,20 @@ async function fetchAndBuildMacroData() {
     const date = allDates[i];
     const timeMs = new Date(date).getTime();
 
-    // Advance bitcointreasuries official purchases to find active average cost
-    if (btPurchases.length > 0) {
-      while (purchaseIdx < btPurchases.length && btPurchases[purchaseIdx].timestamp <= timeMs + 86400000) {
-        lastMstrCost = btPurchases[purchaseIdx].avgCostUSD;
-        curHoldings = btPurchases[purchaseIdx].balance;
-        purchaseIdx++;
-      }
-    } else {
-      while (mstrIdx < effectiveMstrList.length && effectiveMstrList[mstrIdx].timestamp <= timeMs + 86400000) {
-        lastMstrCost = effectiveMstrList[mstrIdx].microStrategyCost;
-        curHoldings = effectiveMstrList[mstrIdx].totalBitcoin;
-        mstrIdx++;
-      }
+    // Advance merged MSTR events (official purchases + post-snapshot live Coinglass records)
+    while (mstrEventIdx < mergedMstrEvents.length && mergedMstrEvents[mstrEventIdx].timestamp <= timeMs + 86400000) {
+      lastMstrCost = mergedMstrEvents[mstrEventIdx].cost;
+      curHoldings = mergedMstrEvents[mstrEventIdx].holdings;
+      mstrEventIdx++;
     }
+
+    // Advance MSTR stock price pointer to last trading day <= date
+    while (stockIdx < stockDates.length && stockDates[stockIdx] <= date) {
+      lastMstrPx = mstrStockMap.get(stockDates[stockIdx]);
+      stockIdx++;
+    }
+
+    let mnavEstimated = false;
 
     // Check if bitcointreasuries daily time series has exact day data
     if (btDailyMap.has(date)) {
@@ -272,6 +331,14 @@ async function fetchAndBuildMacroData() {
       const prevHoldings = i >= 30 ? points[i - 30].mstrHoldings : (points[0] ? points[0].mstrHoldings : 21454);
       const holdingsDiff = curHoldings - prevHoldings;
       curVelocity = windowDays > 0 ? Number((Math.max(0, holdingsDiff) / windowDays).toFixed(1)) : 0;
+
+      // Estimate mNAV beyond snapshot coverage via market-cap/NAV ratio scaling
+      const btcToday = btcMap.get(date);
+      if (mnavAnchor && lastMstrPx && curHoldings > 0 && btcToday > 0) {
+        const navNow = curHoldings * btcToday;
+        curMnav = Number((mnavAnchor.mnav * (mnavAnchor.nav / navNow) * (lastMstrPx / mnavAnchor.px)).toFixed(3));
+        mnavEstimated = true;
+      }
     }
 
     if (fred1y.has(date)) last1y = fred1y.get(date);
@@ -298,6 +365,7 @@ async function fetchAndBuildMacroData() {
       mstrHoldings: curHoldings,
       mstrBuyVelocity30d: curVelocity,
       mnav: curMnav,
+      mnavEstimated,
       us1y: last1y,
       us10y: last10y,
       yieldSpread,
@@ -344,6 +412,7 @@ async function fetchAndBuildMacroData() {
     currentMstrVelocity30d: latest ? latest.mstrBuyVelocity30d : (btData?.metadata?.latestVelocity30d || 153.4),
     peakVelocity30d: peakVel,
     currentMnav: latest ? latest.mnav : (btData?.metadata?.latestMnav || 1.055),
+    mnavEstimated: latest ? !!latest.mnavEstimated : false,
     minMnav: btData?.metadata?.minMnav || 0.929,
     maxMnav: btData?.metadata?.maxMnav || 8.006,
     mstrPurchasesCount: btPurchases.length || effectiveMstrList.length,

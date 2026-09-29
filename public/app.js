@@ -4250,6 +4250,13 @@ function initGoldCorrelationEvents() {
   setupToggle(btnGoldToggleCorr, 'corr');
   setupToggle(btnGoldToggleBtc, 'btcPrice');
   setupToggle(btnGoldToggleGold, 'goldPrice');
+
+  // Auto-refresh gold correlation every 60 seconds when viewing (server-side cache TTL is 10 min)
+  setInterval(() => {
+    if (currentActiveView === 'view-gold-correlation' || currentActiveView === 'view-all') {
+      loadGoldCorrelationData(false);
+    }
+  }, 60000);
 }
 
 // ============================================================================

@@ -483,6 +483,7 @@ async function handleApiRequest(req, res, parsedUrl) {
             fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
             getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
+            getGoldCorrelationData(true).catch(e => console.error('[GoldFetcher] Sync refresh error:', e.message)),
             getAiBtcTensionData(true).catch(e => console.error('[AiBtcTensionFetcher] Sync refresh error:', e.message)),
             getMcClellanData(true).catch(e => console.error('[McClellanFetcher] Sync refresh error:', e.message))
           ]);

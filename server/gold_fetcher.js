@@ -7,7 +7,9 @@ const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Approx $18.5T for ~212,500 tonnes
 const BTC_CIRCULATING_SUPPLY = 19.8e6;     // Approx 19.8M circulating BTC in 2026
 
 let inMemoryCache = null;
+let lastFetchTime = 0;
 let currentFetchPromise = null;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
 /**
  * Calculates Pearson correlation coefficient between two equal-length numerical arrays
@@ -235,7 +237,8 @@ async function fetchGoldCorrelationFromSource() {
  * Public getter with memory caching, single-flight fetching, and disk fallback
  */
 async function getGoldCorrelationData(forceRefresh = false) {
-  if (!forceRefresh && inMemoryCache) {
+  const now = Date.now();
+  if (!forceRefresh && inMemoryCache && (now - lastFetchTime < CACHE_TTL_MS)) {
     return inMemoryCache;
   }
 
@@ -248,6 +251,7 @@ async function getGoldCorrelationData(forceRefresh = false) {
       console.log('[GoldFetcher] Fetching real-time PAXG and BTC klines from Binance...');
       const result = await fetchGoldCorrelationFromSource();
       inMemoryCache = result;
+      lastFetchTime = Date.now();
 
       // Persist to disk
       try {
@@ -267,6 +271,7 @@ async function getGoldCorrelationData(forceRefresh = false) {
           const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
           console.log('[GoldFetcher] Returning persisted disk cache fallback');
           inMemoryCache = cached;
+          lastFetchTime = Date.now();
           return cached;
         } catch (readErr) {
           console.warn('[GoldFetcher] Error reading disk fallback:', readErr.message);
