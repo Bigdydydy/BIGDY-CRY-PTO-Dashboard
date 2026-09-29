@@ -104,20 +104,20 @@ async function getSystemAuditData(doProbe = false) {
       primarySource: 'FRED (圣路易斯联储) + bitcointreasuries.net + Deribit 实时现货',
       targetEndpoints: [
         'https://api.stlouisfed.org/fred/series/observations (DGS1, DGS10, WALCL, WTREGEN, RRPONTSYD)',
-        'https://bitcointreasuries.net (118 official MSTR purchases)',
+        `https://bitcointreasuries.net (${macroData?.summary?.mstrPurchasesCount || 120} official MSTR purchases)`,
         'https://www.deribit.com/api/v2/public/get_index_price'
       ],
       timeframe: '宏观长线日频 (FRED 美债) + 周频 (WALCL 联储资产) + 30秒动态现货注入',
       updateInterval: '5m 后台常驻轮询',
       isRealtime: true,
       recordCount: macroData?.points?.length || 2245,
-      mstrPurchasesCount: macroData?.mstrPurchases?.length || 118,
+      mstrPurchasesCount: macroData?.summary?.mstrPurchasesCount || 120,
       lastUpdated: macroData?.summary?.updatedAt || cache.lastSyncCheckTime || serverTimeUTC,
       provenanceSignatures: [
         'FRED_DGS1_1Y_YIELD',
         'FRED_DGS10_10Y_YIELD',
         'FRED_WALCL_TOTAL_ASSETS',
-        '118_MSTR_OFFICIAL_PURCHASES_SEC_8K',
+        `${macroData?.summary?.mstrPurchasesCount || 120}_MSTR_OFFICIAL_PURCHASES_SEC_8K`,
         'DYNAMIC_SPOT_PROFIT_MULTIPLIER'
       ],
       healthStatus: (macroData?.points?.length > 0 || fs.existsSync(path.join(DATA_DIR, 'macro_chart.json'))) ? 'ONLINE' : 'INITIALIZING'

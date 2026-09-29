@@ -3,10 +3,11 @@
  * -----------------------------------------------------------------------------
  * 依据: 《波浪理论详解》手稿 OCR 第 1-378 页 + 柳玉冬微博实战研判体系。
  *
- * 手稿覆盖章节: 驱动浪基础(Ch1) / 通道(Ch2) / 斐波那契系统比率(Ch3) /
+ * 手稿覆盖章节: 驱动浪基础(Ch1) / 斐波那契系统比率(Ch3) /
  * 单锯齿(Ch4) / 平台形(Ch5) / 收缩三角形(Ch6) / 双锯齿与三锯齿(Ch7, 至P378止)。
  * 联合形(双重/三重横向整理)取手稿散见条文: P50-52 定义与回撤规则、P131-132 取点表、
  * P158/P272-276 内部结构限制、P297 时间上限、P301 x浪总量上限。
+ * 说明: 艾略特通道仅作为图表辅助参考线输出，不作为判定或制定波浪的标准。
  * 手稿缺失章节: Ch8 联合形专章(主体以散见条文实现), Ch9 推动浪验证手册,
  * Ch10-11 引导/终结楔形——楔形校验补充主流艾略特(EWI)条则并标注「通用」。
  *
@@ -15,7 +16,7 @@
  *   2. 规则库 RULE_BOOK: 每条规则带 类别(六类) / 手稿页码 / 软硬标记 / 端点需求
  *   3. 假设搜索: 跨拐点组合浪的终点 -> 硬规则剪枝 -> 指引打分 -> 结构复核
  *   4. 子浪结构: 优先用低周期 K 线, 否则更细 Zigzag; 数据不足如实标记, 不编造
- *   5. 输出: 主备方案 + 监测点(失效位) + 手稿取点表斐波那契目标 + 艾略特通道
+ *   5. 输出: 主备方案 + 监测点(失效位) + 手稿取点表斐波那契目标 + 辅助通道(非波浪制定标准)
  *
  * 验证顺序 (手稿方法论): 浪型规则 -> 比率规则 -> 时间规则 -> 指引(不否决只调分)
  * 关键术语 (手稿): 「价格」=起点到终点; 「运行总量」=含所有子浪的最高最低区间。
@@ -252,11 +253,6 @@
       g => { const r = g.l[3] / g.l[2]; return { pass: r >= 0.15 && r <= 0.55, detail: `浪4回撤 ${fmtPct(r)}` }; }),
     rg('G5', C_G_RATIO, false, null, 6, 'P96/P181', '浪5常为浪1的0.618/1/1.618倍', 1,
       g => { const r = g.l[4] / g.l[0]; return { pass: (r > 0.5 && r < 1.8) || near(r, [2.618], 0.15), detail: `浪5=浪1×${r.toFixed(2)}` }; }),
-    rg('G6', C_G_PAT, false, null, 5, 'P53-56', '艾略特平行通道：浪4终点宜落在过浪1终点的平行轨附近', 1,
-      g => {
-        const rail = lineVal(g.p[0].idx, g.p[0].price, g.p[2].idx, g.p[2].price, g.p[1].idx, g.p[1].price, g.p[4].idx);
-        return { pass: Math.abs(g.p[4].price - rail) <= 0.15 * g.l[2], detail: `浪4终点 ${fmtNum(g.p[4].price)} vs 下轨 ${fmtNum(rail)}` };
-      }),
     rg('G8', C_G_PAT, false, null, 3, '通用（EWI同级别显著性/right look）', '同级别显著性：驱动浪内部的逆向回撤不应大于相邻的同级别调整浪（浪2/浪4）', 1.5,
       (g, ev) => {
         if (!ev || !ev.highs || !ev.lows) return { pass: true, neutral: true, detail: '无K线数据未验' };
@@ -319,7 +315,7 @@
   const DIAGONAL_RULES = [
     rg('D1', C_PRICE, true, 'min', 5, 'P48（楔形反向）', '楔形浪4必须切入浪1价格区', 1,
       g => ({ pass: g.d * (g.p[4].price - g.p[1].price) <= EPS, detail: `浪4终点 ${fmtNum(g.p[4].price)} vs 浪1终点 ${fmtNum(g.p[1].price)}` })),
-    rg('D2', C_G_PAT, false, null, 5, '通用（手稿楔形章缺失）', '楔形通道线（1-3 与 2-4）应收敛或发散，不宜平行', 1,
+    rg('D2', C_G_PAT, false, null, 5, '通用（手稿楔形章缺失）', '楔形边界线（1-3 与 2-4）应收敛或发散，不宜平行', 1,
       g => {
         const sA = (g.p[3].price - g.p[1].price) / (g.p[3].idx - g.p[1].idx);
         const sB = (g.p[4].price - g.p[2].price) / (g.p[4].idx - g.p[2].idx);
@@ -429,15 +425,15 @@
       }),
     rg('T8', C_PRICE, true, null, 6, 'P302', 'e浪不能大于d浪', 1,
       g => ({ pass: g.l[4] <= g.l[3] + EPS, detail: `e=${fmtNum(g.l[4])} vs d=${fmtNum(g.l[3])}` })),
-    rg('T9', C_PRICE, true, null, 5, 'P301/P307', '通道线 a-c 与 b-d 必须收敛（仅 b-d 可水平，a-c 不可水平）', 1,
+    rg('T9', C_PRICE, true, null, 5, 'P301/P307', '收敛三角形：边界线 a-c 与 b-d 必须收敛（仅 b-d 可水平，a-c 不可水平）', 1,
       g => {
         const w = x => (lineVal(g.p[1].idx, g.p[1].price, g.p[3].idx, g.p[3].price, x) -
           lineVal(g.p[2].idx, g.p[2].price, g.p[4].idx, g.p[4].price, x)) * g.d;
         const wAt4 = w(g.p[4].idx), wAt2 = w(g.p[2].idx);
         const acFlat = Math.abs(g.p[3].price - g.p[1].price) <= 0.02 * Math.max(g.l[0], g.l[1]);
-        return { pass: wAt4 > EPS && wAt4 < wAt2 - EPS && !acFlat, detail: `通道宽 b→${fmtNum(wAt2)} d→${fmtNum(wAt4)}${acFlat ? '，a-c水平(违规)' : ''}` };
+        return { pass: wAt4 > EPS && wAt4 < wAt2 - EPS && !acFlat, detail: `边界宽 b→${fmtNum(wAt2)} d→${fmtNum(wAt4)}${acFlat ? '，a-c水平(违规)' : ''}` };
       }),
-    rg('T10', C_PRICE, true, null, 6, 'P307', '通道交点须在e浪终点右侧且不超出最长浪时间范围', 1,
+    rg('T10', C_PRICE, true, null, 6, 'P307', '收敛三角形：边界线交点须在e浪终点右侧且不超出最长浪时间范围', 1,
       g => {
         const sAc = (g.p[3].price - g.p[1].price) / (g.p[3].idx - g.p[1].idx);
         const sBd = (g.p[4].price - g.p[2].price) / (g.p[4].idx - g.p[2].idx);
@@ -447,7 +443,7 @@
         const maxT = Math.max.apply(null, g.t);
         return { pass: tA > g.p[5].idx && tA <= g.p[5].idx + maxT, detail: `交点距e ${Math.round(tA - g.p[5].idx)} 根K线 vs 上限 ${maxT}` };
       }),
-    rg('T11', C_PRICE, true, null, 5, 'P308', 'c/d浪子浪越过通道线不得超过前浪总量的10%', 1,
+    rg('T11', C_PRICE, true, null, 5, 'P308', '收敛三角形：c/d浪子浪越过边界线不得超过前浪总量的10%', 1,
       (g, ev) => {
         if (!ev || !ev.highs) return { pass: true, neutral: true, detail: '无K线数据未验' };
         const ac = [g.p[1].idx, g.p[1].price, g.p[3].idx, g.p[3].price];
@@ -460,7 +456,7 @@
           lineOvershoot(ev.highs, ev.lows, g.p[3].idx, g.p[4].idx, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[2] || 1);
         return { pass: o1 <= 0.1 + EPS && o2 <= 0.1 + EPS, detail: `c越线${fmtPct(o1)} d越线${fmtPct(o2)}` };
       }, { slow: true }),
-    rg('T12', C_PRICE, true, null, 6, 'P308', 'e浪子浪越过通道线不得超过d浪总量的10%', 1,
+    rg('T12', C_PRICE, true, null, 6, 'P308', '收敛三角形：e浪子浪越过边界线不得超过d浪总量的10%', 1,
       (g, ev) => {
         if (!ev || !ev.highs) return { pass: true, neutral: true, detail: '无K线数据未验' };
         const ac = [g.p[1].idx, g.p[1].price, g.p[3].idx, g.p[3].price];
@@ -984,7 +980,7 @@
         const height = Math.abs(lineVal(p[1].idx, p[1].price, p[3].idx, p[3].price, p[0].idx) -
           lineVal(p[2].idx, p[2].price, p[4].idx, p[4].price, p[0].idx));
         targets.push(tgt(p[5].price - d * height, '突破目标=三角形高度(P349)', null));
-        monitoringPivot = lvl(bdNow, 'b-d通道线·突破确认', '手稿P349-350: 突破须顺原趋势；反扑回到通道内即判误');
+        monitoringPivot = lvl(bdNow, 'b-d趋势线·突破确认', '手稿P349-350: 突破须顺原趋势；反扑回到区间内即判误');
         secondaryPivot = lvl(p[5].price, 'e浪终点·下一浪起点', '手稿P352: 三角形后下一浪必须从e浪终点起步');
       }
     } else if (type === 'COMBINATION' || type === 'TRIPLE_COMBINATION') {
@@ -1039,6 +1035,7 @@
   }
 
   function buildChannel(type, g) {
+    // 艾略特通道：仅作为视觉辅助参照物与投射辅助线输出，不作为制定或裁决波浪有效性的标准
     const p = g.p, n = p.length;
     const pt = q => ({ time: q.time, price: q.price });
     if (type === 'IMPULSE' || type === 'DIAGONAL') {
@@ -1047,24 +1044,24 @@
           type: 'CONVERGING',
           upperLine: { pA: pt(p[1]), pB: pt(p[3]) },
           lowerLine: { pA: pt(p[2]), pB: pt(p[4]) },
-          note: '楔形通道: 1-3 与 2-4 收敛/发散线'
+          note: '楔形边界参考线: 1-3 与 2-4（仅供视觉参考，非波浪判定标准）'
         };
       }
       if (n >= 5) {
-        return { type: 'PARALLEL', baseLine: { pA: pt(p[2]), pB: pt(p[4]) }, parallelLine: { p: pt(p[3]) }, note: '推动浪通道: 2-4 基线过浪3平行轨' };
+        return { type: 'PARALLEL', baseLine: { pA: pt(p[2]), pB: pt(p[4]) }, parallelLine: { p: pt(p[3]) }, note: '推动浪辅助通道: 2-4 基线过浪3平行轨（仅供视觉参考，非波浪判定标准）' };
       }
-      return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '早期通道: 0-2 基线过浪1平行轨' };
+      return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '早期辅助通道: 0-2 基线过浪1平行轨（仅供视觉参考，非波浪判定标准）' };
     }
     if (type === 'TRIANGLE' && n >= 5) {
       return {
         type: 'CONVERGING',
         upperLine: { pA: pt(p[1]), pB: pt(p[3]) },
         lowerLine: { pA: pt(p[2]), pB: pt(p[4]) },
-        note: '三角形艾略特通道: a-c 与 b-d 须收敛'
+        note: '三角形边界收敛线: a-c 与 b-d（仅供视觉参考，非波浪判定标准）'
       };
     }
     if (n >= 3) {
-      return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '调整浪通道: 0-b/x 基线过a/w平行轨' };
+      return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '调整浪辅助通道: 0-b/x 基线过a/w平行轨（仅供视觉参考，非波浪判定标准）' };
     }
     return null;
   }
@@ -1984,7 +1981,7 @@
       decisiveness: { level: 'NONE', topShare: 0, shown: 0, text: '无合规浪型' },
       dualScenario: null,
       mtf: null, forecast: null,
-      rulebookNote: '规则依据手稿P1-378（驱动浪基础/通道/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
+      rulebookNote: '规则依据手稿P1-378（驱动浪基础/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。艾略特通道仅作为辅助画线与视觉投影参考，不作为制定或裁决波浪的标准。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
 
     if (userSel && userSel.contextShortfall) {

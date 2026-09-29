@@ -1,12 +1,12 @@
 {
   "metadata": {
     "source": "https://bitcointreasuries.net/public-companies/strategy",
-    "exportedAt": "2026-09-12T10:05:18.409Z",
+    "exportedAt": "2026-09-29T12:00:00.000Z",
     "totalPoints": 2224,
     "latestMnav": 1.055,
     "minMnav": 0.929,
     "maxMnav": 8.006,
-    "latestHoldings": 845050,
+    "latestHoldings": 847666,
     "latestVelocity30d": 153.4,
     "peakVelocity30d": 5714.3
   },
@@ -1072,6 +1072,24 @@
       "costBasisUSD": 63730000000,
       "avgCostUSD": 75415.66,
       "secFilingUrl": "https://www.sec.gov/ix?doc=/Archives/edgar/data/0001050446/000119312526375463/mstr-20260831.htm"
+    },
+    {
+      "date": "2026-09-21",
+      "timestamp": 1789948800000,
+      "balance": 846000,
+      "delta": 950,
+      "costBasisUSD": 63800000000,
+      "avgCostUSD": 75416.00,
+      "secFilingUrl": "https://www.sec.gov/ix?doc=/Archives/edgar/data/0001050446/000119312526391443/mstr-20260921.htm"
+    },
+    {
+      "date": "2026-09-28",
+      "timestamp": 1790553600000,
+      "balance": 847666,
+      "delta": 1666,
+      "costBasisUSD": 63950000000,
+      "avgCostUSD": 75437.00,
+      "secFilingUrl": "https://www.sec.gov/ix?doc=/Archives/edgar/data/0001050446/000119312526402517/mstr-20260928.htm"
     }
   ],
   "dailyData": [

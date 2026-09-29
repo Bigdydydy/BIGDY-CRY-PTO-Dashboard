@@ -760,4 +760,15 @@ describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     const res = analyzeWaves(flat, 'BTC/USDT');
     assert.strictEqual(res.dualScenario, null);
   });
+
+  it('标准去耦: 艾略特平行通道不作为制定或评判波浪的标准 (无G6通道规则扣分)', () => {
+    const pts = [
+      P(0, 100, 'low'), P(10, 200, 'high'), P(20, 150, 'low'),
+      P(35, 400, 'high'), P(45, 360, 'low'), P(60, 500, 'high')
+    ];
+    const res = evaluatePattern('IMPULSE', pts, null);
+    const channelRule = res.checks.find(c => c.id === 'G6' || /平行通道/.test(c.text));
+    assert.strictEqual(channelRule, undefined, '波浪引擎不应包含艾略特通道制定标准');
+    assert.strictEqual(res.hardFails.length, 0);
+  });
 });

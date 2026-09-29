@@ -25,7 +25,7 @@
   let showMarkers = true;
   let showZigzag = true;
   let showSubwaves = false;
-  let showChannel = true;
+  let showChannel = false;
   let showMonitoring = true;
   let showTargets = true;
 
@@ -1747,14 +1747,28 @@
       }
     });
 
-    // 恢复全景按钮 - 清除选区并恢复全量自动波浪研判
+    // 完全重置图表按钮 - 清空所有波浪预设与选区，恢复纯净K线，准备选取新的K线区域
     const btnResetRange = document.getElementById('btn-reset-range');
     if (btnResetRange) {
       btnResetRange.addEventListener('click', () => {
         cancelRangeSelection();
         currentRange = null;
         updateRangeBanner(null, null);
-        runWaveAnalysis(currentSymbol, null);
+        clearWaveAnalysisState();
+        if (waveChart && currentBars && currentBars.length > 0) {
+          if (currentBars.length > 150) {
+            waveChart.timeScale().setVisibleLogicalRange({
+              from: currentBars.length - 150,
+              to: currentBars.length
+            });
+          } else {
+            waveChart.timeScale().fitContent();
+          }
+        }
+        const statusMsg = document.getElementById('wave-status-msg');
+        if (statusMsg) {
+          statusMsg.textContent = `● [${currentSymbol} ${currentTf.toUpperCase()}] 图表已完全重置（无任何波浪预设）· 请点击【🖱️ 框选分析模式】选取待研判的 K 线区域`;
+        }
       });
     }
 
@@ -1764,7 +1778,21 @@
         cancelRangeSelection();
         currentRange = null;
         updateRangeBanner(null, null);
-        runWaveAnalysis(currentSymbol, null);
+        clearWaveAnalysisState();
+        if (waveChart && currentBars && currentBars.length > 0) {
+          if (currentBars.length > 150) {
+            waveChart.timeScale().setVisibleLogicalRange({
+              from: currentBars.length - 150,
+              to: currentBars.length
+            });
+          } else {
+            waveChart.timeScale().fitContent();
+          }
+        }
+        const statusMsg = document.getElementById('wave-status-msg');
+        if (statusMsg) {
+          statusMsg.textContent = `● [${currentSymbol} ${currentTf.toUpperCase()}] 已退出选区并完全重置 · 请点击【🖱️ 框选分析模式】选取待研判的 K 线区域`;
+        }
       });
     }
 

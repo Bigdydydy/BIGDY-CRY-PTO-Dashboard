@@ -2350,9 +2350,9 @@
 
               <div class="chart-tools-group">
                 <button class="chart-tool-btn" id="btn-drag-range" title="两步点击框选任意区间分析 (最大750根K线)">🖱️ 框选分析模式</button>
-                <button class="chart-tool-btn" id="btn-reset-range" title="重置并分析全量 4H 宏观走势">↺ 重置全量4H</button>
+                <button class="chart-tool-btn" id="btn-reset-range" title="完全重置图表至无波浪预设状态，准备选取新的K线区域">↺ 重置图表 (清空波浪)</button>
                 <button class="chart-tool-btn" id="btn-toggle-subwaves" title="切换大级别波浪内部嵌套的小级别次级子浪">大浪嵌套小浪</button>
-                <button class="chart-tool-btn active" id="btn-toggle-channel" title="切换艾略特平行/收敛通道模块">艾略特通道</button>
+                <button class="chart-tool-btn" id="btn-toggle-channel" title="切换艾略特辅助通道线 (仅作视觉投影参考，不作为波浪判定标准)">艾略特通道</button>
                 <button class="chart-tool-btn active" id="btn-toggle-markers" title="切换图表上的浪型标注 ①-⑤/(A)-(C)">浪型标引</button>
                 <button class="chart-tool-btn active" id="btn-toggle-zigzag" title="切换波浪分笔折线">分笔折线</button>
                 <button class="chart-tool-btn active" id="btn-toggle-invalidation" title="切换关键监测点与防守水平虚线">核心监测点</button>
@@ -2366,7 +2366,7 @@
                 <span class="range-pulse-dot"></span>
                 <span>当前选定分析区间：<strong id="wave-range-text">--</strong></span>
               </div>
-              <button class="chart-tool-btn btn-sm" id="btn-cancel-range" title="恢复全量分析">退出选区并重置</button>
+              <button class="chart-tool-btn btn-sm" id="btn-cancel-range" title="清空所有波浪预设并退出选区">退出选区并清空</button>
             </div>
 
             <!-- Lightweight Charts Container -->
