@@ -9,13 +9,13 @@ import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import yfinance as yf
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
+from src.collectors.daily_close_store import DailyCloseStore
 
 CORE_BASKET_TICKERS = [
     "BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "DOGE-USD",
@@ -47,6 +47,7 @@ class HistoricalBreadthSeeder:
                 pass
 
         print(f"[Seeder] Downloading historical candles for Core & Meme baskets to construct breadth history...")
+        import yfinance as yf
         all_tickers = list(set(CORE_BASKET_TICKERS + MEME_BASKET_TICKERS))
         data = yf.download(all_tickers, start=start_date, auto_adjust=True, progress=False, threads=False)
 
@@ -58,6 +59,10 @@ class HistoricalBreadthSeeder:
             vol = None
 
         close = close.dropna(how="all").ffill()
+
+        # Backfill the daily close store for the Core universe so live
+        # classification can use the UTC close-to-close basis immediately.
+        self._seed_close_store(close)
 
         # Compute daily returns
         ret = close.pct_change(fill_method=None).dropna(how="all")
@@ -99,6 +104,38 @@ class HistoricalBreadthSeeder:
         res.to_csv(self.output_file)
         print(f"[Seeder] Successfully seeded historical breadth ({len(res)} days from {res.index.min().date()} to {res.index.max().date()}).")
         return res
+
+    def _seed_close_store(self, close: pd.DataFrame):
+        """
+        Persist the basket's yfinance close matrix into the DailyCloseStore
+        under the Core track. Yahoo-style suffixed tickers (e.g. SUI20947-USD)
+        are normalized by stripping the '-USD' quote suffix and trailing
+        disambiguation digits so they match live CoinGecko symbols.
+        """
+        try:
+            store = DailyCloseStore()
+            rows = []
+            for ticker in CORE_BASKET_TICKERS:
+                if ticker not in close.columns:
+                    continue
+                sym = ticker[:-4].upper() if ticker.endswith("-USD") else ticker.upper()
+                stripped = sym.rstrip("0123456789")
+                if stripped:
+                    sym = stripped
+                ser = close[ticker].dropna()
+                for dt, px in ser.items():
+                    rows.append({
+                        "date": dt.strftime("%Y-%m-%d"),
+                        "track": "core",
+                        "key": sym,
+                        "close_usd": float(px)
+                    })
+            if rows:
+                store.upsert_frame(pd.DataFrame(rows))
+                store.save()
+                print(f"[Seeder] Backfilled {len(rows)} core closes into the daily close store.")
+        except Exception as e:
+            print(f"[Seeder Warning] Close-store backfill failed: {e}")
 
 if __name__ == "__main__":
     seeder = HistoricalBreadthSeeder()

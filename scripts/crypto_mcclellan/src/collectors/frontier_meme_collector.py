@@ -18,10 +18,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
+from src.collectors.daily_close_store import DailyCloseStore, effective_pct_change, BASIS_ROLLING_24H
 
 class FrontierMemeCollector:
-    def __init__(self, cache_dir=config.CACHE_DIR):
+    def __init__(self, cache_dir=config.CACHE_DIR, close_store: DailyCloseStore = None):
         self.cache_dir = Path(cache_dir)
+        self.close_store = close_store or DailyCloseStore(cache_dir)
         self.registry_file = self.cache_dir / "meme_tracking_registry.json"
         self.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MacroQuant/1.0"}
 
@@ -130,6 +132,12 @@ class FrontierMemeCollector:
         # 2. Fetch from DexScreener
         candidates.extend(self.fetch_dexscreener_seeds())
 
+        today = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+
+        def _resolve_daily_pct(item_key: str, item: dict):
+            prev_close = self.close_store.previous_close("frontier", item_key, today)
+            return effective_pct_change(item.get("price_usd"), prev_close, item.get("price_change_24h"))
+
         # Apply Gatekeeper Criteria
         min_liq = config.MEME_GATEKEEPER["min_liquidity_usd"]
         min_vol = config.MEME_GATEKEEPER["min_volume_24h_usd"]
@@ -144,6 +152,7 @@ class FrontierMemeCollector:
             # Check if meets qualification standards
             if item["liquidity_usd"] >= min_liq and item["volume_24h"] >= min_vol and item["fdv_usd"] >= min_fdv:
                 key = f"{item['chain']}_{item['symbol']}"
+                daily_pct, pct_basis = _resolve_daily_pct(key, item)
                 if key not in registry:
                     newly_qualified += 1
                     registry[key] = {
@@ -153,6 +162,9 @@ class FrontierMemeCollector:
                         "first_seen": current_time,
                         "retention_until": current_time + retention_window,
                         "price_change_24h": item["price_change_24h"],
+                        "daily_pct": daily_pct,
+                        "pct_basis": pct_basis,
+                        "price_usd": item["price_usd"],
                         "volume_24h": item["volume_24h"],
                         "liquidity_usd": item["liquidity_usd"],
                         "fdv_usd": item["fdv_usd"]
@@ -161,13 +173,20 @@ class FrontierMemeCollector:
                     # Update live quote and extend retention
                     registry[key]["retention_until"] = max(registry[key].get("retention_until", 0), current_time + retention_window)
                     registry[key]["price_change_24h"] = item["price_change_24h"]
+                    registry[key]["daily_pct"] = daily_pct
+                    registry[key]["pct_basis"] = pct_basis
+                    registry[key]["price_usd"] = item["price_usd"]
                     registry[key]["volume_24h"] = item["volume_24h"]
                     registry[key]["liquidity_usd"] = item["liquidity_usd"]
                     registry[key]["fdv_usd"] = item["fdv_usd"]
             elif f"{item['chain']}_{item['symbol']}" in registry:
                 # Even if it dropped below threshold today, update price change for decline tracking!
                 key = f"{item['chain']}_{item['symbol']}"
+                daily_pct, pct_basis = _resolve_daily_pct(key, item)
                 registry[key]["price_change_24h"] = item["price_change_24h"]
+                registry[key]["daily_pct"] = daily_pct
+                registry[key]["pct_basis"] = pct_basis
+                registry[key]["price_usd"] = item["price_usd"]
                 registry[key]["volume_24h"] = item["volume_24h"]
 
         # Clean expired tokens (older than retention window)
@@ -181,13 +200,16 @@ class FrontierMemeCollector:
         # Build DataFrame of Active Tracking Meme Universe
         records = []
         for k, v in active_tokens.items():
-            pct = float(v.get("price_change_24h", 0.0))
+            pct = float(v.get("daily_pct", v.get("price_change_24h", 0.0)) or 0.0)
+            price_usd = float(v.get("price_usd") or 0.0)
             records.append({
                 "key": k,
                 "symbol": v["symbol"],
                 "name": v.get("name", v["symbol"]),
                 "chain": v.get("chain", "solana"),
+                "price_usd": price_usd,
                 "price_change_24h": pct,
+                "pct_basis": v.get("pct_basis", BASIS_ROLLING_24H),
                 "volume_24h": float(v.get("volume_24h", 0.0)),
                 "liquidity_usd": float(v.get("liquidity_usd", 0.0)),
                 "fdv_usd": float(v.get("fdv_usd", 0.0)),
@@ -195,7 +217,9 @@ class FrontierMemeCollector:
                 "is_decline": 1 if pct < 0 else 0,
                 "is_unchanged": 1 if pct == 0 else 0
             })
+            self.close_store.record("frontier", k, today, price_usd)
 
+        self.close_store.save()
         df = pd.DataFrame(records)
         if not df.empty:
             df = df.sort_values("volume_24h", ascending=False).head(config.MEME_GATEKEEPER["max_basket_size"])
@@ -227,6 +251,8 @@ class FrontierMemeCollector:
             "declines": dec_count,
             "unchanged": unch_count,
             "total_constituents": len(df),
+            "close_basis_count": int((df["pct_basis"] == "close_to_close").sum()) if "pct_basis" in df else 0,
+            "rolling_basis_count": int((df["pct_basis"] == "rolling_24h").sum()) if "pct_basis" in df else len(df),
             "ramo": ramo,
             "vramo": vramo,
             "adv_volume_usd": adv_vol,
