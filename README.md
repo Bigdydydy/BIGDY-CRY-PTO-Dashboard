@@ -87,6 +87,15 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **艾略特通道与关键监测点**：
   - 辅助通道动态投影，结合手稿斐波那契目标位与失效反转临界点。
   - 决断度与概率权重的多重候选浪型智能排序输出。
+- **v3 柳氏实战信号层**（依据柳玉冬 2026 年微博研判按标的时间串联提炼，见 `docs/module8_wave_v3.md`）：
+  - 监测点战法（当前段小级别拐点 + 确认位）、最大回撤判据（回撤量超过段内最大回撤 → 小级别见顶/底）。
+  - 吃掉前段 0.618 / 0.7 判据与调整分部投射（三角形 b≈0.618、平台/联合形 b/x≥0.7、双锯齿 x 不必到 0.618）。
+  - 出身检验：当前段非五浪 → 不作新趋势起点，列出引导楔形成立条件。
+  - 级别阶梯：高一级别 → 本级别 → 当前段小级别嵌套计数。
+- **标的扩展**：BTC/ETH + 柳玉冬跟踪的币安 TradFi 永续（XAU、XAG、CL、CRCL、小米 HK1810、SNDK、NVDA 等）。
+- **柳玉冬波浪脉络**：`data/liu_wave_threads.json` 将同一标的的研判按时间串联（监测点轨迹、叙事段、价位谱系），前端用已加载 K 线客观核验每个价位是否被触发。
+  - 重新生成：`node scripts/liu_threads/build_liu_threads.js [语料目录]`
+  - 真实 K 线回放校准：`node scripts/liu_threads/replay_liu_threads.js XAU,XAG,CL,CRCL`
 
 ---
 
@@ -185,6 +194,8 @@ PORT=8080 npm start
 | `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
 | `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h) |
 | `/api/wave/analysis` | `GET / POST` | 20 req/min IP 限流 | 柳玉冬波浪理论全量智能研判、铁律校验与候选集引擎 |
+| `/api/wave/symbols` | `GET` | — | 波浪研判标的白名单（加密 + 柳玉冬跟踪的 TradFi 永续） |
+| `/api/wave/liu-thread` | `GET` | — | 指定标的的柳玉冬波浪脉络（按时间串联的研判线程） |
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
 

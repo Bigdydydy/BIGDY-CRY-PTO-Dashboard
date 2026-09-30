@@ -226,7 +226,7 @@ describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     }, /K线数据不足/);
   });
 
-  it('HTTP API: GET /api/wave/klines 严格限制标的为 BTC/USDT 与 ETH/USDT', async () => {
+  it('HTTP API: GET /api/wave/klines 严格限制标的为白名单 (BTC/ETH + 柳玉冬跟踪的TradFi永续)', async () => {
     await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', async () => {
         const port = server.address().port;
@@ -235,7 +235,8 @@ describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
           const resInvalid = await fetch(`http://127.0.0.1:${port}/api/wave/klines?symbol=SOLUSDT&interval=4h`);
           assert.strictEqual(resInvalid.status, 400);
           const jsonInvalid = await resInvalid.json();
-          assert.ok(jsonInvalid.error.includes('仅限定 BTC/USDT 与 ETH/USDT'));
+          assert.ok(jsonInvalid.error.includes('白名单'));
+          assert.ok(jsonInvalid.error.includes('BTC/USDT') && jsonInvalid.error.includes('XAU/USDT'));
 
           // 非 4h/1h/15m 周期应被拒绝 400
           const resBadInterval = await fetch(`http://127.0.0.1:${port}/api/wave/klines?symbol=BTCUSDT&interval=1m`);

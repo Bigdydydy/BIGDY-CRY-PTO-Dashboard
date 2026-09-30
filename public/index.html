@@ -1995,6 +1995,25 @@
               <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
               <button class="wave-symbol-btn" data-symbol="ETH/USDT">ETH / USDT</button>
             </div>
+            <select class="wave-symbol-select" id="wave-symbol-select" aria-label="柳玉冬跟踪标的 (币安 TradFi 永续)" title="柳玉冬微博跟踪标的 · 币安 TradFi 永续行情">
+              <option value="">柳玉冬跟踪标的 ▾</option>
+              <option value="XAU/USDT">黄金 XAU</option>
+              <option value="XAG/USDT">白银 XAG</option>
+              <option value="CL/USDT">WTI原油 CL</option>
+              <option value="CRCL/USDT">Circle CRCL</option>
+              <option value="HK1810/USDT">小米集团 1810</option>
+              <option value="SNDK/USDT">闪迪 SNDK</option>
+              <option value="NVDA/USDT">英伟达 NVDA</option>
+              <option value="MSTR/USDT">Strategy MSTR</option>
+              <option value="GOOGL/USDT">谷歌 GOOGL</option>
+              <option value="INTC/USDT">英特尔 INTC</option>
+              <option value="AAPL/USDT">苹果 AAPL</option>
+              <option value="MU/USDT">美光 MU</option>
+              <option value="COIN/USDT">Coinbase COIN</option>
+              <option value="PLTR/USDT">Palantir PLTR</option>
+              <option value="SPCX/USDT">SpaceX概念 SPCX</option>
+              <option value="BABA/USDT">阿里巴巴 BABA</option>
+            </select>
             <div class="wave-symbol-group" role="group" aria-label="选择周期">
               <button class="wave-symbol-btn wave-tf-btn" data-interval="15m">15m</button>
               <button class="wave-symbol-btn wave-tf-btn" data-interval="1h">1H</button>
@@ -2171,6 +2190,33 @@
               </p>
             </div>
 
+            <!-- 3.5 柳氏实战信号 (v3: 监测点战法 / 最大回撤 / 吃掉0.7 / 调整分部 / 出身) -->
+            <div class="bento-card" id="card-wave-liu-signals">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>柳氏实战信号 · 当前段</h3>
+                  </div>
+                  <span class="card-badge badge-neutral" id="wave-liu-signal-badge">待研判</span>
+                </div>
+              </div>
+              <div id="wave-liu-signals-body" class="liu-signals-body">
+                <p class="liu-idle">研判后显示：监测点战法、最大回撤判据、吃掉前段0.618/0.7、调整分部投射与出身检验。</p>
+              </div>
+            </div>
+
+            <!-- 3.6 级别阶梯 (大级别 → 本级别 → 当前段小级别) -->
+            <div class="bento-card" id="card-wave-degree-ladder">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>级别阶梯 · 嵌套计数</h3>
+                </div>
+              </div>
+              <div id="wave-degree-ladder-body" class="liu-ladder">
+                <p class="liu-idle">研判后显示高一级别、本级别与当前段小级别的嵌套关系。</p>
+              </div>
+            </div>
+
             <!-- 4. Blocker Diagnostics (说明哪里阻止了浪型判断) -->
             <div class="bento-card" id="card-wave-blockers" style="display: none;">
               <div class="card-header">
@@ -2232,6 +2278,26 @@
             </div>
           </div>
         </div> <!-- /.card-body -->
+
+        <!-- 柳玉冬波浪脉络: 同一标的的微博研判按时间串联 (data/liu_wave_threads.json) -->
+        <div class="bento-card liu-thread-card" id="card-liu-thread">
+          <div class="card-header liu-thread-header">
+            <div>
+              <div class="card-title-group">
+                <h3>柳玉冬波浪脉络 · 同标的按时间串联</h3>
+              </div>
+              <p class="card-desc" id="liu-thread-desc">选择柳玉冬跟踪标的后，按时间串联其每篇研判的浪型、监测点与目标，并用当前 K 线核验价位是否被触发。</p>
+            </div>
+            <div class="chart-tools-group">
+              <span class="card-badge badge-neutral" id="liu-thread-badge">无语料</span>
+              <button class="chart-tool-btn" id="btn-liu-overlay" title="在K线图上叠加最新一篇研判的监测点与目标位">叠加最新监测点</button>
+            </div>
+          </div>
+          <div id="liu-thread-summary" class="liu-thread-summary"></div>
+          <div id="liu-thread-arcs" class="liu-arcs"></div>
+          <div id="liu-thread-trail" class="liu-trail"></div>
+          <div id="liu-thread-entries" class="liu-entries"></div>
+        </div>
       </section> <!-- /#module-wave-radar -->
     </div> <!-- /#view-wave-radar -->
 

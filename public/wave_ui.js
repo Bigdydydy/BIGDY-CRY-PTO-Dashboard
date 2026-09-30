@@ -838,6 +838,7 @@
     const bottomSignal = document.getElementById('wave-bottom-signal');
     if (thesisText) thesisText.textContent = `请使用【🖱️ 框选分析模式】选择 ${currentTf.toUpperCase()} K 线行情走势区间以生成柳玉冬实战研判结论。`;
     if (bottomSignal) bottomSignal.textContent = '';
+    resetLiuSignalCards();
   }
 
   /**
@@ -880,6 +881,7 @@
       // 入场不自动数浪：浪的起点应由用户意图决定——
       // 「框选」后按选区研判，或点「智能研判」解算全量当前浪位
       clearWaveAnalysisState();
+      loadLiuThread(symbol);
       if (statusMsg) {
         statusMsg.textContent = `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 开启「框选分析」指定区间，或点击「智能研判」解算全量浪位`;
       }
@@ -1662,9 +1664,311 @@
 
     if (analysis.commentary) {
       if (elThesis) elThesis.textContent = analysis.commentary.thesis;
-      if (elBottomSignal) elBottomSignal.textContent = analysis.commentary.bottomTopSignal;
+      if (elBottomSignal) {
+        const extra = (analysis.commentary.liuLines || []).map(t => `· ${t}`).join('\n');
+        elBottomSignal.style.whiteSpace = 'pre-line';
+        elBottomSignal.textContent = analysis.commentary.bottomTopSignal + (extra ? `\n${extra}` : '');
+      }
       if (elQuote) elQuote.textContent = analysis.commentary.quote;
     }
+
+    // 5. v3 柳氏实战信号 & 级别阶梯
+    renderLiuSignals(analysis);
+    renderDegreeLadder(analysis);
+  }
+
+  // ---------------------------------------------------------------------------
+  // v3 · 柳氏实战信号 / 级别阶梯 / 柳玉冬波浪脉络 (按标的时间串联)
+  // ---------------------------------------------------------------------------
+
+  let liuThread = null;
+  let liuThreadSymbol = null;
+  let showLiuOverlay = false;
+  let liuPriceLines = [];
+  let liuEntriesShown = 30;
+
+  const LIU_METHOD_SHORT = {
+    MONITOR: '监测点', LARGEST_COUNTERMOVE: '最大回撤', EAT_BACK: '吃掉0.7', NOT_MOTIVE: '非推动浪',
+    MOTIVE_FORMED: '成推动浪', LEADING_DIAGONAL: '引导楔形', PARTS: '调整分部', DEGREE: '级别',
+    VALUE_ZONE: '便宜区', TIME_RULE: '时间窗', EXT_LIMIT: '极限', RETRACE_RANGE: '0.2-0.618', REVISION: '修正'
+  };
+  const LIU_KIND = { monitor: '监测', trigger: '触发', target: '目标', target_hit: '达标', support: '支撑', resistance: '压力' };
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function fmtP(v) {
+    if (v === null || v === undefined || !isFinite(v)) return '--';
+    const a = Math.abs(v);
+    return Number(v).toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 1 : a >= 10 ? 2 : 4 });
+  }
+  function stanceChip(st) {
+    if (st === 'BULL') return '<span class="liu-chip pos">看涨</span>';
+    if (st === 'BEAR') return '<span class="liu-chip neg">看跌/警惕</span>';
+    if (st === 'MIXED') return '<span class="liu-chip warn">多空并提</span>';
+    return '<span class="liu-chip">中性</span>';
+  }
+
+  function resetLiuSignalCards() {
+    const body = document.getElementById('wave-liu-signals-body');
+    const badge = document.getElementById('wave-liu-signal-badge');
+    const ladder = document.getElementById('wave-degree-ladder-body');
+    if (body) body.innerHTML = '<p class="liu-idle">研判后显示：监测点战法、最大回撤判据、吃掉前段0.618/0.7、调整分部投射与出身检验。</p>';
+    if (badge) { badge.textContent = '待研判'; badge.className = 'card-badge badge-neutral'; }
+    if (ladder) ladder.innerHTML = '<p class="liu-idle">研判后显示高一级别、本级别与当前段小级别的嵌套关系。</p>';
+  }
+
+  function renderLiuSignals(analysis) {
+    const body = document.getElementById('wave-liu-signals-body');
+    const badge = document.getElementById('wave-liu-signal-badge');
+    if (!body) return;
+    const ls = analysis && analysis.liuSignals;
+    if (!ls) { resetLiuSignalCards(); return; }
+    const bull = ls.direction === 'BULLISH';
+    const mp = ls.monitorPoint;
+    const stTxt = mp.status === 'HOLDING' ? (bull ? '上涨延续中' : '下跌延续中')
+      : mp.status === 'BROKEN' ? (bull ? '小级别见顶' : '小级别见底') : '本段已结束';
+    if (badge) {
+      badge.textContent = stTxt;
+      badge.className = `card-badge ${mp.status === 'HOLDING' ? (bull ? 'badge-bull' : 'badge-bear') : 'badge-neutral'}`;
+    }
+    const eat = ls.eatBack;
+    const pctW = eat.ratio === null ? 0 : Math.min(100, eat.ratio / 1.2 * 100);
+    const ticks = [0.618, 0.7, 1].map(k => `<div class="liu-eat-tick${k === 0.7 ? ' up' : ''}" style="left:${(k / 1.2 * 100).toFixed(1)}%"><span>${k}</span></div>`).join('');
+    const parts = (ls.partsProjector || []).map(r => `
+      <tr class="${r.alive ? '' : 'dead'}">
+        <td>${esc(r.pattern)} <span style="color:var(--text-muted)">${esc(r.role)}浪</span></td>
+        <td class="num">${fmtP(r.minPrice)}</td>
+        <td>${r.alive ? (r.reachedMin ? '<span class="liu-chip pos">满足</span>' : '<span class="liu-chip">未到</span>') : '<span class="liu-chip neg">否决</span>'}</td>
+      </tr>`).join('');
+    const origin = ls.origin || {};
+    body.innerHTML = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>监测点战法</span><span class="liu-chip ${mp.status === 'HOLDING' ? 'pos' : 'warn'}">${fmtP(mp.price)}</span></div>
+        ${esc(mp.text)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>最大回撤判据</span><span class="liu-chip ${ls.largestCounterMove.exceeded ? 'warn' : ''}">段内最大 ${fmtP(ls.largestCounterMove.innerMax)}</span></div>
+        ${esc(ls.largestCounterMove.text)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>吃掉前段比例</span><span class="liu-chip info">${eat.ratio === null ? '--' : (eat.ratio * 100).toFixed(0) + '%'}</span></div>
+        <div class="liu-eat-bar"><div class="liu-eat-fill" style="width:${pctW.toFixed(1)}%"></div>${ticks}</div>
+        ${esc(eat.verdict)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>调整分部投射（前段作第一部分时，第二部分最低要求）</span></div>
+        ${(ls.partsProjector || []).some(r => r.alive) ? '' : '<div style="color:var(--text-muted);margin-bottom:2px">当前段已远超前段（超过各浪型上限），前段不再是本级别调整的第一部分，投射仅作参考。</div>'}
+        <table class="liu-parts-table"><tbody>${parts}</tbody></table>
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>出身 · 当前段结构</span><span class="liu-chip ${origin.structure === '5' ? 'pos' : origin.structure === '3' ? 'neg' : ''}">${origin.structure === '5' ? '五浪' : origin.structure === '3' ? '非五浪' : '待定'}</span></div>
+        ${esc(origin.text || '')}
+        ${ls.threeLegWarning ? `<div style="margin-top:4px;color:var(--color-warn)">${esc(ls.threeLegWarning)}</div>` : ''}
+        ${origin.leadingDiagonal ? `<div style="margin-top:4px;color:var(--text-muted)">${esc(origin.leadingDiagonal.text)}</div>` : ''}
+      </div>`;
+  }
+
+  function renderDegreeLadder(analysis) {
+    const el = document.getElementById('wave-degree-ladder-body');
+    if (!el) return;
+    const dl = analysis && analysis.degreeLadder;
+    if (!dl || !dl.levels || !dl.levels.length) {
+      el.innerHTML = '<p class="liu-idle">无可用的级别阶梯。</p>';
+      return;
+    }
+    const cls = { HIGHER: 'higher', MAIN: 'main', LOWER: 'lower' };
+    const rows = dl.levels.map(l => {
+      let txt;
+      if (l.count) {
+        const pts = l.count.pivots.map((p, i) => `${esc(l.count.waveLabels[i] || '')}:${fmtP(p.price)}`).join(' → ');
+        txt = `<strong>${esc(l.count.name)}</strong><div style="font-family:var(--font-mono);font-size:0.64rem;color:var(--text-muted);margin-top:2px">${pts}</div>`;
+      } else if (l.degree === 'LOWER') {
+        txt = esc(l.text || '');
+      } else {
+        txt = '<span style="color:var(--text-muted)">该级别暂无合规计数</span>';
+      }
+      const meta = l.pivotCount ? `<div style="font-size:0.6rem;color:var(--text-muted);font-weight:500">${l.pivotCount} 拐点</div>` : '';
+      return `<div class="liu-ladder-row ${cls[l.degree] || ''}"><div class="deg">${esc(l.label)}${meta}</div><div>${txt}</div></div>`;
+    }).join('');
+    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '');
+  }
+
+  // ---- 柳玉冬波浪脉络 ----
+
+  /** 用已加载K线客观核验某价位在发帖后是否被触发 (不在K线覆盖范围内则返回 null) */
+  function verifyLevel(level, ts) {
+    if (!currentBars || !currentBars.length) return null;
+    if (ts < currentBars[0].time || ts > currentBars[currentBars.length - 1].time) return null;
+    const i0 = currentBars.findIndex(b => b.time > ts);
+    if (i0 < 0) return null;
+    const ref = currentBars[Math.max(0, i0 - 1)].close;
+    if (Math.abs(level.price - ref) / ref > 0.35) return null;
+    // 价位在参考价下方 → 看是否被跌破；上方 → 看是否被涨破
+    const below = level.side ? level.side === 'below' : level.price < ref;
+    for (let i = i0; i < currentBars.length; i++) {
+      const b = currentBars[i];
+      if (below ? b.low <= level.price : b.high >= level.price) {
+        return { hit: true, time: b.time, below };
+      }
+    }
+    return { hit: false, below };
+  }
+
+  function levelChip(l, ts) {
+    const v = verifyLevel(l, ts);
+    let cls = '', mark = '';
+    if (v) {
+      if (v.hit) {
+        const d = new Date(v.time * 1000);
+        mark = ` ✓${v.below ? '破' : '达'} ${d.getMonth() + 1}/${d.getDate()}`;
+        cls = l.kind === 'target' || l.kind === 'target_hit' ? 'pos' : 'warn';
+      } else {
+        mark = ' 未触发';
+      }
+    }
+    const f0 = l.followups && l.followups[0];
+    const fu = f0 ? ` · 后帖${f0.verb === 'HIT' ? '称实现' : f0.verb === 'BROKEN' ? '称被破' : '称守住'}` : '';
+    return `<span class="liu-chip ${cls}" title="${esc(l.phrase || '')}">${LIU_KIND[l.kind] || esc(l.kind)} ${fmtP(l.price)}${esc(mark)}${esc(fu)}</span>`;
+  }
+
+  function renderLiuTrailSvg(th) {
+    const el = document.getElementById('liu-thread-trail');
+    if (!el) return;
+    const trail = (th && th.monitorTrail) || [];
+    if (trail.length < 2) { el.innerHTML = ''; return; }
+    const pts = trail.map(t => ({ t: Date.parse(t.date + 'T12:00:00+08:00') / 1000, p: t.price }));
+    const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+    const closes = (currentBars || []).filter(b => b.time >= t0 && b.time <= t1 + 86400).map(b => ({ t: b.time, p: b.close }));
+    const all = pts.map(q => q.p).concat(closes.map(q => q.p));
+    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    const pad = (hi - lo) * 0.08 || hi * 0.02;
+    lo -= pad; hi += pad;
+    const W = 1000, Hh = 150, L = 8, R = 8, T = 10, B = 18;
+    const x = t => L + (W - L - R) * (t - t0) / Math.max(1, t1 - t0);
+    const y = p => T + (Hh - T - B) * (1 - (p - lo) / (hi - lo));
+    const closePath = closes.length > 1 ? closes.map((c, i) => `${i ? 'L' : 'M'}${x(c.t).toFixed(1)},${y(c.p).toFixed(1)}`).join('') : '';
+    const stepPath = pts.map((q, i) => i ? `H${x(q.t).toFixed(1)}V${y(q.p).toFixed(1)}` : `M${x(q.t).toFixed(1)},${y(q.p).toFixed(1)}`).join('') + `H${x(t1).toFixed(1)}`;
+    const dots = pts.map((q, i) => `<circle cx="${x(q.t).toFixed(1)}" cy="${y(q.p).toFixed(1)}" r="3" fill="var(--accent-primary)"><title>${esc(trail[i].date)} 监测点 ${fmtP(q.p)}</title></circle>`).join('');
+    el.innerHTML = `
+      <svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="柳玉冬监测点轨迹与收盘价">
+        ${closePath ? `<path d="${closePath}" fill="none" stroke="var(--text-muted)" stroke-width="1" opacity="0.7" vector-effect="non-scaling-stroke"/>` : ''}
+        <path d="${stepPath}" fill="none" stroke="var(--accent-primary)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+        ${dots}
+        <text class="axis-label" x="${L}" y="${Hh - 4}">${esc(trail[0].date)}</text>
+        <text class="axis-label" x="${W - R}" y="${Hh - 4}" text-anchor="end">${esc(trail[trail.length - 1].date)}</text>
+        <text class="axis-label" x="${W - R}" y="${T + 8}" text-anchor="end">${fmtP(hi)}</text>
+        <text class="axis-label" x="${W - R}" y="${Hh - B - 2}" text-anchor="end">${fmtP(lo)}</text>
+      </svg>
+      <div style="font-size:0.64rem;color:var(--text-muted);margin-top:2px">橙色阶梯 = 柳玉冬逐帖监测点轨迹（监测点战法）；灰线 = 当前周期收盘价（仅覆盖已加载K线的时间段）</div>`;
+  }
+
+  function renderLiuThread() {
+    const th = liuThread;
+    const badge = document.getElementById('liu-thread-badge');
+    const desc = document.getElementById('liu-thread-desc');
+    const sum = document.getElementById('liu-thread-summary');
+    const arcs = document.getElementById('liu-thread-arcs');
+    const list = document.getElementById('liu-thread-entries');
+    const trailEl = document.getElementById('liu-thread-trail');
+    if (!sum || !list) return;
+    if (!th) {
+      if (badge) { badge.textContent = '无语料'; badge.className = 'card-badge badge-neutral'; }
+      if (desc) desc.textContent = `${currentSymbol} 暂无柳玉冬研判语料。请从「柳玉冬跟踪标的」中选择（黄金、白银、原油、Circle、小米等）。`;
+      sum.innerHTML = '';
+      if (arcs) arcs.innerHTML = '';
+      if (trailEl) trailEl.innerHTML = '';
+      list.innerHTML = '';
+      applyLiuOverlay();
+      return;
+    }
+    if (badge) { badge.textContent = `${th.posts} 帖 · ${th.first} ~ ${th.last}`; badge.className = 'card-badge badge-bull'; }
+    if (desc) desc.textContent = `${th.name}：按时间串联 ${th.posts} 篇研判（含波浪图解 ${th.wavePosts} 篇）。价位后的「✓破/✓达」由当前已加载 K 线客观核验；「后帖称…」是作者在后续帖子里的自述。`;
+    const ls = th.lineageStats || {};
+    const topMethods = Object.entries(th.methodCount || {}).sort((a, b) => b[1] - a[1]).slice(0, 4)
+      .map(([k, n]) => `${LIU_METHOD_SHORT[k] || k}×${n}`).join(' · ');
+    sum.innerHTML = `
+      <div class="liu-stat">研判篇数<strong>${th.posts}</strong></div>
+      <div class="liu-stat">监测点轨迹<strong>${(th.monitorTrail || []).length}</strong></div>
+      <div class="liu-stat">叙事段<strong>${(th.arcs || []).length}</strong></div>
+      <div class="liu-stat">价位后帖跟进<strong>${ls.withFollowup || 0}/${ls.levels || 0}</strong></div>
+      <div class="liu-stat" style="flex:1;min-width:220px">常用方法<strong style="font-size:0.72rem;font-family:var(--font-sans)">${esc(topMethods || '--')}</strong></div>`;
+    if (arcs) {
+      arcs.innerHTML = (th.arcs || []).map(a => {
+        const tip = `${a.start} ~ ${a.end} · ${a.stance === 'BULL' ? '看涨' : a.stance === 'BEAR' ? '看跌' : '中性'} · ${a.posts}帖 · ${a.trigger}${a.patterns.length ? ' · ' + a.patterns.join('/') : ''}`;
+        return `<div class="liu-arc ${esc(a.stance)}" style="flex:${a.posts}" title="${esc(tip)}"></div>`;
+      }).join('');
+    }
+    renderLiuTrailSvg(th);
+    const entries = th.entries.slice().reverse();
+    const shown = entries.slice(0, liuEntriesShown);
+    list.innerHTML = shown.map(e => {
+      const tags = [stanceChip(e.stance)]
+        .concat(e.patterns.map(p => `<span class="liu-chip info">${esc(p)}</span>`))
+        .concat(e.methods.filter(m => m !== 'MONITOR').map(m => `<span class="liu-chip">${esc(LIU_METHOD_SHORT[m] || m)}</span>`))
+        .concat(e.waveTags.length ? [`<span class="liu-chip">浪位 ${esc(e.waveTags.join('/'))}</span>`] : []);
+      const levels = e.levels.map(l => levelChip(l, e.ts)).join('');
+      const zoneName = z => z.label === 'value_zone' ? '便宜区' : z.label === 'support_zone' ? '支撑带' : z.label === 'resistance_zone' ? '压力带' : '区间';
+      const zones = (e.zones || []).map(z => `<span class="liu-chip">${zoneName(z)} ${fmtP(z.lo)}–${fmtP(z.hi)}</span>`).join('');
+      const link = /^https:\/\/weibo\.com\//.test(e.link || '') ? `<div style="margin-top:3px"><a href="${esc(e.link)}" target="_blank" rel="noopener noreferrer" style="font-size:0.62rem;color:var(--text-muted)">原帖</a></div>` : '';
+      return `
+        <div class="liu-entry">
+          <div class="liu-entry-date">${esc(e.date)}<small>${esc(e.time)} · ${esc((e.timeframe || '').toUpperCase() || '—')}</small></div>
+          <div>
+            <div class="liu-entry-tags">${tags.join('')}</div>
+            <div class="liu-entry-text">${esc(e.annotation || e.text)}</div>
+            ${levels || zones ? `<div class="liu-entry-levels">${levels}${zones}</div>` : ''}
+            ${link}
+          </div>
+        </div>`;
+    }).join('') + (entries.length > shown.length
+      ? `<button class="chart-tool-btn liu-more-btn" id="btn-liu-more">显示更早的 ${Math.min(30, entries.length - shown.length)} 篇（共 ${entries.length}）</button>` : '');
+    const more = document.getElementById('btn-liu-more');
+    if (more) more.addEventListener('click', () => { liuEntriesShown += 30; renderLiuThread(); });
+    applyLiuOverlay();
+  }
+
+  function applyLiuOverlay() {
+    const btn = document.getElementById('btn-liu-overlay');
+    if (btn) btn.classList.toggle('active', showLiuOverlay);
+    if (!candleSeries) return;
+    liuPriceLines.forEach(pl => { try { candleSeries.removePriceLine(pl); } catch (e) {} });
+    liuPriceLines = [];
+    if (!showLiuOverlay || !liuThread) return;
+    const latest = liuThread.entries.slice().reverse().find(e => e.levels && e.levels.length);
+    if (!latest) return;
+    const lastClose = currentBars.length ? currentBars[currentBars.length - 1].close : null;
+    latest.levels.slice(0, 6).forEach(l => {
+      if (lastClose && Math.abs(l.price - lastClose) / lastClose > 0.4) return;
+      const isMon = l.kind === 'monitor' || l.kind === 'trigger';
+      liuPriceLines.push(candleSeries.createPriceLine({
+        price: l.price,
+        color: isMon ? '#a855f7' : '#14b8a6',
+        lineWidth: isMon ? 2 : 1,
+        lineStyle: isMon ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: `柳${latest.date.slice(5)} ${LIU_KIND[l.kind] || ''} ${fmtP(l.price)}`
+      }));
+    });
+  }
+
+  async function loadLiuThread(symbol) {
+    const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
+    if (liuThreadSymbol === clean) { renderLiuThread(); return; }
+    liuThreadSymbol = clean;
+    liuThread = null;
+    liuEntriesShown = 30;
+    try {
+      const resp = await fetch(`/api/wave/liu-thread?symbol=${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(8000) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (liuThreadSymbol === clean) liuThread = json.thread || null;
+      }
+    } catch (e) {
+      liuThread = null;
+    }
+    if (liuThreadSymbol === clean) renderLiuThread();
   }
 
   /**
@@ -1678,6 +1982,8 @@
         const sym = btn.dataset.symbol;
         if (sym && sym !== currentSymbol) {
           symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
+          const sel = document.getElementById('wave-symbol-select');
+          if (sel) { sel.value = ''; sel.classList.remove('active'); }
           cancelRangeSelection();
           currentRange = null;
           updateRangeBanner(null, null);
@@ -1685,6 +1991,29 @@
         }
       });
     });
+
+    // 柳玉冬跟踪标的 (币安 TradFi 永续): 下拉切换
+    const symbolSelect = document.getElementById('wave-symbol-select');
+    if (symbolSelect) {
+      symbolSelect.addEventListener('change', () => {
+        const sym = symbolSelect.value;
+        if (!sym || sym === currentSymbol) return;
+        symbolBtns.forEach(b => b.classList.remove('active'));
+        symbolSelect.classList.add('active');
+        cancelRangeSelection();
+        currentRange = null;
+        updateRangeBanner(null, null);
+        loadChartCandles(sym);
+      });
+    }
+
+    const btnLiuOverlay = document.getElementById('btn-liu-overlay');
+    if (btnLiuOverlay) {
+      btnLiuOverlay.addEventListener('click', () => {
+        showLiuOverlay = !showLiuOverlay;
+        applyLiuOverlay();
+      });
+    }
 
     // 周期切换 (15m / 1H / 4H) - 重新拉取周期 K 线并实时重新解算波浪
     const tfBtns = document.querySelectorAll('.wave-tf-btn');

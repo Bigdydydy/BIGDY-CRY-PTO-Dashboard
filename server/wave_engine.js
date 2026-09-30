@@ -1,5 +1,5 @@
 /**
- * Module 8: 柳玉冬波浪理论智能研判引擎 v2
+ * Module 8: 柳玉冬波浪理论智能研判引擎 v3
  * -----------------------------------------------------------------------------
  * 依据: 《波浪理论详解》手稿 OCR 第 1-378 页 + 柳玉冬微博实战研判体系。
  *
@@ -17,6 +17,9 @@
  *   3. 假设搜索: 跨拐点组合浪的终点 -> 硬规则剪枝 -> 指引打分 -> 结构复核
  *   4. 子浪结构: 优先用低周期 K 线, 否则更细 Zigzag; 数据不足如实标记, 不编造
  *   5. 输出: 主备方案 + 监测点(失效位) + 手稿取点表斐波那契目标 + 辅助通道(非波浪制定标准)
+ *   6. v3 柳氏实战信号层: 监测点战法 / 最大回撤判据 / 吃掉0.618·0.7 / 调整分部投射 / 非推动浪不做底
+ *      (依据 2026 年微博语料按标的时间串联提炼, 见 scripts/liu_threads)
+ *   7. v3 级别阶梯: 高一级别 → 本级别 → 当前段小级别 嵌套计数
  *
  * 验证顺序 (手稿方法论): 浪型规则 -> 比率规则 -> 时间规则 -> 指引(不否决只调分)
  * 关键术语 (手稿): 「价格」=起点到终点; 「运行总量」=含所有子浪的最高最低区间。
@@ -32,7 +35,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '3.0.0';
   const EPS = 1e-9;
 
   const C_PRICE = 'price_rule';        // 价格(比率)规则 - 硬性
@@ -359,6 +362,8 @@
       }),
     rg('ZG4', C_G_RATIO, false, null, 4, 'P214', 'c浪若远超a浪，更可能是推动浪而非c浪', 1,
       g => ({ pass: g.l[2] <= 3 * g.l[0], detail: `c/a=${(g.l[2] / g.l[0]).toFixed(2)}` })),
+    rg('ZG8', C_G_PAT, false, null, 4, '柳玉冬实战（黄金2026-03-20）', 'c浪超过a浪1.618倍则有发展为推动浪的危险（三段可能是五浪的前三段）', 0.5,
+      g => { const r = g.l[2] / g.l[0]; return { pass: r <= 1.618 + EPS, detail: `c/a=${r.toFixed(2)}${r > 1.618 ? '，警惕发展为推动浪' : ''}` }; }),
     rg('ZG5', C_G_RATIO, false, 'min', 4, 'P216', 'c浪通常超过a浪终点（失败c浪极少见）', 0.5,
       g => ({ pass: g.d * (g.p[3].price - g.p[1].price) > 0, detail: `c终点 ${fmtNum(g.p[3].price)} vs a终点 ${fmtNum(g.p[1].price)}` })),
     rg('ZG6', C_G_TIME, false, null, 3, 'P215', 'b浪时间常为a浪的0.618~1.618倍', 1,
@@ -716,7 +721,8 @@
    */
   function legStructure(g, legIdx, ev) {
     const pA = g.p[legIdx], pB = g.p[legIdx + 1];
-    const key = pA.idx + '_' + pB.idx;
+    const key = pA.time + '_' + pB.time;
+    if (!ev.structCache) ev.structCache = new Map(); // 外部调用 (如前端 analyzeOrigin) 可能只传 {bars}
     if (ev.structCache.has(key)) return ev.structCache.get(key);
     const res = computeLegStructure(pA, pB, ev);
     ev.structCache.set(key, res);
@@ -734,7 +740,14 @@
           (b[b.length - 1].time - b[0].time) >= 0.6 * (t1 - t0)) { seg = b; srcName = s.name; break; }
       }
     }
-    if (!seg) { seg = ev.bars.slice(pA.idx, pB.idx + 1); srcName = null; }
+    if (!seg) {
+      // 按时间截取: 拐点 idx 相对于分析切片，调用方传入的 bars 可能是全量K线
+      const i0 = ev.bars.findIndex(x => x.time >= t0);
+      let i1 = i0;
+      while (i1 >= 0 && i1 + 1 < ev.bars.length && ev.bars[i1 + 1].time <= t1) i1++;
+      seg = i0 >= 0 ? ev.bars.slice(i0, i1 + 1) : null;
+      srcName = null;
+    }
     if (!seg || seg.length < 6) return { label: 'unknown', subPivots: [], source: srcName };
 
     const range = Math.abs(pB.price - pA.price);
@@ -926,12 +939,16 @@
           secondaryPivot = lvl(p[2].price, '浪2终点·最后防线', '手稿P42: 浪4不得完全回撤浪3');
         }
       } else if (status === 'COMPLETED') {
-        [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[5].price - d * r * (l[0] + l[2] + l[4] || l[2]), `整体回撤×${r}`, r)));
+        // 回撤以整段五浪的价格(0→5)为基准；柳玉冬实战口径「正常回撤0.2~0.618，极限0.8」
+        const total = Math.abs(p[5].price - p[0].price);
+        [0.2, 0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[5].price - d * r * total, `整体回撤×${r}`, r)));
+        targets.push(tgt(p[5].price - d * 0.8 * total, '整体回撤极限×0.8（超过则怀疑非本级别调整）', 0.8));
         monitoringPivot = lvl(p[5].price, '浪5终点·趋势延续线', '突破则浪5延长或更大级别趋势延续，需重估计数');
         secondaryPivot = lvl(p[4].price, '浪4终点·同级调整目标区', '调整浪常以浪4价格区为回撤目标');
       } else {
         [0.618, 1, 1.618].forEach(r => targets.push(tgt(p[4].price + d * r * l[0], `浪5=浪1×${r}`, r)));
-        if (l[2] < l[0]) targets.push(tgt(p[4].price + d * 0.382 * l[2], '浪5上限≈0.382×浪3（浪3非最短约束）', 0.382));
+        // 浪3已短于浪1时，浪5不得长于浪3（否则浪3成为最短，违反M5）——柳玉冬所称「上涨极限」
+        if (l[2] < l[0]) targets.push(tgt(p[4].price + d * l[2], '浪5极限=浪4终点+浪3长度（浪3不能最短, P32/P44）', 1));
         targets.push(tgt(p[4].price + d * 0.7 * l[3], '衰竭5浪最低: 0.7×浪4 (P204)', 0.7));
         monitoringPivot = lvl(p[4].price, '浪4终点·浪5防线', '跌破则浪5可能结束或计数失效');
         secondaryPivot = lvl(p[3].price, '浪3终点·衰竭判定线', '未过此线且不足浪4×0.7则浪型违规（P204）');
@@ -1715,7 +1732,8 @@
     } else {
       bottomTopSignal = `现价 ${fmtNum(currentPrice)}：该形态暂无明确监测点。`;
     }
-    return { title: `${symbol} ${tf} 波浪理论研判`, thesis, bottomTopSignal, quote };
+    const liuLines = analysis?.liuSignals ? analysis.liuSignals.lines.slice(0, 3) : [];
+    return { title: `${symbol} ${tf} 波浪理论研判`, thesis, bottomTopSignal, liuLines, quote };
   }
 
   // ---------------------------------------------------------------------------
@@ -1848,6 +1866,8 @@
     if (prior) {
       arb.push(
         { price: H0.price, effect: '否决情境B的锯齿/双锯齿解释（Z2/W2）', rule: 'Z2/W2', soft: false, crossed: (X.price - H0.price) * d >= 0 },
+        { price: O.price + d * 0.618 * D, effect: '到达0.618：三角形b浪解释具备（TG1）', rule: 'TG1', soft: true, crossed: (X.price - (O.price + d * 0.618 * D)) * d >= 0 },
+        { price: O.price + d * 0.7 * D, effect: '吃掉前段0.7：平台形/联合形解释成立（F1/C1），前段方向一方失败', rule: 'F1/C1', soft: true, crossed: (X.price - (O.price + d * 0.7 * D)) * d >= 0 },
         { price: O.price + d * 1.5 * D, effect: '否决联合形x解释（C2）', rule: 'C2', soft: false, crossed: (X.price - (O.price + d * 1.5 * D)) * d >= 0 },
         { price: O.price + d * 2 * D, effect: '否决平台形b解释，情境B不成立（F2）', rule: 'F2', soft: false, crossed: (X.price - (O.price + d * 2 * D)) * d >= 0 }
       );
@@ -1891,6 +1911,272 @@
       arbitration: arb,
       stance, lean, summary
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8.6 柳玉冬实战信号层 (语料 2026-01~08 按标的串联后反复出现、可形式化的判据)
+  //     以主级别最后两段腿为对象，不依赖候选计数:
+  //       前段 P→O (已完成)  |  当前段 O→X (X为运行中极值)  |  X之后的反向回撤
+  //   1. 监测点战法: 当前段内最近一个小级别反向拐点，逐日随趋势上移/下移
+  //   2. 最大回撤判据: 反向回撤量超过当前段内部最大回撤 → 小级别见顶/底
+  //   3. 吃掉0.618/0.7/0.8: 当前段对前段的回撤比例 → 前段性质(锯齿 / 三角形 / 平台形·联合形)
+  //   4. 调整分部投射: 若前段为调整第一部分(a/w)，各调整浪型对第二部分的要求
+  //   5. 出身: 当前段非五浪 → 不作新趋势起点，只剩引导楔形可能(列出条件)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 区间 (i0,i1] 内逆 d 方向的最大回撤 (bar 级)，返回 {amount, fromIdx, toIdx, toPrice}。
+   * 以起点拐点价 startPrice 为初始极值: 起点K线的另一端影线发生在拐点之前，不属于本段。
+   */
+  function maxCounterMove(highs, lows, i0, i1, d, startPrice) {
+    let best = { amount: 0, fromIdx: i0, toIdx: i0, toPrice: startPrice };
+    let extIdx = i0, ext = startPrice;
+    for (let i = i0 + 1; i <= i1 && i < highs.length; i++) {
+      if (d > 0 ? highs[i] > ext : lows[i] < ext) { ext = d > 0 ? highs[i] : lows[i]; extIdx = i; }
+      const dd = d > 0 ? ext - lows[i] : highs[i] - ext;
+      if (dd > best.amount) best = { amount: dd, fromIdx: extIdx, toIdx: i, toPrice: d > 0 ? lows[i] : highs[i] };
+    }
+    return best;
+  }
+
+  const PARTS_TABLE = [
+    { pattern: '双锯齿', role: 'x', min: 0.2, typical: 0.382, max: 1, need: 'x浪0.2~0.618即可，不必到0.618（W1/WG1）', rules: 'W1/W2' },
+    { pattern: '单锯齿', role: 'b', min: 0.2, typical: 0.5, max: 1, need: 'b浪0.2~<1（Z1/Z2）', rules: 'Z1/Z2' },
+    { pattern: '收缩三角形', role: 'b', min: 0.5, typical: 0.618, max: 1.5, need: 'b浪常达0.618（硬性≥0.5, ≤1.5; T1/T2/TG1）', rules: 'T1/T2' },
+    { pattern: '平台形', role: 'b', min: 0.7, typical: 1, max: 2, need: 'b浪须≥0.7（F1），<2（F2）', rules: 'F1/F2' },
+    { pattern: '联合形', role: 'x', min: 0.7, typical: 1, max: 1.5, need: 'x浪须≥0.7（C1），≤1.5（C2）', rules: 'C1/C2' }
+  ];
+
+  function buildLiuSignals(slice, pivs, ev) {
+    const n = pivs ? pivs.length : 0;
+    if (n < 3 || !slice || !slice.length) return null;
+    const highs = ev.highs, lows = ev.lows;
+    const lastIdx = slice.length - 1;
+    const X = pivs[n - 1], O = pivs[n - 2], P = pivs[n - 3];
+    const d = X.price > O.price ? 1 : -1;
+    const S = Math.abs(X.price - O.price);
+    const Lp = Math.abs(O.price - P.price);
+    const upTxt = d > 0 ? '上涨' : '下跌';
+    const dn = d > 0 ? '跌破' : '涨破';
+    const lastClose = slice[lastIdx].close;
+    const beyond = (price, lvl) => d * (lvl - price) > 0; // 价格是否已越过(逆当前段方向)该位
+
+    // 1. 当前段内最大回撤 & X之后的回撤
+    const inner = maxCounterMove(highs, lows, O.idx, X.idx, d, O.price);
+    let after = 0, afterIdx = X.idx;
+    for (let i = X.idx + 1; i <= lastIdx; i++) {
+      const v = d > 0 ? X.price - lows[i] : highs[i] - X.price;
+      if (v > after) { after = v; afterIdx = i; }
+    }
+    const thresholdLevel = X.price - d * inner.amount;
+    const exceeded = inner.amount > 0 && after > inner.amount + EPS;
+    const largestCounterMove = {
+      innerMax: +inner.amount.toFixed(4),
+      innerMaxLow: +inner.toPrice.toFixed(4),
+      innerMaxTime: slice[inner.toIdx] ? slice[inner.toIdx].time : null,
+      currentPullback: +after.toFixed(4),
+      thresholdLevel: +thresholdLevel.toFixed(4),
+      exceeded,
+      text: inner.amount > 0
+        ? (exceeded
+          ? `自极值 ${fmtNum(X.price)} 的回撤 ${fmtNum(after)} 已大于本段内最大回撤 ${fmtNum(inner.amount)}：本段${upTxt}很小级别见${d > 0 ? '顶' : '底'}（柳氏「最大回撤」判据）`
+          : `回撤量不大于 ${fmtNum(inner.amount)}（即不${dn} ${fmtNum(thresholdLevel)}）之前，本段${upTxt}仍有动力`)
+        : `本段为单边推进，无内部回撤可参照`
+    };
+
+    // 2. 监测点战法: 当前段内小级别拐点(逐日上移)
+    const seg = slice.slice(O.idx, X.idx + 1);
+    let monitor = null;
+    if (seg.length >= 4) {
+      const segAtr = avgTR(seg) || S / seg.length;
+      const thr = Math.max(0.8 * segAtr, 0.06 * S);
+      const zp = anchorZigzag(zigzagPivots(seg, thr),
+        { idx: 0, time: O.time, price: O.price, type: O.type },
+        { idx: seg.length - 1, time: X.time, price: X.price, type: X.type });
+      for (let k = zp.length - 2; k >= 1; k--) {
+        if (zp[k].type === O.type) { monitor = { price: zp[k].price, time: zp[k].time, idx: O.idx + zp[k].idx }; break; }
+      }
+    }
+    if (!monitor) monitor = { price: O.price, time: O.time, idx: O.idx };
+    const monitorBroken = beyond(lastClose, monitor.price) || (d > 0 ? lows : highs).slice(X.idx + 1).some(v => beyond(v, monitor.price));
+    const confirmLevel = inner.amount > 0 ? inner.toPrice : O.price;
+    const confirmBroken = beyond(lastClose, confirmLevel);
+    const monitorPoint = {
+      price: +monitor.price.toFixed(4), time: monitor.time,
+      side: d > 0 ? 'below' : 'above',
+      status: confirmBroken ? 'CONFIRMED_END' : monitorBroken ? 'BROKEN' : 'HOLDING',
+      confirmLevel: +confirmLevel.toFixed(4),
+      text: confirmBroken
+        ? `已${dn}确认位 ${fmtNum(confirmLevel)}：本段${upTxt}结束，进入针对本段的${d > 0 ? '回撤' : '反弹'}`
+        : monitorBroken
+          ? `监测点 ${fmtNum(monitor.price)} 已${dn}：小级别见${d > 0 ? '顶' : '底'}；须${dn} ${fmtNum(confirmLevel)} 才确认本段结束`
+          : `监测点 ${fmtNum(monitor.price)}：不${dn}认为继续${d > 0 ? '涨' : '跌'}；${dn} ${fmtNum(confirmLevel)} 才确认本段结束`
+    };
+
+    // 3. 吃掉前段的比例 (0.618 / 0.7 / 0.8 / 0.9 / 1)
+    const ratio = Lp > 0 ? S / Lp : null;
+    const eatLevels = [0.618, 0.7, 0.8, 0.9, 1].map(k => ({
+      ratio: k, price: +(O.price + d * k * Lp).toFixed(4), reached: ratio !== null && ratio >= k - EPS
+    }));
+    let eatVerdict;
+    if (ratio === null) eatVerdict = '前段长度为零，无法衡量';
+    else if (ratio >= 1) eatVerdict = `当前段已收复前段起点（${(ratio * 100).toFixed(0)}%）：前段只能是调整浪或扩散平台形b浪，前段方向一方已失败`;
+    else if (ratio >= 0.7) eatVerdict = `吃掉前段 ${(ratio * 100).toFixed(0)}% ≥ 0.7：平台形/联合形条件具备，前段按调整第一部分对待，${d > 0 ? '空头' : '多头'}基本就败了`;
+    else if (ratio >= 0.618) eatVerdict = `回撤前段 ${(ratio * 100).toFixed(0)}%：达到三角形b浪常见值0.618；平台形/联合形尚需0.7（${fmtNum(eatLevels[1].price)}）`;
+    else eatVerdict = `回撤前段 ${(ratio * 100).toFixed(0)}% < 0.618：仅支持单/双锯齿的b/x浪，前段方向仍占优`;
+    const eatBack = { priorLeg: { from: P.price, to: O.price, fromTime: P.time, toTime: O.time }, ratio: ratio === null ? null : +ratio.toFixed(3), levels: eatLevels, verdict: eatVerdict };
+
+    // 4. 调整分部投射: 前段 P→O 作为调整第一部分(a/w)时，第二部分的要求
+    const partsProjector = Lp > 0 ? PARTS_TABLE.map(row => {
+      const alive = ratio <= row.max + EPS;
+      return {
+        pattern: row.pattern, role: row.role, rules: row.rules, need: row.need,
+        minPrice: +(O.price + d * row.min * Lp).toFixed(4),
+        typicalPrice: +(O.price + d * row.typical * Lp).toFixed(4),
+        maxPrice: +(O.price + d * row.max * Lp).toFixed(4),
+        reachedMin: ratio >= row.min - EPS,
+        alive,
+        status: !alive ? '已否决（超出上限）' : ratio >= row.min - EPS ? '最低要求已满足' : `尚需到达 ${fmtNum(O.price + d * row.min * Lp)}`
+      };
+    }) : [];
+
+    // 5. 出身: 当前段是否可数为五浪
+    const st = computeLegStructure(O, X, ev);
+    const subs = st.subPivots || [];
+    const segLens = [];
+    for (let i = 1; i < subs.length; i++) segLens.push(Math.abs(subs[i].price - subs[i - 1].price));
+    let threeLegWarning = null;
+    if (st.label === '3' && segLens.length === 3 && segLens[2] > 1.618 * segLens[0]) {
+      threeLegWarning = `当前段走了3段且第三段为第一段的 ${(segLens[2] / segLens[0]).toFixed(2)} 倍（>1.618）：有发展为推动浪的危险`;
+    }
+    const origin = {
+      structure: st.label, subSwings: segLens.length, source: st.source || null,
+      canStartTrend: st.label === '5',
+      text: st.label === '5'
+        ? `当前段可数为五浪：具备${d > 0 ? '做底' : '做顶'}后新趋势起步的资格`
+        : st.label === '3'
+          ? `当前段不是推动浪：不看作新的${upTxt}，按对前段的${d > 0 ? '反弹' : '回调'}（调整浪）对待`
+          : '当前段内部小级别数据不足，出身待确认',
+      leadingDiagonal: st.label === '3' ? {
+        mustHold: O.price, mustExceed: X.price,
+        text: `若要${d > 0 ? '做底' : '做顶'}只剩引导楔形可能：须不${dn} ${fmtNum(O.price)}、再创${d > 0 ? '新高' : '新低'}越过 ${fmtNum(X.price)}，走满5段且边界不扩散`
+      } : null
+    };
+
+    const lines = [monitorPoint.text, largestCounterMove.text, eatVerdict, origin.text];
+    if (threeLegWarning) lines.push(threeLegWarning);
+    if (origin.leadingDiagonal) lines.push(origin.leadingDiagonal.text);
+
+    return {
+      direction: d > 0 ? 'BULLISH' : 'BEARISH',
+      activeLeg: { from: { price: O.price, time: O.time }, extreme: { price: X.price, time: X.time, open: !!X.open }, length: +S.toFixed(4) },
+      monitorPoint, largestCounterMove, eatBack, partsProjector, origin, threeLegWarning,
+      lines,
+      note: '依据柳玉冬2026年微博按标的串联语料提炼（监测点战法/最大回撤/吃掉0.7/调整分部/非推动浪不做底），仅讨论波浪，不构成交易建议。'
+    };
+  }
+
+  /** 在给定级别的拐点序列上搜索全部浪型假设 → 硬规则终审 → 候选 (未排序) */
+  function collectCandidates(pivots, ev, sliceLen, rangeExtrema, precedingContext, blockMap) {
+    const legOk = buildLegTable(pivots);
+    const hyps = [];
+    for (const type of Object.keys(PATTERNS)) {
+      hyps.push.apply(hyps, searchPattern(type, pivots, legOk, ev, blockMap));
+    }
+    const seen = new Set();
+    const cands = [];
+    for (const h of hyps) {
+      const key = h.type + '|' + h.idxs.join('-');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const pts = h.idxs.map(i => pivots[i]);
+      const evalRes = evaluatePattern(h.type, pts, ev);
+      if (evalRes.hardFails.length) {
+        const f = evalRes.hardFails[0];
+        const key2 = h.type + '|' + f.id;
+        if (!blockMap.has(key2)) blockMap.set(key2, { pattern: PATTERNS[h.type].name, rule: f, detail: f.detail, span: h.idxs[h.idxs.length - 1] - h.idxs[0] });
+        continue;
+      }
+      const cand = buildCandidate(h, evalRes, ev, pivots);
+      cand.score = scoreCandidate(cand, evalRes, sliceLen, rangeExtrema, precedingContext);
+      cands.push(cand);
+    }
+    return cands;
+  }
+
+  /**
+   * 级别阶梯 (柳玉冬多色嵌套画法: 大级别 → 本级别 → 当前段小级别)
+   * 高一级别取主级别之后第一个更粗的 Zigzag 层 (拐点更少) 重新计数；
+   * 低一级别为当前段 (最后一腿) 内部的子浪结构。
+   */
+  function buildDegreeLadder(degrees, top, liuSignals, ev, sliceLen, rangeExtrema, precedingContext) {
+    const summarize = c => c ? {
+      name: c.name, baseType: c.baseType, direction: c.direction, status: c.status, currentWave: c.currentWave,
+      waveLabels: c.waveLabels, score: c.score,
+      pivots: c.pivots.map(q => ({ time: q.time, price: q.price, type: q.type }))
+    } : null;
+    const ladder = [];
+    const main = degrees.main;
+    const mi = degrees.levels.indexOf(main);
+    const maxHigher = Math.max(6, Math.round(main.pivots.length * 0.6));
+    let higher = degrees.levels.slice(mi + 1).find(l => l.pivots.length >= 4 && l.pivots.length <= maxHigher);
+    if (!higher) {
+      // 主级别已是预设最粗层: 继续放大阈值寻找更大级别
+      for (const k of [1.5, 2, 2.6, 3.4, 4.5]) {
+        const thr = main.thr * k;
+        const pv = zigzagPivots(ev.bars, thr);
+        if (pv.length < 4) break;
+        if (pv.length <= maxHigher) { higher = { mult: +(main.mult * k).toFixed(2), thr, pivots: pv }; break; }
+      }
+    }
+    if (higher) {
+      const hc = collectCandidates(higher.pivots, ev, sliceLen, rangeExtrema, precedingContext, new Map());
+      // 嵌套优先: 本级别首选计数恰为高一级别最后一浪 (+20) 或落在其内 (+12)
+      const sameAsTop = c => !!top && c.pivots.length === top.pivots.length && c.pivots.every((q, i) => q.time === top.pivots[i].time);
+      const nestBonus = c => {
+        if (!top) return 0;
+        if (sameAsTop(c)) return 8; // 两级重合: 同一结构在更粗级别仍成立，但优先展示真正的上级嵌套
+        const n = c.pivots.length, last = c.pivots[n - 1], prev = c.pivots[n - 2];
+        const t0 = top.pivots[0].time, t1 = top.pivots[top.pivots.length - 1].time;
+        if (t1 > last.time) return 0;
+        if (t0 === prev.time) return 20;
+        return t0 >= prev.time ? 12 : 0;
+      };
+      hc.forEach(c => { c.nestBonus = nestBonus(c); });
+      hc.sort((a, b) => ((b.rawScore || 0) + b.nestBonus) - ((a.rawScore || 0) + a.nestBonus));
+      ladder.push({ degree: 'HIGHER', label: '高一级别', atrMult: higher.mult, pivotCount: higher.pivots.length, count: summarize(hc[0]) });
+    }
+    ladder.push({ degree: 'MAIN', label: '本级别', atrMult: main.mult, pivotCount: main.pivots.length, count: summarize(top) });
+    if (liuSignals && liuSignals.origin) {
+      ladder.push({
+        degree: 'LOWER', label: '当前段小级别',
+        structure: liuSignals.origin.structure, subSwings: liuSignals.origin.subSwings,
+        text: liuSignals.origin.text
+      });
+    }
+    // 嵌套一致性: 本级别首选计数应落在高一级别计数的最后一浪之内
+    const hi = ladder[0].degree === 'HIGHER' && ladder[0].count ? ladder[0].count : null;
+    let nesting = null;
+    const same = hi && top && hi.pivots.length === top.pivots.length && hi.pivots.every((q, i) => q.time === top.pivots[i].time);
+    if (same) {
+      nesting = { inside: true, isLastLeg: false, sameCount: true, sameDirection: true,
+        text: `高一级别首选计数与本级别重合：「${top.name}」在更粗的拐点层上同样成立，是当前可见的最大级别结构` };
+    } else if (hi && top) {
+      const hiLastStart = hi.pivots[hi.pivots.length - 2];
+      const inside = top.pivots[0].time >= hiLastStart.time;
+      const isLastLeg = top.pivots[0].time === hiLastStart.time;
+      const hiLegDir = hi.pivots[hi.pivots.length - 1].price > hiLastStart.price ? 'BULLISH' : 'BEARISH';
+      const hiLastLabel = hi.waveLabels[hi.waveLabels.length - 1];
+      nesting = {
+        inside, isLastLeg, sameDirection: hiLegDir === top.direction,
+        text: isLastLeg
+          ? `本级别「${top.name}」即高一级别「${hi.name}」的第 ${hiLastLabel} 浪（嵌套一致）`
+          : inside
+            ? `本级别计数位于高一级别「${hi.name}」第 ${hiLastLabel} 浪之内，${hiLegDir === top.direction ? '方向一致（顺大级别）' : '方向相反（为大级别末浪内的逆向子浪）'}`
+            : `高一级别首选「${hi.name}」与本级别不嵌套（本级别起点早于其末浪）：本级别整体可能是高一级别的起始浪（1浪或a浪），需人工复核`
+      };
+    }
+    return { levels: ladder, nesting };
   }
 
   // ---------------------------------------------------------------------------
@@ -1980,6 +2266,7 @@
       pattern: null, originAnalysis: null, commentary: null,
       decisiveness: { level: 'NONE', topShare: 0, shown: 0, text: '无合规浪型' },
       dualScenario: null,
+      liuSignals: null, degreeLadder: null,
       mtf: null, forecast: null,
       rulebookNote: '规则依据手稿P1-378（驱动浪基础/比率/单锯齿/平台形/收缩三角形/双三锯齿/联合形散见条文P50-52、P131-132、P158、P272-301）。艾略特通道仅作为辅助画线与视觉投影参考，不作为制定或裁决波浪的标准。楔形专章缺失，已按主流艾略特条则补齐并标注「通用」。'
     };
@@ -1999,32 +2286,9 @@
     }
 
     const ev = { bars: slice, highs, lows, sources, structCache: new Map() };
-    const legOk = buildLegTable(main.pivots);
     const blockMap = new Map();
-
-    const hyps = [];
-    for (const type of Object.keys(PATTERNS)) {
-      hyps.push.apply(hyps, searchPattern(type, main.pivots, legOk, ev, blockMap));
-    }
-
-    const seen = new Set();
-    let cands = [];
-    for (const h of hyps) {
-      const key = h.type + '|' + h.idxs.join('-');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const pts = h.idxs.map(i => main.pivots[i]);
-      const evalRes = evaluatePattern(h.type, pts, ev);
-      if (evalRes.hardFails.length) {
-        const f = evalRes.hardFails[0];
-        const key2 = h.type + '|' + f.id;
-        if (!blockMap.has(key2)) blockMap.set(key2, { pattern: PATTERNS[h.type].name, rule: f, detail: f.detail, span: h.idxs[h.idxs.length - 1] - h.idxs[0] });
-        continue;
-      }
-      const cand = buildCandidate(h, evalRes, ev, main.pivots);
-      cand.score = scoreCandidate(cand, evalRes, slice.length, rangeExtrema, precedingContext);
-      cands.push(cand);
-    }
+    result.liuSignals = buildLiuSignals(slice, main.pivots, ev);
+    const cands = collectCandidates(main.pivots, ev, slice.length, rangeExtrema, precedingContext, blockMap);
 
     const candCmp = (a, b) => {
       // 1. rawScore 优先 (未封顶的指引加成与背景契合分；显示分已封顶不作排序键)
@@ -2116,6 +2380,7 @@
     result.dualScenario = final.length
       ? buildDualScenario({ cands, top: final[0], slice, precedingContext, mtf: result.mtf })
       : null;
+    result.degreeLadder = buildDegreeLadder(degrees, final[0] || null, result.liuSignals, ev, slice.length, rangeExtrema, precedingContext);
     result.forecast = result.mtf.forecast;
     result.commentary = generateLiuCommentary(final[0], currentPrice, symbol, timeframe, result);
     return result;
@@ -2166,6 +2431,7 @@
     analyzePrecedingContext,
     RANKING,
     PATTERNS,
-    _internal: { mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    buildLiuSignals,
+    _internal: { buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });
