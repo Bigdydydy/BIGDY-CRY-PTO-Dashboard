@@ -7,7 +7,9 @@ const {
   analyzeBlockTrades,
   calcGreeks,
   parseInstrument,
-  identifyInstitutionalStrategy
+  identifyInstitutionalStrategy,
+  evaluate0DTEBehavior,
+  evaluateTradeAction
 } = require('../server/analytics_engine');
 
 const { sendJsonResponse } = require('../server/index');
@@ -1305,3 +1307,255 @@ describe('Module 3: Deribit Section 12 Advanced Multi-Leg Strategy Suite', () =>
     assert.ok(res.smileAlphaRating.comment.includes('Put 相对 Call 显著高估'));
   });
 });
+
+describe('Module 4: 大宗交易开平仓推断与末日 0DTE 行为分类引擎', () => {
+  const { parseDeribitExpiry } = require('../server/analytics_engine');
+
+  describe('evaluate0DTEBehavior (末日期权行为诊断)', () => {
+    test('Non-0DTE: 远期到期合约正确归类为 NORMAL_TERM', () => {
+      const expTs = parseDeribitExpiry('26DEC26').getTime();
+      const trade = {
+        instrument_name: 'BTC-26DEC26-80000-C',
+        timestamp: expTs - 48 * 3600 * 1000, // 48 hours to expiry
+        direction: 'buy',
+        price: 0.05
+      };
+      const res = evaluate0DTEBehavior(trade, 77000);
+      assert.equal(res.is0DTE, false);
+      assert.equal(res.hoursToExpiry, 48);
+      assert.equal(res.timingCategory, 'NORMAL_TERM');
+      assert.equal(res.tag, '远期/常规期权');
+      assert.ok(res.rationale.includes('48 小时'));
+    });
+
+    test('0DTE Pin Risk Avoidance: 距交割 <= 4h 且现货紧贴行权价 (<=1.5%) 判定为钉盘避险', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trade = {
+        instrument_name: 'BTC-25SEP26-77000-C',
+        timestamp: expTs - 2.5 * 3600 * 1000, // 2.5 hours to expiry
+        direction: 'buy',
+        price: 0.008,
+        strike: 77000
+      };
+      const res = evaluate0DTEBehavior(trade, 77200); // dist = 0.26%
+      assert.equal(res.is0DTE, true);
+      assert.equal(res.hoursToExpiry, 2.5);
+      assert.equal(res.timingCategory, '0DTE_PIN_RISK');
+      assert.equal(res.tag, '末日钉盘避险');
+      assert.equal(res.badgeClass, 'badge-0dte-danger');
+      assert.ok(res.rationale.includes('Gamma 钉盘'));
+    });
+
+    test('0DTE Lotto Hunting: 距交割 <= 16h 且虚值 1.5%~6.5% 且极低单价买入判定为末日彩票', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trade = {
+        instrument_name: 'BTC-25SEP26-80000-C',
+        timestamp: expTs - 6 * 3600 * 1000, // 6 hours to expiry
+        direction: 'buy',
+        price: 0.0012, // cheap ~0.0012 BTC ($90)
+        strike: 80000
+      };
+      const res = evaluate0DTEBehavior(trade, 77000); // dist = 3.9%
+      assert.equal(res.is0DTE, true);
+      assert.equal(res.hoursToExpiry, 6);
+      assert.equal(res.timingCategory, '0DTE_LOTTO');
+      assert.equal(res.tag, '末日彩票博弈');
+      assert.equal(res.badgeClass, 'badge-0dte-lotto');
+      assert.ok(res.rationale.includes('百倍凸性赔率'));
+    });
+
+    test('0DTE Penny Scraping: 距交割 <= 16h 且深度虚值 >= 5% 且卖出判定为残值收割', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trade = {
+        instrument_name: 'BTC-25SEP26-70000-P',
+        timestamp: expTs - 5 * 3600 * 1000, // 5 hours to expiry
+        direction: 'sell',
+        price: 0.0006, // $46 USD
+        strike: 70000
+      };
+      const res = evaluate0DTEBehavior(trade, 77000); // dist = 9.1%
+      assert.equal(res.is0DTE, true);
+      assert.equal(res.hoursToExpiry, 5);
+      assert.equal(res.timingCategory, '0DTE_PENNY');
+      assert.equal(res.tag, '末日残值收割');
+      assert.equal(res.badgeClass, 'badge-0dte-scraping');
+      assert.ok(res.rationale.includes('权利金残值'));
+    });
+
+    test('0DTE Directional Momentum: 距交割 <= 16h 且平值买入判定为单边冲刺', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trade = {
+        instrument_name: 'BTC-25SEP26-77000-C',
+        timestamp: expTs - 8 * 3600 * 1000, // 8 hours to expiry
+        direction: 'buy',
+        price: 0.012,
+        strike: 77000
+      };
+      const res = evaluate0DTEBehavior(trade, 77100); // dist = 0.13%
+      assert.equal(res.is0DTE, true);
+      assert.equal(res.hoursToExpiry, 8);
+      assert.equal(res.timingCategory, '0DTE_MOMENTUM');
+      assert.equal(res.tag, '末日单边冲刺');
+      assert.equal(res.badgeClass, 'badge-0dte-momentum');
+      assert.ok(res.rationale.includes('替代现货'));
+    });
+  });
+
+  describe('evaluateTradeAction (大宗交易开平仓推断)', () => {
+    test('Rollover: 跨期限一买一卖组合精准判定为跨期展期 (CALENDAR_ROLLOVER)', () => {
+      const group = {
+        legs: [
+          { instrument_name: 'BTC-25SEP26-80000-C', direction: 'sell', amount: 50, price: 0.02 },
+          { instrument_name: 'BTC-26DEC26-80000-C', direction: 'buy', amount: 50, price: 0.06 }
+        ],
+        strategyType: 'LONG_CALENDAR_SPREAD'
+      };
+      const res = evaluateTradeAction(group, 77000);
+      assert.equal(res.action, 'ROLLOVER');
+      assert.equal(res.actionType, 'CALENDAR_ROLLOVER');
+      assert.equal(res.confidence, 'HIGH');
+      assert.equal(res.badgeClass, 'badge-action-roll');
+      assert.ok(res.rationale.includes('跨期滚动展期'));
+    });
+
+    test('Strategy Entry: 经典闭合式多腿策略包精准判定为全新结构建仓 (STRATEGY_ENTRY)', () => {
+      const group = {
+        legs: [
+          { instrument_name: 'BTC-26DEC26-75000-C', direction: 'buy', amount: 100, price: 0.08 },
+          { instrument_name: 'BTC-26DEC26-85000-C', direction: 'sell', amount: 100, price: 0.03 }
+        ],
+        strategyType: 'BULL_CALL_SPREAD',
+        strategyNameZh: '牛市看涨价差 (Bull Call Spread)'
+      };
+      const res = evaluateTradeAction(group, 77000);
+      assert.equal(res.action, 'OPENING');
+      assert.equal(res.actionType, 'STRATEGY_ENTRY');
+      assert.equal(res.confidence, 'HIGH');
+      assert.equal(res.badgeClass, 'badge-action-open');
+      assert.ok(res.rationale.includes('全新结构建仓'));
+    });
+
+    test('Aggressive Open: 主动买入且 IV 显著溢价 (IV - Mark IV >= 1.2) 判定为溢价抢筹开仓', () => {
+      const trade = {
+        instrument_name: 'BTC-26DEC26-80000-C',
+        direction: 'buy',
+        iv: 58.5,
+        mark_iv: 55.0, // +3.5% IV premium
+        price: 0.06
+      };
+      const res = evaluateTradeAction(trade, 77000);
+      assert.equal(res.action, 'OPENING');
+      assert.equal(res.actionType, 'AGGRESSIVE_OPEN');
+      assert.equal(res.confidence, 'MEDIUM_HIGH');
+      assert.equal(res.badgeClass, 'badge-action-open');
+      assert.ok(res.rationale.includes('溢价迅速扫盘买入'));
+    });
+
+    test('Discounted Close: 主动卖出且 IV 显著贴水 (IV - Mark IV <= -1.2) 判定为让利平仓离场', () => {
+      const trade = {
+        instrument_name: 'BTC-26DEC26-80000-C',
+        direction: 'sell',
+        iv: 51.5,
+        mark_iv: 55.0, // -3.5% IV discount
+        price: 0.04
+      };
+      const res = evaluateTradeAction(trade, 77000);
+      assert.equal(res.action, 'CLOSING');
+      assert.equal(res.actionType, 'DISCOUNTED_CLOSE');
+      assert.equal(res.confidence, 'MEDIUM_HIGH');
+      assert.equal(res.badgeClass, 'badge-action-close');
+      assert.ok(res.rationale.includes('贴水让利挂单出脱'));
+    });
+
+    test('Pin Risk Close: 0DTE 钉盘高危窗口自动联动为钉盘避险平仓', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trade = {
+        instrument_name: 'BTC-25SEP26-77000-C',
+        timestamp: expTs - 2 * 3600 * 1000, // 2 hours to expiry
+        direction: 'buy',
+        strike: 77000,
+        price: 0.008
+      };
+      const res = evaluateTradeAction(trade, 77100);
+      assert.equal(res.action, 'CLOSING');
+      assert.equal(res.actionType, 'PIN_RISK_CLOSE');
+      assert.equal(res.confidence, 'HIGH');
+      assert.equal(res.badgeClass, 'badge-action-close');
+    });
+
+    test('Neutral Flow: 微观偏离极小且非标准组合判定为中性撮合 (需OI确认)', () => {
+      const trade = {
+        instrument_name: 'BTC-26DEC26-80000-C',
+        direction: 'buy',
+        iv: 55.2,
+        mark_iv: 55.0, // +0.2% IV
+        price: 0.05
+      };
+      const res = evaluateTradeAction(trade, 77000);
+      assert.equal(res.action, 'UNCONFIRMED');
+      assert.equal(res.actionType, 'NEUTRAL_FLOW');
+      assert.equal(res.confidence, 'LOW');
+      assert.equal(res.badgeClass, 'badge-action-neutral');
+    });
+  });
+
+  describe('analyzeBlockTrades 完整端到端集成检验', () => {
+    test('whaleBlocks 与 icebergClusters 完整挂载 actionProfile 与 timingProfile 字段', () => {
+      const expTs = parseDeribitExpiry('25SEP26').getTime();
+      const trades = [
+        // Whale block: aggressive buy
+        {
+          trade_id: 'wb-1',
+          block_trade_id: 'block-open-1',
+          instrument_name: 'BTC-26DEC26-80000-C',
+          direction: 'buy',
+          amount: 500,
+          price: 0.08,
+          iv: 62.0,
+          mark_iv: 58.0,
+          index_price: 77500,
+          timestamp: expTs - 100 * 3600 * 1000
+        },
+        // 0DTE Pin Risk Whale block
+        {
+          trade_id: 'wb-2',
+          block_trade_id: 'block-0dte-pin',
+          instrument_name: 'BTC-25SEP26-77500-C',
+          direction: 'buy',
+          amount: 450,
+          price: 0.006,
+          iv: 75.0,
+          mark_iv: 75.0,
+          index_price: 77550,
+          timestamp: expTs - 2 * 3600 * 1000 // 2h before expiry, ATM
+        }
+      ];
+
+      const result = analyzeBlockTrades(trades, 30000000, 'all', 77500);
+      assert.ok(result.whaleBlocks.length >= 2);
+
+      // Verify block 1
+      const b1 = result.whaleBlocks.find(b => b.blockId === 'block-open-1');
+      assert.ok(b1);
+      assert.ok(b1.actionProfile);
+      assert.equal(b1.actionProfile.action, 'OPENING');
+      assert.equal(b1.is0DTE, false);
+      assert.ok(b1.actionTag);
+      assert.ok(b1.timingTag);
+
+      // Verify block 2 (0DTE pin risk)
+      const b2 = result.whaleBlocks.find(b => b.blockId === 'block-0dte-pin');
+      assert.ok(b2);
+      assert.ok(b2.timingProfile);
+      assert.equal(b2.is0DTE, true);
+      assert.equal(b2.timingProfile.timingCategory, '0DTE_PIN_RISK');
+      assert.equal(b2.actionProfile.action, 'CLOSING');
+
+      // Verify narrative paragraph integration
+      assert.ok(result.paragraph.includes('微观性质穿透显示'));
+      assert.ok(result.paragraph.includes('全新建仓'));
+      assert.ok(result.paragraph.includes('平仓离场'));
+    });
+  });
+});
+

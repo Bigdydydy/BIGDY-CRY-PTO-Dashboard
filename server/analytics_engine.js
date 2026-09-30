@@ -1275,12 +1275,291 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 // Backwards compatibility alias
 const classifyTradeIntent = identifyInstitutionalStrategy;
 
+/**
+ * Evaluate 0DTE Expiration Behavior & Risk Regime
+ * Deribit options expire daily at 08:00 UTC (16:00 UTC+8).
+ * 0DTE window is defined as hoursToExpiry <= 16 hours.
+ * Extreme Pin Risk window is hoursToExpiry <= 4 hours.
+ */
+function evaluate0DTEBehavior(tradeOrGroup, spotPrice = 77250) {
+  const legs = Array.isArray(tradeOrGroup.legs) && tradeOrGroup.legs.length > 0
+    ? tradeOrGroup.legs
+    : [tradeOrGroup];
+
+  const tradeTs = tradeOrGroup.timestamp || (legs[0] && legs[0].timestamp) || Date.now();
+  let minHoursToExpiry = Infinity;
+  let targetLeg = legs[0] || {};
+
+  for (const leg of legs) {
+    const instName = leg.instrument_name || leg.instrument || '';
+    const inst = parseInstrument(instName);
+    if (inst) {
+      const expDate = parseDeribitExpiry(inst.expiryStr);
+      if (expDate) {
+        const diffH = (expDate.getTime() - tradeTs) / (3600 * 1000);
+        if (diffH < minHoursToExpiry) {
+          minHoursToExpiry = diffH;
+          targetLeg = leg;
+        }
+      }
+    }
+  }
+
+  // If expiry parsing didn't match Deribit format, fallback
+  if (minHoursToExpiry === Infinity) {
+    minHoursToExpiry = 24 * 30; // fallback to 30 days
+  }
+
+  const hoursToExpiry = Math.max(0, Math.round(minHoursToExpiry * 10) / 10);
+  const is0DTE = hoursToExpiry <= 16;
+
+  if (!is0DTE) {
+    const days = Math.round(hoursToExpiry / 24);
+    return {
+      is0DTE: false,
+      hoursToExpiry,
+      timingCategory: 'NORMAL_TERM',
+      tag: '远期/常规期权',
+      badgeClass: 'badge-timing-normal',
+      rationale: `该交易距离到期尚有 ${days} 天 (${hoursToExpiry} 小时)，属于标准中远期流动性配置，未进入 0DTE 末日加速衰减期。`
+    };
+  }
+
+  // 0DTE behavior classification
+  const S = spotPrice || targetLeg.indexPrice || targetLeg.index_price || 77250;
+  const inst = parseInstrument(targetLeg.instrument_name || targetLeg.instrument || '');
+  const strike = inst ? inst.strike : (targetLeg.strike || S);
+  const absDistPct = (Math.abs(strike - S) / S) * 100;
+  const price = Number(targetLeg.price || 0); // BTC per contract
+  const direction = (targetLeg.direction || tradeOrGroup.direction || '').toLowerCase();
+  const isBuy = direction === 'buy';
+  const isSell = direction === 'sell';
+
+  // 1. Pin Risk Avoidance (hoursToExpiry <= 4 and near ATM <= 1.5%)
+  if (hoursToExpiry <= 4 && absDistPct <= 1.5) {
+    return {
+      is0DTE: true,
+      hoursToExpiry,
+      timingCategory: '0DTE_PIN_RISK',
+      tag: '末日钉盘避险',
+      badgeClass: 'badge-0dte-danger',
+      rationale: `距离结算仅剩 ${hoursToExpiry} 小时，现货与行权价 ($${strike.toLocaleString()}) 偏差仅 ${absDistPct.toFixed(1)}%，处于极度危险的无限 Gamma 钉盘磁吸区间。交易旨在规避交割被行权与插针爆仓风险。`
+    };
+  }
+
+  // 2. Lotto Hunting (OTM 1.5% ~ 6.5%, low price <= 0.005 BTC or <= $350 USD, Buy)
+  if (isBuy && absDistPct >= 1.5 && absDistPct <= 6.5 && (price <= 0.005 || (price * S) <= 350)) {
+    return {
+      is0DTE: true,
+      hoursToExpiry,
+      timingCategory: '0DTE_LOTTO',
+      tag: '末日彩票博弈',
+      badgeClass: 'badge-0dte-lotto',
+      rationale: `买入距到期仅 ${hoursToExpiry} 小时的虚值期权 (偏离 ${absDistPct.toFixed(1)}%)，单张成本极低 (~${price.toFixed(4)} BTC)，以极小资金博取到期前突发剧烈单边脉冲的百倍凸性赔率。`
+    };
+  }
+
+  // 3. Penny Scraping (Far OTM >= 5.0%, low price, Sell)
+  if (isSell && absDistPct >= 5.0 && (price <= 0.004 || (price * S) <= 250)) {
+    return {
+      is0DTE: true,
+      hoursToExpiry,
+      timingCategory: '0DTE_PENNY',
+      tag: '末日残值收割',
+      badgeClass: 'badge-0dte-scraping',
+      rationale: `卖出距到期仅 ${hoursToExpiry} 小时且偏离现货 ${absDistPct.toFixed(1)}% 的深度虚值期权，全额赚取濒临归零的权利金残值，胜率极高但需防范流动性骤缩的极端黑天鹅。`
+    };
+  }
+
+  // 4. Directional Momentum (Near ATM < 2.0%, Buy)
+  if (isBuy && absDistPct < 2.0) {
+    return {
+      is0DTE: true,
+      hoursToExpiry,
+      timingCategory: '0DTE_MOMENTUM',
+      tag: '末日单边冲刺',
+      badgeClass: 'badge-0dte-momentum',
+      rationale: `买入距到期仅 ${hoursToExpiry} 小时的平值期权，放弃远期时间价值，利用接近 1.0 的超高杠杆 Delta 替代现货进行日内单边决战。`
+    };
+  }
+
+  // 5. Generic 0DTE
+  return {
+    is0DTE: true,
+    hoursToExpiry,
+    timingCategory: '0DTE_GENERIC',
+    tag: '末日到期博弈',
+    badgeClass: 'badge-0dte-generic',
+    rationale: `距到期仅 ${hoursToExpiry} 小时的末日期权头寸，剧烈暴露于日内极限 Theta 衰减与 Gamma 放大效应中。`
+  };
+}
+
+/**
+ * Evaluate Trade Action Intent (Opening vs Closing vs Rollover)
+ * Based on multi-leg structure, calendar rollover signatures, IV premium/discount spread, and aggressive taker execution.
+ */
+function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming = null) {
+  const legs = Array.isArray(tradeOrGroup.legs) && tradeOrGroup.legs.length > 0
+    ? tradeOrGroup.legs
+    : [tradeOrGroup];
+
+  const timing = precomputedTiming || evaluate0DTEBehavior(tradeOrGroup, spotPrice);
+  const strategyType = tradeOrGroup.strategyType || tradeOrGroup.intentType || '';
+  const isMultiLeg = legs.length > 1;
+
+  // 1. Calendar Rollover Detection across expiries
+  if (isMultiLeg) {
+    const expiries = [...new Set(legs.map(l => parseInstrument(l.instrument_name || l.instrument || '')?.expiryStr).filter(Boolean))];
+    if (expiries.length >= 2) {
+      const sortedByExp = [...legs].sort((a, b) => {
+        const ta = parseDeribitExpiry(parseInstrument(a.instrument_name || a.instrument || '')?.expiryStr)?.getTime() || 0;
+        const tb = parseDeribitExpiry(parseInstrument(b.instrument_name || b.instrument || '')?.expiryStr)?.getTime() || 0;
+        return ta - tb;
+      });
+      const nearLeg = sortedByExp[0];
+      const farLeg = sortedByExp[sortedByExp.length - 1];
+      const nearDir = (nearLeg.direction || '').toLowerCase();
+      const farDir = (farLeg.direction || '').toLowerCase();
+
+      if ((nearDir === 'sell' && farDir === 'buy') || (nearDir === 'buy' && farDir === 'sell')) {
+        const nearExp = parseInstrument(nearLeg.instrument_name || nearLeg.instrument || '')?.expiryStr || '';
+        const farExp = parseInstrument(farLeg.instrument_name || farLeg.instrument || '')?.expiryStr || '';
+        return {
+          action: 'ROLLOVER',
+          actionType: 'CALENDAR_ROLLOVER',
+          confidence: 'HIGH',
+          tag: '🔄 跨期展期 (Rollover)',
+          badgeClass: 'badge-action-roll',
+          rationale: `交易跨越不同交割期（近端 ${nearExp} 与远端 ${farExp}），近月平仓与远月接力同步执行，属于典型的大资金跨期滚动展期。`
+        };
+      }
+    }
+  }
+
+  // 2. Standard Multi-Leg Strategy Package Entry (Opening)
+  const STANDARD_STRATEGIES = [
+    'IRON_CONDOR', 'IRON_BUTTERFLY', 'RATIO_CALL_BACKSPREAD', 'RATIO_CALL_FRONT_SPREAD',
+    'RATIO_PUT_BACKSPREAD', 'BULL_CALL_SPREAD', 'BEAR_CALL_SPREAD', 'BULL_PUT_SPREAD',
+    'BEAR_PUT_SPREAD', 'LONG_STRADDLE', 'SHORT_STRADDLE', 'LONG_STRANGLE', 'SHORT_STRANGLE',
+    'BULLISH_RISK_REVERSAL', 'BEARISH_RISK_REVERSAL', 'SYNTHETIC_LONG_FUTURE', 'SYNTHETIC_SHORT_FUTURE',
+    'PUT_BUTTERFLY', 'BROKEN_WING_PUT_BUTTERFLY', 'LONG_CALENDAR_SPREAD', 'REVERSE_CALENDAR_SPREAD'
+  ];
+  if (isMultiLeg && STANDARD_STRATEGIES.includes(strategyType)) {
+    return {
+      action: 'OPENING',
+      actionType: 'STRATEGY_ENTRY',
+      confidence: 'HIGH',
+      tag: '🧱 全新结构建仓 (Strategy Entry)',
+      badgeClass: 'badge-action-open',
+      rationale: `该组合呈现标准闭合的【${tradeOrGroup.strategyNameZh || strategyType}】策略形态，各腿同时同比例撮合成交，判定为机构大资金一揽子战略性全新结构建仓。`
+    };
+  }
+
+  // 3. 0DTE Pin Risk Avoidance Close
+  if (timing.is0DTE && timing.timingCategory === '0DTE_PIN_RISK') {
+    return {
+      action: 'CLOSING',
+      actionType: 'PIN_RISK_CLOSE',
+      confidence: 'HIGH',
+      tag: '🛡️ 钉盘避险平仓 (Pin Risk Close)',
+      badgeClass: 'badge-action-close',
+      rationale: '结算前数小时现货紧贴行权价，面临无限 Gamma 震荡与钉盘行权，持仓方主动平仓买回消除交割被行权风险。'
+    };
+  }
+
+  // 4. IV Spread (Trade IV vs Mark IV) & Directional Urgency
+  const primaryLeg = legs[0] || tradeOrGroup;
+  const iv = primaryLeg.iv != null ? primaryLeg.iv : tradeOrGroup.iv;
+  const markIv = primaryLeg.mark_iv != null ? primaryLeg.mark_iv : tradeOrGroup.mark_iv;
+  const direction = (primaryLeg.direction || tradeOrGroup.direction || '').toLowerCase();
+  const tickDir = primaryLeg.tick_direction || tradeOrGroup.tick_direction;
+
+  if (iv != null && markIv != null && !isNaN(iv) && !isNaN(markIv)) {
+    const ivDiff = iv - markIv;
+    if (direction === 'buy' && ivDiff >= 1.2) {
+      return {
+        action: 'OPENING',
+        actionType: 'AGGRESSIVE_OPEN',
+        confidence: 'MEDIUM_HIGH',
+        tag: '🎯 溢价抢筹开仓 (Aggressive Open)',
+        badgeClass: 'badge-action-open',
+        rationale: `买方主动支付高于公允标记波动率 (+${ivDiff.toFixed(1)}% IV) 的溢价迅速扫盘买入，成交意愿极其急迫，反映明确的增量主动建仓动力。`
+      };
+    }
+    if (direction === 'sell' && ivDiff <= -1.2) {
+      return {
+        action: 'CLOSING',
+        actionType: 'DISCOUNTED_CLOSE',
+        confidence: 'MEDIUM_HIGH',
+        tag: '🚪 让利平仓离场 (Discounted Close)',
+        badgeClass: 'badge-action-close',
+        rationale: `卖方以显著低于公允估值 (-${Math.abs(ivDiff).toFixed(1)}% IV) 的贴水让利挂单出脱，表明大资金急于关停存量敞口或止损/锁利离场。`
+      };
+    }
+    if (direction === 'sell' && ivDiff >= 1.2) {
+      return {
+        action: 'OPENING',
+        actionType: 'PREMIUM_HARVEST_OPEN',
+        confidence: 'MEDIUM',
+        tag: '💰 溢价沽空建仓 (Premium Harvest)',
+        badgeClass: 'badge-action-open',
+        rationale: `卖方在波动率显著偏高的高溢价区 (+${ivDiff.toFixed(1)}% IV) 主动沽出期权收割时间价值，符合专业做市商与机构卖方开仓行为。`
+      };
+    }
+    if (direction === 'buy' && ivDiff <= -1.2) {
+      return {
+        action: 'OPENING',
+        actionType: 'DISCOUNT_ACCUMULATION',
+        confidence: 'MEDIUM',
+        tag: '📥 贴水低吸建仓 (Discount Accumulation)',
+        badgeClass: 'badge-action-open',
+        rationale: `买方在波动率贴水折价区 (-${Math.abs(ivDiff).toFixed(1)}% IV) 低成本吸纳，属于被动挂单撮合或逢低建仓。`
+      };
+    }
+  }
+
+  // 5. Tick Direction Taker Aggression (Ask taker vs Bid taker)
+  if (tickDir === 'plus' || tickDir === 'zero_plus') {
+    if (direction === 'buy') {
+      return {
+        action: 'OPENING',
+        actionType: 'AGGRESSIVE_OPEN',
+        confidence: 'MEDIUM',
+        tag: '🎯 主动扫盘开仓 (Taker Buy)',
+        badgeClass: 'badge-action-open',
+        rationale: '交易以主动买方吃单 (Ask Taker) 撮合成交，具有积极的主动开仓攻击性特征。'
+      };
+    }
+  } else if (tickDir === 'minus' || tickDir === 'zero_minus') {
+    if (direction === 'sell') {
+      return {
+        action: 'CLOSING',
+        actionType: 'DISCOUNTED_CLOSE',
+        confidence: 'MEDIUM',
+        tag: '🚪 砸盘平仓减亏 (Taker Sell)',
+        badgeClass: 'badge-action-close',
+        rationale: '交易以主动卖方砸盘 (Bid Taker) 撮合成交，反映大资金离场意愿急迫，具有较强平仓离场特征。'
+      };
+    }
+  }
+
+  // 6. Default Neutral Match
+  return {
+    action: 'UNCONFIRMED',
+    actionType: 'NEUTRAL_FLOW',
+    confidence: 'LOW',
+    tag: '⚖️ 常规撮合 (需OI确认)',
+    badgeClass: 'badge-action-neutral',
+    rationale: '定价贴近公允价值，微观无极端溢价或折价，需结合次日持仓量(OI)净变动综合印证是新增开仓还是平仓回补。'
+  };
+}
+
 
 /**
  * Module 3: Whale Block Trades & Iceberg Split Order Clustering
  * Enhanced with Black-Scholes Greeks calculation & Detailed Intent Diagnostics
  */
-function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all') {
+function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all', spotPrice = 77250) {
   if (!rawTrades || !rawTrades.length) {
     return {
       status: 'insufficient_data',
@@ -1394,6 +1673,22 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     if (totalNotional >= notionalThresholdUSD) {
       const intent = classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional);
 
+      const blockCandidate = {
+        legs: processedLegs,
+        strategyType: intent.strategyType,
+        strategyNameZh: intent.strategyNameZh,
+        direction: processedLegs.length === 1 ? processedLegs[0].direction : (netDeltaUSD >= 0 ? 'buy' : 'sell'),
+        timestamp,
+        notionalUSD: totalNotional,
+        iv: processedLegs[0]?.iv,
+        mark_iv: legs[0]?.mark_iv,
+        tick_direction: legs[0]?.tick_direction,
+        price: processedLegs[0]?.price
+      };
+      const S = processedLegs[0]?.indexPrice || spotPrice || 77250;
+      const timingProfile = evaluate0DTEBehavior(blockCandidate, S);
+      const actionProfile = evaluateTradeAction(blockCandidate, S, timingProfile);
+
       const dateUtc8 = formatUTC8(timestamp);
       whaleBlocks.push({
         blockId: bid,
@@ -1411,6 +1706,14 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         netThetaUSD,
         legCount: legs.length,
         legs: processedLegs,
+        actionProfile,
+        timingProfile,
+        actionTag: actionProfile.tag,
+        actionBadgeClass: actionProfile.badgeClass,
+        timingTag: timingProfile.tag,
+        timingBadgeClass: timingProfile.badgeClass,
+        hoursToExpiry: timingProfile.hoursToExpiry,
+        is0DTE: timingProfile.is0DTE,
         ...intent
       });
     }
@@ -1547,6 +1850,20 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         primaryDirection = aggregatedLegs[0].direction;
       }
 
+      const clusterCandidate = {
+        legs: aggregatedLegs,
+        strategyType: intent.strategyType,
+        strategyNameZh: intent.strategyNameZh,
+        direction: primaryDirection,
+        timestamp: group[0].timestamp,
+        notionalUSD: clusterNotional,
+        iv: aggregatedLegs[0]?.iv,
+        price: aggregatedLegs[0]?.price
+      };
+      const S = aggregatedLegs[0]?.indexPrice || spotPrice || 77250;
+      const timingProfile = evaluate0DTEBehavior(clusterCandidate, S);
+      const actionProfile = evaluateTradeAction(clusterCandidate, S, timingProfile);
+
       icebergClusters.push({
         instrument: displayInstrument,
         instrumentRaw: base.structureSignature,
@@ -1571,6 +1888,14 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         avgPrice: aggregatedLegs.length === 1 ? aggregatedLegs[0].price : (aggregatedLegs.reduce((acc, l) => acc + l.price * l.amount, 0) / (totalContracts || 1)),
         blockIds,
         legs: aggregatedLegs,
+        actionProfile,
+        timingProfile,
+        actionTag: actionProfile.tag,
+        actionBadgeClass: actionProfile.badgeClass,
+        timingTag: timingProfile.tag,
+        timingBadgeClass: timingProfile.badgeClass,
+        hoursToExpiry: timingProfile.hoursToExpiry,
+        is0DTE: timingProfile.is0DTE,
         ...intent
       });
     }
@@ -1608,8 +1933,19 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   if (bullRatio >= 60) flowBias = '偏多吸筹与牛市价差构建';
   else if (bullRatio <= 40) flowBias = '对冲防守与空头价差布控';
 
+  let openCount = 0;
+  let closeCount = 0;
+  let rollCount = 0;
+  let zeroDteCount = 0;
+  for (const b of whaleBlocks) {
+    if (b.actionProfile?.action === 'OPENING') openCount++;
+    else if (b.actionProfile?.action === 'CLOSING') closeCount++;
+    else if (b.actionProfile?.action === 'ROLLOVER') rollCount++;
+    if (b.timingProfile?.is0DTE) zeroDteCount++;
+  }
+
   const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : '过去 30 天历史沉淀'));
-  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。大资金目前主要集中在 9 月底交割（25SEP26）的深度虚值看涨牛市价差（Call Spread）与卖出看跌期权（Short Put），显示主流期权做市与宏观机构对近端下跌空间有较强防护信心，倾向于在低波震荡中吃进 Theta 时间价值。`;
+  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。微观性质穿透显示：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。大资金目前主要集中在 9 月底交割（25SEP26）的深度虚值看涨牛市价差（Call Spread）与卖出看跌期权（Short Put），显示主流期权做市与宏观机构对近端下跌空间有较强防护信心，倾向于在低波震荡中吃进 Theta 时间价值。`;
 
   return {
     whaleBlocks,
@@ -1823,6 +2159,8 @@ module.exports = {
   calcGreeks,
   parseInstrument,
   parseDeribitExpiry,
-  identifyInstitutionalStrategy
+  identifyInstitutionalStrategy,
+  evaluate0DTEBehavior,
+  evaluateTradeAction
 };
 

@@ -238,7 +238,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       // Always re-run analysis dynamically on current data (enhanced with real-time atmData)
       const atmAnalysis = analyzeAtmIv(data.ivHistory, data.dvolStats, data.atmData);
       const gexAnalysis = analyzeDynamicGex(data.gex, new Date());
-      const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam);
+      const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice);
       blockAnalysis.timeRange = timeRangeParam;
       blockAnalysis.activeTradesCount = activeTrades.length;
       blockAnalysis.tradeStoreStats = data.tradeStoreStats || null;

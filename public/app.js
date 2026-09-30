@@ -768,8 +768,14 @@ function renderIcebergsList(clusters) {
           </div>
         </div>
         <div>
-          <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
-          ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;margin-top:4px;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+            <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+              ${c.actionTag ? `<span class="intent-badge-pill ${escapeHtml(c.actionBadgeClass || 'badge-neutral')}">${escapeHtml(c.actionTag)}</span>` : ''}
+              ${c.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(c.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE: ${escapeHtml(c.timingTag)}</span>` : ''}
+              <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
+            </div>
+            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
+          </div>
         </div>
         <div class="cluster-stats">
           <div class="cluster-stat-item">
@@ -834,6 +840,10 @@ function renderWhaleSinglesList(blocks) {
         <td>${escapeHtml(b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp))}</td>
         <td><span class="text-accent">${escapeHtml(b.blockId)}</span></td>
         <td>
+          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
+            ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
+            ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE ${escapeHtml(b.timingTag)}</span>` : ''}
+          </div>
           <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
           ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
         </td>
@@ -852,7 +862,11 @@ function renderWhaleSinglesList(blocks) {
             <span class="wmc-id">${escapeHtml(b.blockId)}</span>
             <span class="wmc-time">${escapeHtml((b.dateTimeUTC8 || b.dateTime || '').slice(5, 16))}</span>
           </div>
-          <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+          <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;">
+            ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
+            ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE</span>` : ''}
+            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+          </div>
         </div>
         <div class="wmc-strategy">${escapeHtml(b.strategyNameZh || '机构定制结构')}</div>
         <div class="wmc-grid">
@@ -892,6 +906,46 @@ function renderWhaleSinglesList(blocks) {
 }
 
 /**
+ * Helper to populate Action Intent and 0DTE Behavior Profiling in Modal Drawer
+ */
+function populateActionTimingDrawer(item) {
+  const elActionBadge = document.getElementById('m-action-badge');
+  const elTimingBadge = document.getElementById('m-timing-badge');
+  const elActionName = document.getElementById('m-action-name');
+  const elActionRationale = document.getElementById('m-action-rationale');
+  const elTimingName = document.getElementById('m-timing-name');
+  const elTimingRationale = document.getElementById('m-timing-rationale');
+
+  const action = item.actionProfile || {};
+  const timing = item.timingProfile || {};
+
+  if (elActionBadge) {
+    elActionBadge.textContent = action.tag || item.actionTag || '常规撮合';
+    elActionBadge.className = `intent-badge-pill ${action.badgeClass || item.actionBadgeClass || 'badge-neutral'}`;
+  }
+  if (elTimingBadge) {
+    const is0D = timing.is0DTE ?? item.is0DTE;
+    elTimingBadge.textContent = is0D ? `⚡ 0DTE: ${timing.tag || item.timingTag || '末日期权'}` : (timing.tag || item.timingTag || '常规期权');
+    elTimingBadge.className = `intent-badge-pill ${timing.badgeClass || item.timingBadgeClass || 'badge-timing-normal'}`;
+  }
+  if (elActionName) {
+    elActionName.textContent = action.tag ? `${action.tag} [置信度: ${action.confidence || 'MEDIUM'}]` : (item.actionTag || '常规撮合 (需OI确认)');
+  }
+  if (elActionRationale) {
+    elActionRationale.textContent = action.rationale || '成交价贴近理论公允价值，无极端微观定价偏离。';
+  }
+  if (elTimingName) {
+    const is0D = timing.is0DTE ?? item.is0DTE;
+    const hours = timing.hoursToExpiry ?? item.hoursToExpiry ?? '--';
+    const dteTitle = is0D ? `【⚡ 0DTE 末日期权】(距交割剩 ${hours}h)` : `【常规远期期权】(距交割剩 ${hours}h)`;
+    elTimingName.textContent = `${dteTitle} · ${timing.tag || item.timingTag || '标准交割'}`;
+  }
+  if (elTimingRationale) {
+    elTimingRationale.textContent = timing.rationale || '属于标准期权流动性配置。';
+  }
+}
+
+/**
  * Modal Drawer Functions
  */
 window.openWhaleDetail = function(idx) {
@@ -908,6 +962,8 @@ window.openWhaleDetail = function(idx) {
   mIntentBadge.textContent = b.intentBadge || '交易意图';
   mIntentBadge.className = `intent-badge-large ${b.intentBadgeClass || ''}`;
   mIntentNarrative.textContent = b.intentNarrative || '交易意图解析生成中...';
+
+  populateActionTimingDrawer(b);
 
   if (mStrategyName) {
     mStrategyName.textContent = b.strategyNameZh || '机构定制结构';
@@ -977,6 +1033,8 @@ window.openIcebergDetail = function(idx) {
   mIntentBadge.textContent = c.intentBadge || '拆单意图';
   mIntentBadge.className = `intent-badge-large ${c.intentBadgeClass || ''}`;
   mIntentNarrative.textContent = c.intentNarrative || '拆单意图分析生成中...';
+
+  populateActionTimingDrawer(c);
 
   if (mStrategyName) {
     mStrategyName.textContent = c.strategyNameZh || '机构时间切片拆单 (Iceberg Synthetic)';
