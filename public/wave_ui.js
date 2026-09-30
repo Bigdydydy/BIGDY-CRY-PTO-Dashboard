@@ -1810,6 +1810,11 @@
       rows.push(`<div class="liu-signal-title" style="margin-top:${alt ? 8 : 0}px"><span>组成部分识别</span></div>`);
       rows.push(comps.map(c => `<div>${esc(c.label)} 浪：${esc(c.text)}${c.developing ? '（运行中）' : ''}</div>`).join(''));
     }
+    const tws = (cand && cand.timeWindows) || [];
+    if (tws.length) {
+      rows.push(`<div class="liu-signal-title" style="margin-top:${rows.length ? 8 : 0}px"><span>时间规则 · 截止日期</span></div>`);
+      rows.push(tws.map(w => `<div style="${w.overdue ? 'color:var(--color-warn)' : ''}">${esc(w.text)}</div>`).join(''));
+    }
     el.style.display = rows.length ? 'block' : 'none';
     el.innerHTML = rows.join('');
   }

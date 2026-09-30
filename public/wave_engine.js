@@ -1331,6 +1331,99 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 6.5 时间窗 (把手稿时间硬规则变成前瞻截止日期)
+  //     硬规则在搜索时已作过滤；这里对「运行中的那一浪」反推最晚结束时间，
+  //     对应柳玉冬「b浪应该在4月7日之前结束」「三角形交叉点在8月26日，必须在此之前突破」。
+  // ---------------------------------------------------------------------------
+
+  /** 运行中的最后一浪: 由硬时间规则给出的最晚结束K线数 (相对该浪起点) */
+  const TIME_DEADLINES = {
+    IMPULSE: { 3: [['浪2', 'M7', 'P34', g => 9 * g.t[0], '浪2用时不超过浪1的9倍']], 5: [['浪4', 'M8', 'P43', g => 2 * g.t[2], '浪4用时不超过浪3的2倍']] },
+    DIAGONAL: { 3: [['浪2', 'M7', 'P34', g => 9 * g.t[0], '浪2用时不超过浪1的9倍']], 5: [['浪4', 'M8', 'P43', g => 2 * g.t[2], '浪4用时不超过浪3的2倍']] },
+    ZIGZAG: { 3: [['b浪', 'Z5', 'P215', g => 10 * g.t[0], 'b浪用时不超过a浪的10倍']], 4: [['c浪', 'Z6', 'P215', g => 10 * (g.l[0] <= g.l[1] ? g.t[0] : g.t[1]), 'c浪用时不超过a、b中较短者的10倍']] },
+    FLAT: { 3: [['b浪', 'F6', 'P236', g => 10 * g.t[0], 'b浪用时不超过a浪的10倍']], 4: [['c浪', 'F7', 'P236', g => 10 * (g.l[0] <= g.l[1] ? g.t[0] : g.t[1]), 'c浪用时不超过a、b中较短者的10倍']] },
+    TRIANGLE: { 5: [['d浪', 'T13', 'P302', g => 4 * g.t[2], 'd浪用时不大于c浪的4倍']], 6: [['e浪', 'T14', 'P302', g => 4 * g.t[3], 'e浪用时不大于d浪的4倍']] },
+    DOUBLE_ZIGZAG: { 3: [['x浪', 'W6', 'P362', g => 5 * g.t[0], 'x浪用时不超过w浪的5倍']], 4: [['y浪', 'W7', 'P364', g => 5 * g.t[0], 'y浪用时不超过w浪的5倍']] },
+    TRIPLE_ZIGZAG: { 5: [['xx浪', 'X5', 'P385', g => 5 * g.t[2], 'xx浪用时不超过y浪的5倍']], 6: [['z浪', 'X6/X7', 'P365', g => 5 * Math.min(g.t[2], g.t[0]), 'z浪用时不超过y浪、w浪的5倍']] },
+    COMBINATION: { 3: [['x浪', 'C3', 'P297', g => 10 * g.t[0], 'x浪用时不超过w浪的10倍']], 4: [['y浪', 'C4', 'P297', g => 10 * g.t[0], 'y浪用时不超过w浪的10倍']] },
+    TRIPLE_COMBINATION: { 5: [['xx浪', 'C7', 'P297', g => 10 * g.t[2], 'xx浪用时不超过y浪的10倍']], 6: [['z浪', 'C8', 'P297', g => 10 * g.t[2], 'z浪用时不超过y浪的10倍']] }
+  };
+
+  /** 运行中的最后一浪: 时间指引给出的常见结束窗口 (相对该浪起点的K线数 [lo, hi]) */
+  const TIME_TYPICAL = {
+    IMPULSE: { 4: ['浪3', '柳玉冬实战（黄金2026-02-03「3浪时间到达1浪的1.618倍是正常的」）', g => [g.t[0], 1.618 * g.t[0]]], 6: ['浪5', '通用（浪5常与浪1用时相当）', g => [0.618 * g.t[0], 1.618 * g.t[0]]] },
+    ZIGZAG: { 3: ['b浪', 'ZG6 P215', g => [0.618 * g.t[0], 1.618 * g.t[0]]], 4: ['c浪', 'ZG7 P215', g => { const mt = g.l[0] <= g.l[1] ? g.t[0] : g.t[1]; return [0.618 * g.t[0], 1.618 * mt]; }] },
+    FLAT: { 4: ['c浪', 'FG4 P236', g => { const mt = g.l[0] <= g.l[1] ? g.t[0] : g.t[1]; return [0.618 * mt, 1.618 * mt]; }] },
+    DOUBLE_ZIGZAG: { 3: ['x浪', 'WG3 P363', g => [0.618 * g.t[0], 1.618 * g.t[0]]], 4: ['y浪', 'WG4 P365', g => [0.618 * g.t[0], 1.618 * g.t[0]]] }
+  };
+
+  function barSeconds(ev) {
+    const b = ev && ev.bars;
+    if (!b || b.length < 2) return 0;
+    const diffs = [];
+    for (let i = Math.max(1, b.length - 50); i < b.length; i++) diffs.push(b[i].time - b[i - 1].time);
+    diffs.sort((x, y) => x - y);
+    return diffs[Math.floor(diffs.length / 2)] || 0;
+  }
+  function fmtDate(sec) {
+    const d = new Date(sec * 1000);
+    const p = x => String(x).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  }
+
+  function buildTimeWindows(type, g, status, ev) {
+    const out = [];
+    const sec = barSeconds(ev);
+    if (!sec || !ev.bars) return out;
+    const n = g.p.length;
+    const lastIdx = ev.bars.length - 1;
+    const lastTime = ev.bars[lastIdx].time;
+    const legStart = g.p[n - 2];
+    const running = status !== 'COMPLETED';
+    const toTime = bars => legStart.time + Math.round(bars) * sec;
+
+    if (running) {
+      for (const [wave, rule, page, fn, text] of ((TIME_DEADLINES[type] || {})[n] || [])) {
+        const maxBars = fn(g);
+        const deadline = toTime(maxBars);
+        const barsLeft = Math.round((deadline - lastTime) / sec);
+        out.push({
+          kind: 'deadline', wave, rule, page, maxBars: Math.round(maxBars), deadline, barsLeft,
+          text: `时间规则（${rule}·手稿${page}）：${text}，${wave}须在 ${fmtDate(deadline)} 前结束（还剩约 ${Math.max(0, barsLeft)} 根K线），逾期则本计数作废`
+        });
+      }
+      const typ = (TIME_TYPICAL[type] || {})[n];
+      if (typ) {
+        const [wave, src, fn] = typ;
+        const [lo, hi] = fn(g);
+        const overdue = lastTime > toTime(hi);
+        out.push({
+          kind: 'typical', wave, rule: src, from: toTime(lo), to: toTime(hi), overdue,
+          text: `时间指引（${src}）：${wave}常见在 ${fmtDate(toTime(lo))} ~ ${fmtDate(toTime(hi))} 之间结束${overdue ? '；目前已超出常见窗口，该浪偏长（延长或计数需复核）' : ''}`
+        });
+      }
+    }
+    // 收缩三角形: a-c 与 b-d 交点 (柳玉冬「交叉点在8月26日，必须在此之前突破」)
+    if (type === 'TRIANGLE' && n >= 5) {
+      const p = g.p;
+      const sAc = (p[3].price - p[1].price) / (p[3].idx - p[1].idx);
+      const sBd = (p[4].price - p[2].price) / (p[4].idx - p[2].idx);
+      if (Math.abs(sAc - sBd) > 1e-12) {
+        const apexIdx = (p[2].price - sBd * p[2].idx - (p[1].price - sAc * p[1].idx)) / (sAc - sBd);
+        const apexTime = ev.bars[Math.min(lastIdx, Math.max(0, Math.round(apexIdx)))].time + Math.max(0, Math.round(apexIdx) - lastIdx) * sec;
+        if (apexIdx > p[n - 1].idx) {
+          out.push({
+            kind: 'apex', wave: '三角形', rule: 'T10', page: 'P307', deadline: apexTime,
+            barsLeft: Math.round((apexTime - lastTime) / sec),
+            text: `三角形边界交点在 ${fmtDate(apexTime)}：须在此之前突破，越晚突破力度越弱`
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
   // 7. 候选构建 / 打分 / 排序
   // ---------------------------------------------------------------------------
 
@@ -1446,6 +1539,7 @@
     }
 
     const levels = buildLevels(h.type, g, h.status, ev);
+    const timeWindows = ev && ev.bars ? buildTimeWindows(h.type, g, h.status, ev) : [];
     const fibLevels = buildFibLevels(h.type, g, h.status);
     const slimClass = c => c ? {
       text: describeClass(c), form: c.form, complexity: c.complexity, developing: c.developing, source: c.source,
@@ -1501,6 +1595,7 @@
       fibLevels,
       alternation,
       components,
+      timeWindows,
       span
     };
   }
@@ -1998,6 +2093,8 @@
       const mp = pattern.monitoringPivot;
       const side = pattern.direction === 'BEARISH' ? '上破' : '跌破';
       bottomTopSignal = `监测点 $${fmtNum(mp.price)}（${mp.levelName}）：${side}则${mp.description || '当前计数失效'}。现价 ${fmtNum(currentPrice)}。`;
+      const dl = (pattern.timeWindows || []).find(w => w.kind === 'deadline' || w.kind === 'apex');
+      if (dl) bottomTopSignal += ` ${dl.text}。`;
     } else {
       bottomTopSignal = `现价 ${fmtNum(currentPrice)}：该形态暂无明确监测点。`;
     }
@@ -2701,6 +2798,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });
