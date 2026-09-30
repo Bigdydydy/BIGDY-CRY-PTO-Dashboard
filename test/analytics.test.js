@@ -756,220 +756,6 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
   });
 });
 
-describe('Module 8: AI–BTC 融资张力指数与微观传导检验系统 (AI–BTC Tension Platform)', () => {
-  const { getAiBtcTensionData } = require('../server/ai_btc_tension_fetcher');
-
-  test('getAiBtcTensionData returns valid 3-layer decoupled quantitative dataset', async () => {
-    const data = await getAiBtcTensionData(false);
-    assert.ok(data, 'Data object must exist');
-    assert.ok(data.metadata, 'Metadata must exist');
-    assert.ok(data.metadata.title.includes('全球宏观暗渠穿透') || data.metadata.title.includes('AI–BTC'), 'Title must be valid');
-    assert.ok(data.metadata.core_hypothesis.length > 10, 'Core hypothesis must exist');
-    assert.ok(data.metadata.total_days >= 1500, 'Total historical days must be >= 1500');
-    assert.ok(Array.isArray(data.series), 'Series must be an array');
-    assert.ok(data.series.length >= 1500, 'Series length must be >= 1500');
-    assert.ok(Array.isArray(data.trajectory_180d), 'Trajectory 180d must be an array');
-    assert.equal(data.trajectory_180d.length, 180, 'Trajectory must contain exactly 180 days');
-  });
-
-  test('4-Quadrant Phase Space state machine classification rules are verified', async () => {
-    const data = await getAiBtcTensionData(false);
-    const { current, regime_stats } = data;
-
-    assert.ok(current, 'Current state object must exist');
-    assert.ok(['Q1', 'Q2', 'Q3', 'Q4'].includes(current.regime_code));
-
-    // Verify current quadrant logic
-    if (current.p_ai >= 0 && current.p_btc < 0) {
-      assert.equal(current.regime_code, 'Q1');
-    } else if (current.p_ai >= 0 && current.p_btc >= 0) {
-      assert.equal(current.regime_code, 'Q2');
-    } else if (current.p_ai < 0 && current.p_btc >= 0) {
-      assert.equal(current.regime_code, 'Q3');
-    } else {
-      assert.equal(current.regime_code, 'Q4');
-    }
-
-    // Verify regime distribution sum ≈ 100%
-    assert.ok(regime_stats.Q1 && regime_stats.Q2 && regime_stats.Q3 && regime_stats.Q4);
-    const totalPct = regime_stats.Q1.pct + regime_stats.Q2.pct + regime_stats.Q3.pct + regime_stats.Q4.pct;
-    assert.ok(Math.abs(totalPct - 100.0) < 0.5, 'Regime percentages must sum to 100%');
-  });
-
-  test('Tension Intensity formula r = sqrt(P_AI^2 + P_BTC^2) is mathematically verified', async () => {
-    const data = await getAiBtcTensionData(false);
-    const { current } = data;
-
-    const expectedR = Math.sqrt(Math.pow(current.p_ai, 2) + Math.pow(current.p_btc, 2));
-    assert.ok(
-      Math.abs(current.tension_intensity - expectedR) < 0.015,
-      `Calculated r (${current.tension_intensity}) must match sqrt(p_ai^2 + p_btc^2) (${expectedR})`
-    );
-  });
-
-  test('OLS Macro Orthogonal regression and Q2 hypothesis tests meet econometric criteria', async () => {
-    const data = await getAiBtcTensionData(false);
-    const { regression } = data;
-
-    assert.ok(regression, 'Regression object must exist');
-    assert.ok(Number.isFinite(regression.r_squared), 'Macro R-squared must be a finite number');
-    assert.ok(regression.r_squared > 0.05, 'Macro R-squared must be economically meaningful (> 5%)');
-    assert.ok(Array.isArray(regression.parameters), 'Parameters must be an array');
-
-    const paramMap = {};
-    regression.parameters.forEach(p => {
-      paramMap[p.var] = p;
-      assert.ok(Number.isFinite(p.beta), `Beta for ${p.var} must be a finite number`);
-      assert.ok(Number.isFinite(p.t_stat), `t-stat for ${p.var} must be a finite number`);
-      assert.ok(Number.isFinite(p.p_value), `p-value for ${p.var} must be a finite number`);
-    });
-
-    // Verify key explanatory variables
-    assert.ok(paramMap.qqq_ret, 'QQQ return beta must be present');
-    assert.ok(paramMap.qqq_ret.beta > 0, 'BTC has positive tech beta with QQQ');
-    assert.ok(paramMap.qqq_ret.p_value < 0.05, 'QQQ beta must be statistically significant');
-
-    assert.ok(paramMap.dxy_ret, 'DXY return beta must be present');
-    assert.ok(paramMap.dxy_ret.beta < 0, 'BTC has negative relationship with USD index DXY');
-
-    assert.ok(paramMap.delta_real_yield, 'TIPS real yield beta must be present');
-    assert.ok(paramMap.vix_delta, 'VIX delta beta must be present');
-    assert.ok(paramMap.delta_fed_net_liq, 'Fed net liquidity beta must be present');
-    assert.ok(paramMap.delta_term_premium, '10Y Term Premium delta beta must be present');
-    assert.ok(paramMap.repo_spread, 'Overnight SOFR-IORB repo spread beta must be present');
-
-    // Q2 Hypothesis test with Welch's t-test and HAC standard errors
-    assert.ok(regression.q2_hypothesis_test, 'Q2 hypothesis test must exist');
-    const q2Test = regression.q2_hypothesis_test;
-    assert.ok(Number.isFinite(q2Test.q2_avg_residual_daily_pct), 'Q2 residual must be finite number');
-    assert.ok(Number.isFinite(q2Test.non_q2_avg_residual_daily_pct), 'Non-Q2 residual must be finite number');
-    assert.ok(Number.isFinite(q2Test.t_stat), 'Welch t-stat must be finite number');
-    assert.ok(Number.isFinite(q2Test.p_value), 'p-value must be finite number');
-    assert.ok(Number.isFinite(q2Test.cohen_d), 'Cohen d effect size must be finite number');
-    assert.strictEqual(typeof q2Test.is_significant_5pct, 'boolean');
-    assert.ok(typeof q2Test.conclusion === 'string' && q2Test.conclusion.length > 10);
-  });
-
-  test('Event Study CAR windows and Phase 2 Miner-HPC Basket are intact', async () => {
-    const data = await getAiBtcTensionData(false);
-    const { event_study, miner_hpc_basket, causality, current } = data;
-
-    // Macro plumbing & compute metrics
-    assert.ok(Number.isFinite(current.i_compute), 'i_compute must exist');
-    assert.ok(Number.isFinite(current.i_crypto), 'i_crypto must exist');
-    assert.ok(Number.isFinite(current.repo_spread), 'repo_spread must exist');
-    assert.ok(Number.isFinite(current.term_premium), 'term_premium must exist');
-
-    // Event study
-    assert.ok(Array.isArray(event_study), 'Event study must be an array');
-    assert.ok(event_study.length >= 8, 'Must have at least 8 landmark AI Capex events');
-    const firstEvent = event_study[0];
-    assert.ok(firstEvent.event_date);
-    assert.ok(firstEvent.ticker);
-    assert.ok(typeof firstEvent.car_1d === 'number');
-    assert.ok(typeof firstEvent.car_5d === 'number');
-    assert.ok(typeof firstEvent.car_20d === 'number');
-
-    // Miner HPC & Pure Play basket
-    assert.ok(Array.isArray(miner_hpc_basket), 'Miner HPC basket must be an array');
-    assert.ok(miner_hpc_basket.length >= 5, 'Must contain at least 5 key miner targets');
-    const tickers = miner_hpc_basket.map(m => m.ticker);
-    assert.ok(tickers.includes('CORZ'), 'CORZ must be in miner basket');
-    assert.ok(tickers.includes('IREN'), 'IREN must be in miner basket');
-    assert.ok(tickers.includes('WULF'), 'WULF must be in miner basket');
-    assert.ok(tickers.includes('MARA'), 'MARA must be in miner basket');
-    assert.ok(tickers.includes('RIOT'), 'RIOT must be in miner basket');
-
-    // Granger causality with ADF unit-root tests and empirical findings
-    assert.ok(causality, 'Granger causality must exist');
-    assert.ok(causality.p_ai_causes_residual, 'P_AI -> ε_BTC must exist');
-    assert.ok(causality.residual_causes_p_ai, 'ε_BTC -> P_AI must exist');
-    assert.ok(causality.adf_tests, 'ADF stationarity tests must be documented');
-    assert.ok(Array.isArray(causality.findings) && causality.findings.length > 0, 'Empirical findings must be reported');
-  });
-
-  test('Module 8 Auditability: HPC spread variance, granular factor breakdowns, econometric metadata, and honest refresh status', async () => {
-    const data = await getAiBtcTensionData(false);
-
-    // 1. Verify hpc_spread is non-zero and has empirical variance (resolves zero-variance bug)
-    const hpcValues = data.series.map(s => s.hpc_spread).filter(v => typeof v === 'number');
-    const nonZeroHpc = hpcValues.filter(v => v !== 0);
-    assert.ok(nonZeroHpc.length > 1000, `hpc_spread must have over 1000 non-zero observations, found: ${nonZeroHpc.length}`);
-
-    const hpcMean = hpcValues.reduce((a, b) => a + b, 0) / hpcValues.length;
-    const hpcVariance = hpcValues.reduce((a, b) => a + Math.pow(b - hpcMean, 2), 0) / hpcValues.length;
-    const hpcStd = Math.sqrt(hpcVariance);
-    assert.ok(hpcStd > 0.5, `hpc_spread standard deviation must be > 0.5, found: ${hpcStd.toFixed(4)}`);
-
-    // 2. Granular breakdown auditability for Layer 1 and Layer 2
-    const latestItem = data.series[data.series.length - 1];
-    assert.ok(latestItem.compute_breakdown, 'Latest series point must have compute_breakdown');
-    assert.ok(latestItem.crypto_breakdown, 'Latest series point must have crypto_breakdown');
-
-    // Layer 1 compute breakdown components
-    const cb = latestItem.compute_breakdown;
-    assert.equal(cb.hpc_spread.weight, 0.4, 'HPC spread weight must be 40% (0.4)');
-    assert.equal(cb.capex_to_ocf.weight, 0.25, 'Capex to OCF weight must be 25% (0.25)');
-    assert.equal(cb.capex_growth.weight, 0.20, 'Capex growth weight must be 20% (0.20)');
-    assert.equal(cb.credit_cost.weight, 0.15, 'Credit cost weight must be 15% (0.15)');
-    assert.ok(Number.isFinite(cb.hpc_spread.raw_ratio), 'HPC spread must have raw_ratio');
-    assert.ok(Number.isFinite(cb.hpc_spread.contribution), 'HPC spread must have contribution');
-
-    // Layer 2 crypto breakdown components
-    const crb = latestItem.crypto_breakdown;
-    assert.equal(crb.basis_inversion.weight, 0.35, 'Basis inversion weight must be 35% (0.35)');
-    assert.equal(crb.basis_momentum.weight, 0.25, 'Basis momentum weight must be 25% (0.25)');
-    assert.equal(crb.volatility_shock.weight, 0.20, 'Volatility shock weight must be 20% (0.20)');
-    assert.equal(crb.miner_squeeze.weight, 0.20, 'Miner squeeze weight must be 20% (0.20)');
-    assert.ok(Number.isFinite(crb.basis_inversion.raw_basis), 'Basis inversion must have raw_basis');
-
-    // 3. Econometric metadata
-    assert.ok(data.regression.hac_metadata, 'HAC robust covariance metadata must exist');
-    assert.equal(data.regression.hac_metadata.maxlags, 5, 'HAC must use 5 lags');
-    assert.ok(data.regression.hac_metadata.kernel.includes('Newey-West') || data.regression.hac_metadata.kernel.includes('Bartlett'));
-
-    assert.ok(data.regression.oos_metadata, 'Out-Of-Sample rolling metadata must exist');
-    assert.equal(data.regression.oos_metadata.rolling_window, 120, 'OOS rolling window must be 120 days');
-    assert.equal(data.regression.oos_metadata.min_burnin, 60, 'OOS burn-in must be 60 days');
-
-    assert.ok(data.event_study_metadata, 'Event study benchmark metadata must exist');
-    assert.ok(data.event_study_metadata.windows.includes('[-1, +1]'));
-
-    // 4. Structured honest refresh status
-    assert.ok(data.refresh_status, 'refresh_status object must exist on returned data');
-    assert.ok(['refreshed', 'pipelineUnavailable', 'stale', 'cached'].includes(data.refresh_status.status));
-    assert.ok(typeof data.refresh_status.message === 'string' && data.refresh_status.message.length > 0);
-  });
-
-  test('HTTP Endpoint GET /api/ai-btc-tension returns 200 with code 0 and valid cache', async () => {
-    const { server } = require('../server/index');
-    await new Promise((resolve) => {
-      server.listen(0, '127.0.0.1', async () => {
-        const port = server.address().port;
-        try {
-          const resp = await fetch(`http://127.0.0.1:${port}/api/ai-btc-tension`);
-          assert.equal(resp.status, 200);
-          const json = await resp.json();
-          assert.equal(json.code, 0);
-          assert.ok(json.data);
-          assert.ok(json.data.current);
-          assert.ok(json.data.metadata.title.includes('全球宏观暗渠穿透') || json.data.metadata.title.includes('AI–BTC'), 'Title must be valid');
-
-          // Verify ETag support on the endpoint
-          const etag = resp.headers.get('etag');
-          if (etag) {
-            const cachedResp = await fetch(`http://127.0.0.1:${port}/api/ai-btc-tension`, {
-              headers: { 'if-none-match': etag }
-            });
-            assert.equal(cachedResp.status, 304);
-          }
-        } finally {
-          server.close(resolve);
-        }
-      });
-    });
-  });
-});
 
 describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes', () => {
   const { getMcClellanData } = require('../server/crypto_mcclellan_fetcher');
@@ -1104,13 +890,13 @@ describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes',
 describe('System Audit & Data Provenance Verification Engine', () => {
   const { getSystemAuditData } = require('../server/audit_engine');
 
-  test('getSystemAuditData returns complete registry of all 11 quantitative modules with provenance signatures', async () => {
+  test('getSystemAuditData returns complete registry of all 10 quantitative modules with provenance signatures', async () => {
     const audit = await getSystemAuditData(false);
     assert.equal(audit.code, 0);
     assert.ok(audit.serverTimeUTC);
     assert.ok(typeof audit.serverUptimeSeconds === 'number');
     assert.ok(['HEALTHY', 'DEGRADED'].includes(audit.overallHealth));
-    assert.equal(audit.modulesCount, 11, 'Must register exactly 11 core modules');
+    assert.equal(audit.modulesCount, 10, 'Must register exactly 10 core modules');
     assert.ok(audit.onlineModulesCount >= 8, 'At least 8 modules must be online');
 
     const expectedModules = [
@@ -1123,8 +909,7 @@ describe('System Audit & Data Provenance Verification Engine', () => {
       'coinbase_orderbook_liquidity',
       'gold_btc_correlation',
       'ssro_oscillator',
-      'crypto_mcclellan_breadth',
-      'ai_btc_tension'
+      'crypto_mcclellan_breadth'
     ];
 
     for (const modId of expectedModules) {
@@ -1159,7 +944,7 @@ describe('System Audit & Data Provenance Verification Engine', () => {
           assert.equal(resp.status, 200);
           const json = await resp.json();
           assert.equal(json.code, 0);
-          assert.equal(json.modulesCount, 11);
+          assert.equal(json.modulesCount, 10);
           assert.ok(json.modules.macro_liquidity);
           assert.ok(json.modules.coinbase_orderbook_liquidity);
 

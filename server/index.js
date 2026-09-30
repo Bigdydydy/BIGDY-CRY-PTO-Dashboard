@@ -18,7 +18,6 @@ const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
-const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { analyzeWaves } = require('./wave_engine');
@@ -59,7 +58,7 @@ let activeRefreshPromise = null;
 const waveRateLimitMap = new Map();
 const waveKlineCache = new Map();
 
-// Module 9 波浪引擎支持的研判周期，严格限定为 15m / 1h / 4h (方案 B 主路径)
+// Module 8 波浪引擎支持的研判周期，严格限定为 15m / 1h / 4h (方案 B 主路径)
 const WAVE_INTERVALS = ['15m', '1h', '4h'];
 const WAVE_SUB_INTERVALS = {
   '15m': [],
@@ -397,23 +396,6 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // GET /api/ai-btc-tension (Module 8: AI-BTC Financing Tension Index & Transmission Analysis)
-  if (pathname === '/api/ai-btc-tension' && req.method === 'GET') {
-    try {
-      const forceRefresh = parsedUrl.query?.refresh === 'true' || parsedUrl.query?.force === '1';
-      const data = await getAiBtcTensionData(forceRefresh);
-      sendJsonResponse(req, res, 200, {
-        code: 0,
-        refreshStatus: data.refresh_status,
-        data,
-        ...data
-      });
-    } catch (err) {
-      console.error('[API Error] ai-btc-tension:', err);
-      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
-    }
-    return;
-  }
 
   // GET /api/crypto-mcclellan (Module 1-B: Crypto Dual-Track McClellan Oscillator & Liquidity Siphon)
   if (pathname === '/api/crypto-mcclellan' && req.method === 'GET') {
@@ -484,7 +466,6 @@ async function handleApiRequest(req, res, parsedUrl) {
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
             getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
             getGoldCorrelationData(true).catch(e => console.error('[GoldFetcher] Sync refresh error:', e.message)),
-            getAiBtcTensionData(true).catch(e => console.error('[AiBtcTensionFetcher] Sync refresh error:', e.message)),
             getMcClellanData(true).catch(e => console.error('[McClellanFetcher] Sync refresh error:', e.message))
           ]);
           return syncResult;
@@ -510,7 +491,7 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // GET /api/wave/klines (Module 9: Wave Kline Feed Proxy & Cache with IP Rate Limit)
+  // GET /api/wave/klines (Module 8: Wave Kline Feed Proxy & Cache with IP Rate Limit)
   if (pathname === '/api/wave/klines' && req.method === 'GET') {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
     if (!checkWaveRateLimit(clientIp)) {
@@ -548,7 +529,7 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // GET / POST /api/wave/analysis (Module 9: Liu Yudong Elliott Wave Theory Analysis API)
+  // GET / POST /api/wave/analysis (Module 8: Liu Yudong Elliott Wave Theory Analysis API)
   if (pathname === '/api/wave/analysis' && (req.method === 'GET' || req.method === 'POST')) {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
     if (!checkWaveRateLimit(clientIp)) {
@@ -700,10 +681,6 @@ function startServer() {
   getCoinbaseLiquidityData()
     .then(() => console.log('[Server] Initial Coinbase liquidity cache ready.'))
     .catch(e => console.warn('[Server] Initial Coinbase fetch warning:', e.message));
-
-  getAiBtcTensionData()
-    .then(() => console.log('[Server] Initial AI-BTC Tension data cache ready.'))
-    .catch(e => console.warn('[Server] Initial AI-BTC Tension fetch warning:', e.message));
 
   getMcClellanData()
     .then(() => console.log('[Server] Initial McClellan data cache ready.'))

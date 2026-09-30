@@ -43,10 +43,8 @@ function validateMcClellanData(data) {
  */
 function detectPython() {
   const candidates = [
-    path.join(__dirname, '..', 'scripts', 'ai_btc_tension', '.venv', 'Scripts', 'python.exe'),
     path.join(PYTHON_PIPELINE_DIR, '.venv', 'Scripts', 'python.exe'),
     path.join(PYTHON_PIPELINE_DIR, '.venv', 'bin', 'python'),
-    path.join(process.env.USERPROFILE || 'C:\\Users\\HZX', '.gemini', 'antigravity', 'scratch', 'ai_btc_tension_index', '.venv', 'Scripts', 'python.exe'),
     'python3',
     'python'
   ];

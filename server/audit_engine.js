@@ -1,7 +1,7 @@
 /**
  * Module: System Data Provenance & Freshness Audit Engine
  *
- * Provides comprehensive auditability across all 11 sub-modules:
+ * Provides comprehensive auditability across all 10 sub-modules:
  * 1. Data Lineage & Provenance: Upstream official endpoints, signatures, record counts.
  * 2. Multi-Timeframe Freshness: Real-time latency, last updated timestamps, update intervals.
  * 3. Health & Connectivity Diagnostics: In-memory metadata checks and optional live ping probes.
@@ -14,7 +14,6 @@ const { getMacroChartData } = require('./macro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
-const { getAiBtcTensionData } = require('./ai_btc_tension_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getCachedTrades } = require('./trade_store');
 const { fetchWithTimeout } = require('./http_client');
@@ -85,12 +84,11 @@ async function getSystemAuditData(doProbe = false) {
   const cache = getCachedData() || {};
 
   // Safely collect latest cache representations without triggering heavy re-computations
-  const [macroData, cbData, goldData, ssroData, aiData, mcData] = await Promise.all([
+  const [macroData, cbData, goldData, ssroData, mcData] = await Promise.all([
     getMacroChartData(false).catch(() => null),
     getCoinbaseLiquidityData(false).catch(() => null),
     getGoldCorrelationData(false).catch(() => null),
     getSsroData(false).catch(() => null),
-    getAiBtcTensionData(false).catch(() => null),
     getMcClellanData(false).catch(() => null)
   ]);
 
@@ -309,25 +307,6 @@ async function getSystemAuditData(doProbe = false) {
         'CORE_FRONTIER_DUAL_TRACK_SPREAD'
       ],
       healthStatus: (mcData?.series?.length > 0 || fs.existsSync(path.join(DATA_DIR, 'crypto_mcclellan.json'))) ? 'ONLINE' : 'INITIALIZING'
-    },
-
-    ai_btc_tension: {
-      id: 'ai_btc_tension',
-      name: 'AI–BTC 融资张力指数与微观传导检验系统',
-      viewId: 'view-ai-btc-tension',
-      primarySource: 'Yahoo Finance (AI 龙头+矿企) + SEC EDGAR Capex + Binance BTC',
-      targetEndpoints: ['Python 计量经济流水线 (scripts/ai_btc_tension/calculate_tension.py)'],
-      timeframe: '日频 OLS 30D 滚动正交回归 + 7D/30D 事件研究',
-      updateInterval: '30s 监听更新',
-      isRealtime: true,
-      recordCount: aiData?.series?.length || 250,
-      lastUpdated: aiData?.refresh_status?.updated_at || cache.lastSyncCheckTime || serverTimeUTC,
-      provenanceSignatures: [
-        'OLS_MACRO_ORTHOGONAL_REGRESSION',
-        'PHASE_SPACE_4_QUADRANT_MACHINE',
-        'CAR_EVENT_STUDY_WINDOWS'
-      ],
-      healthStatus: (aiData?.series?.length > 0 || fs.existsSync(path.join(DATA_DIR, 'ai_btc_tension.json'))) ? 'ONLINE' : 'INITIALIZING'
     }
   };
 

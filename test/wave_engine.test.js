@@ -17,7 +17,7 @@ const { server } = require('../server/index');
 
 const P = (idx, price, type) => ({ idx, time: idx, price, type, confirmed: true });
 
-describe('Module 9: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave Theory Engine)', () => {
+describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave Theory Engine)', () => {
 
   it('Iron Rule 1: 浪2回撤绝不能跌破浪1起点 (多头与空头双向)', () => {
     // Bullish
