@@ -10,6 +10,7 @@
   let candleSeries = null;
   let zigzagSeries = null;
   let subwaveSeries = null;
+  let higherSeries = null; // 高一级别计数折线 (多级别同屏)
   let channelUpperSeries = null;
   let channelLowerSeries = null;
 
@@ -25,6 +26,7 @@
   let showMarkers = true;
   let showZigzag = true;
   let showSubwaves = false;
+  let showHigherDegree = true;
   let showChannel = false;
   let showMonitoring = true;
   let showTargets = true;
@@ -53,6 +55,8 @@
       volDownColor: isLight ? 'rgba(225, 29, 72, 0.35)' : 'rgba(244, 63, 94, 0.35)',
       zigzagColor: isLight ? '#ea580c' : '#ff5722',
       subwaveColor: isLight ? '#0284c7' : '#38bdf8',
+      higherColor: isLight ? 'rgba(124, 58, 237, 0.30)' : 'rgba(167, 139, 250, 0.35)',
+      higherLabelColor: isLight ? '#7c3aed' : '#a78bfa',
       channelColor: isLight ? 'rgba(234, 88, 12, 0.5)' : 'rgba(255, 87, 34, 0.45)',
       monitoringColor: isLight ? '#dc2626' : '#f43f5e',
       targetColor: isLight ? '#059669' : '#10b981'
@@ -231,6 +235,16 @@
       crosshairMarkerVisible: false
     });
 
+    // 高一级别计数折线 (粗半透明紫线，位于主折线之下；柳玉冬式多色嵌套)
+    const higher = safeCreateSeries(chart, 'Line', {
+      color: colors.higherColor,
+      lineWidth: 8,
+      lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false
+    });
+
     // 次级嵌套子浪折线 (细虚线，天蓝色)
     const subwave = safeCreateSeries(chart, 'Line', {
       color: colors.subwaveColor,
@@ -292,6 +306,7 @@
     candleSeries = candles;
     zigzagSeries = zigzag;
     subwaveSeries = subwave;
+    higherSeries = higher;
     channelUpperSeries = channelUpper;
     channelLowerSeries = channelLower;
 
@@ -637,6 +652,7 @@
 
     if (zigzagSeries) zigzagSeries.applyOptions({ color: colors.zigzagColor });
     if (subwaveSeries) subwaveSeries.applyOptions({ color: colors.subwaveColor });
+    if (higherSeries) higherSeries.applyOptions({ color: colors.higherColor });
     if (channelUpperSeries) channelUpperSeries.applyOptions({ color: colors.channelColor });
     if (channelLowerSeries) channelLowerSeries.applyOptions({ color: colors.channelColor });
 
@@ -730,6 +746,7 @@
     // 1. 清空图表上的所有波浪图层
     if (zigzagSeries) zigzagSeries.setData([]);
     if (subwaveSeries) subwaveSeries.setData([]);
+    if (higherSeries) higherSeries.setData([]);
     if (channelUpperSeries) channelUpperSeries.setData([]);
     if (channelLowerSeries) channelLowerSeries.setData([]);
     setChartMarkers(candleSeries, []);
@@ -1063,6 +1080,7 @@
     if (!currentAnalysis || !currentAnalysis.candidates || currentAnalysis.candidates.length === 0) {
       if (zigzagSeries) zigzagSeries.setData([]);
       if (subwaveSeries) subwaveSeries.setData([]);
+      if (higherSeries) higherSeries.setData([]);
       if (channelUpperSeries) channelUpperSeries.setData([]);
       if (channelLowerSeries) channelLowerSeries.setData([]);
       setChartMarkers(candleSeries, []);
@@ -1105,6 +1123,12 @@
       } else {
         subwaveSeries.setData([]);
       }
+    }
+
+    // 2.5 多级别同屏: 高一级别计数 (与当前计数重合时不重复绘制)
+    if (higherSeries) {
+      const hc = higherDegreeCount(cand);
+      higherSeries.setData(showHigherDegree && hc ? hc.pivots.map(p => ({ time: p.time, value: p.price })) : []);
     }
 
     // 3. 绘制艾略特通道模块
@@ -1180,6 +1204,17 @@
   /**
    * 应用波浪标引 Markers (大浪圆标 + 嵌套小浪标引)
    */
+  /** 级别阶梯中的高一级别计数；与当前激活计数完全重合时返回 null (避免重复绘制) */
+  function higherDegreeCount(cand) {
+    const dl = currentAnalysis && currentAnalysis.degreeLadder;
+    const lvl = dl && dl.levels && dl.levels.find(l => l.degree === 'HIGHER');
+    const hc = lvl && lvl.count;
+    if (!hc || !hc.pivots || hc.pivots.length < 2) return null;
+    if (cand && cand.pivots && cand.pivots.length === hc.pivots.length &&
+      cand.pivots.every((p, i) => p.time === hc.pivots[i].time)) return null;
+    return hc;
+  }
+
   function applyMarkers(cand) {
     if (!candleSeries) return;
     if (!showMarkers || !cand || !cand.pivots) {
@@ -1219,6 +1254,24 @@
           shape: 'circle',
           text: sp.label ? `(${sp.label})` : '',
           size: 0.8
+        });
+      });
+    }
+
+    // 高一级别浪号: 用带括号的大写标注 (1)(2)…/(A)(B)(C)/(W)(X)(Y)，与本级别圆圈浪号区分
+    const hc = showHigherDegree ? higherDegreeCount(cand) : null;
+    if (hc) {
+      const hColor = getWaveChartColors().higherLabelColor;
+      hc.pivots.forEach((p, i) => {
+        const raw = String(hc.waveLabels[i] || '').replace('?', '');
+        if (!raw || raw === '0') return;
+        markers.push({
+          time: p.time,
+          position: p.type === 'high' ? 'aboveBar' : 'belowBar',
+          color: hColor,
+          shape: 'square',
+          text: `(${raw.toUpperCase()})${String(hc.waveLabels[i]).includes('?') ? '?' : ''} 大级别`,
+          size: 1
         });
       });
     }
@@ -1841,7 +1894,8 @@
       const meta = l.pivotCount ? `<div style="font-size:0.6rem;color:var(--text-muted);font-weight:500">${l.pivotCount} 拐点</div>` : '';
       return `<div class="liu-ladder-row ${cls[l.degree] || ''}"><div class="deg">${esc(l.label)}${meta}</div><div>${txt}</div></div>`;
     }).join('');
-    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '');
+    const legend = '<div class="liu-nesting">图上同屏：<span style="color:#8b5cf6;font-weight:700">紫色粗线 (1)(A)</span> = 高一级别 · 彩色主线 ①Ⓐ = 本级别 · <span style="color:#06b6d4;font-weight:700">青色点线</span> = 小级别（开启「大浪嵌套小浪」）</div>';
+    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '') + legend;
   }
 
 
@@ -1981,6 +2035,16 @@
       btnSubwaves.addEventListener('click', () => {
         showSubwaves = !showSubwaves;
         btnSubwaves.classList.toggle('active', showSubwaves);
+        applyActiveCandidate(activeCandidateIndex);
+      });
+    }
+
+    // 多级别同屏开关 (高一级别计数)
+    const btnHigher = document.getElementById('btn-toggle-higher');
+    if (btnHigher) {
+      btnHigher.addEventListener('click', () => {
+        showHigherDegree = !showHigherDegree;
+        btnHigher.classList.toggle('active', showHigherDegree);
         applyActiveCandidate(activeCandidateIndex);
       });
     }

@@ -5498,9 +5498,9 @@ body {
   color: var(--text-secondary);
   line-height: 1.45;
 }
-.liu-ladder-row.higher { border-left-color: var(--color-info); }
+.liu-ladder-row.higher { border-left-color: #8b5cf6; } /* 与图上高一级别紫色折线一致 */
 .liu-ladder-row.main { border-left-color: var(--accent-primary); }
-.liu-ladder-row.lower { border-left-color: var(--accent-teal); }
+.liu-ladder-row.lower { border-left-color: #06b6d4; } /* 与图上子浪青色点线一致 */
 .liu-ladder-row .deg { font-weight: 700; color: var(--text-primary); font-size: 0.68rem; }
 .liu-nesting {
   font-size: 0.68rem;
