@@ -134,11 +134,11 @@ async function fetchCdriData(forceRefresh = false) {
   // Check disk cache if valid
   if (!forceRefresh && fs.existsSync(CACHE_FILE)) {
     try {
-      const fileStat = fs.statSync(CACHE_FILE);
-      if (now - fileStat.mtimeMs < CACHE_TTL_MS) {
-        const raw = fs.readFileSync(CACHE_FILE, 'utf8');
-        inMemoryCache = JSON.parse(raw);
-        lastFetchTime = fileStat.mtimeMs;
+      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      const cachedAt = cached && typeof cached.timestamp === 'number' ? cached.timestamp : 0;
+      if (now - cachedAt < CACHE_TTL_MS) {
+        inMemoryCache = cached;
+        lastFetchTime = cachedAt;
         return inMemoryCache;
       }
     } catch (e) {

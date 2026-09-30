@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchWithTimeout } = require('./http_client');
+const { fetchBinanceSpot } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'gold_correlation.json');
 const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Approx $18.5T for ~212,500 tonnes of global above-ground gold
@@ -134,8 +134,8 @@ function classifyCorrelationRegime(r, btcGoldRatio, btcMarketCapShare) {
  */
 async function fetchGoldCorrelationFromSource() {
   const [paxgResp, btcResp] = await Promise.all([
-    fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000'),
-    fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000')
+    fetchBinanceSpot('/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000'),
+    fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000')
   ]);
 
   if (!paxgResp.ok) throw new Error(`Binance PAXG HTTP ${paxgResp.status}`);
@@ -229,7 +229,8 @@ async function fetchGoldCorrelationFromSource() {
       date: latest.date
     },
     regime,
-    series
+    series,
+    updatedAt: new Date().toISOString()
   };
 }
 

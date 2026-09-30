@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
-const { fetchWithTimeout } = require('./http_client');
+const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'macro_chart.json');
 const BT_STRATEGY_FILE = path.join(__dirname, '..', 'data', 'bitcointreasuries_strategy.json');
@@ -189,7 +189,7 @@ async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
     const now = Date.now();
     const allKlines = [];
     while (start < now) {
-      const resp = await fetchWithTimeout('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
+      const resp = await fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
       if (!resp.ok) break;
       const data = await resp.json();
       if (!Array.isArray(data) || data.length === 0) break;
@@ -539,7 +539,25 @@ async function getMacroChartData(forceRefresh = false) {
     }
   }
 
-  return await fetchAndBuildMacroData();
+  try {
+    return await fetchAndBuildMacroData();
+  } catch (err) {
+    const fallback = inMemoryCache || readMacroCacheFile();
+    if (!fallback) throw err;
+    console.warn('[MacroFetcher] Live rebuild failed, serving last cached dataset:', err.message);
+    inMemoryCache = fallback;
+    return fallback;
+  }
+}
+
+function readMacroCacheFile() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return null;
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return cached && Array.isArray(cached.points) && cached.points.length > 0 ? cached : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 module.exports = {
