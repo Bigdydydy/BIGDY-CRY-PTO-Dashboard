@@ -139,7 +139,8 @@ def main():
                 "ratio_scale": config.RATIO_SCALE,
                 "alert_threshold": config.SPREAD_DIVERGENCE_ALERT,
                 "overbought": config.OSC_OVERBOUGHT,
-                "oversold": config.OSC_OVERSOLD
+                "oversold": config.OSC_OVERSOLD,
+                "adv_dec_basis": "utc_close_to_close"
             },
             "gatekeeper": config.MEME_GATEKEEPER
         },
@@ -155,11 +156,15 @@ def main():
             "core_declines": int(core_stats.get("declines", latest_row.get("core_dec", 0))),
             "core_ramo": round(float(core_stats.get("ramo", latest_row.get("core_ramo", 0.0))), 1),
             "core_summation": round(float(latest_row.get("core_summation", 1000.0)), 1),
+            "core_close_basis_count": int(core_stats.get("close_basis_count", 0)),
+            "core_rolling_basis_count": int(core_stats.get("rolling_basis_count", 0)),
             "frontier_oscillator": round(latest_f_osc, 2),
             "frontier_advances": int(meme_stats.get("advances", latest_row.get("frontier_adv", 0))),
             "frontier_declines": int(meme_stats.get("declines", latest_row.get("frontier_dec", 0))),
             "frontier_ramo": round(float(meme_stats.get("ramo", latest_row.get("frontier_ramo", 0.0))), 1),
             "frontier_summation": round(float(latest_row.get("frontier_summation", 1000.0)), 1),
+            "frontier_close_basis_count": int(meme_stats.get("close_basis_count", 0)),
+            "frontier_rolling_basis_count": int(meme_stats.get("rolling_basis_count", 0)),
             "spread": round(latest_sp, 2),
             "spread_alert": is_siphon_alert,
             "btc_close": round(float(latest_row.get("btc_close", 0.0)), 2)

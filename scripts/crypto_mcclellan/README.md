@@ -34,6 +34,17 @@
 
 ## 3. 数学与量化指标定义
 
+### 涨跌判定口径 (UTC Close-to-Close)
+传统美股以交易所收盘判定涨跌。加密市场 24/7 运行，直接取行情 API 的 `price_change_24h`
+滚动窗口会让同一段行情被相邻两个数据点重复计入、并与历史序列的 UTC 日收盘口径不一致。
+因此每个成分的日内涨跌幅优先按 **UTC 日收盘对收盘** 计算：
+
+$$\text{daily\_pct}_t = \left(\frac{\text{close}_t}{\text{close}_{t-1}} - 1\right) \times 100\%$$
+
+- `DailyCloseStore`（`data/cache/daily_closes.csv`）按 `(date, track, key)` 持久化每个成分的日收盘价；首次入库的成分当日回退到 API 24h 滚动口径（`pct_basis = rolling_24h`），次日起自动切换为 `close_to_close`。
+- 历史种子重建时会把 yfinance 核心篮子的日收盘矩阵回填进 store，使核心轨立即获得收盘基準。
+- 该 store 同时充当逐日成分快照（point-in-time universe），用于抵御幸存者偏差。
+
 ### 比率调整净上涨值 (RAMO)
 $$\text{RAMO}_t = \frac{\text{Advances}_t - \text{Declines}_t}{\text{Advances}_t + \text{Declines}_t} \times 1000.0$$
 *数值严格落在 $[-1000, +1000]$ 区间内，不受成分数量动态变动影响。*
