@@ -5385,3 +5385,128 @@ body {
   color: var(--text-muted);
 }
 
+
+/* ==========================================================================
+   Module 8 v3 · 柳玉冬实战信号 / 级别阶梯 / 按标的串联的波浪脉络
+   ========================================================================== */
+.liu-idle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 8px 0 0 0;
+}
+.liu-signals-body, .liu-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.liu-signal-row {
+  padding: 8px 10px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.71rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.liu-signal-row strong { color: var(--text-primary); }
+.liu-signal-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+.liu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.64rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  background: var(--bg-pill);
+  white-space: nowrap;
+}
+.liu-chip.pos { color: var(--color-pos); background: var(--color-pos-bg); border-color: var(--color-pos-border); }
+.liu-chip.neg { color: var(--color-neg); background: var(--color-neg-bg); border-color: var(--color-neg-border); }
+.liu-chip.warn { color: var(--color-warn); background: var(--color-warn-bg); border-color: var(--color-warn-border); }
+.liu-chip.info { color: var(--color-info); background: var(--color-info-bg); border-color: var(--color-info-border); }
+.liu-eat-bar {
+  position: relative;
+  height: 8px;
+  margin: 8px 0 16px 0;
+  background: var(--bg-pill);
+  border-radius: var(--radius-pill);
+}
+.liu-eat-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--accent-primary);
+  border-radius: var(--radius-pill);
+  opacity: 0.75;
+}
+.liu-eat-tick {
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 14px;
+  background: var(--text-muted);
+}
+.liu-eat-tick span {
+  position: absolute;
+  top: 14px;
+  transform: translateX(-50%);
+  font-size: 0.58rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.liu-eat-tick.up span { top: -15px; }
+.liu-eat-bar { margin-top: 18px; }
+.liu-parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.66rem;
+  margin-top: 4px;
+}
+.liu-parts-table td {
+  padding: 3px 4px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+.liu-parts-table td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+.liu-parts-table tr.dead td { opacity: 0.45; text-decoration: line-through; }
+.liu-ladder-row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 7px 10px;
+  border-left: 3px solid var(--border-default);
+  background: var(--bg-surface-elevated);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.liu-ladder-row.higher { border-left-color: var(--color-info); }
+.liu-ladder-row.main { border-left-color: var(--accent-primary); }
+.liu-ladder-row.lower { border-left-color: var(--accent-teal); }
+.liu-ladder-row .deg { font-weight: 700; color: var(--text-primary); font-size: 0.68rem; }
+.liu-nesting {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+@media (max-width: 640px) {
+  .liu-ladder-row { grid-template-columns: 1fr; }
+}

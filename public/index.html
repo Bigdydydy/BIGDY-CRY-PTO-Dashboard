@@ -2150,6 +2150,7 @@
                       <span class="text-secondary" id="rule-status-3" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
                     </div>
                   </div>
+                  <div class="liu-signal-row" id="wave-structure-detail" style="display: none; margin-top: 10px;"></div>
                 </div>
               </div>
             </div>
@@ -2169,6 +2170,33 @@
               <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; margin-top: 10px;" id="wave-pivot-desc">
                 选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。
               </p>
+            </div>
+
+            <!-- 3.5 柳氏实战信号 (v3: 监测点战法 / 最大回撤 / 吃掉0.7 / 调整分部 / 出身) -->
+            <div class="bento-card" id="card-wave-liu-signals">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>柳氏实战信号 · 当前段</h3>
+                  </div>
+                  <span class="card-badge badge-neutral" id="wave-liu-signal-badge">待研判</span>
+                </div>
+              </div>
+              <div id="wave-liu-signals-body" class="liu-signals-body">
+                <p class="liu-idle">研判后显示：监测点战法、最大回撤判据、吃掉前段0.618/0.7、调整分部投射与出身检验。</p>
+              </div>
+            </div>
+
+            <!-- 3.6 级别阶梯 (大级别 → 本级别 → 当前段小级别) -->
+            <div class="bento-card" id="card-wave-degree-ladder">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h3>级别阶梯 · 嵌套计数</h3>
+                </div>
+              </div>
+              <div id="wave-degree-ladder-body" class="liu-ladder">
+                <p class="liu-idle">研判后显示高一级别、本级别与当前段小级别的嵌套关系。</p>
+              </div>
             </div>
 
             <!-- 4. Blocker Diagnostics (说明哪里阻止了浪型判断) -->
@@ -2232,6 +2260,7 @@
             </div>
           </div>
         </div> <!-- /.card-body -->
+
       </section> <!-- /#module-wave-radar -->
     </div> <!-- /#view-wave-radar -->
 

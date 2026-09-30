@@ -838,6 +838,8 @@
     const bottomSignal = document.getElementById('wave-bottom-signal');
     if (thesisText) thesisText.textContent = `请使用【🖱️ 框选分析模式】选择 ${currentTf.toUpperCase()} K 线行情走势区间以生成柳玉冬实战研判结论。`;
     if (bottomSignal) bottomSignal.textContent = '';
+    resetLiuSignalCards();
+    renderStructureDetail(null);
   }
 
   /**
@@ -1371,6 +1373,7 @@
     }
 
     // 3. 更新右侧主浪型卡片详情
+    renderStructureDetail(cand);
     const elWaveName = document.getElementById('wave-regime-name');
     const elWaveBadge = document.getElementById('wave-regime-badge');
     const elWaveCur = document.getElementById('wave-current-stage');
@@ -1662,10 +1665,144 @@
 
     if (analysis.commentary) {
       if (elThesis) elThesis.textContent = analysis.commentary.thesis;
-      if (elBottomSignal) elBottomSignal.textContent = analysis.commentary.bottomTopSignal;
+      if (elBottomSignal) {
+        const extra = (analysis.commentary.liuLines || []).map(t => `· ${t}`).join('\n');
+        elBottomSignal.style.whiteSpace = 'pre-line';
+        elBottomSignal.textContent = analysis.commentary.bottomTopSignal + (extra ? `\n${extra}` : '');
+      }
       if (elQuote) elQuote.textContent = analysis.commentary.quote;
     }
+
+    // 5. v3 柳氏实战信号 & 级别阶梯
+    renderLiuSignals(analysis);
+    renderDegreeLadder(analysis);
   }
+
+  // ---------------------------------------------------------------------------
+  // v3 · 柳氏实战信号 / 级别阶梯 / 柳玉冬波浪脉络 (按标的时间串联)
+  // ---------------------------------------------------------------------------
+
+
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function fmtP(v) {
+    if (v === null || v === undefined || !isFinite(v)) return '--';
+    const a = Math.abs(v);
+    return Number(v).toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 1 : a >= 10 ? 2 : 4 });
+  }
+
+  function resetLiuSignalCards() {
+    const body = document.getElementById('wave-liu-signals-body');
+    const badge = document.getElementById('wave-liu-signal-badge');
+    const ladder = document.getElementById('wave-degree-ladder-body');
+    if (body) body.innerHTML = '<p class="liu-idle">研判后显示：监测点战法、最大回撤判据、吃掉前段0.618/0.7、调整分部投射与出身检验。</p>';
+    if (badge) { badge.textContent = '待研判'; badge.className = 'card-badge badge-neutral'; }
+    if (ladder) ladder.innerHTML = '<p class="liu-idle">研判后显示高一级别、本级别与当前段小级别的嵌套关系。</p>';
+  }
+
+  function renderLiuSignals(analysis) {
+    const body = document.getElementById('wave-liu-signals-body');
+    const badge = document.getElementById('wave-liu-signal-badge');
+    if (!body) return;
+    const ls = analysis && analysis.liuSignals;
+    if (!ls) { resetLiuSignalCards(); return; }
+    const bull = ls.direction === 'BULLISH';
+    const mp = ls.monitorPoint;
+    const stTxt = mp.status === 'HOLDING' ? (bull ? '上涨延续中' : '下跌延续中')
+      : mp.status === 'BROKEN' ? (bull ? '小级别见顶' : '小级别见底') : '本段已结束';
+    if (badge) {
+      badge.textContent = stTxt;
+      badge.className = `card-badge ${mp.status === 'HOLDING' ? (bull ? 'badge-bull' : 'badge-bear') : 'badge-neutral'}`;
+    }
+    const eat = ls.eatBack;
+    const pctW = eat.ratio === null ? 0 : Math.min(100, eat.ratio / 1.2 * 100);
+    const ticks = [0.618, 0.7, 1].map(k => `<div class="liu-eat-tick${k === 0.7 ? ' up' : ''}" style="left:${(k / 1.2 * 100).toFixed(1)}%"><span>${k}</span></div>`).join('');
+    const parts = (ls.partsProjector || []).map(r => `
+      <tr class="${r.alive ? '' : 'dead'}">
+        <td>${esc(r.pattern)} <span style="color:var(--text-muted)">${esc(r.role)}浪</span></td>
+        <td class="num">${fmtP(r.minPrice)}</td>
+        <td>${r.alive ? (r.reachedMin ? '<span class="liu-chip pos">满足</span>' : '<span class="liu-chip">未到</span>') : '<span class="liu-chip neg">否决</span>'}</td>
+      </tr>`).join('');
+    const origin = ls.origin || {};
+    body.innerHTML = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>监测点战法</span><span class="liu-chip ${mp.status === 'HOLDING' ? 'pos' : 'warn'}">${fmtP(mp.price)}</span></div>
+        ${esc(mp.text)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>最大回撤判据</span><span class="liu-chip ${ls.largestCounterMove.exceeded ? 'warn' : ''}">段内最大 ${fmtP(ls.largestCounterMove.innerMax)}</span></div>
+        ${esc(ls.largestCounterMove.text)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>吃掉前段比例</span><span class="liu-chip info">${eat.ratio === null ? '--' : (eat.ratio * 100).toFixed(0) + '%'}</span></div>
+        <div class="liu-eat-bar"><div class="liu-eat-fill" style="width:${pctW.toFixed(1)}%"></div>${ticks}</div>
+        ${esc(eat.verdict)}
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>调整分部投射（前段作第一部分时，第二部分最低要求）</span></div>
+        ${(ls.partsProjector || []).some(r => r.alive) ? '' : '<div style="color:var(--text-muted);margin-bottom:2px">当前段已远超前段（超过各浪型上限），前段不再是本级别调整的第一部分，投射仅作参考。</div>'}
+        <table class="liu-parts-table"><tbody>${parts}</tbody></table>
+      </div>
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>出身 · 当前段结构</span><span class="liu-chip ${origin.structure === '5' ? 'pos' : origin.structure === '3' ? 'neg' : ''}">${origin.structure === '5' ? '五浪' : origin.structure === '3' ? '非五浪' : '待定'}</span></div>
+        ${esc(origin.text || '')}
+        ${ls.threeLegWarning ? `<div style="margin-top:4px;color:var(--color-warn)">${esc(ls.threeLegWarning)}</div>` : ''}
+        ${origin.leadingDiagonal ? `<div style="margin-top:4px;color:var(--text-muted)">${esc(origin.leadingDiagonal.text)}</div>` : ''}
+      </div>`;
+  }
+
+  /** 主浪型卡片: 浪2/浪4 交替原则 与 联合形组成部分 */
+  function renderStructureDetail(cand) {
+    const el = document.getElementById('wave-structure-detail');
+    if (!el) return;
+    const rows = [];
+    const alt = cand && cand.alternation;
+    if (alt) {
+      const chip = alt.pass === true ? '<span class="liu-chip pos">符合交替</span>'
+        : alt.pass === false ? '<span class="liu-chip warn">未交替</span>' : '<span class="liu-chip">待确认</span>';
+      const cls = w => w && w.class ? esc(w.class.text) : '结构未识别';
+      rows.push(`<div class="liu-signal-title"><span>交替原则 · 浪2 vs 浪4</span>${chip}</div>`);
+      rows.push(`<div>浪2：${cls(alt.wave2)} · 回撤 ${(alt.wave2.retrace * 100).toFixed(0)}%</div>`);
+      if (alt.wave4) rows.push(`<div>浪4：${cls(alt.wave4)} · 回撤 ${(alt.wave4.retrace * 100).toFixed(0)}%</div>`);
+      rows.push(`<div style="margin-top:3px;color:var(--text-muted)">${esc(alt.text)}</div>`);
+    }
+    const comps = cand && cand.components;
+    if (comps && comps.length) {
+      rows.push(`<div class="liu-signal-title" style="margin-top:${alt ? 8 : 0}px"><span>组成部分识别</span></div>`);
+      rows.push(comps.map(c => `<div>${esc(c.label)} 浪：${esc(c.text)}${c.developing ? '（运行中）' : ''}</div>`).join(''));
+    }
+    el.style.display = rows.length ? 'block' : 'none';
+    el.innerHTML = rows.join('');
+  }
+
+  function renderDegreeLadder(analysis) {
+    const el = document.getElementById('wave-degree-ladder-body');
+    if (!el) return;
+    const dl = analysis && analysis.degreeLadder;
+    if (!dl || !dl.levels || !dl.levels.length) {
+      el.innerHTML = '<p class="liu-idle">无可用的级别阶梯。</p>';
+      return;
+    }
+    const cls = { HIGHER: 'higher', MAIN: 'main', LOWER: 'lower' };
+    const rows = dl.levels.map(l => {
+      let txt;
+      if (l.count) {
+        const pts = l.count.pivots.map((p, i) => `${esc(l.count.waveLabels[i] || '')}:${fmtP(p.price)}`).join(' → ');
+        txt = `<strong>${esc(l.count.name)}</strong><div style="font-family:var(--font-mono);font-size:0.64rem;color:var(--text-muted);margin-top:2px">${pts}</div>`;
+      } else if (l.degree === 'LOWER') {
+        txt = esc(l.text || '');
+      } else {
+        txt = '<span style="color:var(--text-muted)">该级别暂无合规计数</span>';
+      }
+      const meta = l.pivotCount ? `<div style="font-size:0.6rem;color:var(--text-muted);font-weight:500">${l.pivotCount} 拐点</div>` : '';
+      return `<div class="liu-ladder-row ${cls[l.degree] || ''}"><div class="deg">${esc(l.label)}${meta}</div><div>${txt}</div></div>`;
+    }).join('');
+    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '');
+  }
+
 
   /**
    * 初始化事件监听器 (标的切换、图表工具开关、框选交互)
@@ -1685,6 +1822,7 @@
         }
       });
     });
+
 
     // 周期切换 (15m / 1H / 4H) - 重新拉取周期 K 线并实时重新解算波浪
     const tfBtns = document.querySelectorAll('.wave-tf-btn');
