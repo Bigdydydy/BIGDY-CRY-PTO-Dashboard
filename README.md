@@ -74,19 +74,19 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **Pearson 滚动相关性曲面**：追踪 BTC 与黄金（PAXG/XAU）的 30D / 90D / 180D 滚动相关系数。
 - **跨资产四象限机制判定**：量化识别“抗通胀避险共振”、“流动性分化背离”、“美元主导无差别挤压”与“独立加密 Alpha 周期”。
 
-### Module 8: 全球宏观暗渠穿透与算力基建重估终端 (AI–BTC Tension & Arbitrage)
-- **资产负债表穿透与隔夜暗渠利差**：
-  - 引入隔夜融资利差（\(\text{SOFR} - \text{IORB}\)）与纽约联储 10 年期美债期限溢价（ACM Term Premium），实时监测一级交易商资产负债表摩擦。
-- **Layer 1: 算力与能源重估指数 (\(I_{\text{Compute}}\))**：
-  - 40% 物理电力与 HPC 转型矿企溢价（CORZ/IREN/WULF 相对 MARA/RIOT/CLSK 比价）、25% AI 巨头 Capex/OCF 强度、20% Capex 同比增速、15% 投资级与高收益债信用利差。
-- **Layer 2: 加密外生流动性压力指数 (\(I_{\text{Crypto}}\))**：
-  - 35% CME 近月基差倒挂风险、25% 基差动量衰减、20% 跨资产波动率冲击（VIX 脉冲）、20% 纯矿企权益挤压（纯矿企相对 BTC 超额回撤）。杜绝循环论证，实现与 BTC 自身价格收益的严格外生解耦。
-- **四象限相空间引力与实战配对**：
-  - **Q1 共振繁荣**、**Q2 算力分化·配对套利 (Long HPC Miners / Short BTC)**、**Q3 加密内生去杠杆**、**Q4 宏观扩张**。
-- **计量经济学检验与可证伪边界**：
-  - **HAC 稳健协方差**：Newey-West 5 阶滞后自相关与异方差修正。
-  - **严格样本外残差 (OOS Residuals)**：120 日向前一步滚窗无前瞻偏误残差 \(\varepsilon_{\text{BTC},t}\)。
-  - **因果与事件窗口**：ADF 差分平稳化后跨期因果检验，以及重大 AI Capex 指引发布前后的 CAR 累计异常收益率分析。
+### Module 8: 柳玉冬波浪理论智能研判系统 (Elliott Wave Theory & Liu Yudong Radar)
+- **三大铁律严格核验**：
+  - 浪2回撤绝不能跌破浪1起点（多头与空头双向对偶核验）。
+  - 浪3不能是最短的驱动浪。
+  - 推动浪中浪4底绝不能进入浪1顶领地（无重叠硬规则）。
+- **《波浪理论详解》手稿全量规则库**：
+  - 覆盖驱动浪基础、斐波那契系统比率、单锯齿、平台形、收缩三角形、双重与三重锯齿及联合形横向整理。
+  - 严格区分浪型规则、比率规则、时间规则与软性打分指引，杜绝规则与指引混淆。
+- **“出身决定命运”微观穿透**：
+  - 15m / 1h / 4h 多级别时间框架切片与子浪验证，向左延伸大级别前序脉络。
+- **艾略特通道与关键监测点**：
+  - 辅助通道动态投影，结合手稿斐波那契目标位与失效反转临界点。
+  - 决断度与概率权重的多重候选浪型智能排序输出。
 
 ---
 
@@ -183,20 +183,15 @@ PORT=8080 npm start
 | `/api/cdri` | `GET` | Gzip + ETag (304) | 获取加密衍生品综合风险指数 (CDRI) 及历史分位 |
 | `/api/ssro` | `GET` | Gzip + ETag (304) | 获取稳定币供给比率振荡器 (SSRO) 宏观流动性指标 |
 | `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
-| `/api/ai-btc-tension` | `GET` | Gzip + ETag (304) | 获取全球宏观暗渠、算力基建重估指数、相空间及计量检验全量数据 |
+| `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h) |
+| `/api/wave/analysis` | `GET / POST` | 20 req/min IP 限流 | 柳玉冬波浪理论全量智能研判、铁律校验与候选集引擎 |
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
 
 ### Python 计量科学计算管线 (Quantitative Pipelines)
 系统内置完备的 Python 科学计算与计量分析管线（位于 `scripts/`）：
 
-1. **AI–BTC 融资张力与宏观暗渠管线 (`scripts/ai_btc_tension/`)**：
-```bash
-pip install -r scripts/ai_btc_tension/requirements.txt
-python scripts/ai_btc_tension/export_to_json.py
-```
-
-2. **双轨加密麦克莱伦市场宽度管线 (`scripts/crypto_mcclellan/`)**：
+1. **双轨加密麦克莱伦市场宽度管线 (`scripts/crypto_mcclellan/`)**：
 ```bash
 pip install -r scripts/crypto_mcclellan/requirements.txt
 python scripts/crypto_mcclellan/export_to_json.py

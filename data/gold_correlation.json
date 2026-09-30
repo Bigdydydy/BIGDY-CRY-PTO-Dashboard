@@ -10,13 +10,13 @@
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 83167,
-    "goldPrice": 4188.43,
-    "btcGoldRatio": 19.86,
-    "goldBtcRatio": 0.05036,
-    "ratioChange24h": -0.5,
-    "marketCapShare": 8.9,
-    "rollingCorr30d": 0.451,
+    "btcPrice": 83084,
+    "goldPrice": 4188.93,
+    "btcGoldRatio": 19.83,
+    "goldBtcRatio": 0.05042,
+    "ratioChange24h": -0.65,
+    "marketCapShare": 8.89,
+    "rollingCorr30d": 0.45,
     "timestamp": 1790726400000,
     "date": "2026-09-30"
   },
@@ -28,7 +28,7 @@
     "summary": "BTC 与黄金保持温和正相关 (30D r = +0.45)。宏观大宗流动性平稳有序，两者维持基准协同但各自具有资产特色。",
     "keyPointers": [
       "流动性常态传导：宏观货币政策处于观察期，黄金稳步筑底，BTC 维持温和风险偏好。",
-      "比价震荡巩固：1 BTC 稳定在 19.9 盎司黄金区间，机构套利与再平衡策略顺畅。",
+      "比价震荡巩固：1 BTC 稳定在 19.8 盎司黄金区间，机构套利与再平衡策略顺畅。",
       "关注事件催化：密切跟踪 CPI 通胀数据与地缘局势变化，观察是否触发共振升级。"
     ]
   },
@@ -10026,12 +10026,12 @@
     {
       "date": "2026-09-30",
       "timestamp": 1790726400000,
-      "btcPrice": 83167,
-      "goldPrice": 4188.43,
-      "btcGoldRatio": 19.86,
-      "goldBtcRatio": 0.05036,
-      "marketCapShare": 8.9,
-      "rollingCorr30d": 0.451
+      "btcPrice": 83084,
+      "goldPrice": 4188.93,
+      "btcGoldRatio": 19.83,
+      "goldBtcRatio": 0.05042,
+      "marketCapShare": 8.89,
+      "rollingCorr30d": 0.45
     }
   ]
 }
