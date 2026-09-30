@@ -130,6 +130,24 @@ describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正
     }
   });
 
+  it('长样本 (10000 根K线): 主级别拐点数自动收敛到上限内，全量分析不超时', () => {
+    // 带趋势与多级别摆动的合成序列
+    const bars = [];
+    let t = 1600000000, px = 100;
+    for (let i = 0; i < 10000; i++) {
+      const drift = Math.sin(i / 900) * 0.6 + Math.sin(i / 97) * 0.9 + Math.sin(i / 13) * 0.5;
+      const o = px, c = Math.max(1, px + drift + (((i * 7919) % 13) - 6) * 0.08);
+      bars.push({ time: t, open: o, close: c, high: Math.max(o, c) + 0.3, low: Math.min(o, c) - 0.3 });
+      px = c; t += 14400;
+    }
+    const deg = E.buildPivotDegrees(bars);
+    assert.ok(deg.main.pivots.length >= 4 && deg.main.pivots.length <= 34, `主级别拐点 ${deg.main.pivots.length}`);
+    const t0 = Date.now();
+    const res = analyzeWaves(bars, 'BTC/USDT', { timeframe: '4h' });
+    assert.ok(Date.now() - t0 < 20000, `全量分析耗时 ${Date.now() - t0}ms`);
+    assert.strictEqual(res.barsCount, 10000);
+  });
+
   it('柳玉冬语料线程 (离线强化引擎用): 黄金线程按时间串联且含监测点轨迹', () => {
     const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'liu_wave_threads.json'), 'utf8'));
     const th = data.symbols.XAU;

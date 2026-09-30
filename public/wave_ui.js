@@ -645,44 +645,78 @@
     }
   }
 
+  // 主图K线根数: 服务端按 endTime 分页拼接 (币安单次上限 1500)
+  const WAVE_BARS = 10000;
+  const TF_HOURS = { '15m': 0.25, '1h': 1, '4h': 4 };
+
+  function parseRawKlines(rows) {
+    return rows.map(b => ({
+      time: Math.floor(b[0] / 1000),
+      open: parseFloat(b[1]),
+      high: parseFloat(b[2]),
+      low: parseFloat(b[3]),
+      close: parseFloat(b[4]),
+      volume: parseFloat(b[5])
+    }));
+  }
+
+  /** 直连币安兜底: 同样按 endTime 向前分页 */
+  async function fetchDirectPaged(base, pageMax, symbol, tf, total) {
+    const rows = [];
+    let endTime = null;
+    while (rows.length < total) {
+      const lim = Math.min(pageMax, total - rows.length);
+      const resp = await fetch(`${base}?symbol=${symbol}&interval=${tf}&limit=${lim}${endTime ? `&endTime=${endTime}` : ''}`, { signal: AbortSignal.timeout(8000) });
+      if (!resp.ok) { if (!rows.length) throw new Error(`HTTP ${resp.status}`); break; }
+      const page = await resp.json();
+      if (!Array.isArray(page) || !page.length) break;
+      rows.unshift(...page);
+      if (page.length < lim) break;
+      endTime = page[0][0] - 1;
+    }
+    return rows;
+  }
+
   /**
-   * 抓取指定周期 1000 根 K线 (优先币安 Futures 合约源)
+   * 抓取指定周期 K 线 (最多 WAVE_BARS 根；优先本地服务端缓存，失败时直连币安合约/现货分页拉取)
    */
   async function fetch4hKlines(symbol, tf = currentTf) {
     const cleanSymbol = symbol.replace(/[\/\-_]/g, '').toUpperCase();
-    const urls = [
-      `/api/wave/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
-      `https://fapi.binance.com/fapi/v1/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
-      `https://data-api.binance.vision/api/v3/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`,
-      `https://api.binance.com/api/v3/klines?symbol=${cleanSymbol}&interval=${tf}&limit=1000`
-    ];
-
     let lastError = null;
-    for (const url of urls) {
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(6000) });
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json && json.bars && Array.isArray(json.bars)) {
-            return { bars: json.bars, source: '币安 Futures (本地缓存加速)' };
-          }
-          if (Array.isArray(json) && json.length > 0) {
-            const bars = json.map(b => ({
-              time: Math.floor(b[0] / 1000),
-              open: parseFloat(b[1]),
-              high: parseFloat(b[2]),
-              low: parseFloat(b[3]),
-              close: parseFloat(b[4]),
-              volume: parseFloat(b[5])
-            }));
-            return { bars, source: '币安合约直连 (fapi.binance.com)' };
-          }
+    try {
+      const resp = await fetch(`/api/wave/klines?symbol=${cleanSymbol}&interval=${tf}&limit=${WAVE_BARS}`, { signal: AbortSignal.timeout(20000) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && Array.isArray(json.bars) && json.bars.length) {
+          return { bars: json.bars, source: '币安 Futures (本地缓存加速)' };
         }
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    const direct = [
+      ['https://fapi.binance.com/fapi/v1/klines', 1500, '币安合约直连 (fapi.binance.com)'],
+      ['https://data-api.binance.vision/api/v3/klines', 1000, '币安现货直连'],
+      ['https://api.binance.com/api/v3/klines', 1000, '币安现货直连']
+    ];
+    for (const [base, pageMax, label] of direct) {
+      try {
+        const rows = await fetchDirectPaged(base, pageMax, cleanSymbol, tf, WAVE_BARS);
+        if (rows.length) return { bars: parseRawKlines(rows), source: label };
       } catch (err) {
         lastError = err;
       }
     }
     throw lastError || new Error('无法连接到币安行情源');
+  }
+
+  /** 顶部「样本」标签: 实际根数与时间跨度 */
+  function updateSampleLabel(bars, tf) {
+    const el = document.getElementById('wave-sample-label');
+    if (!el || !bars || !bars.length) return;
+    const days = Math.round((bars[bars.length - 1].time - bars[0].time) / 86400);
+    const span = days >= 365 ? `约${(days / 365).toFixed(1)}年` : `约${days}天`;
+    el.textContent = `${bars.length.toLocaleString()} 根 ${tf.toUpperCase()} K线 (${span})`;
   }
 
   /**
@@ -856,6 +890,7 @@
     try {
       const { bars } = await fetch4hKlines(symbol, currentTf);
       currentBars = bars;
+      updateSampleLabel(bars, currentTf);
 
       if (!waveChart) {
         initChart();
@@ -923,6 +958,7 @@
       if (!currentBars || currentBars.length === 0) {
         const { bars } = await fetch4hKlines(symbol, currentTf);
         currentBars = bars;
+        updateSampleLabel(bars, currentTf);
       }
 
       if (!waveChart) {
@@ -950,7 +986,7 @@
           queryParams.append('endTime', rangeOptions.endTime);
         }
         const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, {
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(20000)
         });
         if (apiResp.ok) {
           analysis = await apiResp.json();
