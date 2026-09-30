@@ -16,10 +16,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
+from src.collectors.daily_close_store import DailyCloseStore, effective_pct_change
 
 class CoreTrackCollector:
-    def __init__(self, cache_dir=config.CACHE_DIR):
+    def __init__(self, cache_dir=config.CACHE_DIR, close_store: DailyCloseStore = None):
         self.cache_dir = Path(cache_dir)
+        self.close_store = close_store or DailyCloseStore(cache_dir)
         self.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MacroQuant/1.0"}
 
     def fetch_coingecko_top(self, per_page: int = 100) -> list:
@@ -87,6 +89,8 @@ class CoreTrackCollector:
         if not raw_list:
             raise RuntimeError("Failed to collect Core track data from both CoinGecko and Binance!")
 
+        today = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+
         cleaned_records = []
         for coin in raw_list:
             sym = str(coin.get("symbol", "")).lower()
@@ -97,14 +101,19 @@ class CoreTrackCollector:
             if pct_change is None:
                 continue
 
-            pct = float(pct_change)
+            price = float(coin.get("current_price") or 0.0)
+            key = sym.upper()
+            prev_close = self.close_store.previous_close("core", key, today)
+            pct, basis = effective_pct_change(price, prev_close, float(pct_change))
             vol = float(coin.get("total_volume") or 0.0)
             mcap = float(coin.get("market_cap") or 0.0)
 
             cleaned_records.append({
                 "symbol": sym.upper(),
                 "name": coin.get("name", sym.upper()),
+                "price_usd": price,
                 "price_change_24h": pct,
+                "pct_basis": basis,
                 "volume_24h": vol,
                 "market_cap": mcap,
                 "is_advance": 1 if pct > 0 else 0,
@@ -112,6 +121,9 @@ class CoreTrackCollector:
                 "is_unchanged": 1 if pct == 0 else 0
             })
 
+            self.close_store.record("core", key, today, price)
+
+        self.close_store.save()
         df = pd.DataFrame(cleaned_records)
 
         # Cache snapshot
@@ -147,6 +159,8 @@ class CoreTrackCollector:
             "declines": dec_count,
             "unchanged": unch_count,
             "total_constituents": len(df),
+            "close_basis_count": int((df["pct_basis"] == "close_to_close").sum()) if "pct_basis" in df else 0,
+            "rolling_basis_count": int((df["pct_basis"] == "rolling_24h").sum()) if "pct_basis" in df else len(df),
             "ramo": ramo,
             "vramo": vramo,
             "adv_volume_usd": adv_vol,
