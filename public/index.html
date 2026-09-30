@@ -2156,21 +2156,22 @@
               </div>
             </div>
 
-            <!-- 3. Monitoring Pivot (柳玉冬核心实战法则) -->
+            <!-- 3. 柳玉冬核心监测点: 失效位 (越过即当前计数失效) + 确认位 (越过即确认本浪结束) -->
             <div class="bento-card">
               <div class="card-header">
                 <div class="card-title-group">
-                  <h3>柳玉冬核心监测点 (防守位)</h3>
+                  <h3>柳玉冬核心监测点</h3>
                 </div>
               </div>
               <div class="wave-pivot-highlight-box">
-                <div style="font-size: 0.7rem; color: var(--text-muted);">临界研判防守位 (突破/跌破即失效)</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);" id="wave-pivot-label">失效位（越过即当前计数失效）</div>
                 <div class="wave-pivot-price" id="wave-pivot-price">$--,---</div>
                 <div class="wave-pivot-diff" id="wave-pivot-diff">等待选区...</div>
               </div>
               <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; margin-top: 10px;" id="wave-pivot-desc">
-                选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。
+                选择有效 K 线区间后，给出当前计数的失效位与确认位。
               </p>
+              <div class="liu-signal-row" id="wave-pivot-confirm" style="display: none; margin-top: 8px;"></div>
             </div>
 
             <!-- 3.5 柳氏实战信号 (v3: 监测点战法 / 最大回撤 / 吃掉0.7 / 调整分部 / 出身) -->
@@ -2200,65 +2201,6 @@
               </div>
             </div>
 
-            <!-- 4. Blocker Diagnostics (说明哪里阻止了浪型判断) -->
-            <div class="bento-card" id="card-wave-blockers" style="display: none;">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3 style="color: var(--color-neg);">🔍 浪型阻碍诊断器 (规则排查)</h3>
-                  </div>
-                  <span class="card-badge badge-bear">铁律排除</span>
-                </div>
-              </div>
-              <p style="font-size: 0.71rem; color: var(--text-muted); margin: 4px 0 8px 0;">说明当前行情结构为何被排除某些经典浪型：</p>
-              <div id="wave-blockers-list" class="wave-blockers-list"></div>
-            </div>
-
-            <!-- 5. Scenario Projections (浪型发展可能性讨论) -->
-            <div class="bento-card" id="card-wave-scenarios">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>📈 浪型发展可能性推演 (情景分析)</h3>
-                  </div>
-                  <span class="card-badge badge-bull">多重推演</span>
-                </div>
-              </div>
-              <div id="wave-scenarios-list" class="wave-scenarios-list" style="margin-top: 10px;">
-                <div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 12px 0;">框选分析后将输出第一、第二情景推演</div>
-              </div>
-            </div>
-
-            <!-- 6. Fibonacci Targets -->
-            <div class="bento-card">
-              <div class="card-header">
-                <div class="card-title-group">
-                  <h3>斐波那契目标位阶</h3>
-                </div>
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 6px;" id="wave-targets-list">
-                <div class="wave-target-row">
-                  <span class="text-secondary">等待选区测算...</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 7. Liu Yudong Commentary Box -->
-            <div class="bento-card">
-              <div class="card-header">
-                <div class="card-title-group">
-                  <h3>柳玉冬实战研判指南</h3>
-                </div>
-              </div>
-              <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.6; margin: 0;" id="wave-thesis-text">
-                请使用【🖱️ 框选分析模式】选择 4H K 线行情走势区间以生成柳玉冬实战研判结论。
-              </p>
-              <div style="margin-top: 10px; font-size: 0.73rem; color: var(--text-secondary); line-height: 1.5;" id="wave-bottom-signal">
-              </div>
-              <div class="liu-quote-box" id="wave-quote-text">
-                “愚昧无法战胜科学，波浪理论是科学。有了推动浪才有做底的可能，没有推动浪或引导楔形就完全没有可能做底。” —— 柳玉冬
-              </div>
-            </div>
           </div>
         </div> <!-- /.card-body -->
 

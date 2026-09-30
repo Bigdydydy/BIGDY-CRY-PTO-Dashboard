@@ -1169,36 +1169,36 @@
       if (n === 3) {
         [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `浪2回撤浪1×${r}`, r)));
         targets.push(tgt(p[0].price, '浪2绝对边界: 浪1起点（铁律）', 1));
-        monitoringPivot = lvl(p[0].price, '浪1起点·铁律红线', '手稿P32: 浪2回撤达到浪1的100%即否决该计数');
+        monitoringPivot = lvl(p[0].price, '浪1起点·铁律红线', '浪2回撤达到浪1的100%，该计数否决（手稿P32铁律）');
       } else if (n === 4) {
         targets.push(tgt(p[1].price, '浪3最低要求: 超越浪1终点', null));
         [1, 1.618, 2.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `浪3=浪1×${r}`, r)));
-        monitoringPivot = lvl(p[2].price, '浪2终点·浪3计数防线', '跌破则“浪3运行中”计数失效（浪2尚未结束）');
-        secondaryPivot = lvl(p[1].price, diag ? '浪1终点·浪4须切入(P48楔形)' : '浪1终点·浪4禁区边界(P48)', diag ? '楔形浪4必须切入浪1价格区' : '推动浪浪4不可切入浪1价格区');
+        monitoringPivot = lvl(p[2].price, '浪2终点·浪3计数防线', '“浪3运行中”计数失效（浪2尚未结束）');
+        secondaryPivot = lvl(p[1].price, diag ? '浪1终点·浪4须切入(P48楔形)' : '浪1终点·浪4禁区边界(P48)', diag ? '浪4切入浪1价格区，满足楔形要求（P48）' : '浪4切入浪1价格区，推动浪计数失效，只能改按楔形（P48）');
       } else if (n === 5) {
         [0.236, 0.382, 0.5].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `浪4回撤浪3×${r}`, r)));
         targets.push(tgt(p[1].price, diag ? '浪4须切入浪1区（楔形）' : '浪4禁区: 浪1价格区上沿', null));
         if (diag) {
-          monitoringPivot = lvl(p[2].price, '浪2终点·浪4不可完全回撤浪3', '手稿P42: 浪4回撤达到浪3的100%即否决');
-          secondaryPivot = lvl(p[1].price, '浪1终点·浪4切入要求', '楔形浪4终点应进入浪1价格区');
+          monitoringPivot = lvl(p[2].price, '浪2终点·浪4不可完全回撤浪3', '浪4完全回撤浪3，该计数否决（手稿P42）');
+          secondaryPivot = lvl(p[1].price, '浪1终点·浪4切入要求', '浪4进入浪1价格区，满足楔形要求');
         } else {
-          monitoringPivot = lvl(p[1].price, '浪1终点·浪4禁区', '手稿P48: 推动浪浪4任何子浪不得切入浪1价格区');
-          secondaryPivot = lvl(p[2].price, '浪2终点·最后防线', '手稿P42: 浪4不得完全回撤浪3');
+          monitoringPivot = lvl(p[1].price, '浪1终点·浪4禁区', '浪4切入浪1价格区，推动浪计数失效（手稿P48）');
+          secondaryPivot = lvl(p[2].price, '浪2终点·最后防线', '浪4完全回撤浪3，任何驱动浪计数均失效（手稿P42）');
         }
       } else if (status === 'COMPLETED') {
         // 回撤以整段五浪的价格(0→5)为基准；柳玉冬实战口径「正常回撤0.2~0.618，极限0.8」
         const total = Math.abs(p[5].price - p[0].price);
         [0.2, 0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[5].price - d * r * total, `整体回撤×${r}`, r)));
         targets.push(tgt(p[5].price - d * 0.8 * total, '整体回撤极限×0.8（超过则怀疑非本级别调整）', 0.8));
-        monitoringPivot = lvl(p[5].price, '浪5终点·趋势延续线', '突破则浪5延长或更大级别趋势延续，需重估计数');
-        secondaryPivot = lvl(p[4].price, '浪4终点·同级调整目标区', '调整浪常以浪4价格区为回撤目标');
+        monitoringPivot = lvl(p[5].price, '浪5终点·趋势延续线', '浪5仍在延长或更大级别趋势延续，“五浪已完成”需重估');
+        secondaryPivot = lvl(p[4].price, '浪4终点·同级调整目标区', '进入浪4价格区，调整的常见目标已到');
       } else {
         [0.618, 1, 1.618].forEach(r => targets.push(tgt(p[4].price + d * r * l[0], `浪5=浪1×${r}`, r)));
         // 浪3已短于浪1时，浪5不得长于浪3（否则浪3成为最短，违反M5）——柳玉冬所称「上涨极限」
         if (l[2] < l[0]) targets.push(tgt(p[4].price + d * l[2], '浪5极限=浪4终点+浪3长度（浪3不能最短, P32/P44）', 1));
         targets.push(tgt(p[4].price + d * 0.7 * l[3], '衰竭5浪最低: 0.7×浪4 (P204)', 0.7));
-        monitoringPivot = lvl(p[4].price, '浪4终点·浪5防线', '跌破则浪5可能结束或计数失效');
-        secondaryPivot = lvl(p[3].price, '浪3终点·衰竭判定线', '未过此线且不足浪4×0.7则浪型违规（P204）');
+        monitoringPivot = lvl(p[4].price, '浪4终点·浪5防线', '浪5可能已经结束或计数失效');
+        secondaryPivot = lvl(p[3].price, '浪3终点·衰竭判定线', '浪5越过浪3终点、不是衰竭5浪；始终未越过则浪5至少需达浪4的0.7倍（P204）');
       }
     } else if (type === 'ZIGZAG' || type === 'FLAT') {
       const flat = type === 'FLAT';
@@ -1206,96 +1206,122 @@
         if (flat) {
           targets.push(tgt(p[1].price - d * 0.7 * l[0], 'b浪最低要求: 0.7×a浪总量(P234)', 0.7));
           [0.95, 1.236, 1.382].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `b浪=a浪×${r}`, r)));
-          monitoringPivot = lvl(p[1].price - d * 2 * l[0], 'b浪上限: 2×a浪总量(P235)', 'b浪运行总量不得超过a浪2倍');
-          secondaryPivot = lvl(p[0].price, 'a浪起点·参照位', 'b浪越过a起点即进入扩散/顺势形态讨论');
+          monitoringPivot = lvl(p[1].price - d * 2 * l[0], 'b浪上限: 2×a浪总量(P235)', 'b浪超过a浪2倍，平台形计数失效（P235）');
+          secondaryPivot = lvl(p[0].price, 'a浪起点·参照位', 'b浪越过a浪起点，转入扩散/顺势平台形讨论');
         } else {
           targets.push(tgt(p[1].price - d * 0.2 * l[0], 'b浪最低要求: 0.2×a浪(P213)', 0.2));
           [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `b浪回撤a浪×${r}`, r)));
-          monitoringPivot = lvl(p[0].price, 'a浪起点·b浪禁区', '手稿P213: b浪不能超过a浪起点');
+          monitoringPivot = lvl(p[0].price, 'a浪起点·b浪禁区', 'b浪越过a浪起点，单锯齿计数失效（手稿P213）');
         }
       } else if (status === 'COMPLETED') {
         const total = Math.abs(p[3].price - p[0].price);
         [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[3].price - d * r * total, `调整整体回撤×${r}`, r)));
-        monitoringPivot = lvl(p[3].price, 'c浪终点·结构防线', '被同向突破则c浪延长或整体计数重估');
-        secondaryPivot = lvl(p[2].price, 'b浪终点·调整结束确认线', '反向收复b浪起点则调整大概率结束');
+        monitoringPivot = lvl(p[3].price, 'c浪终点·结构防线', 'c浪仍在延长，“调整已完成”需重估');
+        secondaryPivot = lvl(p[2].price, 'b浪终点·调整结束确认线', '该调整大概率已经结束');
       } else {
         targets.push(tgt(p[2].price + d * 0.9 * l[1], 'c浪最低要求: 0.9×b浪(P213)', 0.9));
         targets.push(tgt(p[1].price, 'a浪终点（c浪通常越过）', null));
         [0.618, 1, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `c=a×${r}`, r)));
         targets.push(tgt(p[1].price + d * 0.618 * l[0], 'a终点+0.618×a (P214)', 0.618));
-        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪起点防线', '反向收复则调整大概率结束（监测点战法）');
-        secondaryPivot = lvl(p[0].price, 'a浪起点·反转确认线', '反向收复a浪起点则确认趋势反转');
+        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪起点防线', 'c浪计数失效，调整大概率已结束（监测点战法）');
+        secondaryPivot = lvl(p[0].price, 'a浪起点·反转确认线', '确认原趋势已经反转');
       }
     } else if (type === 'TRIANGLE') {
       if (n === 4) {
         targets.push(tgt(p[2].price + d * 0.618 * l[0], 'c浪≈0.618×a浪(P327)', 0.618));
         targets.push(tgt(p[2].price + d * 0.786 * l[0], 'c浪≈0.786×a浪', 0.786));
-        monitoringPivot = lvl(p[1].price, 'b浪起点·c浪禁区', '手稿P302: c浪不能大于b浪');
+        monitoringPivot = lvl(p[1].price, 'b浪起点·c浪禁区', 'c浪大于b浪，三角形计数失效（手稿P302）');
       } else if (n === 5) {
         [0.618, 0.786].forEach(r => targets.push(tgt(p[3].price - d * r * l[1], `d浪≈${r}×b浪`, r)));
-        monitoringPivot = lvl(p[2].price, 'c浪终点·d浪禁区', '手稿P302: d浪不能超过c浪起点');
+        monitoringPivot = lvl(p[2].price, 'c浪终点·d浪禁区', 'd浪超过c浪，三角形计数失效（手稿P302）');
       } else if (status !== 'COMPLETED') {
         targets.push(tgt(p[4].price + d * 0.7 * l[3], 'e浪≈0.7×d浪(P327)', 0.7));
         targets.push(tgt(p[4].price + d * 0.618 * l[2], 'e浪≈0.618×c浪(P327)', 0.618));
-        monitoringPivot = lvl(p[3].price, 'd浪起点·e浪禁区', '手稿P302: e浪不能超过d浪起点');
-        secondaryPivot = lvl(p[1].price, 'a浪终点·e浪区间边界', '手稿P345: e浪须进入a浪价格区间');
+        monitoringPivot = lvl(p[3].price, 'd浪起点·e浪禁区', 'e浪超过d浪，三角形计数失效（手稿P302）');
+        secondaryPivot = lvl(p[1].price, 'a浪终点·e浪区间边界', 'e浪进入a浪价格区间，满足三角形要求（手稿P345）');
       } else {
         const bdNow = lineVal(p[2].idx, p[2].price, p[4].idx, p[4].price, lastIdx);
         const height = Math.abs(lineVal(p[1].idx, p[1].price, p[3].idx, p[3].price, p[0].idx) -
           lineVal(p[2].idx, p[2].price, p[4].idx, p[4].price, p[0].idx));
         targets.push(tgt(p[5].price - d * height, '突破目标=三角形高度(P349)', null));
-        monitoringPivot = lvl(bdNow, 'b-d趋势线·突破确认', '手稿P349-350: 突破须顺原趋势；反扑回到区间内即判误');
-        secondaryPivot = lvl(p[5].price, 'e浪终点·下一浪起点', '手稿P352: 三角形后下一浪必须从e浪终点起步');
+        monitoringPivot = lvl(p[5].price, 'e浪终点·三角形防线', 'e浪仍在延长，“三角形已完成”需重估（手稿P352: 下一浪须从e浪终点起步）');
+        secondaryPivot = lvl(bdNow, 'b-d趋势线·突破确认', '突破三角形，确认突破浪展开（手稿P349-350）；反扑回到区间内即判误');
       }
     } else if (type === 'COMBINATION' || type === 'TRIPLE_COMBINATION') {
       const triple = type === 'TRIPLE_COMBINATION';
       if (!triple && n === 3) {
         targets.push(tgt(p[1].price - d * 0.7 * l[0], 'x浪最低要求: 0.7×w浪(P50)', 0.7));
         [1.0, 1.382].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `x=w×${r}`, r)));
-        monitoringPivot = lvl(p[1].price - d * 1.5 * l[0], 'x浪上限: 1.5×w浪总量(P301)', 'x浪运行总量超过w浪1.5倍则联合形假设作废');
-        secondaryPivot = lvl(p[0].price, 'w浪起点·参照位', 'x浪越过w起点进入顺势联合形讨论');
+        monitoringPivot = lvl(p[1].price - d * 1.5 * l[0], 'x浪上限: 1.5×w浪总量(P301)', 'x浪超过w浪1.5倍，联合形计数失效（P301）');
+        secondaryPivot = lvl(p[0].price, 'w浪起点·参照位', 'x浪越过w浪起点，转入顺势联合形讨论');
       } else if (!triple && status !== 'COMPLETED') {
         [0.786, 1, 1.272].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `y=w×${r}(扩展取点0-w-x, P131)`, r)));
-        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪起点防线', 'y浪自x浪终点起步');
-        secondaryPivot = lvl(p[0].price, 'w浪起点·箱型边界', '横向整理应维持箱型外观（P50）');
+        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪起点防线', 'y浪计数失效（x浪尚未结束）');
+        secondaryPivot = lvl(p[0].price, 'w浪起点·箱型边界', '离开箱型区间，横向整理外观被破坏（P50）');
       } else if (triple && n === 5) {
         targets.push(tgt(p[3].price - d * 0.7 * l[2], 'xx浪最低要求: 0.7×y浪(P51)', 0.7));
         targets.push(tgt(p[3].price - d * 1.0 * l[2], 'xx=y×1', 1));
-        monitoringPivot = lvl(p[3].price - d * 1.5 * l[2], 'xx浪上限: 1.5×y浪总量(P301类推)', 'xx浪总量超过y浪1.5倍则三重横向整理假设作废');
+        monitoringPivot = lvl(p[3].price - d * 1.5 * l[2], 'xx浪上限: 1.5×y浪总量(P301类推)', 'xx浪超过y浪1.5倍，三重横向整理计数失效');
       } else if (triple && status !== 'COMPLETED') {
         targets.push(tgt(p[4].price + d * 1.0 * l[2], 'z=y×1（扩展取点x-y-xx, P132)', 1));
         targets.push(tgt(p[4].price + d * 0.786 * l[2], 'z=y×0.786', 0.786));
-        monitoringPivot = lvl(p[4].price, 'xx浪终点·z浪起点防线', 'z浪自xx浪终点起步');
-        secondaryPivot = lvl(p[2].price, 'y浪起点·参照位', '');
+        monitoringPivot = lvl(p[4].price, 'xx浪终点·z浪起点防线', 'z浪计数失效（xx浪尚未结束）');
+        secondaryPivot = lvl(p[2].price, 'y浪起点·参照位', '回到y浪起点，y浪被完全回撤');
       } else {
         const end = p[n - 1].price, total = Math.abs(end - p[0].price);
         [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(end - d * r * total, `整体回撤×${r}`, r)));
-        monitoringPivot = lvl(end, `${triple ? 'z' : 'y'}浪终点·结构防线`, '被同向突破则横向整理延长或计数重估');
-        secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '反向收复则调整大概率结束');
+        monitoringPivot = lvl(end, `${triple ? 'z' : 'y'}浪终点·结构防线`, '横向整理仍在延长，“已完成”需重估');
+        secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '该调整大概率已经结束');
       }
     } else if (type === 'DOUBLE_ZIGZAG' || type === 'TRIPLE_ZIGZAG') {
       const triple = type === 'TRIPLE_ZIGZAG';
       if (!triple && n === 4 && status !== 'COMPLETED') {
         targets.push(tgt(p[2].price + d * 0.9 * l[0], 'y浪最低要求: 0.9×w浪(P372)', 0.9));
         [1, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `y=w×${r}`, r)));
-        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪禁区', '手稿P372: y浪不可越过x浪起点');
-        secondaryPivot = lvl(lineVal(p[0].idx, p[0].price, p[2].idx, p[2].price, lastIdx), '0-x基线', '手稿P362: y浪子浪不能越过0-x基线');
+        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪禁区', 'y浪计数失效（手稿P372）');
+        secondaryPivot = lvl(lineVal(p[0].idx, p[0].price, p[2].idx, p[2].price, lastIdx), '0-x基线', 'y浪越过0-x基线，双锯齿计数失效（手稿P362）');
       } else if (triple && n === 5) {
         [0.3, 0.5, 0.618].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `xx浪回撤y浪×${r}`, r)));
-        monitoringPivot = lvl(p[2].price, 'y浪起点·xx禁区', '手稿P385: xx浪不能越过y浪起点');
+        monitoringPivot = lvl(p[2].price, 'y浪起点·xx禁区', 'xx浪越过y浪起点，三锯齿计数失效（手稿P385）');
       } else if (triple && status !== 'COMPLETED') {
         targets.push(tgt(p[4].price + d * 0.9 * l[1], 'z浪最低要求: 0.9×x浪', 0.9));
         [1, 1.618].forEach(r => targets.push(tgt(p[4].price + d * r * l[2], `z=y×${r}`, r)));
-        monitoringPivot = lvl(p[4].price, 'xx终点·z浪防线', 'z浪运行中以xx终点为结构防线');
-        secondaryPivot = lvl(p[2].price, 'y浪起点', 'xx/y结构参照位');
+        monitoringPivot = lvl(p[4].price, 'xx终点·z浪防线', 'z浪计数失效（xx浪尚未结束）');
+        secondaryPivot = lvl(p[2].price, 'y浪起点', '回到y浪起点，y浪被完全回撤');
       } else {
         const end = p[n - 1].price, total = Math.abs(end - p[0].price);
         [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(end - d * r * total, `整体回撤×${r}`, r)));
-        monitoringPivot = lvl(end, `${triple ? 'z' : 'y'}浪终点·结构防线`, '被同向突破则联合调整延长或计数重估');
-        secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '反向收复则调整大概率结束');
+        monitoringPivot = lvl(end, `${triple ? 'z' : 'y'}浪终点·结构防线`, '联合调整仍在延长，“已完成”需重估');
+        secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '该调整大概率已经结束');
       }
     }
     return { monitoringPivot, secondaryPivot, targets };
+  }
+
+  /**
+   * 给监测点标注方向与状态。
+   * side: 'below' = 价位在下方，跌破即触发；'above' = 价位在上方，上破即触发。
+   * 方向以最后一个拐点那根K线的收盘价为参照 (失效位按构造尚未被越过)，
+   * breached = 最后拐点之后是否已有K线越过该价位。
+   */
+  function annotateLevel(lv, role, g, ev) {
+    if (!lv || !isFinite(lv.price)) return lv;
+    const bars = ev.bars;
+    const lastIdx = bars.length - 1;
+    const pIdx = Math.min(lastIdx, Math.max(0, g.p[g.p.length - 1].idx));
+    let ref = bars[pIdx].close;
+    if (Math.abs(ref - lv.price) <= EPS) ref = bars[lastIdx].close;
+    const side = lv.price < ref ? 'below' : 'above';
+    let breached = false;
+    for (let i = pIdx + 1; i <= lastIdx; i++) {
+      if (side === 'below' ? bars[i].low < lv.price - EPS : bars[i].high > lv.price + EPS) { breached = true; break; }
+    }
+    const last = bars[lastIdx].close;
+    return Object.assign({}, lv, {
+      role, side, breached,
+      verb: side === 'below' ? '跌破' : '上破',
+      distancePct: +((lv.price / last - 1) * 100).toFixed(2)
+    });
   }
 
   function buildChannel(type, g) {
@@ -1539,6 +1565,28 @@
     }
 
     const levels = buildLevels(h.type, g, h.status, ev);
+    if (ev && ev.bars && h.status === 'COMPLETED' && h.type !== 'TRIANGLE') {
+      // 柳玉冬「必须跌破4944才能确认橙线结束」: 结束确认看最后一浪内部最后一个小级别回撤点，
+      // 主级别结构位 (浪4 / b浪终点) 保留为更大级别确认
+      const st = legStructure(g, n - 2, ev);
+      const sub = st.subPivots || [];
+      const startType = g.p[n - 2].type;
+      let near = null;
+      for (let k = sub.length - 2; k >= 1; k--) {
+        if (sub[k].type === startType) { near = sub[k]; break; }
+      }
+      const lastLabel = /^\d/.test(def.labels[n - 1]) ? `浪${def.labels[n - 1]}` : `${def.labels[n - 1]}浪`;
+      if (near && Math.abs(near.price - g.p[n - 1].price) > EPS) {
+        const far = levels.secondaryPivot;
+        levels.secondaryPivot = lvl(near.price, `${lastLabel}内部最后回撤点·结束确认线`,
+          `确认${lastLabel}已经结束${far ? `；再越过 ${fmtNum(far.price)}（${far.levelName}）则${def.category === '驱动浪' ? '确认更大级别调整展开' : '确认整个调整结束、原趋势恢复'}` : ''}`);
+        levels.structuralPivot = far || null;
+      }
+    }
+    if (ev && ev.bars) {
+      levels.monitoringPivot = annotateLevel(levels.monitoringPivot, 'invalidation', g, ev);
+      levels.secondaryPivot = annotateLevel(levels.secondaryPivot, h.status === 'COMPLETED' ? 'confirmation' : 'reference', g, ev);
+    }
     const timeWindows = ev && ev.bars ? buildTimeWindows(h.type, g, h.status, ev) : [];
     const fibLevels = buildFibLevels(h.type, g, h.status);
     const slimClass = c => c ? {
@@ -1591,6 +1639,7 @@
       channel: buildChannel(h.type, g),
       monitoringPivot: levels.monitoringPivot,
       secondaryPivot: levels.secondaryPivot,
+      structuralPivot: levels.structuralPivot || null,
       targets: levels.targets,
       fibLevels,
       alternation,
@@ -2091,8 +2140,10 @@
     let bottomTopSignal;
     if (pattern.monitoringPivot) {
       const mp = pattern.monitoringPivot;
-      const side = pattern.direction === 'BEARISH' ? '上破' : '跌破';
-      bottomTopSignal = `监测点 $${fmtNum(mp.price)}（${mp.levelName}）：${side}则${mp.description || '当前计数失效'}。现价 ${fmtNum(currentPrice)}。`;
+      const side = mp.verb || (mp.price < currentPrice ? '跌破' : '上破');
+      bottomTopSignal = `失效位 $${fmtNum(mp.price)}（${mp.levelName}）：${side}则${mp.description || '当前计数失效'}。现价 ${fmtNum(currentPrice)}。`;
+      const sp = pattern.secondaryPivot;
+      if (sp && isFinite(sp.price)) bottomTopSignal += ` 确认位 $${fmtNum(sp.price)}（${sp.levelName}）${sp.description ? '：' + sp.description : ''}。`;
       const dl = (pattern.timeWindows || []).find(w => w.kind === 'deadline' || w.kind === 'apex');
       if (dl) bottomTopSignal += ` ${dl.text}。`;
     } else {

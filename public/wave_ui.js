@@ -870,25 +870,10 @@
     const pivotDesc = document.getElementById('wave-pivot-desc');
     if (pivotPrice) pivotPrice.textContent = '$--,---';
     if (pivotDiff) pivotDiff.textContent = '等待选区...';
-    if (pivotDesc) pivotDesc.textContent = '选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。';
+    if (pivotDesc) pivotDesc.textContent = '选择有效 K 线区间后，给出当前计数的失效位与确认位。';
+    const pivotConfirm = document.getElementById('wave-pivot-confirm');
+    if (pivotConfirm) { pivotConfirm.style.display = 'none'; pivotConfirm.innerHTML = ''; }
 
-    const cardBlockers = document.getElementById('card-wave-blockers');
-    if (cardBlockers) cardBlockers.style.display = 'none';
-
-    const scenariosList = document.getElementById('wave-scenarios-list');
-    if (scenariosList) {
-      scenariosList.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 12px 0;">框选分析后将输出第一、第二情景推演</div>`;
-    }
-
-    const tgtContainer = document.getElementById('wave-targets-list');
-    if (tgtContainer) {
-      tgtContainer.innerHTML = `<div class="wave-target-row"><span class="text-secondary">等待选区测算...</span></div>`;
-    }
-
-    const thesisText = document.getElementById('wave-thesis-text');
-    const bottomSignal = document.getElementById('wave-bottom-signal');
-    if (thesisText) thesisText.textContent = `请使用【🖱️ 框选分析模式】选择 ${currentTf.toUpperCase()} K 线行情走势区间以生成柳玉冬实战研判结论。`;
-    if (bottomSignal) bottomSignal.textContent = '';
     resetLiuSignalCards();
     renderStructureDetail(null);
   }
@@ -1491,56 +1476,8 @@
       if (rs3) rs3.textContent = cand.rules.rule3_wave4_no_overlap !== false ? '严防死守' : '浪4底穿透浪1顶';
     }
 
-    // 核心监测点
-    const elPivotPrice = document.getElementById('wave-pivot-price');
-    const elPivotDiff = document.getElementById('wave-pivot-diff');
-    const elPivotDesc = document.getElementById('wave-pivot-desc');
-
-    if (cand.monitoringPivot) {
-      const pPrice = cand.monitoringPivot.price;
-      if (elPivotPrice) elPivotPrice.textContent = `$${pPrice.toLocaleString()}`;
-      if (elPivotDesc) elPivotDesc.textContent = cand.monitoringPivot.description || '';
-
-      if (elPivotDiff && curP > 0) {
-        const diff = curP - pPrice;
-        const pct = ((diff / pPrice) * 100).toFixed(2);
-        const isSafe = curP >= pPrice;
-        elPivotDiff.innerHTML = `距当前价: <strong style="color: ${isSafe ? 'var(--color-pos)' : 'var(--color-neg)'}">${diff >= 0 ? '+' : ''}$${Math.round(diff).toLocaleString()} (${pct}%)</strong> • 状态: <strong style="color: ${isSafe ? 'var(--color-pos)' : 'var(--color-neg)'}">${isSafe ? '防守有效' : '已跌破预警'}</strong>`;
-      }
-    }
-
-    // 斐波那契目标位
-    const tgtContainer = document.getElementById('wave-targets-list');
-    if (tgtContainer && cand.targets) {
-      tgtContainer.innerHTML = cand.targets.map(t => {
-        const diffPct = (((t.price - curP) / curP) * 100).toFixed(1);
-        const sign = t.price >= curP ? '+' : '';
-        return `
-          <div class="wave-target-row">
-            <span class="text-secondary">${t.label}</span>
-            <div style="text-align: right;">
-              <span class="wave-target-price">$${t.price.toLocaleString()}</span>
-              <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">(${sign}${diffPct}%)</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 4. 同步更新底部柳玉冬实战研判解读与监测点信号
-    if (window.LiuWaveEngine && typeof window.LiuWaveEngine.generateLiuCommentary === 'function') {
-      const activeCommentary = window.LiuWaveEngine.generateLiuCommentary(
-        cand,
-        curP,
-        currentAnalysis?.symbol || currentSymbol,
-        currentAnalysis?.timeframe || currentTf,
-        currentAnalysis
-      );
-      const elThesis = document.getElementById('wave-thesis-text');
-      const elBottomSignal = document.getElementById('wave-bottom-signal');
-      if (elThesis && activeCommentary) elThesis.textContent = activeCommentary.thesis;
-      if (elBottomSignal && activeCommentary) elBottomSignal.textContent = activeCommentary.bottomTopSignal;
-    }
+    // 核心监测点: 失效位 + 确认位 (方向与状态由引擎按价位所在一侧给出)
+    renderPivotCard(cand, curP);
 
     // 5. 动态穿透检测选中候选首浪的出身
     if (window.LiuWaveEngine && typeof window.LiuWaveEngine.analyzeOrigin === 'function' && currentBars && currentBars.length > 0) {
@@ -1713,55 +1650,6 @@
       }
     }
 
-    // 2. 阻碍诊断卡片 (为什么排除？)
-    const cardBlockers = document.getElementById('card-wave-blockers');
-    const blockersList = document.getElementById('wave-blockers-list');
-    if (cardBlockers && blockersList) {
-      const blockers = analysis.blockers || [];
-      if (blockers.length > 0) {
-        cardBlockers.style.display = 'block';
-        blockersList.innerHTML = blockers.map(b => `
-          <div class="blocker-item">${b}</div>
-        `).join('');
-      } else {
-        cardBlockers.style.display = 'none';
-      }
-    }
-
-    // 3. 发展可能性讨论 (情景分析)
-    const scenariosList = document.getElementById('wave-scenarios-list');
-    if (scenariosList) {
-      const scenarios = analysis.scenarios || [];
-      scenariosList.innerHTML = scenarios.map(s => `
-        <div class="scenario-card">
-          <div class="scenario-header">
-            <span>情景 ${s.rank || ''}: ${s.name}</span>
-            <span class="scenario-prob">概率 ${s.probability}%</span>
-          </div>
-          <div class="scenario-desc">${s.rationale || s.description || ''}</div>
-          <div class="scenario-pivots">
-            <div><span>确认触发点:</span> <strong>$${s.confirmTrigger ? s.confirmTrigger.toLocaleString() : '--'}</strong></div>
-            <div><span>失效临界位:</span> <strong>$${s.invalidationLevel ? s.invalidationLevel.toLocaleString() : '--'}</strong></div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // 4. 柳玉冬实战研判解读
-    const elThesis = document.getElementById('wave-thesis-text');
-    const elBottomSignal = document.getElementById('wave-bottom-signal');
-    const elQuote = document.getElementById('wave-quote-text');
-
-    if (analysis.commentary) {
-      if (elThesis) elThesis.textContent = analysis.commentary.thesis;
-      if (elBottomSignal) {
-        const extra = (analysis.commentary.liuLines || []).map(t => `· ${t}`).join('\n');
-        elBottomSignal.style.whiteSpace = 'pre-line';
-        elBottomSignal.textContent = analysis.commentary.bottomTopSignal + (extra ? `\n${extra}` : '');
-      }
-      if (elQuote) elQuote.textContent = analysis.commentary.quote;
-    }
-
     // 5. v3 柳氏实战信号 & 级别阶梯
     renderLiuSignals(analysis);
     renderDegreeLadder(analysis);
@@ -1841,6 +1729,51 @@
         ${ls.threeLegWarning ? `<div style="margin-top:4px;color:var(--color-warn)">${esc(ls.threeLegWarning)}</div>` : ''}
         ${origin.leadingDiagonal ? `<div style="margin-top:4px;color:var(--text-muted)">${esc(origin.leadingDiagonal.text)}</div>` : ''}
       </div>`;
+  }
+
+  /** 柳玉冬核心监测点卡片: 失效位 (越过即计数失效) 与 确认位 (越过即确认本浪结束) */
+  function renderPivotCard(cand, curP) {
+    const elPrice = document.getElementById('wave-pivot-price');
+    const elDiff = document.getElementById('wave-pivot-diff');
+    const elDesc = document.getElementById('wave-pivot-desc');
+    const elLabel = document.getElementById('wave-pivot-label');
+    const elConfirm = document.getElementById('wave-pivot-confirm');
+    const fmt = v => `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    const verbOf = lv => lv.verb || (lv.price < curP ? '跌破' : '上破');
+    const distTxt = lv => {
+      if (!(curP > 0)) return '';
+      const pct = (lv.price / curP - 1) * 100;
+      return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    };
+    const mp = cand && cand.monitoringPivot;
+    if (!mp) {
+      if (elPrice) elPrice.textContent = '$--,---';
+      if (elDiff) elDiff.textContent = '该计数暂无明确失效位';
+      if (elDesc) elDesc.textContent = '';
+    } else {
+      const verb = verbOf(mp);
+      const ok = !mp.breached;
+      if (elLabel) elLabel.textContent = `失效位 · ${esc(mp.levelName || '')}（${verb}即当前计数失效）`;
+      if (elPrice) elPrice.textContent = fmt(mp.price);
+      if (elDiff) {
+        elDiff.innerHTML = `距现价 <strong>${distTxt(mp)}</strong>（在现价${mp.side === 'above' ? '上方' : '下方'}） • 状态：<strong style="color:${ok ? 'var(--color-pos)' : 'var(--color-neg)'}">${ok ? '未触发 · 计数有效' : `已${verb} · 计数存疑`}</strong>`;
+      }
+      if (elDesc) elDesc.textContent = `${verb} ${fmt(mp.price)} 则${mp.description || '当前计数失效'}。`;
+    }
+    const sp = cand && cand.secondaryPivot;
+    if (elConfirm) {
+      if (sp && isFinite(sp.price)) {
+        const verb = verbOf(sp);
+        elConfirm.style.display = 'block';
+        elConfirm.innerHTML = `
+          <div class="liu-signal-title"><span>${sp.role === 'reference' ? '参考位' : '确认位'} · ${esc(sp.levelName || '')}</span><span class="liu-chip ${sp.breached ? 'pos' : ''}">${sp.breached ? `已${verb}${sp.role === 'reference' ? '' : '·已确认'}` : (sp.role === 'reference' ? '未越过' : '未确认')}</span></div>
+          <div><strong>${fmt(sp.price)}</strong> · 距现价 ${distTxt(sp)}</div>
+          <div style="color:var(--text-muted);margin-top:2px">${verb}则${esc(sp.description || '')}</div>`;
+      } else {
+        elConfirm.style.display = 'none';
+        elConfirm.innerHTML = '';
+      }
+    }
   }
 
   /** 主浪型卡片: 浪2/浪4 交替原则 与 联合形组成部分 */

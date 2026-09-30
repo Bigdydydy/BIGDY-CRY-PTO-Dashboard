@@ -148,6 +148,29 @@ describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正
     assert.strictEqual(res.barsCount, 10000);
   });
 
+  it('监测点方向: 失效位/确认位按所在一侧标注跌破或上破，描述不再重复动词', () => {
+    const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'eth_usdt_4h_20260501_20260928.json'), 'utf8'));
+    const bars = fx.bars || fx;
+    for (const opts of [{ timeframe: '4h' }, { timeframe: '4h', startTime: bars[200].time, endTime: bars[520].time }]) {
+      const res = analyzeWaves(bars, 'ETH/USDT', opts);
+      for (const c of res.candidates) {
+        for (const lv of [c.monitoringPivot, c.secondaryPivot]) {
+          if (!lv) continue;
+          assert.ok(lv.side === 'below' || lv.side === 'above');
+          assert.strictEqual(lv.verb, lv.side === 'below' ? '跌破' : '上破');
+          if (!lv.breached) assert.strictEqual(lv.side === 'below', lv.price < res.currentPrice, `${c.name} ${lv.levelName}`);
+          assert.ok(!/^(被同向)?(突破|跌破|上破|反向)/.test(lv.description || ''), lv.description);
+        }
+        if (c.monitoringPivot) assert.strictEqual(c.monitoringPivot.breached, false, `${c.name} 失效位不应已被越过`);
+        if (c.status === 'COMPLETED' && c.baseType === 'IMPULSE') {
+          assert.strictEqual(c.monitoringPivot.side, 'above', '已完成的上升五浪: 失效位是浪5顶, 在上方');
+          assert.ok(/结束确认线/.test(c.secondaryPivot.levelName));
+        }
+      }
+      assert.ok(!/跌破则突破|上破则突破|则被同向/.test(res.commentary.bottomTopSignal), res.commentary.bottomTopSignal);
+    }
+  });
+
   it('柳玉冬语料线程 (离线强化引擎用): 黄金线程按时间串联且含监测点轨迹', () => {
     const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'liu_wave_threads.json'), 'utf8'));
     const th = data.symbols.XAU;
