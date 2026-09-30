@@ -166,8 +166,8 @@ async function fetchAndBuildHistoricalBasis() {
     const excessReturn = Number((apr30d - 8.0).toFixed(2)); // Against 8.0% institutional hurdle rate
     const excessOverTBill = Number((apr30d - 4.5).toFixed(2)); // Against 4.5% risk-free T-Bill
 
-    // Decoupled weighted institutional carry score: Yield (60%) + Structure (40%)
-    const carryScore = calculateCarryScore(excessReturn, spread90d7d);
+    // Continuous Risk-Adjusted Institutional Carry Score (Amberdata Section 5)
+    const carryScore = calculateCarryScore(excessOverTBill, spread90d7d);
     const btcPrice = Math.round(Number(cq.indexPrice));
 
     resultSeries.push({

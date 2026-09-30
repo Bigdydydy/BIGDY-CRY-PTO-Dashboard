@@ -38269,11 +38269,11 @@
     },
     {
       "date": "2026-09-30",
-      "btcPrice": 83020,
+      "btcPrice": 83902.71,
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.156,
+      "mnav": 1.144,
       "mnavEstimated": true,
       "us1y": 4.59,
       "us10y": 5.24,
@@ -38286,12 +38286,12 @@
     }
   ],
   "summary": {
-    "currentBtc": 83020,
+    "currentBtc": 83902.71,
     "currentMstrCost": 75437,
     "currentMstrHoldings": 847666,
     "currentMstrVelocity30d": 87.2,
     "peakVelocity30d": 5714.3,
-    "currentMnav": 1.156,
+    "currentMnav": 1.144,
     "mnavEstimated": true,
     "minMnav": 0.929,
     "maxMnav": 8.006,
@@ -38300,7 +38300,7 @@
     "current10y": 5.24,
     "currentSpread": 0.65,
     "isCurveInverted": false,
-    "mstrProfitMultiplier": 1.1,
+    "mstrProfitMultiplier": 1.11,
     "currentFedNetLiquidity": 5.7592,
     "currentFedNetLiqSma20": 5.8242,
     "currentFedWalcl": 6.748,
@@ -38313,7 +38313,7 @@
       "start": "2020-08-01",
       "end": "2026-09-30"
     },
-    "updatedAt": "2026-09-30T07:06:22.357Z"
+    "updatedAt": "2026-09-30T10:48:42.832Z"
   },
   "rawMstr": [
     {

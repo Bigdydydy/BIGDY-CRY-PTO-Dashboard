@@ -2293,6 +2293,7 @@ let tpVisibleSeries = {
   apr30d: true,
   hurdle: true,
   tbill: true,
+  carryScore: true,
   allCurves: false
 };
 
@@ -2333,6 +2334,7 @@ const btnToggleSpread180d30d = document.getElementById('btn-toggle-spread180d30d
 const btnToggleApr30d = document.getElementById('btn-toggle-apr30d');
 const btnToggleHurdle = document.getElementById('btn-toggle-hurdle');
 const btnToggleTbill = document.getElementById('btn-toggle-tbill');
+const btnToggleCarryScore = document.getElementById('btn-toggle-carry-score');
 const btnToggleAllCurves = document.getElementById('btn-toggle-all-curves');
 
 /**
@@ -2512,6 +2514,7 @@ function renderTermPremiumChart() {
   const spread90d7dData = sliced.map(s => s.spread90d7d);
   const spread30d7dData = sliced.map(s => s.spread30d7d);
   const spread180d30dData = sliced.map(s => s.spread180d30d);
+  const carryScoreData = sliced.map(s => s.carryScore != null ? s.carryScore : 0);
 
   const seriesList = [];
 
@@ -2591,6 +2594,38 @@ function renderTermPremiumChart() {
       data: tbillData,
       lineStyle: { width: 1.5, color: '#f43f5e', type: 'dotted' },
       itemStyle: { color: '#f43f5e' }
+    });
+  }
+
+  // Top Grid Series: Institutional Carry Score (Right Y-Axis 2)
+  if (tpVisibleSeries.carryScore) {
+    seriesList.push({
+      id: 'top-carryScore',
+      name: '套利评分 (Carry Score)',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 2,
+      showSymbol: false,
+      smooth: 0.25,
+      data: carryScoreData,
+      lineStyle: { width: 2.2, color: '#818cf8' },
+      itemStyle: { color: '#818cf8' },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        data: [
+          {
+            yAxis: 20,
+            lineStyle: { color: 'rgba(16, 185, 129, 0.45)', type: 'dashed', width: 1 },
+            label: { show: true, position: 'insideEndTop', formatter: '极佳套利 (>20)', color: '#10b981', fontSize: 10 }
+          },
+          {
+            yAxis: 10,
+            lineStyle: { color: 'rgba(245, 158, 11, 0.45)', type: 'dashed', width: 1 },
+            label: { show: true, position: 'insideEndTop', formatter: '微利临界 (10)', color: '#f59e0b', fontSize: 10 }
+          }
+        ]
+      }
     });
   }
 
@@ -2754,11 +2789,21 @@ function renderTermPremiumChart() {
         // Top grid items
         const topItems = params.filter(p => p.seriesId && p.seriesId.startsWith('top-'));
         if (topItems.length) {
-          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:2px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">常数期限基差率 (APR):</div>`;
+          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:2px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">基差率与套利评分 (Basis &amp; Carry):</div>`;
           topItems.forEach(p => {
+            const isScore = p.seriesId && p.seriesId.includes('carryScore');
+            const unit = isScore ? ' 分' : '%';
+            const valFormatted = isScore ? Number(p.value).toFixed(1) : Number(p.value).toFixed(2);
+            let tierTag = '';
+            if (isScore) {
+              const s = Number(p.value);
+              if (s >= 20) tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(16,185,129,0.2);color:#10b981;">极佳</span>';
+              else if (s >= 10) tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(245,158,11,0.2);color:#f59e0b;">微利</span>';
+              else tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(244,63,94,0.2);color:#f43f5e;">回避</span>';
+            }
             html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
               <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
-              <span style="font-weight:700;color:${p.color};">${Number(p.value).toFixed(2)}%</span>
+              <span style="font-weight:700;color:${p.color};">${valFormatted}${unit}${tierTag}</span>
             </div>`;
           });
         }
@@ -2835,6 +2880,21 @@ function renderTermPremiumChart() {
         splitLine: {
           lineStyle: { color: colors.splitLine }
         }
+      },
+      {
+        type: 'value',
+        gridIndex: 0,
+        position: 'right',
+        name: '套利评分 Carry',
+        nameTextStyle: { color: '#818cf8', fontSize: 10, fontFamily: 'JetBrains Mono' },
+        axisLabel: {
+          color: '#818cf8',
+          fontFamily: 'JetBrains Mono',
+          fontSize: 10,
+          formatter: '{value}'
+        },
+        splitLine: { show: false },
+        show: tpVisibleSeries.carryScore
       }
     ],
     series: seriesList
@@ -2887,6 +2947,7 @@ function initTermPremiumEvents() {
   setupToggle(btnToggleApr30d, 'apr30d');
   setupToggle(btnToggleHurdle, 'hurdle');
   setupToggle(btnToggleTbill, 'tbill');
+  setupToggle(btnToggleCarryScore, 'carryScore');
 
   if (btnToggleAllCurves) {
     btnToggleAllCurves.addEventListener('click', () => {
