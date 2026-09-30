@@ -92,8 +92,8 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
   - 吃掉前段 0.618 / 0.7 判据与调整分部投射（三角形 b≈0.618、平台/联合形 b/x≥0.7、双锯齿 x 不必到 0.618）。
   - 出身检验：当前段非五浪 → 不作新趋势起点，列出引导楔形成立条件。
   - 级别阶梯：高一级别 → 本级别 → 当前段小级别嵌套计数。
-- **标的扩展**：BTC/ETH + 柳玉冬跟踪的币安 TradFi 永续（XAU、XAG、CL、CRCL、小米 HK1810、SNDK、NVDA 等）。
-- **柳玉冬波浪脉络**：`data/liu_wave_threads.json` 将同一标的的研判按时间串联（监测点轨迹、叙事段、价位谱系），前端用已加载 K 线客观核验每个价位是否被触发。
+- **交替原则与子形态识别**：在浪2/浪4内部的低级别拐点上，用同一套手稿规则匹配单锯齿/平台形/收缩三角形/双重三重锯齿/联合形，判定「一陡一横、一简一繁」；浪3运行中预判浪4形态，浪4运行中列出仍成立的形态；联合形/双锯齿识别 w、y、z 组成部分（三角形只能作最后一部分）。
+- **柳玉冬语料仅作离线强化**：Module 8 只研判 BTC/ETH。`data/liu_wave_threads.json` 把柳玉冬对黄金、白银、原油、个股的研判按标的时间串联，用于提炼规则与回放校准，不在界面上提供这些标的。
   - 重新生成：`node scripts/liu_threads/build_liu_threads.js [语料目录]`
   - 真实 K 线回放校准：`node scripts/liu_threads/replay_liu_threads.js XAU,XAG,CL,CRCL`
 
@@ -194,8 +194,6 @@ PORT=8080 npm start
 | `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
 | `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h) |
 | `/api/wave/analysis` | `GET / POST` | 20 req/min IP 限流 | 柳玉冬波浪理论全量智能研判、铁律校验与候选集引擎 |
-| `/api/wave/symbols` | `GET` | — | 波浪研判标的白名单（加密 + 柳玉冬跟踪的 TradFi 永续） |
-| `/api/wave/liu-thread` | `GET` | — | 指定标的的柳玉冬波浪脉络（按时间串联的研判线程） |
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
 

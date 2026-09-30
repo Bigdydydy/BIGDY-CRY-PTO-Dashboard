@@ -5,7 +5,6 @@ const os = require('os');
 const path = require('path');
 const E = require('../server/wave_engine');
 const { build: buildLiuThreads, extractLevels } = require('../scripts/liu_threads/build_liu_threads');
-const { resolveWaveSymbol, getLiuThread } = require('../server/wave_symbols');
 
 const { analyzeWaves, evaluatePattern, _internal } = E;
 const P = (idx, price, type) => ({ idx, time: idx, price, type, confirmed: true });
@@ -131,15 +130,10 @@ describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正
     }
   });
 
-  it('标的白名单: 归一化与柳玉冬线程映射', () => {
-    assert.strictEqual(resolveWaveSymbol('xau/usdt').symbol, 'XAUUSDT');
-    assert.strictEqual(resolveWaveSymbol('1810.HK/USDT').symbol, 'HK1810USDT');
-    assert.strictEqual(resolveWaveSymbol('BTC-USDT').display, 'BTC/USDT');
-    assert.strictEqual(resolveWaveSymbol('SOLUSDT'), null);
-    const th = getLiuThread(resolveWaveSymbol('XAUUSDT'));
-    assert.ok(th, 'data/liu_wave_threads.json 应包含黄金线程');
-    assert.strictEqual(th.code, 'XAU');
-    assert.ok(th.entries.length > 50 && th.monitorTrail.length > 10);
+  it('柳玉冬语料线程 (离线强化引擎用): 黄金线程按时间串联且含监测点轨迹', () => {
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'liu_wave_threads.json'), 'utf8'));
+    const th = data.symbols.XAU;
+    assert.ok(th && th.entries.length > 50 && th.monitorTrail.length > 10);
     for (let i = 1; i < th.entries.length; i++) assert.ok(th.entries[i].ts >= th.entries[i - 1].ts, '线程须按时间排序');
   });
 

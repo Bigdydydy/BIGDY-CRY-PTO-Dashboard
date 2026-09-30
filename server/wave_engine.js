@@ -310,7 +310,13 @@
         }
         return { pass: worst <= EPS, detail: worst > EPS ? `浪4子浪切入浪1区 ${fmtNum(worst)}` : `浪4终点 ${fmtNum(g.p[4].price)} vs 浪1终点 ${fmtNum(g.p[1].price)}` };
       }, { slow: true }),
-    rg('I2', C_G_PAT, false, null, 4, 'P85/P88', '交替原则：浪2与浪4形态宜一陡一横', 0.5, null, { manual: true }),
+    rg('I2', C_G_PAT, false, null, 5, 'P85/P88 + 柳玉冬实战（赣锋2026-04-10「2浪是单锯齿，4浪是三角形」）', '交替原则：浪2与浪4宜一陡一横或一简一繁', 1,
+      (g, ev) => {
+        const alt = alternationFor(g, ev);
+        if (!alt) return { pass: true, neutral: true, detail: '无K线数据未验' };
+        if (alt.pass === null) return { pass: true, pending: true, detail: alt.text };
+        return { pass: alt.pass, detail: alt.text };
+      }, { deferred: true }),
     rg('G7', C_G_PAT, false, null, 6, '通用（EWI延长浪惯例）', '浪3通常是三个驱动浪中最长的（至少一浪延长）', 0.5,
       g => ({ pass: g.l[2] >= Math.max(g.l[0], g.l[4]) - EPS, detail: `1:${fmtNum(g.l[0])} 3:${fmtNum(g.l[2])} 5:${fmtNum(g.l[4])}` }))
   ];
@@ -525,6 +531,14 @@
       g => ({ pass: g.t[2] <= 5 * g.t[0], detail: `y用时 ${g.t[2]} vs w×5=${5 * g.t[0]}` })),
     rg('W8', C_PRICE, true, null, 4, 'P387', 'y浪不能同时大于x浪的价格与时间', 1,
       g => ({ pass: !(g.l[2] > g.l[1] && g.t[2] > g.t[1]), detail: `y/x 价格${(g.l[2] / g.l[1]).toFixed(2)} 时间${(g.t[2] / g.t[1]).toFixed(2)}` })),
+    rg('WG5', C_G_PAT, false, null, 4, 'P362（双锯齿=两个锯齿以x相连）', '双/三锯齿的w、y(、z)应为锯齿形（陡峭）', 1,
+      (g, ev) => {
+        const comps = combinationComponents('DOUBLE_ZIGZAG', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
+        const judged = (comps || []).filter(c => !c.developing && c.class && c.class.alive.length);
+        if (!judged.length) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
+        const bad = judged.filter(c => !c.class.alive.some(a => a.form === 'sharp'));
+        return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
+      }, { deferred: true }),
     rg('WG1', C_G_RATIO, false, null, 3, 'P363', 'x浪常见回撤w浪的0.3~0.7倍（0.382/0.5/0.618）', 1,
       g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.28 && r <= 0.72, detail: `x/w=${fmtPct(r)}` }; }),
     rg('WG2', C_G_RATIO, false, 'min', 4, 'P372/P377', 'y浪常见为w浪的1或1.618倍', 1,
@@ -547,6 +561,13 @@
       g => ({ pass: g.t[1] <= 10 * g.t[0], detail: `x用时 ${g.t[1]} vs w×10` })),
     rg('C4', C_TIME, true, null, 4, 'P297（类推x浪条则）', 'y浪时间不超过w浪的10倍', 1,
       g => ({ pass: g.t[2] <= 10 * g.t[0], detail: `y用时 ${g.t[2]} vs w×10` })),
+    rg('CG5', C_G_PAT, false, null, 4, '通用（EWI联合形条则）', '联合形中三角形只能作为最后一个组成部分', 1,
+      (g, ev) => {
+        const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
+        if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
+      }, { deferred: true }),
     rg('CG1', C_G_RATIO, false, 'min', 4, 'P131', 'y浪常见为w浪的1倍（扩展取点0-w-x）', 1,
       g => { const r = g.l[2] / g.l[0]; return { pass: near(r, [0.786, 1, 1.272], 0.22), detail: `y/w=${r.toFixed(2)}` }; }),
     rg('CG2', C_G_PAT, false, null, 4, 'P50', '外观应接近箱型/平缓平行四边形（横向整理）', 1,
@@ -572,6 +593,13 @@
       g => ({ pass: g.t[3] <= 10 * g.t[2], detail: `xx用时 ${g.t[3]}` })),
     rg('C8', C_TIME, true, null, 6, 'P297（类推）', 'z浪时间不超过y浪的10倍', 1,
       g => ({ pass: g.t[4] <= 10 * g.t[2], detail: `z用时 ${g.t[4]}` })),
+    rg('CG5', C_G_PAT, false, null, 6, '通用（EWI联合形条则）', '联合形中三角形只能作为最后一个组成部分', 1,
+      (g, ev) => {
+        const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
+        if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
+      }, { deferred: true }),
     rg('CG3', C_G_RATIO, false, 'min', 6, 'P132', 'z浪常见为y浪的1倍（扩展取点x-y-xx）', 1,
       g => { const r = g.l[4] / g.l[2]; return { pass: near(r, [0.786, 1, 1.272], 0.22), detail: `z/y=${r.toFixed(2)}` }; }),
     rg('CG4', C_G_PAT, false, null, 6, 'P51', '外观应接近箱型/平缓平行四边形（横向整理）', 1,
@@ -730,24 +758,7 @@
   }
 
   function computeLegStructure(pA, pB, ev) {
-    const t0 = pA.time, t1 = pB.time;
-    let seg = null, srcName = null;
-    if (ev.sources) {
-      for (const s of ev.sources) {
-        if (s.isMain) continue;
-        const b = s.bars.filter(x => x.time >= t0 && x.time <= t1);
-        if (b.length >= 12 && b.length <= 900 &&
-          (b[b.length - 1].time - b[0].time) >= 0.6 * (t1 - t0)) { seg = b; srcName = s.name; break; }
-      }
-    }
-    if (!seg) {
-      // 按时间截取: 拐点 idx 相对于分析切片，调用方传入的 bars 可能是全量K线
-      const i0 = ev.bars.findIndex(x => x.time >= t0);
-      let i1 = i0;
-      while (i1 >= 0 && i1 + 1 < ev.bars.length && ev.bars[i1 + 1].time <= t1) i1++;
-      seg = i0 >= 0 ? ev.bars.slice(i0, i1 + 1) : null;
-      srcName = null;
-    }
+    const { seg, srcName } = legSegment(pA, pB, ev);
     if (!seg || seg.length < 6) return { label: 'unknown', subPivots: [], source: srcName };
 
     const range = Math.abs(pB.price - pA.price);
@@ -786,6 +797,220 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 4.5 调整浪子形态识别 (浪2/浪4 交替原则、联合形组成部分)
+  //     在腿内部的低级别拐点上，用本引擎同一套规则库 (硬规则全过) 匹配各调整浪型；
+  //     多个子级别阈值并行尝试，保留每种浪型的最佳匹配。数据不足如实返回空，不编造。
+  // ---------------------------------------------------------------------------
+
+  const CORRECTIVE_TYPES = ['ZIGZAG', 'FLAT', 'TRIANGLE', 'DOUBLE_ZIGZAG', 'COMBINATION', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'];
+  // 陡峭(sharp)=锯齿族；横向(sideways)=平台/三角/联合。简单=单一形态；复杂=双重/三重
+  const CORR_FORM = { ZIGZAG: 'sharp', DOUBLE_ZIGZAG: 'sharp', TRIPLE_ZIGZAG: 'sharp', FLAT: 'sideways', TRIANGLE: 'sideways', COMBINATION: 'sideways', TRIPLE_COMBINATION: 'sideways' };
+  const CORR_COMPLEXITY = { ZIGZAG: 'simple', FLAT: 'simple', TRIANGLE: 'simple', DOUBLE_ZIGZAG: 'complex', TRIPLE_ZIGZAG: 'complex', COMBINATION: 'complex', TRIPLE_COMBINATION: 'complex' };
+  const FORM_TXT = { sharp: '陡', sideways: '横' };
+  const CPLX_TXT = { simple: '简单', complex: '复杂' };
+
+  /** 腿 pA→pB 的K线段: 优先更低周期数据源, 否则按时间截取主周期 */
+  function legSegment(pA, pB, ev) {
+    const t0 = pA.time, t1 = pB.time;
+    if (ev.sources) {
+      for (const s of ev.sources) {
+        if (s.isMain) continue;
+        const b = s.bars.filter(x => x.time >= t0 && x.time <= t1);
+        if (b.length >= 12 && b.length <= 900 &&
+          (b[b.length - 1].time - b[0].time) >= 0.6 * (t1 - t0)) return { seg: b, srcName: s.name };
+      }
+    }
+    // 按时间截取: 拐点 idx 相对于分析切片，调用方传入的 bars 可能是全量K线
+    const i0 = ev.bars.findIndex(x => x.time >= t0);
+    let i1 = i0;
+    while (i1 >= 0 && i1 + 1 < ev.bars.length && ev.bars[i1 + 1].time <= t1) i1++;
+    return { seg: i0 >= 0 ? ev.bars.slice(i0, i1 + 1) : null, srcName: null };
+  }
+
+  /** 在锚定的子拐点序列上匹配一种调整浪型: 起点=子序列首点, 终点=子序列末点 */
+  function matchCorrectiveOn(type, sub, developing) {
+    const def = PATTERNS[type];
+    const last = sub.length - 1;
+    const sizes = [];
+    if (developing) { for (let m = 3; m <= def.pts; m++) sizes.push(m); } else sizes.push(def.pts);
+    const legOk = buildLegTable(sub);
+    let best = null, budget = 4000;
+    const path = [0];
+    function rec(cur, m) {
+      if (--budget <= 0) return;
+      if (path.length === m - 1) {
+        if (((last - cur) & 1) === 0 || !legOk[cur][last]) return;
+        const pts = path.concat([last]).map(i => sub[i]);
+        const res = evaluatePattern(type, pts, null);
+        if (res.hardFails.length) return;
+        const score = res.guide.weight ? res.guide.weightGot / res.guide.weight : 0.5;
+        const complete = pts.length === def.pts;
+        // 完整形态优先于发展中形态，其次比指引符合度
+        const key = (complete ? 1 : 0) + score;
+        if (!best || key > best.key) best = { key, score, complete, pts };
+        return;
+      }
+      for (let j = cur + 1; j < last; j++) {
+        if (((j - cur) & 1) === 0 || !legOk[cur][j]) continue;
+        path.push(j);
+        rec(j, m);
+        path.pop();
+        if (budget <= 0) return;
+      }
+    }
+    for (const m of sizes) {
+      if (m < 2 || last < m - 1) continue;
+      if (m === 2) continue;
+      path.length = 1;
+      rec(0, m);
+    }
+    return best;
+  }
+
+  /**
+   * 识别腿 pA→pB 内部的调整浪子形态。developing=true 表示该腿尚在运行 (如运行中的浪4)，
+   * 此时返回「仍然成立」的浪型集合 (柳玉冬: 「它或者是平台形、联合形、三角形…平台形可以否定」)。
+   */
+  function classifyCorrectiveLeg(pA, pB, ev, developing) {
+    if (!ev || !ev.bars) return null;
+    if (!ev.structCache) ev.structCache = new Map();
+    const key = `cls|${pA.time}_${pB.time}|${developing ? 1 : 0}`;
+    if (ev.structCache.has(key)) return ev.structCache.get(key);
+    const out = computeCorrectiveClass(pA, pB, ev, developing);
+    ev.structCache.set(key, out);
+    return out;
+  }
+
+  function computeCorrectiveClass(pA, pB, ev, developing) {
+    const empty = { alive: [], best: null, form: null, complexity: null, source: null, developing: !!developing };
+    const { seg, srcName } = legSegment(pA, pB, ev);
+    const range = Math.abs(pB.price - pA.price);
+    if (!seg || seg.length < 6 || !(range > 0)) return empty;
+    const sAtr = avgTR(seg) || range / seg.length;
+    const ps = { idx: 0, time: seg[0].time, price: pA.price, type: pA.type, confirmed: true };
+    const pe = { idx: seg.length - 1, time: seg[seg.length - 1].time, price: pB.price, type: pB.type, confirmed: !developing, open: !!developing };
+    const bestByType = {};
+    const seen = new Set();
+    for (const m of [0.3, 0.2, 0.14, 0.1, 0.07, 0.05]) {
+      const thr = Math.max(range * m, 1.0 * sAtr);
+      const sub = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
+      if (sub.length < 4 || sub.length > 16) continue;
+      const sig = sub.map(q => q.idx).join(',');
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      for (const type of CORRECTIVE_TYPES) {
+        const hit = matchCorrectiveOn(type, sub, developing);
+        if (!hit) continue;
+        const prev = bestByType[type];
+        // 同一浪型取更简洁的分解(更粗级别)优先，其次指引分
+        if (!prev || hit.key > prev.key + 0.05) {
+          bestByType[type] = Object.assign({ subSwings: sub.length - 1 }, hit);
+        }
+      }
+    }
+    const alive = Object.keys(bestByType).map(type => {
+      const h = bestByType[type];
+      return {
+        type, name: PATTERNS[type].name, form: CORR_FORM[type], complexity: CORR_COMPLEXITY[type],
+        score: Math.round(100 * h.score), complete: h.complete, subSwings: h.subSwings,
+        points: h.pts.map(q => ({ time: q.time, price: q.price }))
+      };
+    }).sort((a, b) => (Number(b.complete) - Number(a.complete)) || (b.score - a.score) ||
+      (a.complexity === 'simple' ? -1 : 1) - (b.complexity === 'simple' ? -1 : 1));
+    if (!alive.length) return Object.assign(empty, { source: srcName });
+    const best = alive[0];
+    const forms = new Set(alive.map(a => a.form));
+    return {
+      alive, best,
+      form: developing ? (forms.size === 1 ? best.form : null) : best.form,
+      complexity: developing ? null : best.complexity,
+      source: srcName, developing: !!developing
+    };
+  }
+
+  function describeClass(c) {
+    if (!c || !c.best) return '结构未识别';
+    if (c.developing) return `仍成立: ${c.alive.map(a => a.name).join('、')}`;
+    return `${c.best.name}（${FORM_TXT[c.best.form]}·${CPLX_TXT[c.best.complexity]}）`;
+  }
+
+  /**
+   * 交替原则 (手稿P85/P88; 柳玉冬「2浪是单锯齿，4浪是三角形。很标准」)
+   * 浪2与浪4: 一陡一横 或 一简单一复杂 即为交替。结构无法识别时以回撤深度/用时作代理。
+   */
+  function alternationFor(g, ev) {
+    if (!ev || !ev.bars || g.p.length < 4) return null;
+    const p = g.p, n = p.length;
+    const w2 = classifyCorrectiveLeg(p[1], p[2], ev, false);
+    const r2 = g.l[1] / g.l[0];
+    const tr2 = g.t[1] / g.t[0];
+    const out = { wave2: { class: w2, retrace: +r2.toFixed(3), timeRatio: +tr2.toFixed(2), text: describeClass(w2) } };
+
+    const f2 = w2 && w2.form;
+    if (n === 4) {
+      // 浪3运行中: 由浪2形态预判浪4
+      out.expectWave4 = f2 === 'sharp'
+        ? { form: 'sideways', types: ['FLAT', 'TRIANGLE', 'COMBINATION'], text: '浪2为陡峭锯齿 → 浪4预期横向：平台形 / 收缩三角形 / 联合形，回撤偏浅(0.236~0.382)、用时偏长' }
+        : f2 === 'sideways'
+          ? { form: 'sharp', types: ['ZIGZAG', 'DOUBLE_ZIGZAG'], text: '浪2为横向调整 → 浪4预期陡峭：单锯齿 / 双锯齿，回撤可较深、用时偏短' }
+          : { form: null, types: [], text: r2 >= 0.5 ? '浪2回撤较深(≥0.5) → 浪4倾向浅而横' : '浪2回撤较浅 → 浪4倾向深而陡' };
+      out.pass = null;
+      out.text = out.expectWave4.text;
+      return out;
+    }
+
+    const developing = n === 5;
+    const w4 = classifyCorrectiveLeg(p[3], p[4], ev, developing);
+    const r4 = g.l[3] / g.l[2];
+    const tr4 = g.t[3] / g.t[2];
+    out.wave4 = { class: w4, retrace: +r4.toFixed(3), timeRatio: +tr4.toFixed(2), text: describeClass(w4) };
+
+    if (w2 && w2.best && w4 && w4.best) {
+      if (developing) {
+        const contrast = w4.alive.filter(a => a.form !== w2.form);
+        out.basis = 'structure';
+        if (!contrast.length) { out.pass = false; out.text = `浪2为${FORM_TXT[w2.form]}，浪4目前仍成立的形态全部同为${FORM_TXT[w2.form]}，暂不符合交替`; }
+        else if (contrast.length === w4.alive.length) { out.pass = true; out.text = `浪2为${describeClass(w2)}；浪4仍成立的形态均为${FORM_TXT[contrast[0].form]}（${contrast.map(a => a.name).join('、')}），符合交替`; }
+        else { out.pass = null; out.text = `浪2为${describeClass(w2)}；浪4尚未定型（${w4.alive.map(a => a.name).join('、')}），交替待确认，符合交替者: ${contrast.map(a => a.name).join('、')}`; }
+        out.expectWave4 = { form: w2.form === 'sharp' ? 'sideways' : 'sharp', types: contrast.map(a => a.type), text: out.text };
+        return out;
+      }
+      const formDiff = w2.form !== w4.form;
+      const cplxDiff = w2.complexity !== w4.complexity;
+      out.basis = 'structure';
+      out.pass = formDiff || cplxDiff;
+      out.text = out.pass
+        ? `浪2=${describeClass(w2)}，浪4=${describeClass(w4)}：${formDiff ? '一陡一横' : ''}${formDiff && cplxDiff ? '、' : ''}${cplxDiff ? '一简一繁' : ''}，符合交替`
+        : `浪2与浪4同为${describeClass(w4)}：未交替（交替是指引而非铁律，降低该计数权重）`;
+      return out;
+    }
+    // 代理判据: 陡=回撤深且快，横=回撤浅且慢
+    const depthDiff = Math.abs(r2 - r4) >= 0.15;
+    const timeDiff = Math.max(tr2, tr4) / Math.max(0.01, Math.min(tr2, tr4)) >= 1.6;
+    out.basis = 'proxy';
+    if (developing) { out.pass = null; out.text = `子浪结构不足，浪4运行中：浪2回撤${(r2 * 100).toFixed(0)}%，浪4目前${(r4 * 100).toFixed(0)}%`; return out; }
+    out.pass = depthDiff || timeDiff ? true : false;
+    out.text = `子浪结构不足，以回撤/用时代理：浪2回撤${(r2 * 100).toFixed(0)}%·用时比${tr2.toFixed(2)}，浪4回撤${(r4 * 100).toFixed(0)}%·用时比${tr4.toFixed(2)}，${out.pass ? '深浅或快慢有别，视作交替' : '深浅快慢相近，未见交替'}`;
+    return out;
+  }
+
+  /** 联合形 / 双三锯齿的组成部分识别 (w、y、z) */
+  function combinationComponents(type, g, ev, status) {
+    if (!ev || !ev.bars) return null;
+    const legs = g.p.length === 6 ? [0, 2, 4] : [0, 2];
+    const labels = ['w', null, 'y', null, 'z'];
+    const out = [];
+    for (const li of legs) {
+      if (li + 1 >= g.p.length) continue;
+      const lastLeg = li + 1 === g.p.length - 1;
+      const developing = lastLeg && status !== 'COMPLETED';
+      const c = classifyCorrectiveLeg(g.p[li], g.p[li + 1], ev, developing);
+      out.push({ label: labels[li], leg: li, developing, class: c, text: describeClass(c) });
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
   // 5. 假设求值
   // ---------------------------------------------------------------------------
 
@@ -799,6 +1024,7 @@
     const checks = [], hardFails = [], pending = [];
     const guide = { pass: 0, fail: 0, weight: 0, weightGot: 0 };
     const lastOpen = !!points[points.length - 1].open;
+    const deferred = [];
 
     for (const r of def.rules) {
       if (points.length < r.need) {
@@ -806,10 +1032,18 @@
         if (!r.hard) { guide.weight += r.w; guide.weightGot += 0.5 * r.w; }
         continue;
       }
-      let res;
-      if (r.struct) res = evalStructRule(r, g, ev || {});
-      else if (r.manual) res = { pass: true, neutral: true, detail: '人工指引项，自动判定从略' };
-      else res = r.test(g, ev) || {};
+      if (r.deferred) { deferred.push(r); continue; }
+      account(r, r.struct ? evalStructRule(r, g, ev || {})
+        : r.manual ? { pass: true, neutral: true, detail: '人工指引项，自动判定从略' }
+          : (r.test(g, ev) || {}));
+    }
+    // 延后规则: 需识别子浪形态，代价较高，只对硬规则全部通过的假设执行
+    for (const r of deferred) {
+      account(r, !hardFails.length && ev && ev.bars ? (r.test(g, ev) || {}) : { pass: true, neutral: true, detail: '未执行子形态识别' });
+    }
+    return { g, checks, hardFails, pending, guide, complete: points.length === def.pts };
+
+    function account(r, res) {
 
       const openSuppressed = lastOpen && r.pending === 'min' && res.pass === false;
       const check = {
@@ -830,7 +1064,6 @@
         else guide.fail++;
       }
     }
-    return { g, checks, hardFails, pending, guide, complete: points.length === def.pts };
   }
 
   /** 增量剪枝: 路径末端新增 pivot 后, 只运行 need===n 的快速硬规则 */
@@ -1200,6 +1433,26 @@
 
     const levels = buildLevels(h.type, g, h.status, ev);
     const fibLevels = buildFibLevels(h.type, g, h.status);
+    const slimClass = c => c ? {
+      text: describeClass(c), form: c.form, complexity: c.complexity, developing: c.developing, source: c.source,
+      alive: c.alive.map(a => ({ type: a.type, name: a.name, form: a.form, complexity: a.complexity, score: a.score, complete: a.complete, points: a.points }))
+    } : null;
+    let alternation = null, components = null;
+    if ((h.type === 'IMPULSE' || h.type === 'DIAGONAL') && ev && ev.bars && n >= 4) {
+      const alt = alternationFor(g, ev);
+      if (alt) {
+        alternation = {
+          pass: alt.pass === undefined ? null : alt.pass, basis: alt.basis || null, text: alt.text,
+          wave2: Object.assign({}, alt.wave2, { class: slimClass(alt.wave2.class) }),
+          wave4: alt.wave4 ? Object.assign({}, alt.wave4, { class: slimClass(alt.wave4.class) }) : null,
+          expectWave4: alt.expectWave4 || null
+        };
+      }
+    }
+    if (/COMBINATION|ZIGZAG/.test(h.type) && h.type !== 'ZIGZAG' && ev && ev.bars) {
+      const comps = combinationComponents(h.type, g, ev, h.status);
+      if (comps) components = comps.map(c => ({ label: c.label, developing: c.developing, text: c.text, class: slimClass(c.class) }));
+    }
 
     // 子浪拐点: 仅使用真实检测到的更细级别拐点 (无数据则为空, 不编造)
     const subPivots = [];
@@ -1232,6 +1485,8 @@
       secondaryPivot: levels.secondaryPivot,
       targets: levels.targets,
       fibLevels,
+      alternation,
+      components,
       span
     };
   }
@@ -2432,6 +2687,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });

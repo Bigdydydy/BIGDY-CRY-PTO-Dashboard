@@ -1995,25 +1995,6 @@
               <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
               <button class="wave-symbol-btn" data-symbol="ETH/USDT">ETH / USDT</button>
             </div>
-            <select class="wave-symbol-select" id="wave-symbol-select" aria-label="柳玉冬跟踪标的 (币安 TradFi 永续)" title="柳玉冬微博跟踪标的 · 币安 TradFi 永续行情">
-              <option value="">柳玉冬跟踪标的 ▾</option>
-              <option value="XAU/USDT">黄金 XAU</option>
-              <option value="XAG/USDT">白银 XAG</option>
-              <option value="CL/USDT">WTI原油 CL</option>
-              <option value="CRCL/USDT">Circle CRCL</option>
-              <option value="HK1810/USDT">小米集团 1810</option>
-              <option value="SNDK/USDT">闪迪 SNDK</option>
-              <option value="NVDA/USDT">英伟达 NVDA</option>
-              <option value="MSTR/USDT">Strategy MSTR</option>
-              <option value="GOOGL/USDT">谷歌 GOOGL</option>
-              <option value="INTC/USDT">英特尔 INTC</option>
-              <option value="AAPL/USDT">苹果 AAPL</option>
-              <option value="MU/USDT">美光 MU</option>
-              <option value="COIN/USDT">Coinbase COIN</option>
-              <option value="PLTR/USDT">Palantir PLTR</option>
-              <option value="SPCX/USDT">SpaceX概念 SPCX</option>
-              <option value="BABA/USDT">阿里巴巴 BABA</option>
-            </select>
             <div class="wave-symbol-group" role="group" aria-label="选择周期">
               <button class="wave-symbol-btn wave-tf-btn" data-interval="15m">15m</button>
               <button class="wave-symbol-btn wave-tf-btn" data-interval="1h">1H</button>
@@ -2169,6 +2150,7 @@
                       <span class="text-secondary" id="rule-status-3" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
                     </div>
                   </div>
+                  <div class="liu-signal-row" id="wave-structure-detail" style="display: none; margin-top: 10px;"></div>
                 </div>
               </div>
             </div>
@@ -2279,25 +2261,6 @@
           </div>
         </div> <!-- /.card-body -->
 
-        <!-- 柳玉冬波浪脉络: 同一标的的微博研判按时间串联 (data/liu_wave_threads.json) -->
-        <div class="bento-card liu-thread-card" id="card-liu-thread">
-          <div class="card-header liu-thread-header">
-            <div>
-              <div class="card-title-group">
-                <h3>柳玉冬波浪脉络 · 同标的按时间串联</h3>
-              </div>
-              <p class="card-desc" id="liu-thread-desc">选择柳玉冬跟踪标的后，按时间串联其每篇研判的浪型、监测点与目标，并用当前 K 线核验价位是否被触发。</p>
-            </div>
-            <div class="chart-tools-group">
-              <span class="card-badge badge-neutral" id="liu-thread-badge">无语料</span>
-              <button class="chart-tool-btn" id="btn-liu-overlay" title="在K线图上叠加最新一篇研判的监测点与目标位">叠加最新监测点</button>
-            </div>
-          </div>
-          <div id="liu-thread-summary" class="liu-thread-summary"></div>
-          <div id="liu-thread-arcs" class="liu-arcs"></div>
-          <div id="liu-thread-trail" class="liu-trail"></div>
-          <div id="liu-thread-entries" class="liu-entries"></div>
-        </div>
       </section> <!-- /#module-wave-radar -->
     </div> <!-- /#view-wave-radar -->
 

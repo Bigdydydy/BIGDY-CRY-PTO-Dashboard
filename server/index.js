@@ -21,7 +21,6 @@ const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { analyzeWaves } = require('./wave_engine');
-const { WAVE_SYMBOLS, resolveWaveSymbol, getLiuThread } = require('./wave_symbols');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -492,30 +491,6 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
-  // GET /api/wave/symbols (Module 8: 波浪研判标的白名单 — 加密 + 柳玉冬跟踪的币安 TradFi 永续)
-  if (pathname === '/api/wave/symbols' && req.method === 'GET') {
-    sendJsonResponse(req, res, 200, {
-      code: 0,
-      symbols: WAVE_SYMBOLS.map(s => {
-        const th = getLiuThread(s);
-        return Object.assign({}, s, { liuPosts: th ? th.posts : 0, liuLast: th ? th.last : null });
-      })
-    });
-    return;
-  }
-
-  // GET /api/wave/liu-thread?symbol=XAUUSDT (Module 8: 柳玉冬按标的时间串联的波浪脉络线程)
-  if (pathname === '/api/wave/liu-thread' && req.method === 'GET') {
-    const symEntry = resolveWaveSymbol(parsedUrl.query?.symbol);
-    if (!symEntry) {
-      sendJsonResponse(req, res, 400, { code: 400, error: '未知标的' });
-      return;
-    }
-    const thread = getLiuThread(symEntry);
-    sendJsonResponse(req, res, 200, { code: 0, symbol: symEntry.display, thread });
-    return;
-  }
-
   // GET /api/wave/klines (Module 8: Wave Kline Feed Proxy & Cache with IP Rate Limit)
   if (pathname === '/api/wave/klines' && req.method === 'GET') {
     const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
@@ -524,12 +499,11 @@ async function handleApiRequest(req, res, parsedUrl) {
       return;
     }
 
-    const symEntry = resolveWaveSymbol(parsedUrl.query?.symbol);
-    if (!symEntry) {
-      sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判仅支持白名单标的: ${WAVE_SYMBOLS.map(x => x.display).join(', ')}` });
+    const rawSymbol = (parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
     }
-    const rawSymbol = symEntry.symbol;
 
     const interval = parsedUrl.query?.interval || '4h';
     if (!WAVE_INTERVALS.includes(interval)) {
@@ -543,7 +517,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const bars = await fetchBinanceKlines(rawSymbol, interval, limit);
       sendJsonResponse(req, res, 200, {
         code: 0,
-        symbol: symEntry.display,
+        symbol: rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT',
         interval,
         count: bars.length,
         bars
@@ -573,12 +547,11 @@ async function handleApiRequest(req, res, parsedUrl) {
       }
     }
 
-    const symEntry = resolveWaveSymbol(payload.symbol || parsedUrl.query?.symbol);
-    if (!symEntry) {
-      sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判仅支持白名单标的: ${WAVE_SYMBOLS.map(x => x.display).join(', ')}` });
+    const rawSymbol = ((payload.symbol || parsedUrl.query?.symbol) || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
     }
-    const rawSymbol = symEntry.symbol;
 
     const startTime = payload.startTime || parsedUrl.query?.startTime || null;
     const endTime = payload.endTime || parsedUrl.query?.endTime || null;
@@ -589,7 +562,7 @@ async function handleApiRequest(req, res, parsedUrl) {
     }
 
     try {
-      const displaySymbol = symEntry.display;
+      const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
       const subTfs = (WAVE_SUB_INTERVALS[interval] || []).slice(0, 2);
       const htfTfs = (WAVE_HTF_INTERVALS[interval] || []).slice(0, 2);
 
