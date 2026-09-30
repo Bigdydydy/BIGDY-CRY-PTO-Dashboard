@@ -133,6 +133,20 @@
         levels.push({ mult: m, thr: atr * m, pivots, count: pivots.length });
       }
     }
+    // 长样本 (如 10000 根K线) 时预设阈值仍会产生数百个拐点: 继续放大阈值直到主级别拐点数落入上限，
+    // 否则假设搜索量随拐点数爆炸 (实测 459 个拐点单次分析约 100 秒)
+    if (levels.length && levels[levels.length - 1].pivots.length > MAX_MAIN_PIVOTS) {
+      let m = DEGREE_MULTS[DEGREE_MULTS.length - 1];
+      for (let k = 0; k < 40; k++) {
+        m *= 1.35;
+        const pivots = zigzagPivots(bars, atr * m);
+        if (pivots.length < 4) break;
+        if (pivots.length !== levels[levels.length - 1].pivots.length) {
+          levels.push({ mult: +m.toFixed(2), thr: atr * m, pivots, count: pivots.length });
+        }
+        if (pivots.length <= MAX_MAIN_PIVOTS) break;
+      }
+    }
     let main = null;
     for (const l of levels) {
       if (l.pivots.length >= 4 && l.pivots.length <= MAX_MAIN_PIVOTS) { main = l; break; }

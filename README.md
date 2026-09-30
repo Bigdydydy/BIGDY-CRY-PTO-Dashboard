@@ -192,7 +192,7 @@ PORT=8080 npm start
 | `/api/cdri` | `GET` | Gzip + ETag (304) | 获取加密衍生品综合风险指数 (CDRI) 及历史分位 |
 | `/api/ssro` | `GET` | Gzip + ETag (304) | 获取稳定币供给比率振荡器 (SSRO) 宏观流动性指标 |
 | `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
-| `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h) |
+| `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h，最多 10000 根，按 endTime 分页拼接) |
 | `/api/wave/analysis` | `GET / POST` | 20 req/min IP 限流 | 柳玉冬波浪理论全量智能研判、铁律校验与候选集引擎 |
 | `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
 | `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |

@@ -86,52 +86,84 @@ function checkWaveRateLimit(clientIp) {
   return true;
 }
 
+// 主图 K 线上限: 币安单次最多 1500 (合约) / 1000 (现货)，超过则按 endTime 向前分页拼接
+const WAVE_MAX_BARS = 10000;
+const waveKlineInflight = new Map();
+
+const KLINE_SOURCES = [
+  { base: 'https://fapi.binance.com/fapi/v1/klines', pageMax: 1500 },
+  { base: 'https://data-api.binance.vision/api/v3/klines', pageMax: 1000 },
+  { base: 'https://api.binance.com/api/v3/klines', pageMax: 1000 }
+];
+
+async function fetchKlinePages(source, symbol, interval, limit) {
+  const rows = [];
+  let endTime = null;
+  while (rows.length < limit) {
+    const pageLimit = Math.min(source.pageMax, limit - rows.length);
+    const url = `${source.base}?symbol=${symbol}&interval=${interval}&limit=${pageLimit}${endTime ? `&endTime=${endTime}` : ''}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) {
+      if (!rows.length) throw new Error(`HTTP ${response.status}`);
+      break; // 已拿到的较新数据仍可用
+    }
+    const page = await response.json();
+    if (!Array.isArray(page) || !page.length) break;
+    rows.unshift(...page);
+    if (page.length < pageLimit) break; // 已到上市首日
+    endTime = page[0][0] - 1;
+  }
+  return rows;
+}
+
 async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
+  limit = Math.max(1, Math.min(WAVE_MAX_BARS, limit));
   const cacheKey = `${symbol}_${interval}_${limit}`;
   const cached = waveKlineCache.get(cacheKey);
   const now = Date.now();
   if (cached && now - cached.timestamp < 120000) {
     return cached.data;
   }
+  // 同一标的/周期/根数的并发请求合并为一次 (图表与研判接口常同时触发)
+  if (waveKlineInflight.has(cacheKey)) return waveKlineInflight.get(cacheKey);
 
-  // 优先采用币安 Futures 合约行情通道 (fapi.binance.com)，降级回退至公共现货源
-  const urls = [
-    `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-    `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
-  ];
-
-  let rawData = null;
-  for (const apiUrl of urls) {
-    try {
-      const response = await fetch(apiUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        signal: AbortSignal.timeout(6000)
-      });
-      if (response.ok) {
-        rawData = await response.json();
-        break;
+  const task = (async () => {
+    // 优先采用币安 Futures 合约行情通道 (fapi.binance.com)，降级回退至公共现货源
+    let rawData = null;
+    for (const source of KLINE_SOURCES) {
+      try {
+        const rows = await fetchKlinePages(source, symbol, interval, limit);
+        if (rows.length) { rawData = rows; break; }
+      } catch (e) {
+        // try next
       }
-    } catch (e) {
-      // try next
     }
+
+    if (!rawData || !Array.isArray(rawData)) {
+      throw new Error(`未能从币安行情源拉取到 ${interval} K 线数据，请稍后重试`);
+    }
+
+    const bars = rawData.map(b => ({
+      time: Math.floor(b[0] / 1000),
+      open: parseFloat(b[1]),
+      high: parseFloat(b[2]),
+      low: parseFloat(b[3]),
+      close: parseFloat(b[4]),
+      volume: parseFloat(b[5])
+    }));
+
+    waveKlineCache.set(cacheKey, { timestamp: Date.now(), data: bars });
+    return bars;
+  })();
+  waveKlineInflight.set(cacheKey, task);
+  try {
+    return await task;
+  } finally {
+    waveKlineInflight.delete(cacheKey);
   }
-
-  if (!rawData || !Array.isArray(rawData)) {
-    throw new Error(`未能从币安行情源拉取到 ${interval} K 线数据，请稍后重试`);
-  }
-
-  const bars = rawData.map(b => ({
-    time: Math.floor(b[0] / 1000),
-    open: parseFloat(b[1]),
-    high: parseFloat(b[2]),
-    low: parseFloat(b[3]),
-    close: parseFloat(b[4]),
-    volume: parseFloat(b[5])
-  }));
-
-  waveKlineCache.set(cacheKey, { timestamp: now, data: bars });
-  return bars;
 }
 
 // MIME types for static serving
@@ -511,7 +543,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       return;
     }
 
-    const limit = Math.min(parseInt(parsedUrl.query?.limit, 10) || 1000, 1000);
+    const limit = Math.min(parseInt(parsedUrl.query?.limit, 10) || WAVE_MAX_BARS, WAVE_MAX_BARS);
 
     try {
       const bars = await fetchBinanceKlines(rawSymbol, interval, limit);
@@ -568,7 +600,7 @@ async function handleApiRequest(req, res, parsedUrl) {
 
       // 并发并行抓取主周期 + 子周期 + 宏观高周期 K 线，防止串行请求导致延迟累加
       const [mainBars, subResults, htfResults] = await Promise.all([
-        fetchBinanceKlines(rawSymbol, interval, 1000),
+        fetchBinanceKlines(rawSymbol, interval, WAVE_MAX_BARS),
         Promise.all(subTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 1000).catch(() => null))),
         Promise.all(htfTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 200).catch(() => null)))
       ]);
