@@ -1446,11 +1446,10 @@
                   <th>净 Delta</th>
                   <th>净 Vega</th>
                   <th>腿数</th>
-                  <th>操作</th>
                 </tr>
               </thead>
               <tbody id="whale-table-body">
-                <tr><td colspan="8" class="text-center">加载巨鲸大单中...</td></tr>
+                <tr><td colspan="7" class="text-center">加载巨鲸大单中...</td></tr>
               </tbody>
             </table>
           </div>
@@ -2243,6 +2242,7 @@
           <div class="modal-title-top">
             <span class="modal-tag" id="m-block-type">WHALE BLOCK</span>
             <h3 id="m-block-title">BLOCK 深度量化解析</h3>
+            <span class="inverse-pill-badge" id="m-inverse-badge" title="本交易为 Deribit 币本位 (Inverse Options) 结算，收益以 BTC 计量">⚡ 币本位结算 ⓘ</span>
           </div>
           <div class="modal-time-meta" id="m-block-time">-- (UTC+8)</div>
         </div>
@@ -2250,67 +2250,7 @@
       </div>
 
       <div class="modal-body">
-        <div class="intent-banner" id="m-intent-banner">
-          <div class="intent-header-row">
-            <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
-            <div class="strategy-name-badge" id="m-strategy-name">策略结构</div>
-          </div>
-          <p class="intent-narrative-text" id="m-intent-narrative">分析生成中...</p>
-        </div>
-
-        <!-- 🧭 交易性质与微观行为画像 (Action & 0DTE Profiling) -->
-        <div class="action-timing-box" id="m-action-timing-box">
-          <div class="action-timing-header">
-            <span class="at-section-title">🧭 交易性质与微观行为画像 (Action &amp; 0DTE Profiling)</span>
-            <div class="at-badges-wrap">
-              <span class="intent-badge-pill" id="m-action-badge">全新建仓</span>
-              <span class="intent-badge-pill" id="m-timing-badge">常规期权</span>
-            </div>
-          </div>
-          <div class="at-content-grid">
-            <div class="at-card">
-              <div class="at-label">开平仓性质研判 (Action Intent)</div>
-              <div class="at-val" id="m-action-name">--</div>
-              <div class="at-sub" id="m-action-rationale">--</div>
-            </div>
-            <div class="at-card">
-              <div class="at-label">交割剩余时间与末日行为 (0DTE Dynamics)</div>
-              <div class="at-val" id="m-timing-name">--</div>
-              <div class="at-sub" id="m-timing-rationale">--</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="risk-profile-box" id="m-risk-profile-box">
-          <div class="risk-profile-title">🎯 机构盈亏模型与损益平衡结构 (Risk &amp; Break-even Profile)</div>
-          <div class="risk-profile-grid">
-            <div class="risk-item">
-              <span class="r-lbl">最大理论盈利</span>
-              <span class="r-val text-pos" id="m-max-profit">--</span>
-            </div>
-            <div class="risk-item">
-              <span class="r-lbl">最大理论亏损</span>
-              <span class="r-val text-neg" id="m-max-loss">--</span>
-            </div>
-            <div class="risk-item">
-              <span class="r-lbl">损益平衡点 (Break-even)</span>
-              <span class="r-val text-highlight" id="m-break-even">--</span>
-            </div>
-            <div class="risk-item" id="m-inverse-wrap" style="grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1);">
-              <span class="r-lbl" style="color:#f59e0b;">⚡ Deribit 币本位反向期权曲率特性 (Inverse Curvature)</span>
-              <span class="r-val" id="m-inverse-curvature" style="font-size:0.8rem;font-weight:normal;color:#cbd5e1;line-height:1.45;margin-top:2px;">--</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pointers-box" id="m-pointers-box">
-          <div class="pointers-title">📐 机构微观结构研判要点 (Key Insights)</div>
-          <ul class="pointers-list" id="m-pointers-list">
-            <li>分析中...</li>
-          </ul>
-        </div>
-
-
+        <!-- 1. 组合净 Greeks 敞口矩阵 (Greeks KPI Grid) -->
         <div class="greeks-kpi-grid">
           <div class="gkpi-box">
             <span class="gkpi-lbl">净 Delta (标的敞口)</span>
@@ -2334,25 +2274,94 @@
           </div>
         </div>
 
-        <div class="modal-sub-title">交易分腿参数与独立希腊字母明细 (Leg Breakdown)</div>
-        <div class="table-responsive">
-          <table class="quant-table modal-table">
-            <thead>
-              <tr>
-                <th>方向</th>
-                <th>合约代码</th>
-                <th>张数</th>
-                <th>成交价</th>
-                <th>成交 IV</th>
-                <th>Delta</th>
-                <th>Vega (USD)</th>
-                <th>Theta (USD/d)</th>
-                <th>名义价值</th>
-              </tr>
-            </thead>
-            <tbody id="m-legs-body">
-            </tbody>
-          </table>
+        <!-- 2. 【核心置顶】交易分腿参数与独立希腊字母明细 (Leg Breakdown) -->
+        <div class="legs-section-box">
+          <div class="legs-section-header">
+            <div class="modal-sub-title">📊 交易分腿参数与独立希腊字母明细 (Leg Breakdown)</div>
+          </div>
+          <div class="table-responsive modal-table-wrap">
+            <table class="quant-table modal-table">
+              <thead>
+                <tr>
+                  <th>方向</th>
+                  <th>合约代码</th>
+                  <th>张数</th>
+                  <th>成交价</th>
+                  <th>成交 IV</th>
+                  <th>Delta</th>
+                  <th>Vega (USD)</th>
+                  <th>Theta (USD/d)</th>
+                  <th>名义价值</th>
+                </tr>
+              </thead>
+              <tbody id="m-legs-body">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3. 机构盈亏模型与损益平衡结构 (Risk & Break-even Profile) -->
+        <div class="risk-profile-box" id="m-risk-profile-box">
+          <div class="risk-profile-title">🎯 机构盈亏模型与损益平衡结构 (Risk &amp; Break-even Profile)</div>
+          <div class="risk-profile-grid">
+            <div class="risk-item">
+              <span class="r-lbl">最大理论盈利</span>
+              <span class="r-val text-pos" id="m-max-profit">--</span>
+            </div>
+            <div class="risk-item">
+              <span class="r-lbl">最大理论亏损</span>
+              <span class="r-val text-neg" id="m-max-loss">--</span>
+            </div>
+            <div class="risk-item">
+              <span class="r-lbl">损益平衡点 (Break-even)</span>
+              <span class="r-val text-highlight" id="m-break-even">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 【下沉深度分析区】机构战略意图、行为画像与微观研判要点 -->
+        <div class="modal-deep-analysis-section">
+          <div class="deep-section-divider">
+            <span>🧠 深度量化研判与微观画像 (Deep Institutional Inference)</span>
+          </div>
+
+          <div class="intent-banner" id="m-intent-banner">
+            <div class="intent-header-row">
+              <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
+              <div class="strategy-name-badge" id="m-strategy-name">策略结构</div>
+            </div>
+            <p class="intent-narrative-text" id="m-intent-narrative">分析生成中...</p>
+          </div>
+
+          <!-- 🧭 交易性质与微观行为画像 (Action & 0DTE Profiling) -->
+          <div class="action-timing-box" id="m-action-timing-box">
+            <div class="action-timing-header">
+              <span class="at-section-title">🧭 交易性质与微观行为画像 (Action &amp; 0DTE Profiling)</span>
+              <div class="at-badges-wrap">
+                <span class="intent-badge-pill" id="m-action-badge">全新建仓</span>
+                <span class="intent-badge-pill" id="m-timing-badge">常规期权</span>
+              </div>
+            </div>
+            <div class="at-content-grid">
+              <div class="at-card">
+                <div class="at-label">开平仓性质研判 (Action Intent)</div>
+                <div class="at-val" id="m-action-name">--</div>
+                <div class="at-sub" id="m-action-rationale">--</div>
+              </div>
+              <div class="at-card">
+                <div class="at-label">交割剩余时间与末日行为 (0DTE Dynamics)</div>
+                <div class="at-val" id="m-timing-name">--</div>
+                <div class="at-sub" id="m-timing-rationale">--</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pointers-box" id="m-pointers-box">
+            <div class="pointers-title">📐 机构微观结构研判要点 (Key Insights)</div>
+            <ul class="pointers-list" id="m-pointers-list">
+              <li>分析中...</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
