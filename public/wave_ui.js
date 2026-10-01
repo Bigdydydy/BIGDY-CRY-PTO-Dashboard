@@ -45,7 +45,7 @@
     IMPULSE: { name: '推动浪 12345', labels: ['0', '1', '2', '3', '4', '5'], marks: ['⓪', '①', '②', '③', '④', '⑤'], minor: ['', 'i', 'ii', 'iii', 'iv', 'v'] },
     ABC: { name: '调整浪 abc', labels: ['0', 'a', 'b', 'c'], marks: ['⓪', 'Ⓐ', 'Ⓑ', 'Ⓒ'], minor: ['', '(a)', '(b)', '(c)'] },
     WXY: { name: '调整浪 wxy', labels: ['0', 'w', 'x', 'y'], marks: ['⓪', 'Ⓦ', 'Ⓧ', 'Ⓨ'], minor: ['', '(w)', '(x)', '(y)'] },
-    WXYXZ: { name: '调整浪 wxyxz', labels: ['0', 'w', 'x', 'y', 'x', 'z'], marks: ['⓪', 'Ⓦ', 'Ⓧ', 'Ⓨ', 'Ⓧ', 'Ⓩ'], minor: ['', '(w)', '(x)', '(y)', '(x)', '(z)'] },
+    WXYXZ: { name: '调整浪 w-x-y-xx-z', labels: ['0', 'w', 'x', 'y', 'xx', 'z'], marks: ['⓪', 'Ⓦ', 'Ⓧ', 'Ⓨ', 'ⓍⓍ', 'Ⓩ'], minor: ['', '(w)', '(x)', '(y)', '(xx)', '(z)'] },
     ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], marks: ['⓪', 'Ⓐ', 'Ⓑ', 'Ⓒ', 'Ⓓ', 'Ⓔ'], minor: ['', '(a)', '(b)', '(c)', '(d)', '(e)'] }
   };
   const VERDICT_STYLE = {
@@ -588,7 +588,7 @@ self.onmessage = function (e) {
     if (!drawTool || drawPoints.length < 3) return;
     const tool = DRAW_TOOLS[drawTool];
     const d = {
-      id: `d${++sketchSeq}`, tool: drawTool, timeframe: currentTf,
+      id: `d${++sketchSeq}`, tool: drawTool, timeframe: currentTf, type: null, // type: 用户指定的浪型 (null = 自动)
       points: drawPoints.map(p => ({ time: p.time, price: p.price, type: p.type }))
     };
     sketch.push(d);
@@ -661,7 +661,7 @@ self.onmessage = function (e) {
     }
     if (!sketch.length) return;
     const token = ++evalToken;
-    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, points: d.points.map(p => ({ time: p.time, price: p.price })) }));
+    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, type: d.type || null, points: d.points.map(p => ({ time: p.time, price: p.price })) }));
     setWaveStatus(`⏳ 正在整体评估 ${drawings.length} 个浪：每个浪的铁律 / 低周期子浪 / 走势检验，以及母子级别一致性…`);
     const badge = document.getElementById('wave-user-eval-badge');
     if (badge) { badge.className = 'card-badge badge-neutral'; badge.textContent = '评估中…'; }
@@ -882,7 +882,7 @@ self.onmessage = function (e) {
           const st = nd ? (VERDICT_STYLE[nd.verdict] || VERDICT_STYLE.DOUBT) : null;
           const rel = it.parentId ? `${esc(it.legName || '')}子浪` : '母浪';
           return `<div class="wave-sketch-row${selectedId === d.id ? ' selected' : ''}${nd ? ' clickable' : ''}" data-id="${esc(d.id)}" style="padding-left:${8 + 16 * (it.depth || 0)}px">
-            <span class="wave-sketch-name">${it.depth ? '└ ' : ''}${esc(nd ? nd.name : DRAW_TOOLS[d.tool].name)}</span>
+            <span class="wave-sketch-name">${it.depth ? '└ ' : ''}${esc(nd ? nd.name : DRAW_TOOLS[d.tool].name)}${d.type ? '（指定）' : ''}</span>
             <span class="wave-sketch-meta">${esc(d.timeframe.toUpperCase())} · ${rel}</span>
             ${st ? `<span class="liu-chip ${st.chip}">${esc(nd.verdictLabel)}</span>` : ''}
             <button class="wave-sketch-del" data-del="${esc(d.id)}" title="删除这个浪">×</button>
@@ -900,7 +900,7 @@ self.onmessage = function (e) {
       if (badge) { badge.className = 'card-badge badge-neutral'; badge.textContent = sketch.length ? '待评估' : '待画浪'; }
       body.innerHTML = sketch.length
         ? '<p class="liu-idle">画完母浪与需要的子浪后，点「评估全部」（或按 Enter）。画在某个浪一段之内的浪自动作为那一段的子浪；可切换到 1H / 15m 画更细的子浪。</p>'
-        : `<p class="liu-idle">选择上方画浪工具（推动浪 12345 / abc / wxy / wxyxz / 三角形 abcde），在图上依次点击各浪端点。<br>
+        : `<p class="liu-idle">选择上方画浪工具（推动浪 12345 / abc / wxy / w-x-y-xx-z / 三角形 abcde），在图上依次点击各浪端点。同一种画法可对应多种浪型（abc 可以是单锯齿或平台形），评估后可在详情里指定。<br>
            先画母浪（例如 4H 上的 12345），再在它的某一段之内画子浪（例如浪2 画 abc、浪4 画三角形，可切到 1H 画），最后「评估全部」。<br>
            引擎逐个检验手稿铁律、低周期子浪与画完后的走势，并检查子浪与母浪该段是否相符（类别、方向、位置、交替原则）。</p>`;
       return;
@@ -936,6 +936,18 @@ self.onmessage = function (e) {
         <div class="liu-signal-title"><span>柳氏研判 · ${esc(r.primary.name)}（${esc(nd.timeframe.toUpperCase())}）</span><span class="liu-chip ${st.chip}">${esc(nd.verdictLabel)}</span></div>
         ${lines.map(l => `<div class="ue-line">${esc(l)}</div>`).join('')}
       </div>`;
+
+    // 判定浪型: 同一画法可对应多种浪型 (abc=单锯齿/平台形，wxy=双锯齿/联合形…)，自动择优或由用户指定
+    const opts = r.toolTypes || [];
+    const typeHtml = opts.length > 1 ? `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>判定浪型</span><span>${r.forcedType ? '已指定' : '自动择优'}</span></div>
+        <div class="wave-type-switch">
+          <button class="chart-tool-btn${!r.forcedType ? ' active' : ''}" data-force="" data-node="${esc(nd.id)}" title="在各浪型中按铁律、子浪结构、指引符合度自动选择">自动</button>
+          ${opts.map(o => `<button class="chart-tool-btn${r.forcedType === o.type ? ' active' : ''}" data-force="${esc(o.type)}" data-node="${esc(nd.id)}" title="只按「${esc(o.name)}」评估">${esc(o.name)}</button>`).join('')}
+        </div>
+        ${!r.forcedType && r.primary ? `<div class="ue-note">自动选择了「${esc(r.primary.name)}」。若你画的是另一种，点上面的按钮指定后会重新整体评估。</div>` : ''}
+      </div>` : '';
 
     const legRows = (r.primary.legs || []).map(L => {
       const s = LEG_STATUS[L.status] || LEG_STATUS.UNKNOWN;
@@ -984,7 +996,7 @@ self.onmessage = function (e) {
         ${other.map(t => `<div class="ue-line">${t}</div>`).join('')}
       </div>` : '';
 
-    return verdictHtml + subHtml + lvHtml + rulesHtml + otherHtml;
+    return verdictHtml + typeHtml + subHtml + lvHtml + rulesHtml + otherHtml;
   }
 
   // ---------------------------------------------------------------------------
@@ -1055,6 +1067,22 @@ self.onmessage = function (e) {
           renderChart();
           renderPanel();
         }
+      });
+    }
+
+    // 指定 / 取消指定某个浪的浪型 (例如 abc 按单锯齿或平台形)，然后重新整体评估
+    const evalBody = document.getElementById('wave-user-eval-body');
+    if (evalBody) {
+      evalBody.addEventListener('click', e => {
+        const btn = e.target.closest('[data-force]');
+        if (!btn) return;
+        const d = sketch.find(x => x.id === btn.dataset.node);
+        if (!d) return;
+        const next = btn.dataset.force || null;
+        if ((d.type || null) === next) return;
+        d.type = next;
+        const keep = d.id;
+        evaluateAll().then(() => { if (nodeOf(keep)) { selectedId = keep; renderChart(); renderPanel(); } });
       });
     }
 

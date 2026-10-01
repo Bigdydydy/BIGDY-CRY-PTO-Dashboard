@@ -886,7 +886,8 @@ async function handleApiRequest(req, res, parsedUrl) {
         timeframe: interval,
         subBars,
         htfBars,
-        compare: payload.compare !== false
+        compare: payload.compare !== false,
+        forceType: payload.type || null
       });
       sendJsonResponse(req, res, 200, { code: 0, ...result });
     } catch (err) {
