@@ -73,7 +73,7 @@ describe('Module 8 v3: 调整浪子形态识别与交替原则', () => {
     const alt = _internal.alternationFor(g, ev);
     assert.strictEqual(alt.pass, null);
     assert.strictEqual(alt.expectWave4.form, 'sideways');
-    assert.deepStrictEqual(alt.expectWave4.types, ['FLAT', 'TRIANGLE', 'COMBINATION']);
+    assert.deepStrictEqual(alt.expectWave4.types, ['FLAT', 'TRIANGLE', 'EXPANDING_TRIANGLE', 'COMBINATION']);
   });
 
   it('浪4运行中: 列出仍成立的浪4形态（柳玉冬「平台形可以否定，剩余联合形、三角形」式排除）', () => {

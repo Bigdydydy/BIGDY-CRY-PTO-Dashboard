@@ -528,6 +528,29 @@
       g => { const r1 = g.l[4] / g.l[3], r2 = g.l[4] / g.l[2]; return { pass: near(r1, [0.7], 0.25) || near(r2, [0.618], 0.25) || r1 < 0.9, detail: `e/d=${r1.toFixed(2)} e/c=${r2.toFixed(2)}` }; })
   ];
 
+  // 扩张三角形 (手稿第6章只讲收缩三角形；补主流 EWI 条则，标「通用」)：边界线 a-c 与 b-d 发散，
+  // 即 c 终点越过 a 终点、d 终点越过 b 终点；各段为三浪；位置与收缩三角形相同 (浪4、b浪、x浪、联合形末段)
+  const EXPANDING_TRIANGLE_RULES = [
+    rg('T0', C_STRUCT, false, null, 2, '通用（EWI扩张三角形3-3-3-3-3）', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
+    rg('E1', C_PRICE, true, 'min', 4, '通用（EWI扩张三角形）', '扩张三角形：c浪须大于b浪（c终点越过a终点，a-c线发散）', 1,
+      g => ({ pass: g.l[2] > g.l[1] + EPS, detail: `c/b=${(g.l[2] / g.l[1]).toFixed(2)}` })),
+    rg('E2', C_PRICE, true, 'min', 5, '通用（EWI扩张三角形）', '扩张三角形：d浪须大于c浪（d终点越过b终点，b-d线发散）', 1,
+      g => ({ pass: g.l[3] > g.l[2] + EPS, detail: `d/c=${(g.l[3] / g.l[2]).toFixed(2)}` })),
+    rg('E3', C_PRICE, true, 'min', 6, '通用（EWI扩张三角形）', '扩张三角形：e浪不小于d浪的50%', 1,
+      g => ({ pass: g.l[4] >= 0.5 * g.l[3] - EPS, detail: `e/d=${fmtPct(g.l[4] / g.l[3])}` })),
+    rg('EG1', C_G_RATIO, false, null, 3, '通用（EWI扩张三角形）', '扩张三角形b浪常大于a浪（各浪依次放大）', 1,
+      g => ({ pass: g.l[1] > g.l[0] - EPS, detail: `b/a=${(g.l[1] / g.l[0]).toFixed(2)}` })),
+    rg('EG2', C_G_RATIO, false, 'min', 6, '通用（EWI扩张三角形）', 'e浪常越过a-c线（e>d）', 1,
+      g => ({ pass: g.l[4] > g.l[3] - EPS, detail: `e/d=${(g.l[4] / g.l[3]).toFixed(2)}` })),
+    rg('EG3', C_G_RATIO, false, null, 5, '通用', '相邻各浪放大倍数常在1~1.618之间（远超则更像推动浪）', 1,
+      g => {
+        const rs = [];
+        for (let k = 1; k < g.l.length; k++) rs.push(g.l[k] / g.l[k - 1]);
+        return { pass: rs.slice(1).every(r => r <= 1.9), detail: rs.map(r => r.toFixed(2)).join(' / ') };
+      })
+  ];
+
   const DOUBLE_ZIGZAG_RULES = [
     rg('W0', C_STRUCT, false, null, 2, 'P362', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
       { struct: true, legs: [0], expect: ['3'] }),
@@ -602,7 +625,7 @@
       (g, ev) => {
         const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
         if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
-        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && /TRIANGLE/.test(c.class.best.type));
         return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
       }, { deferred: true }),
     rg('CG1', C_G_RATIO, false, 'min', 4, 'P131', 'y浪常见为w浪的1倍（扩展取点0-w-x）', 1,
@@ -634,7 +657,7 @@
       (g, ev) => {
         const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
         if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
-        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && /TRIANGLE/.test(c.class.best.type));
         return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
       }, { deferred: true }),
     rg('CG3', C_G_RATIO, false, 'min', 6, 'P132', 'z浪常见为y浪的1倍（扩展取点x-y-xx）', 1,
@@ -680,6 +703,7 @@
     ZIGZAG: { pts: 4, minDev: 3, name: '单锯齿调整浪', category: '调整浪', rules: ZIGZAG_RULES, labels: ['0', 'a', 'b', 'c'] },
     FLAT: { pts: 4, minDev: 3, name: '平台形调整浪', category: '调整浪', rules: FLAT_RULES, labels: ['0', 'a', 'b', 'c'] },
     TRIANGLE: { pts: 6, minDev: 4, name: '收缩三角形', category: '调整浪', rules: TRIANGLE_RULES, labels: ['0', 'a', 'b', 'c', 'd', 'e'] },
+    EXPANDING_TRIANGLE: { pts: 6, minDev: 4, name: '扩张三角形', category: '调整浪', rules: EXPANDING_TRIANGLE_RULES, labels: ['0', 'a', 'b', 'c', 'd', 'e'] },
     DOUBLE_ZIGZAG: { pts: 4, minDev: 4, name: '双锯齿调整浪', category: '联合调整', rules: DOUBLE_ZIGZAG_RULES, labels: ['0', 'w', 'x', 'y'] },
     TRIPLE_ZIGZAG: { pts: 6, minDev: 5, name: '三锯齿调整浪', category: '联合调整', rules: TRIPLE_ZIGZAG_RULES, labels: ['0', 'w', 'x', 'y', 'xx', 'z'] },
     COMBINATION: { pts: 4, minDev: 3, name: '双重横向整理', category: '联合调整', rules: COMBINATION_RULES, labels: ['0', 'w', 'x', 'y'] },
@@ -914,10 +938,10 @@
   //     多个子级别阈值并行尝试，保留每种浪型的最佳匹配。数据不足如实返回空，不编造。
   // ---------------------------------------------------------------------------
 
-  const CORRECTIVE_TYPES = ['ZIGZAG', 'FLAT', 'TRIANGLE', 'DOUBLE_ZIGZAG', 'COMBINATION', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'];
+  const CORRECTIVE_TYPES = ['ZIGZAG', 'FLAT', 'TRIANGLE', 'EXPANDING_TRIANGLE', 'DOUBLE_ZIGZAG', 'COMBINATION', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'];
   // 陡峭(sharp)=锯齿族；横向(sideways)=平台/三角/联合。简单=单一形态；复杂=双重/三重
-  const CORR_FORM = { ZIGZAG: 'sharp', DOUBLE_ZIGZAG: 'sharp', TRIPLE_ZIGZAG: 'sharp', FLAT: 'sideways', TRIANGLE: 'sideways', COMBINATION: 'sideways', TRIPLE_COMBINATION: 'sideways' };
-  const CORR_COMPLEXITY = { ZIGZAG: 'simple', FLAT: 'simple', TRIANGLE: 'simple', DOUBLE_ZIGZAG: 'complex', TRIPLE_ZIGZAG: 'complex', COMBINATION: 'complex', TRIPLE_COMBINATION: 'complex' };
+  const CORR_FORM = { ZIGZAG: 'sharp', DOUBLE_ZIGZAG: 'sharp', TRIPLE_ZIGZAG: 'sharp', FLAT: 'sideways', TRIANGLE: 'sideways', EXPANDING_TRIANGLE: 'sideways', COMBINATION: 'sideways', TRIPLE_COMBINATION: 'sideways' };
+  const CORR_COMPLEXITY = { ZIGZAG: 'simple', FLAT: 'simple', TRIANGLE: 'simple', EXPANDING_TRIANGLE: 'simple', DOUBLE_ZIGZAG: 'complex', TRIPLE_ZIGZAG: 'complex', COMBINATION: 'complex', TRIPLE_COMBINATION: 'complex' };
   const FORM_TXT = { sharp: '陡', sideways: '横' };
   const CPLX_TXT = { simple: '简单', complex: '复杂' };
 
@@ -1083,7 +1107,7 @@
     if (n === 4) {
       // 浪3运行中: 由浪2形态预判浪4
       out.expectWave4 = f2 === 'sharp'
-        ? { form: 'sideways', types: ['FLAT', 'TRIANGLE', 'COMBINATION'], text: '浪2为陡峭锯齿 → 浪4预期横向：平台形 / 收缩三角形 / 联合形，回撤偏浅(0.236~0.382)、用时偏长' }
+        ? { form: 'sideways', types: ['FLAT', 'TRIANGLE', 'EXPANDING_TRIANGLE', 'COMBINATION'], text: '浪2为陡峭锯齿 → 浪4预期横向：平台形 / 三角形 / 联合形，回撤偏浅(0.236~0.382)、用时偏长' }
         : f2 === 'sideways'
           ? { form: 'sharp', types: ['ZIGZAG', 'DOUBLE_ZIGZAG'], text: '浪2为横向调整 → 浪4预期陡峭：单锯齿 / 双锯齿，回撤可较深、用时偏短' }
           : { form: null, types: [], text: r2 >= 0.5 ? '浪2回撤较深(≥0.5) → 浪4倾向浅而横' : '浪2回撤较浅 → 浪4倾向深而陡' };
@@ -1371,6 +1395,28 @@
         monitoringPivot = lvl(p[5].price, 'e浪终点·三角形防线', 'e浪仍在延长，“三角形已完成”需重估（手稿P352: 下一浪须从e浪终点起步）');
         secondaryPivot = lvl(bdNow, 'b-d趋势线·突破确认', '突破三角形，确认突破浪展开（手稿P349-350）；反扑回到区间内即判误');
       }
+    } else if (type === 'EXPANDING_TRIANGLE') {
+      if (n === 3) {
+        [1, 1.272].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `b浪≈${r}×a浪（扩张）`, r)));
+        monitoringPivot = lvl(p[1].price, 'a浪终点·c浪须越过此位', 'b浪继续延长不影响计数；c浪须越过a浪终点');
+      } else if (n === 4) {
+        targets.push(tgt(p[1].price, 'c浪最低要求: 越过a浪终点（扩张）', null));
+        [1.272, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[1], `c浪≈${r}×b浪`, r)));
+        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪防线', '回到b浪终点之外则b浪尚未结束');
+        secondaryPivot = lvl(p[1].price, 'a浪终点·发散要求', 'c浪越过a浪终点，a-c线发散');
+      } else if (n === 5) {
+        targets.push(tgt(p[2].price, 'd浪最低要求: 越过b浪终点（扩张）', null));
+        [1.272, 1.618].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `d浪≈${r}×c浪`, r)));
+        monitoringPivot = lvl(p[3].price, 'c浪终点·d浪防线', '越过c浪终点则c浪尚未结束');
+        secondaryPivot = lvl(p[2].price, 'b浪终点·发散要求', 'd浪越过b浪终点，b-d线发散');
+      } else if (status !== 'COMPLETED') {
+        targets.push(tgt(p[4].price + d * 0.5 * l[3], 'e浪最低要求: 0.5×d浪', 0.5));
+        [1, 1.272].forEach(r => targets.push(tgt(p[4].price + d * r * l[3], `e浪≈${r}×d浪（越过a-c线）`, r)));
+        monitoringPivot = lvl(p[4].price, 'd浪终点·e浪防线', '越过d浪终点则d浪尚未结束');
+      } else {
+        monitoringPivot = lvl(p[5].price, 'e浪终点·扩张三角形防线', 'e浪仍在延长，扩张三角形已完成的判断需重估');
+        secondaryPivot = lvl(p[4].price, 'd浪终点·反向确认线', '越过d浪终点，确认扩张三角形结束、下一浪展开');
+      }
     } else if (type === 'COMBINATION' || type === 'TRIPLE_COMBINATION') {
       // 三重形态只画到 y 浪 (n<5) 时，与双重形态的 w-x-y 取点相同
       const triple = type === 'TRIPLE_COMBINATION' && n >= 5;
@@ -1472,6 +1518,14 @@
         return { type: 'PARALLEL', baseLine: { pA: pt(p[2]), pB: pt(p[4]) }, parallelLine: { p: pt(p[3]) }, note: '推动浪辅助通道: 2-4 基线过浪3平行轨（仅供视觉参考，非波浪判定标准）' };
       }
       return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '早期辅助通道: 0-2 基线过浪1平行轨（仅供视觉参考，非波浪判定标准）' };
+    }
+    if (type === 'EXPANDING_TRIANGLE' && n >= 5) {
+      return {
+        type: 'CONVERGING',
+        upperLine: { pA: pt(p[1]), pB: pt(p[3]) },
+        lowerLine: { pA: pt(p[2]), pB: pt(p[4]) },
+        note: '扩张三角形边界发散线: a-c 与 b-d（仅供视觉参考，非波浪判定标准）'
+      };
     }
     if (type === 'TRIANGLE' && n >= 5) {
       return {
@@ -1598,6 +1652,7 @@
       ZIGZAG: { 3: 'b浪运行中', 4: status === 'COMPLETED' ? '锯齿完成' : 'c浪运行中' },
       FLAT: { 3: 'b浪运行中', 4: status === 'COMPLETED' ? '平台形完成' : 'c浪运行中' },
       TRIANGLE: { 3: 'b浪收敛中', 4: 'c浪收敛中', 5: 'd浪收敛中', 6: status === 'COMPLETED' ? '三角形完成·等待突破' : 'e浪收敛中' },
+      EXPANDING_TRIANGLE: { 3: 'b浪扩张中', 4: 'c浪扩张中', 5: 'd浪扩张中', 6: status === 'COMPLETED' ? '扩张三角形完成' : 'e浪扩张中' },
       DOUBLE_ZIGZAG: { 3: 'x浪运行中', 4: status === 'COMPLETED' ? '双锯齿完成' : 'y浪运行中' },
       TRIPLE_ZIGZAG: { 3: 'x浪运行中', 4: 'y浪运行中', 5: 'xx浪运行中', 6: status === 'COMPLETED' ? '三锯齿完成' : 'z浪运行中' },
       COMBINATION: { 3: 'x浪运行中', 4: status === 'COMPLETED' ? '双重横向整理完成' : 'y浪运行中' },
@@ -1695,7 +1750,7 @@
     } else if (h.type === 'ZIGZAG' || h.type === 'FLAT') {
       metrics.retrace_B = +(g.l[1] / g.l[0]).toFixed(3);
       if (n >= 4) metrics.ratio_C_A = +(g.l[2] / g.l[0]).toFixed(3);
-    } else if (h.type === 'TRIANGLE') {
+    } else if (h.type === 'TRIANGLE' || h.type === 'EXPANDING_TRIANGLE') {
       metrics.ratio_B_A = +(g.l[1] / g.l[0]).toFixed(3);
       if (n >= 4) metrics.ratio_C_B = +(g.l[2] / g.l[1]).toFixed(3);
       if (n >= 5) metrics.ratio_D_C = +(g.l[3] / g.l[2]).toFixed(3);
@@ -1728,7 +1783,7 @@
         [0.618, 0.786].forEach(r => levels.targets.unshift(tgt(g.p[n - 1].price - g.d * r * total, `引导楔形后浪2常深回撤×${r}（EWI）`, r)));
       }
     }
-    if (ev && ev.bars && h.status === 'COMPLETED' && h.type !== 'TRIANGLE') {
+    if (ev && ev.bars && h.status === 'COMPLETED' && !/TRIANGLE/.test(h.type)) {
       // 柳玉冬「必须跌破4944才能确认橙线结束」: 结束确认看最后一浪内部最后一个小级别回撤点，
       // 主级别结构位 (浪4 / b浪终点) 保留为更大级别确认
       const st = legStructure(g, n - 2, ev);
@@ -2984,7 +3039,7 @@
     ABC: { name: '调整浪 abc', labels: ['0', 'a', 'b', 'c'], types: ['ZIGZAG', 'FLAT'] },
     WXY: { name: '调整浪 wxy', labels: ['0', 'w', 'x', 'y'], types: ['DOUBLE_ZIGZAG', 'COMBINATION'] },
     WXYXZ: { name: '调整浪 wxyxz', labels: ['0', 'w', 'x', 'y', 'xx', 'z'], types: ['TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'] },
-    ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], types: ['TRIANGLE'] }
+    ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], types: ['TRIANGLE', 'EXPANDING_TRIANGLE'] }
   };
 
   // 各浪型逐段内部结构要求 ('5'=驱动五浪, '3'=调整三浪) 及手稿依据
@@ -2995,6 +3050,7 @@
     ZIGZAG: { legs: ['5', '3', '5'], page: 'P216（5-3-5）' },
     FLAT: { legs: ['3', '3', '5'], page: 'P236（3-3-5）' },
     TRIANGLE: { legs: ['3', '3', '3', '3', '3'], page: 'P272-276（3-3-3-3-3）' },
+    EXPANDING_TRIANGLE: { legs: ['3', '3', '3', '3', '3'], page: '通用（EWI扩张三角形3-3-3-3-3）' },
     DOUBLE_ZIGZAG: { legs: ['3', '3', '3'], page: 'P362（w、y为锯齿）' },
     COMBINATION: { legs: ['3', '3', '3'], page: 'P50/P158' },
     TRIPLE_ZIGZAG: { legs: ['3', '3', '3', '3', '3'], page: 'P362/P385' },

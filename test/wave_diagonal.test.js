@@ -150,6 +150,27 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.ok(!res4.hardFails.some(c => c.id === 'D1'));
   });
 
+  it('扩张三角形: 各段依次放大、边界发散 → 收缩三角形否决，扩张三角形成立', () => {
+    // 0=120 a→112 b→124 c→106 d→130 e→100；a=8 b=12 c=18 d=24 e=30，各段为三浪
+    const legs = [[116, 118, 112], [119, 116, 124], [116, 120, 106], [117, 113, 130], [118, 123, 100]];
+    const prefix = staircase(60, 120, 12, false);
+    const { v, ends } = path(prefix, legs, [110, 106, 118]);
+    const r = evaluate(v, ends, 'ABCDE');
+    assert.strictEqual(r.primary.type, 'EXPANDING_TRIANGLE', r.primary.name);
+    assert.strictEqual(r.primary.hardFails.length, 0, JSON.stringify(r.primary.hardFails));
+    assert.match(r.primary.name, /扩张三角形/);
+    const tri = r.interpretations.find(i => i.type === 'TRIANGLE');
+    assert.ok(tri.hardFails > 0, '收缩三角形应被铁律否决 (c<b、d≤c 等)');
+  });
+
+  it('扩张三角形规则: c须大于b (E1)、d须大于c (E2)', () => {
+    const mk = arr => arr.map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'low' : 'high' }));
+    const ok = E.evaluatePattern('EXPANDING_TRIANGLE', mk([120, 112, 124, 106, 130, 100]), null);
+    assert.ok(!ok.hardFails.length, JSON.stringify(ok.hardFails.map(c => c.id)));
+    const contracting = E.evaluatePattern('EXPANDING_TRIANGLE', mk([120, 100, 116, 104, 112, 107]), null);
+    assert.ok(contracting.hardFails.some(c => c.id === 'E1'));
+  });
+
   it('楔形规则: 收缩楔形浪4须小于浪2 (D3)、浪5须小于浪3 (D5)', () => {
     const mk = arr => arr.map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' }));
     // 3<1 (收缩)，但 4(16) > 2(12)
