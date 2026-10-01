@@ -258,8 +258,6 @@
       g => ({ pass: g.t[1] <= 9 * g.t[0], detail: `浪2用时 ${g.t[1]} vs 浪1×9=${9 * g.t[0]}` })),
     rg('M8', C_TIME, true, null, 5, 'P43', '浪4时间超过浪3的2倍则否决原数浪', 1,
       g => ({ pass: g.t[3] <= 2 * g.t[2], detail: `浪4用时 ${g.t[3]} vs 浪3×2=${2 * g.t[2]}` })),
-    rg('M9', C_STRUCT, false, null, 2, 'P9-16', '出身检验：浪1内部应为五浪（驱动浪或引导楔形）', 2, null,
-      { struct: true, legs: [0], expect: ['5'] }),
     rg('G1', C_G_RATIO, false, null, 3, 'P34/P94', '浪2常见回撤为浪1的0.382~0.618倍', 1,
       g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.3 && r <= 0.7, detail: `回撤 ${fmtPct(r)}` }; }),
     rg('G2', C_G_RATIO, false, null, 3, 'P34', '浪2回撤超过浪1的80%则存疑', 1,
@@ -324,6 +322,22 @@
         }
         return { pass: worst <= EPS, detail: worst > EPS ? `浪4子浪切入浪1区 ${fmtNum(worst)}` : `浪4终点 ${fmtNum(g.p[4].price)} vs 浪1终点 ${fmtNum(g.p[1].price)}` };
       }, { slow: true }),
+    // 出身检验 (5-3-5-3-5): 浪1可为推动浪或引导楔形，浪3只能是推动浪，浪5可为推动浪或终结楔形
+    rg('M9', C_STRUCT, false, null, 2, 'P9-16', '出身检验：浪1内部应为五浪（推动浪或引导楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 0, '引导楔形')),
+    rg('M10', C_STRUCT, false, 'min', 4, 'P9-16 + 通用（EWI：楔形只出现在浪1/浪5/a浪/c浪）', '浪3内部应为五浪推动（不能是楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 2, null), { deferred: true }),
+    rg('M11', C_STRUCT, false, 'min', 6, 'P9-16 + 通用（EWI终结楔形）', '浪5内部应为五浪（推动浪或终结楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 4, '终结楔形'), { deferred: true }),
+    rg('M12', C_STRUCT, false, 'min', 6, 'P204 + 通用（EWI失败第五浪）', '失败第五浪（未越过浪3终点）内部仍须走满五浪，否则是浪4未完', 2,
+      (g, ev) => {
+        if (!truncatedFifth(g)) return { pass: true, neutral: true, detail: '浪5已越过浪3终点，非失败第五浪' };
+        return motiveLegCheck(g, ev, 4, '终结楔形');
+      }, { deferred: true }),
+    rg('G9', C_G_RATIO, false, null, 6, '通用（EWI失败第五浪）', '失败第五浪通常出现在特别强劲的浪3之后（浪3≥1.618×浪1）', 0.5,
+      g => truncatedFifth(g) && !g.p[5].open
+        ? { pass: g.l[2] >= 1.618 * g.l[0] - EPS, detail: `失败第五浪，浪3=浪1×${(g.l[2] / g.l[0]).toFixed(2)}` }
+        : { pass: true, neutral: true, detail: '浪5已越过浪3终点，非失败第五浪' }),
     rg('I2', C_G_PAT, false, null, 5, 'P85/P88 + 柳玉冬实战（赣锋2026-04-10「2浪是单锯齿，4浪是三角形」）', '交替原则：浪2与浪4宜一陡一横或一简一繁', 1,
       (g, ev) => {
         const alt = alternationFor(g, ev);
@@ -345,19 +359,26 @@
         const scale = g.l[0] / Math.max(1, g.p[3].idx - g.p[0].idx);
         return { pass: Math.abs(sA - sB) > 0.1 * scale, detail: `上轨斜率 ${sA.toFixed(4)} vs 下轨 ${sB.toFixed(4)}` };
       }),
-    rg('D3', C_G_RATIO, false, null, 6, '通用（EWI楔形条则）', '收缩楔形：浪3<浪1、浪4<浪2、浪5<浪3；扩散楔形反向且须一致', 1.5,
+    // 收缩/扩散由浪3与浪1之比决定，其后各浪须同向一致 (EWI 列为楔形定义)
+    rg('D3', C_PRICE, true, 'min', 5, '通用（EWI楔形条则）', '收缩楔形浪4<浪2、扩散楔形浪4>浪2（与浪3/浪1同向一致）', 1,
       g => {
         const contracting = g.l[2] < g.l[0];
-        const ok = contracting
-          ? (g.l[3] < g.l[1] + EPS && g.l[4] < g.l[2] + EPS)
-          : (g.l[3] > g.l[1] - EPS && g.l[4] > g.l[2] - EPS);
-        return { pass: ok, detail: `${contracting ? '收缩' : '扩散'}一致性 4/2=${(g.l[3] / g.l[1]).toFixed(2)} 5/3=${(g.l[4] / g.l[2]).toFixed(2)}` };
-      })
+        return { pass: contracting ? g.l[3] < g.l[1] + EPS : g.l[3] > g.l[1] - EPS, detail: `${contracting ? '收缩' : '扩散'} 3/1=${(g.l[2] / g.l[0]).toFixed(2)} 4/2=${(g.l[3] / g.l[1]).toFixed(2)}` };
+      }),
+    rg('D5', C_PRICE, true, 'min', 6, '通用（EWI楔形条则）', '收缩楔形浪5<浪3、扩散楔形浪5>浪3', 1,
+      g => {
+        const contracting = g.l[2] < g.l[0];
+        return { pass: contracting ? g.l[4] < g.l[2] + EPS : g.l[4] > g.l[2] - EPS, detail: `${contracting ? '收缩' : '扩散'} 5/3=${(g.l[4] / g.l[2]).toFixed(2)}` };
+      }),
+    rg('D4', C_STRUCT, false, 'min', 4, '通用（EWI：引导楔形5-3-5-3-5或3-3-3-3-3；终结楔形3-3-3-3-3）', '楔形浪1/3/5结构须一致，且与所处位置相符', 2,
+      (g, ev) => diagonalStructCheck(g, ev), { deferred: true })
   ];
 
   const ZIGZAG_RULES = [
-    rg('Z0', C_STRUCT, false, null, 2, 'P216', '出身检验：浪a内部应为五浪（驱动浪或引导楔形）', 2, null,
-      { struct: true, legs: [0], expect: ['5'] }),
+    rg('Z0', C_STRUCT, false, null, 2, 'P216', '出身检验：浪a内部应为五浪（推动浪或引导楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 0, '引导楔形')),
+    rg('Z7', C_STRUCT, false, 'min', 4, 'P216 + 通用（EWI终结楔形）', 'c浪内部应为五浪（推动浪或终结楔形）', 1.5,
+      (g, ev) => motiveLegCheck(g, ev, 2, '终结楔形'), { deferred: true }),
     rg('Z1', C_PRICE, true, 'min', 3, 'P213', 'b浪不小于a浪的20%', 1,
       g => ({ pass: g.l[1] >= 0.2 * g.l[0] - EPS, detail: `b/a=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('Z2', C_PRICE, true, null, 3, 'P213', 'b浪不能超过a浪起点', 1,
@@ -395,6 +416,8 @@
   const FLAT_RULES = [
     rg('F0', C_STRUCT, false, null, 2, 'P236/P251/P158', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
       { struct: true, legs: [0], expect: ['3'] }),
+    rg('F8', C_STRUCT, false, 'min', 4, 'P236 + 通用（EWI终结楔形）', 'c浪内部应为五浪（推动浪或终结楔形）', 1.5,
+      (g, ev) => motiveLegCheck(g, ev, 2, '终结楔形'), { deferred: true }),
     rg('F1', C_PRICE, true, 'min', 3, 'P234-235', 'b浪运行总量回撤不少于a浪运行总量的70%', 1,
       g => ({ pass: g.l[1] >= 0.7 * g.l[0] - EPS, detail: `b总量/a总量=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('F2', C_PRICE, true, null, 3, 'P235', 'b浪运行总量小于a浪运行总量的2倍', 1,
@@ -708,19 +731,22 @@
     const g = mkGeom(pts);
     const rules = kind === 'IMPULSE' ? MOTIVE_RULES.concat([IMPULSE_RULES[0]]) : MOTIVE_RULES.concat([DIAGONAL_RULES[0]]);
     for (const r of rules) {
-      if (r.struct || r.slow || (r.cat !== C_PRICE && r.cat !== C_TIME)) continue;
+      // 慢速规则 (如 I1 逐根扫描子浪) 在无K线时退化为端点检验，同样参与: 否则推动浪与楔形无从区分
+      if (r.struct || (r.cat !== C_PRICE && r.cat !== C_TIME)) continue;
       if (pts.length < r.need) continue;
       const res = r.test(g, null) || {};
       if (res.pass === false) {
         const open = !!pts[pts.length - 1].open;
-        if (!(open && r.pending === 'min')) return false;
+        if (!(open && r.pending === 'min' && r.need === pts.length)) return false;
       }
     }
     return true;
   }
 
   /** 在交替拐点序列 zp 上寻找覆盖全段的合规五浪计数 (允许跳点，严控防爆搜预算) */
-  function findMotiveCount(zp) {
+  function findMotiveCount(zp, kinds) {
+    kinds = kinds || ['IMPULSE', 'DIAGONAL'];
+    const ok = pts => kinds.some(k => motiveRulesOK(pts, k));
     const N = zp.length;
     if (N < 6) return false;
     let arr = zp;
@@ -742,14 +768,14 @@
       if (path.length === 5) {
         if (((last - cur) & 1) === 0) return false;
         const pts = path.concat([last]).map(i => arr[i]);
-        if (motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL')) { found = pts; return true; }
+        if (ok(pts)) { found = pts; return true; }
         return false;
       }
       for (let j = cur + 1; j < last; j++) {
         if (((j - cur) & 1) === 0) continue;
         path.push(j);
         const pts = path.map(i => arr[i]);
-        if (motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL')) {
+        if (ok(pts)) {
           if (rec(j)) return true;
         }
         path.pop();
@@ -788,10 +814,79 @@
       const thr = Math.max(range * m, 1.2 * sAtr);
       const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
       if (anchored.length - 1 < 3) continue;
-      const is5 = anchored.length >= 6 && findMotiveCount(anchored);
-      return { label: is5 ? '5' : '3', subPivots: anchored, source: srcName };
+      const five = findMotiveTyped(anchored);
+      return { label: five ? '5' : '3', motive: five ? five.kind : null, subPivots: anchored, source: srcName };
     }
     return { label: 'unknown', subPivots: [], source: srcName };
+  }
+
+  /** 五浪计数并区分推动浪 / 楔形 (推动浪优先): {points, kind:'IMPULSE'|'DIAGONAL'} 或 null */
+  function findMotiveTyped(zp) {
+    if (zp.length < 6) return null;
+    const imp = findMotiveCount(zp, ['IMPULSE']);
+    if (imp) return { points: imp, kind: 'IMPULSE' };
+    const dia = findMotiveCount(zp, ['DIAGONAL']);
+    return dia ? { points: dia, kind: 'DIAGONAL' } : null;
+  }
+
+  /**
+   * 驱动段出身检验: 内部须为五浪。diagName 为该位置允许的楔形 ('引导楔形' / '终结楔形')，
+   * null 表示该位置不允许楔形 (浪3)。
+   */
+  function motiveLegCheck(g, ev, li, diagName) {
+    if (!ev || !ev.bars) return { pass: true, neutral: true, detail: '无K线数据未验' };
+    if (li + 1 >= g.p.length) return { pass: true, neutral: true, detail: '该浪尚未出现' };
+    const st = legStructure(g, li, ev);
+    const nm = g.p.length <= 4 ? `${'abc'[li]}浪` : `浪${li + 1}`;
+    const src = st.source ? `（${st.source}）` : '';
+    if (st.label === 'unknown') return { pass: true, neutral: true, detail: `${nm}小级别数据不足，结构未验证` };
+    if (st.label !== '5') return { pass: false, detail: `${nm}：非五浪${src}` };
+    if (st.motive === 'DIAGONAL' && !diagName) return { pass: false, detail: `${nm}只能数成楔形${src}——浪3不能是楔形` };
+    return { pass: true, detail: `${nm}：${st.motive === 'DIAGONAL' ? diagName : '五浪推动'}${src}` };
+  }
+
+  /** 失败第五浪 (截断): 浪5未越过浪3终点 */
+  function truncatedFifth(g) {
+    return g.p.length >= 6 && g.d * (g.p[5].price - g.p[3].price) <= 0;
+  }
+
+  /**
+   * 楔形所处位置: 引导楔形只出现在浪1/a浪 (新趋势起点)，终结楔形只出现在浪5/c浪 (同向趋势末端)。
+   * 取楔形起点之前 1.5 倍楔形长度 (至少 20 根) 的窗口:
+   *   起点是窗口内的反向极值 (上升楔形起点为窗口最低) → 新趋势起点 → 'LEADING'
+   *   窗口内已有更远的反向极值且窗口起点在起点反侧 (同向趋势已运行一段) → 'ENDING'
+   *   其余 (横盘 / 数据不足) → null
+   */
+  function diagonalRole(g, ev) {
+    const bars = ev && (ev.ctxBars || ev.bars);
+    if (!bars || bars.length < 10) return null;
+    const p0 = g.p[0], pN = g.p[g.p.length - 1], d = g.d;
+    const idxOf = t => { let i = bars.findIndex(b => b.time >= t); return i < 0 ? bars.length - 1 : i; };
+    const i0 = idxOf(p0.time), iN = idxOf(pN.time);
+    const from = i0 - Math.max(20, Math.round(1.5 * (iN - i0)));
+    if (from < 0) return null;
+    let ext = d > 0 ? Infinity : -Infinity;
+    for (let i = from; i < i0; i++) ext = d > 0 ? Math.min(ext, bars[i].low) : Math.max(ext, bars[i].high);
+    if (d * (p0.price - ext) <= EPS) return 'LEADING';
+    if (d * (p0.price - bars[from].close) > 0) return 'ENDING';
+    return null;
+  }
+
+  /** 楔形浪1/3/5结构一致性 (全为五浪=5-3-5-3-5 引导楔形；全为三浪=3-3-3-3-3) 及与位置相符 */
+  function diagonalStructCheck(g, ev) {
+    if (!ev || !ev.bars) return { pass: true, neutral: true, detail: '无K线数据未验' };
+    const n = g.p.length, lastOpen = !!g.p[n - 1].open;
+    // 运行中的末浪内部尚未走完，不参与一致性比较
+    const legs = [0, 2, 4].filter(li => li + 1 < n && !(lastOpen && li + 1 === n - 1)).map(li => ({ li, st: legStructure(g, li, ev) }));
+    const known = legs.filter(x => x.st.label !== 'unknown');
+    const role = diagonalRole(g, ev);
+    const roleTxt = role === 'LEADING' ? '位置：新趋势起点（浪1/a浪）' : role === 'ENDING' ? '位置：同向趋势末端（浪5/c浪）' : '位置不明';
+    const desc = known.map(x => `浪${x.li + 1}:${x.st.label === '5' ? '五浪' : '三浪'}`).join(' ');
+    if (known.length < 2) return { pass: true, neutral: true, detail: `子浪结构不足未验；${roleTxt}` };
+    const fives = known.filter(x => x.st.label === '5').length;
+    if (fives && fives < known.length) return { pass: false, detail: `${desc}——浪1/3/5结构不一致；${roleTxt}` };
+    if (fives && role === 'ENDING') return { pass: false, detail: `${desc}——5-3-5-3-5只能是引导楔形，但${roleTxt}` };
+    return { pass: true, detail: `${desc}（${fives ? '5-3-5-3-5' : '3-3-3-3-3'}）；${roleTxt}` };
   }
 
   function evalStructRule(r, g, ev) {
@@ -807,7 +902,7 @@
       const ok = st.label === 'unknown' || st.label === expect;
       if (!ok) allPass = false;
       const legName = (g.p.length === 4) ? 'abc'[li] : (g.p.length === 6 ? '12345'[li] : `${li + 1}`);
-      parts.push(`浪${legName}:${st.label === '5' ? '五浪' : st.label === '3' ? '非五浪' : '级别不足'}${st.source ? `(${st.source})` : ''}`);
+      parts.push(`浪${legName}:${st.label === '5' ? (st.motive === 'DIAGONAL' ? '五浪(楔形)' : '五浪') : st.label === '3' ? '非五浪' : '级别不足'}${st.source ? `(${st.source})` : ''}`);
     }
     if (!anyEval) return { pass: true, neutral: true, detail: '小级别数据不足，结构未验证' };
     return { pass: allPass, detail: parts.join(' ') };
@@ -1083,7 +1178,8 @@
 
     function account(r, res) {
 
-      const openSuppressed = lastOpen && r.pending === 'min' && res.pass === false;
+      // 最低要求类只在其最后一个涉及点 (第 need 个点) 即未确认末点时暂缓；更早的点已确认，照常否决
+      const openSuppressed = lastOpen && r.pending === 'min' && r.need === points.length && res.pass === false;
       const check = {
         id: r.id, cat: r.cat, page: r.page, text: r.text, hard: !!r.hard,
         pass: res.pass !== false, pending: !!res.pending, neutral: !!res.neutral,
@@ -1561,14 +1657,34 @@
     let subtype = '';
     if (h.type === 'FLAT' && n === 4) subtype = flatSubtype(g);
     if (h.type === 'TRIANGLE' && n >= 3) subtype = triSubtype(g);
+    // 楔形角色: 5-3-5-3-5 只能是引导楔形；3-3-3-3-3 按所处位置区分引导 / 终结
+    let diagRole = null;
+    const structNotes = [];
+    const hasEv = !!(ev && ev.bars);
+    const legSt = li => (hasEv && li + 1 < n ? legStructure(g, li, ev) : null);
     if (h.type === 'DIAGONAL') {
-      const i0 = h.idxs[0];
-      const sameDirBefore = i0 >= 2 && (g.d * (pivs[i0 - 1].price - pivs[i0 - 2].price) > 0);
-      subtype = sameDirBefore ? '终结楔形倾向' : '引导楔形倾向';
+      const pos = diagonalRole(g, ev);
+      const odd = [0, 2, 4].filter(li => !(h.status !== 'COMPLETED' && li + 1 === n - 1)).map(legSt).filter(st => st && st.label !== 'unknown');
+      const all5 = odd.length >= 2 && odd.every(st => st.label === '5');
+      const all3 = odd.length >= 2 && odd.every(st => st.label === '3');
+      diagRole = all5 ? 'LEADING' : pos;
+      const shape = n >= 4 ? (g.l[2] < g.l[0] ? '收缩' : '扩散') : '';
+      const base = diagRole === 'LEADING' ? '引导楔形' : diagRole === 'ENDING' ? '终结楔形' : '楔形';
+      subtype = `${shape}${base}${all5 ? '（5-3-5-3-5）' : all3 ? '（3-3-3-3-3）' : ''}`;
+      if (all5 && pos === 'ENDING') structNotes.push('5-3-5-3-5 只能是引导楔形，但所处位置像趋势末端');
+      if (!diagRole) structNotes.push('位置不明：处于新趋势起点则为引导楔形，处于同向趋势末端则为终结楔形');
+    } else if (hasEv && (h.type === 'IMPULSE' || h.type === 'ZIGZAG' || h.type === 'FLAT')) {
+      const isImp = h.type === 'IMPULSE';
+      const first = isImp || h.type === 'ZIGZAG' ? legSt(0) : null;
+      const last = legSt(isImp ? 4 : 2);
+      if (first && first.motive === 'DIAGONAL') structNotes.push(`${isImp ? '浪1' : 'a浪'}为引导楔形`);
+      if (last && last.motive === 'DIAGONAL') structNotes.push(`${isImp ? '浪5' : 'c浪'}为终结楔形`);
     }
+    if (h.type === 'IMPULSE' && h.status === 'COMPLETED' && truncatedFifth(g)) structNotes.push('失败第五浪');
 
     const stage = stageText(h.type, n, h.status);
-    const name = `${subtype ? subtype : def.name}（${dirTxt}·${stage}）`;
+    const noteTxt = structNotes.filter(x => !/^位置不明|^5-3-5-3-5/.test(x)).join('·');
+    const name = `${subtype ? subtype : def.name}（${dirTxt}·${stage}${noteTxt ? '·' + noteTxt : ''}）`;
 
     const metrics = {};
     if (h.type === 'IMPULSE' || h.type === 'DIAGONAL') {
@@ -1600,6 +1716,18 @@
     }
 
     const levels = buildLevels(h.type, g, h.status, ev);
+    if (h.status === 'COMPLETED') {
+      // 终结楔形结束后通常急速回到楔形起点；引导楔形之后的浪2常深回撤 (EWI)
+      const endDiagStart = h.type === 'DIAGONAL' && diagRole === 'ENDING' ? g.p[0]
+        : structNotes.includes('浪5为终结楔形') ? g.p[4]
+          : structNotes.includes('c浪为终结楔形') ? g.p[2] : null;
+      if (endDiagStart) {
+        levels.targets.unshift(tgt(endDiagStart.price, '终结楔形起点：楔形结束后常急速回到此处（EWI）', null));
+      } else if (h.type === 'DIAGONAL' && diagRole === 'LEADING') {
+        const total = Math.abs(g.p[n - 1].price - g.p[0].price);
+        [0.618, 0.786].forEach(r => levels.targets.unshift(tgt(g.p[n - 1].price - g.d * r * total, `引导楔形后浪2常深回撤×${r}（EWI）`, r)));
+      }
+    }
     if (ev && ev.bars && h.status === 'COMPLETED' && h.type !== 'TRIANGLE') {
       // 柳玉冬「必须跌破4944才能确认橙线结束」: 结束确认看最后一浪内部最后一个小级别回撤点，
       // 主级别结构位 (浪4 / b浪终点) 保留为更大级别确认
@@ -1668,6 +1796,7 @@
       status: h.status, currentWave: stage,
       pivots: g.p.map(q => ({ idx: q.idx, time: q.time, price: q.price, type: q.type, confirmed: q.confirmed !== false })),
       waveLabels, subPivots,
+      structureNotes: structNotes, diagonalRole: diagRole,
       metrics, rules, ruleChecks: evalRes.checks.map(c => ({ id: c.id, category: CAT_NAMES[c.cat], page: c.page, text: c.text, hard: c.hard, pass: c.pass, pending: c.pending, detail: c.detail })),
       pendingCount: evalRes.pending.length,
       guidePct: evalRes.guide.weight ? Math.round(100 * evalRes.guide.weightGot / evalRes.guide.weight) : 0,
@@ -2737,7 +2866,7 @@
       return result;
     }
 
-    const ev = { bars: slice, highs, lows, sources, structCache: new Map() };
+    const ev = { bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map() };
     const blockMap = new Map();
     result.liuSignals = buildLiuSignals(slice, main.pivots, ev);
     const cands = collectCandidates(main.pivots, ev, slice.length, rangeExtrema, precedingContext, blockMap);
@@ -2862,7 +2991,7 @@
   const SUB_EXPECT = {
     IMPULSE: { legs: ['5', '3', '5', '3', '5'], page: 'P9-16（5-3-5-3-5）' },
     DIAGONAL_LEADING: { legs: ['5', '3', '5', '3', '5'], page: '通用（引导楔形5-3-5-3-5）' },
-    DIAGONAL_ENDING: { legs: ['3', '3', '3', '3', '3'], page: '通用（终结楔形3-3-3-3-3）' },
+    DIAGONAL_THREES: { legs: ['3', '3', '3', '3', '3'], page: '通用（终结楔形3-3-3-3-3；引导楔形亦可为3-3-3-3-3）' },
     ZIGZAG: { legs: ['5', '3', '5'], page: 'P216（5-3-5）' },
     FLAT: { legs: ['3', '3', '5'], page: 'P236（3-3-5）' },
     TRIANGLE: { legs: ['3', '3', '3', '3', '3'], page: 'P272-276（3-3-3-3-3）' },
@@ -2989,12 +3118,12 @@
       const swings = anchored.length - 1;
       if (swings < 3) continue;
       if (swings > PROBE_MAX_SWINGS) { if (!out.coarse) out.noisy = true; break; }
-      const motive = anchored.length >= 6 ? findMotiveCount(anchored) : false;
+      const five = anchored.length >= 6 ? findMotiveTyped(anchored) : null;
       if (!out.coarse) {
-        out.coarse = { label: motive ? '5' : '3', swings, anchored, motive: motive || null };
+        out.coarse = { label: five ? '5' : '3', swings, anchored, motive: five ? five.points : null };
         out.strict5 = anchored.length === 6 && motiveRulesOK(anchored, 'IMPULSE');
       }
-      if (motive && !out.any5) out.any5 = { points: motive, swings };
+      if (five && !out.any5) out.any5 = { points: five.points, swings, kind: five.kind };
       if (out.any5) break;
     }
     return out;
@@ -3173,7 +3302,7 @@
     }
     sources.sort((a, b) => a.tfSec - b.tfSec);
     const subNames = sources.filter(s => !s.isMain).map(s => s.name);
-    const mkEv = () => ({ bars: slice, highs, lows, sources, structCache: new Map(), refineSubTimes: true, mainTfSec: tfSec, maxSubBars: 4000 });
+    const mkEv = () => ({ bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map(), refineSubTimes: true, mainTfSec: tfSec, maxSubBars: 4000 });
 
     const live = projectLive(slice, pts, fullPts, atr);
     const lp = live.pts;
@@ -3209,8 +3338,10 @@
           if (pr.any5) lead++;
           else if (pr.coarse) end++;
         }
-        key = end > lead ? 'DIAGONAL_ENDING' : 'DIAGONAL_LEADING';
+        key = end > lead ? 'DIAGONAL_THREES' : 'DIAGONAL_LEADING';
       }
+      // 各位置允许的楔形: 浪1/a浪=引导楔形，浪5/c浪=终结楔形，浪3不能是楔形
+      const diagAt = { IMPULSE: { 0: '引导楔形', 4: '终结楔形' }, ZIGZAG: { 0: '引导楔形', 2: '终结楔形' }, FLAT: { 2: '终结楔形' } }[type] || null;
       const spec = SUB_EXPECT[key];
       const legs = [];
       const ev = mkEv();
@@ -3223,7 +3354,18 @@
         const evLeg = pr.source ? Object.assign(mkEv(), { sources: sources.filter(s => s.isMain || s.name === pr.source) }) : ev;
         const corrClass = expect === '3' && pr.coarse ? classifyCorrectiveLeg(A, B, evLeg, running) : null;
         const lbl = PATTERNS[type].labels[li + 1];
-        legs.push(judgeLeg(li, expect, pr, legNameOf(lbl), running, corrClass));
+        const L = judgeLeg(li, expect, pr, legNameOf(lbl), running, corrClass);
+        if (diagAt && L.found === '5' && pr.any5 && pr.any5.kind === 'DIAGONAL') {
+          const nm = diagAt[li];
+          if (nm) {
+            L.diagonal = nm;
+            L.text = L.text.replace('✓', `（${nm}）✓`);
+          } else {
+            Object.assign(L, { status: 'DOUBT', severity: 'medium',
+              text: `${legNameOf(lbl)}：${pr.source || '主周期'} 只能数成楔形、数不成推动浪——浪3不能是楔形，存疑` });
+          }
+        }
+        legs.push(L);
       }
       return { key, page: spec.page, legs };
     }
@@ -3236,7 +3378,8 @@
         const pr = probe(A, B);
         const label = !pr.coarse ? (pr.noisy ? '3' : 'unknown') : L.expect === '5' ? (pr.any5 ? '5' : '3') : (pr.strict5 ? '5' : '3');
         const subPivots = L.expect === '5' && pr.any5 ? pr.any5.points : pr.coarse ? pr.coarse.anchored : [];
-        ev.structCache.set(A.time + '_' + B.time, { label, subPivots, source: pr.source });
+        const motive = label === '5' && pr.any5 ? pr.any5.kind : null;
+        ev.structCache.set(A.time + '_' + B.time, { label, motive, subPivots, source: pr.source });
       });
       return ev;
     }
@@ -3257,9 +3400,12 @@
         liveCand = buildCandidate({ type, idxs: lp.map((_, i) => i), status: live.status }, liveEval, evL, lp);
       }
       if (type === 'DIAGONAL') {
-        const nm = sub.key === 'DIAGONAL_ENDING' ? '终结楔形（3-3-3-3-3）' : '引导楔形（5-3-5-3-5）';
-        drawnCand.name = drawnCand.name.replace(/^[^（]+/, nm);
-        if (liveCand) liveCand.name = liveCand.name.replace(/^[^（]+/, nm);
+        // buildCandidate 已按结构与位置命名；用户画浪以所画各段的结构为准
+        const role = sub.key === 'DIAGONAL_LEADING' ? 'LEADING' : diagonalRole(mkGeom(pts), evD);
+        const shape = pts.length >= 4 ? (Math.abs(pts[3].price - pts[2].price) < Math.abs(pts[1].price - pts[0].price) ? '收缩' : '扩散') : '';
+        const nm = `${shape}${role === 'LEADING' ? '引导楔形' : role === 'ENDING' ? '终结楔形' : '楔形'}${sub.key === 'DIAGONAL_LEADING' ? '（5-3-5-3-5）' : '（3-3-3-3-3）'}`;
+        drawnCand.name = drawnCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
+        if (liveCand) liveCand.name = liveCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
       }
       const strong = sub.legs.filter(L => L.severity === 'strong');
       const medium = sub.legs.filter(L => L.severity === 'medium');
@@ -3489,6 +3635,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });
