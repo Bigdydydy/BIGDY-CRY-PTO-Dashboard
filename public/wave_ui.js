@@ -278,17 +278,37 @@
     return rows;
   }
 
+  /**
+   * 服务端K线 (带缓存)。Render 免费实例休眠唤醒、首次分页拉取 10000 根都较慢：放宽超时并重试一次。
+   * 国内网络一般直连不了币安，所以服务端是主路径，直连只作最后兜底。
+   */
+  async function fetchServerBars(clean, tf, limit, onRetry) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt && onRetry) onRetry();
+      try {
+        const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${limit}`, { signal: AbortSignal.timeout(45000) });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && Array.isArray(json.bars) && json.bars.length) return json.bars;
+          lastError = new Error('服务端未返回K线');
+        } else {
+          lastError = new Error(`服务端 HTTP ${resp.status}`);
+          if (resp.status === 400) break; // 参数错误，重试无意义
+        }
+      } catch (err) { lastError = err; }
+    }
+    throw lastError || new Error('服务端未返回K线');
+  }
+
   /** 主图K线 (最多 WAVE_BARS 根；服务端缓存优先，失败直连币安合约/现货) */
   async function fetchKlines(symbol, tf) {
     const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
     let lastError = null;
     try {
-      const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${WAVE_BARS}`, { signal: AbortSignal.timeout(20000) });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json && Array.isArray(json.bars) && json.bars.length) return json.bars;
-      }
+      return await fetchServerBars(clean, tf, WAVE_BARS, () => setWaveStatus('服务端行情响应较慢（可能正在唤醒），重试中…'));
     } catch (err) { lastError = err; }
+    const serverError = lastError;
     const direct = [
       ['https://fapi.binance.com/fapi/v1/klines', 1500],
       ['https://data-api.binance.vision/api/v3/klines', 1000],
@@ -300,7 +320,7 @@
         if (rows.length) return parseRawKlines(rows);
       } catch (err) { lastError = err; }
     }
-    throw lastError || new Error('无法连接到币安行情源');
+    throw new Error(`服务端行情不可用（${(serverError && serverError.message) || '超时'}），浏览器直连币安也失败`);
   }
 
   const AUX_TTL_MS = 120000;
@@ -313,13 +333,7 @@
     const hit = auxKlineCache.get(key);
     if (hit && Date.now() - hit.t < AUX_TTL_MS) return hit.bars;
     let bars = null;
-    try {
-      const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${limit}`, { signal: AbortSignal.timeout(15000) });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json && Array.isArray(json.bars) && json.bars.length) bars = json.bars;
-      }
-    } catch (e) { /* 降级直连 */ }
+    try { bars = await fetchServerBars(clean, tf, limit); } catch (e) { /* 降级直连 */ }
     if (!bars) {
       try {
         const rows = await fetchDirectPaged('https://fapi.binance.com/fapi/v1/klines', 1500, clean, tf, limit);
