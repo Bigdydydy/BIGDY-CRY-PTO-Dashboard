@@ -21,6 +21,7 @@
   let activeCandidateIndex = 0;
   let activePriceLines = [];
   let currentRange = null; // { startTime, endTime, barsCount }
+  let initialLoadPromise = null; // 首次进入时的K线加载 (防止重复拉取)
 
   // 图表可见性控制开关
   let showMarkers = true;
@@ -2128,9 +2129,6 @@ self.onmessage = function (e) {
   window.WaveRadarModule = {
     init: function () {
       initEvents();
-      if (window.location.hash === '#wave-radar' || document.getElementById('view-wave-radar')?.classList.contains('active')) {
-        loadChartCandles(currentSymbol);
-      }
     },
     runAnalysis: runWaveAnalysis,
     loadCandles: loadChartCandles,
@@ -2141,7 +2139,9 @@ self.onmessage = function (e) {
         initChart();
       }
       if (currentBars.length === 0) {
-        loadChartCandles(currentSymbol);
+        if (!initialLoadPromise) {
+          initialLoadPromise = loadChartCandles(currentSymbol).finally(() => { initialLoadPromise = null; });
+        }
       } else {
         const container = document.getElementById('wave-chart-container');
         if (container && waveChart) {

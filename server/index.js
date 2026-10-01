@@ -24,6 +24,7 @@ const { analyzeWaves } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const WAVE_ENGINE_FILE = path.join(__dirname, 'wave_engine.js');
 
 /**
  * Parse JSON request body helper
@@ -54,6 +55,37 @@ function parseJsonBody(req) {
 const refreshRateLimitMap = new Map();
 let activeRefreshPromise = null;
 
+// 按需刷新: 记录最近一次 API 访问；无人访问时暂停定时拉取外部行情
+const IDLE_PAUSE_MS = 5 * 60 * 1000;
+const MARKET_REFRESH_MS = 30000;
+let lastApiActivity = 0;
+let lastMarketRefreshAt = 0;
+let marketRefreshInflight = null;
+let backgroundRefreshEnabled = false; // 仅 startServer() 启动的常驻服务才做后台刷新 (测试中引入模块不触发外部请求)
+
+function refreshMarketInBackground() {
+  if (marketRefreshInflight) return marketRefreshInflight;
+  marketRefreshInflight = refreshAllMarketData('BTC')
+    .catch(e => console.warn('[Server] Background sync check error:', e.message))
+    .finally(() => {
+      lastMarketRefreshAt = Date.now();
+      marketRefreshInflight = null;
+    });
+  return marketRefreshInflight;
+}
+
+/** 空闲后的第一次访问立即在后台补一次刷新 (不阻塞本次响应) */
+function noteApiActivity() {
+  const now = Date.now();
+  const wasIdle = now - lastApiActivity > IDLE_PAUSE_MS;
+  lastApiActivity = now;
+  if (backgroundRefreshEnabled && wasIdle && now - lastMarketRefreshAt > MARKET_REFRESH_MS) refreshMarketInBackground();
+}
+
+function isServerIdle() {
+  return Date.now() - lastApiActivity > IDLE_PAUSE_MS;
+}
+
 // Wave Engine API Rate Limiting & Kline Cache
 const waveRateLimitMap = new Map();
 const waveKlineCache = new Map();
@@ -77,6 +109,11 @@ const WAVE_HTF_INTERVALS = {
 function checkWaveRateLimit(clientIp) {
   const now = Date.now();
   const windowMs = 60000;
+  if (waveRateLimitMap.size > 2000) {
+    for (const [ip, ts] of waveRateLimitMap) {
+      if (!ts.length || now - ts[ts.length - 1] >= windowMs) waveRateLimitMap.delete(ip);
+    }
+  }
   const maxReq = 20; // Max 20 requests per minute per IP
   let timestamps = waveRateLimitMap.get(clientIp) || [];
   timestamps = timestamps.filter(t => now - t < windowMs);
@@ -122,8 +159,17 @@ async function fetchKlinePages(source, symbol, interval, limit) {
   return rows;
 }
 
+// 缓存只按固定档位存放，避免 ?limit= 任意取值造成缓存键无限增长
+const KLINE_TIERS = [200, 1000, WAVE_MAX_BARS];
+
 async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
-  limit = Math.max(1, Math.min(WAVE_MAX_BARS, limit));
+  limit = Math.max(1, Math.min(WAVE_MAX_BARS, parseInt(limit, 10) || 1000));
+  const tier = KLINE_TIERS.find(t => t >= limit) || WAVE_MAX_BARS;
+  const bars = await fetchKlineTier(symbol, interval, tier);
+  return bars.length > limit ? bars.slice(bars.length - limit) : bars;
+}
+
+async function fetchKlineTier(symbol, interval, limit) {
   const cacheKey = `${symbol}_${interval}_${limit}`;
   const cached = waveKlineCache.get(cacheKey);
   const now = Date.now();
@@ -243,6 +289,7 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
  */
 async function handleApiRequest(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
+  noteApiActivity();
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -670,8 +717,9 @@ function handleStaticRequest(req, res, parsedUrl) {
   }
 
   const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
-  const filePath = path.join(PUBLIC_DIR, safePath);
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  // 前端与服务端共用同一份 UMD 引擎文件，不再在 public/ 下保留副本
+  const filePath = reqPath === '/wave_engine.js' ? WAVE_ENGINE_FILE : path.join(PUBLIC_DIR, safePath);
+  if (filePath !== WAVE_ENGINE_FILE && !filePath.startsWith(PUBLIC_DIR)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('404 Not Found');
     return;
@@ -756,10 +804,10 @@ function startServer() {
     console.log(`=======================================================`);
   });
 
+  backgroundRefreshEnabled = true;
   console.log('[Server] Initializing market data cache...');
-  refreshAllMarketData('BTC')
-    .then(() => console.log('[Server] Initial market data cache ready.'))
-    .catch(e => console.warn('[Server] Initial fetch warning:', e.message));
+  refreshMarketInBackground()
+    .then(() => console.log('[Server] Initial market data cache ready.'));
 
   fetchCdriData()
     .then(() => console.log('[Server] Initial CDRI data cache ready.'))
@@ -777,17 +825,15 @@ function startServer() {
     .then(() => console.log('[Server] Initial Macro chart data cache ready.'))
     .catch(e => console.warn('[Server] Initial Macro fetch warning:', e.message));
 
-  // Background auto-refresh for high-frequency market data every 30 seconds
-  setInterval(async () => {
-    try {
-      await refreshAllMarketData('BTC');
-    } catch (e) {
-      console.warn('[Server] Background sync check error:', e.message);
-    }
-  }, 30000);
+  // 高频行情每 30 秒后台刷新；5 分钟内无人访问则暂停，避免空转消耗免费实例的 CPU 与外部配额
+  setInterval(() => {
+    if (isServerIdle()) return;
+    refreshMarketInBackground();
+  }, MARKET_REFRESH_MS);
 
-  // Background auto-refresh for macro data every 5 minutes (300,000 ms)
+  // 宏观数据每 5 分钟刷新 (同样仅在有人访问时)
   setInterval(async () => {
+    if (isServerIdle()) return;
     try {
       await getMacroChartData(true);
     } catch (e) {
@@ -803,5 +849,6 @@ if (require.main === module) {
 module.exports = {
   server,
   startServer,
-  sendJsonResponse
+  sendJsonResponse,
+  _internal: { fetchBinanceKlines, waveKlineCache, KLINE_TIERS, noteApiActivity, isServerIdle }
 };

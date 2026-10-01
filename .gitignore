@@ -6,3 +6,6 @@ Thumbs.db
 __pycache__/
 *.pyc
 .venv/
+
+# 离线校准输出 (scripts/liu_threads/replay_liu_threads.js 生成)
+data/liu_replay_summary.json
