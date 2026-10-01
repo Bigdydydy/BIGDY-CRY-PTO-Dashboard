@@ -24,20 +24,12 @@ def main():
 
     # 1. Collectors
     core_col = CoreTrackCollector()
-    try:
-        core_df = core_col.collect_and_clean()
-        core_stats = core_col.compute_breadth_stats(core_df)
-    except Exception as e:
-        print(f"[McClellan Export Warning] Core collection error ({e}), using fallback stats...")
-        core_stats = {"total_constituents": 90, "advances": 76, "declines": 12, "ramo": 727.3}
+    core_df = core_col.collect_and_clean()
+    core_stats = core_col.compute_breadth_stats(core_df)
 
     meme_col = FrontierMemeCollector()
-    try:
-        meme_df = meme_col.collect_and_gatekeep()
-        meme_stats = meme_col.compute_breadth_stats(meme_df)
-    except Exception as e:
-        print(f"[McClellan Export Warning] Meme collection error ({e}), using fallback stats...")
-        meme_stats = {"total_constituents": 22, "advances": 18, "declines": 4, "ramo": 636.4}
+    meme_df = meme_col.collect_and_gatekeep()
+    meme_stats = meme_col.compute_breadth_stats(meme_df)
 
     # 2. Historical Breadth Alignment
     seeder = HistoricalBreadthSeeder(data_dir=ROOT_DIR / "data")

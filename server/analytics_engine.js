@@ -367,8 +367,13 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
   const curYear = nowUTC8.getUTCFullYear();
   const curMonth = nowUTC8.getUTCMonth();
 
-  const curMonthLastFriday = getLastFridayOfMonth(curYear, curMonth);
-  const curMonthEndExpiryStr = formatDeribitExpiry(curMonthLastFriday);
+  let frontMonthFriday = getLastFridayOfMonth(curYear, curMonth);
+  const isRolledToNextMonth = frontMonthFriday < now;
+  if (isRolledToNextMonth) {
+    frontMonthFriday = getLastFridayOfMonth(curYear, curMonth + 1);
+  }
+  const curMonthEndExpiryStr = formatDeribitExpiry(frontMonthFriday);
+  const frontMonthLabel = isRolledToNextMonth ? '次月月底交割' : '当月月底交割';
 
   const quarterExpiries = [];
   for (let offset = 0; offset <= 4; offset++) {
@@ -385,7 +390,8 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     }
   }
 
-  const yearEndFriday = getLastFridayOfMonth(curYear, 11);
+  let yearEndFriday = getLastFridayOfMonth(curYear, 11);
+  if (yearEndFriday < now) yearEndFriday = getLastFridayOfMonth(curYear + 1, 11);
   const yearEndExpiryStr = formatDeribitExpiry(yearEndFriday);
 
   const allowedFocusSet = new Set();
@@ -422,8 +428,8 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     const isYearEnd = exp === yearEndExpiryStr;
 
     let categoryTag = '普通周期';
-    if (isCurMonth && isQuarter) categoryTag = '当月月底 & 季度交割';
-    else if (isCurMonth) categoryTag = '当月月底交割';
+    if (isCurMonth && isQuarter) categoryTag = `${frontMonthLabel.replace('交割', '')} & 季度交割`;
+    else if (isCurMonth) categoryTag = frontMonthLabel;
     else if (isYearEnd) categoryTag = '年度最终交割';
     else if (isQuarter) categoryTag = '主季度交割';
 
@@ -485,7 +491,7 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     allExpiries: allList,
     totalFocusedGexM: Number((totalFocusedGex / 1e6).toFixed(2)),
     marketMakerRegime,
-    dynamicRuleDescription: `当前日期基准（${curDateStr} UTC+8）：系统自动锁定当月月底（${curMonthEndExpiryStr}）、季末交割及年底交割（${yearEndExpiryStr}），自动隐去非当月普通到期（如 27NOV26 等，待日历推进至对应月份时将动态激活）。`,
+    dynamicRuleDescription: `当前日期基准（${curDateStr} UTC+8）：系统自动锁定${isRolledToNextMonth ? '次月月底（当月交割已过，自动滚动至' : '当月月底（'}${curMonthEndExpiryStr}）、季末交割及年底交割（${yearEndExpiryStr}），自动隐去非当月普通到期（如 27NOV26 等，待日历推进至对应月份时将动态激活）。`,
     paragraph
   };
 }

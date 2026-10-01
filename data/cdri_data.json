@@ -1,9 +1,9 @@
 {
   "performance": {
-    "price": 58,
-    "level": "中性波动",
-    "levelEn": "Neutral Volatility",
-    "color": "#93ea2a",
+    "price": 63,
+    "level": "高风险",
+    "levelEn": "High Risk",
+    "color": "#ffc800",
     "yesterday": 60,
     "yesterdayRisk": {
       "level": "中性波动",
@@ -5067,7 +5067,7 @@
       59,
       61,
       60,
-      58
+      63
     ],
     "priceList": [
       39375.1,
@@ -6740,9 +6740,9 @@
       84432.9,
       83461,
       83624.5,
-      83870
+      84209.3
     ]
   },
-  "updatedAt": "2026-09-30 18:48:40",
-  "timestamp": 1790765320363
+  "updatedAt": "2026-09-30 22:12:12",
+  "timestamp": 1790777532843
 }
