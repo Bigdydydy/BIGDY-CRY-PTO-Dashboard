@@ -17,6 +17,7 @@
   let currentTf = '4h';
   let currentBars = [];
   let initialLoadPromise = null;
+  let mainKlineSource = null; // 服务端返回的主图行情源 (币安被拒时为 Bybit / OKX)
 
   let showMarkers = true;
   let showSubwaves = false;
@@ -290,7 +291,10 @@
         const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${limit}`, { signal: AbortSignal.timeout(45000) });
         if (resp.ok) {
           const json = await resp.json();
-          if (json && Array.isArray(json.bars) && json.bars.length) return json.bars;
+          if (json && Array.isArray(json.bars) && json.bars.length) {
+            if (tf === currentTf) mainKlineSource = json.source || null;
+            return json.bars;
+          }
           lastError = new Error('服务端未返回K线');
         } else {
           lastError = new Error(`服务端 HTTP ${resp.status}`);
@@ -445,6 +449,7 @@ self.onmessage = function (e) {
     if (title) title.textContent = `${tfLabel} K 线图 · 画浪`;
     setWaveStatus(`正在拉取 ${symbol} ${tfLabel} K 线…`);
     try {
+      mainKlineSource = null;
       const bars = await fetchKlines(symbol, currentTf);
       currentBars = bars;
       updateSampleLabel(bars, currentTf);
@@ -452,9 +457,10 @@ self.onmessage = function (e) {
       candleSeries.setData(bars.map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
       focusChart();
       renderChart();
-      setWaveStatus(sketch.length
+      const srcNote = mainKlineSource && !/币安/.test(mainKlineSource) ? ` · 行情源：${mainKlineSource}（币安暂不可用）` : '';
+      setWaveStatus((sketch.length
         ? `● [${symbol} ${tfLabel}] K线就绪 · 已画 ${sketch.length} 个浪（其它周期画的浪按本周期K线显示），可继续画子浪`
-        : `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 选择上方画浪工具，在图上从起点开始依次点击各浪端点`);
+        : `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 选择上方画浪工具，在图上从起点开始依次点击各浪端点`) + srcNote);
     } catch (err) {
       console.error('[Wave Load Error]:', err);
       setWaveStatus(`❌ 行情加载失败: ${err.message || '网络连接超时'}`);
