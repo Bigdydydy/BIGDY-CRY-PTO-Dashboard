@@ -3039,7 +3039,7 @@
     IMPULSE: { name: '推动浪 12345', labels: ['0', '1', '2', '3', '4', '5'], types: ['IMPULSE', 'DIAGONAL'] },
     ABC: { name: '调整浪 abc', labels: ['0', 'a', 'b', 'c'], types: ['ZIGZAG', 'FLAT'] },
     WXY: { name: '调整浪 wxy', labels: ['0', 'w', 'x', 'y'], types: ['DOUBLE_ZIGZAG', 'COMBINATION'] },
-    WXYXZ: { name: '调整浪 wxyxz', labels: ['0', 'w', 'x', 'y', 'xx', 'z'], types: ['TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'] },
+    WXYXZ: { name: '调整浪 w-x-y-xx-z', labels: ['0', 'w', 'x', 'y', 'xx', 'z'], types: ['TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'] },
     ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], types: ['TRIANGLE', 'EXPANDING_TRIANGLE'] }
   };
 
@@ -3512,7 +3512,10 @@
 
     const rank = (a, b) => (a.hardFails.length - b.hardFails.length) || (a.strongCount - b.strongCount) ||
       (a.liveHardFails.length - b.liveHardFails.length) || (a.mediumCount - b.mediumCount) || (b.guidePct - a.guidePct);
-    const interps = tool.types.map(interpret).filter(Boolean).sort(rank);
+    // 用户可指定浪型 (例如 abc 指定为单锯齿或平台形)；未指定时在工具的各浪型中自动择优
+    const forced = options.forceType && tool.types.indexOf(options.forceType) >= 0 ? options.forceType : null;
+    const types = forced ? [forced] : tool.types;
+    const interps = types.map(interpret).filter(Boolean).sort(rank);
     if (!interps.length) throw new Error(`「${tool.name}」无法容纳 ${n} 个点`);
     const primary = interps[0];
 
@@ -3520,7 +3523,7 @@
     const alternatives = [];
     // 画满时只与同点数浪型比较；未画满时任何能容纳这些点的浪型都可，优先更简单者 (点数少)
     for (const type of Object.keys(PATTERNS)) {
-      if (tool.types.indexOf(type) >= 0) continue;
+      if (types.indexOf(type) >= 0) continue;
       if (n === fullPts ? PATTERNS[type].pts !== n : PATTERNS[type].pts < n) continue;
       const it = interpret(type);
       if (it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length) alternatives.push(it);
@@ -3645,6 +3648,7 @@
     return {
       symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT',
       tool: options.tool, toolName: tool.name, labels,
+      forcedType: forced, toolTypes: tool.types.map(t => ({ type: t, name: PATTERNS[t].name })),
       analysisTime: new Date().toISOString(), currentPrice,
       subTimeframes: subNames,
       points: pts.map((q, i) => ({ label: labels[i], time: q.time, price: q.price, type: q.type, open: !!q.open })),
@@ -3808,7 +3812,7 @@
   function evaluateUserSketch(barsByTf, symbol, options) {
     options = options || {};
     const drawings = (options.drawings || []).map((d, i) => ({
-      id: String(d.id !== undefined && d.id !== null ? d.id : i + 1), tool: d.tool, timeframe: d.timeframe || '4h',
+      id: String(d.id !== undefined && d.id !== null ? d.id : i + 1), tool: d.tool, timeframe: d.timeframe || '4h', type: d.type || null,
       points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price }))
     }));
     if (!drawings.length) throw new Error('还没有画浪');
@@ -3827,7 +3831,7 @@
       if (!bars || !bars.length) throw new Error(`缺少 ${d.timeframe} K线`);
       const sub = {};
       (SKETCH_SUB_TFS[d.timeframe] || []).forEach(tf => { if (barsByTf[tf] && barsByTf[tf].length) sub[tf] = barsByTf[tf]; });
-      return evaluateUserCount(bars, symbol, Object.assign({ tool: d.tool, points: d.points, timeframe: d.timeframe, subBars: sub }, extra));
+      return evaluateUserCount(bars, symbol, Object.assign({ tool: d.tool, points: d.points, timeframe: d.timeframe, subBars: sub, forceType: d.type }, extra));
     };
 
     // 由内向外: 最深的子浪先评估

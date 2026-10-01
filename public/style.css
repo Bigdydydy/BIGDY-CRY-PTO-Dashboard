@@ -5591,3 +5591,11 @@ body {
   padding: 0 2px;
 }
 .wave-sketch-del:hover { color: var(--color-neg); }
+
+/* Module 8 · 判定浪型切换 (自动 / 指定) */
+.wave-type-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}

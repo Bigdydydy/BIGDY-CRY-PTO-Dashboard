@@ -98,6 +98,33 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.match(leg.text, /三角形通常不作为浪2/);
   });
 
+  it('指定浪型: abc 可指定为单锯齿或平台形，未指定时自动择优并列出可选浪型', () => {
+    // 0→a 下跌 100→80，b 反弹到 96 (回撤 80%，单锯齿与平台形都不违反铁律)，c 下跌到 76
+    const v = [120, 100, 80, 96, 76, 90];
+    const bars = build(v);
+    const pts = [1, 2, 3, 4].map(k => pt(v, k, 3600));
+    const auto = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', points: pts, timeframe: '1h', subBars: { '15m': bars['15m'] } });
+    assert.strictEqual(auto.forcedType, null);
+    assert.deepStrictEqual(auto.toolTypes.map(t => t.type), ['ZIGZAG', 'FLAT']);
+    for (const type of ['ZIGZAG', 'FLAT']) {
+      const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', points: pts, timeframe: '1h', subBars: { '15m': bars['15m'] }, forceType: type });
+      assert.strictEqual(r.primary.type, type);
+      assert.strictEqual(r.forcedType, type);
+      assert.deepStrictEqual(r.interpretations.map(x => x.type), [type], '指定后只按该浪型评估');
+    }
+    // 不属于该工具的浪型被忽略 (abc 不能指定为三角形)
+    const bad = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', points: pts, timeframe: '1h', forceType: 'TRIANGLE' });
+    assert.strictEqual(bad.forcedType, null);
+    // 整体评估同样带上指定的浪型
+    const sk = E.evaluateUserSketch(bars, 'TEST', { drawings: [{ id: 'A', tool: 'ABC', timeframe: '1h', type: 'FLAT', points: pts }] });
+    assert.strictEqual(sk.nodes[0].result.primary.type, 'FLAT');
+  });
+
+  it('三锯齿标号为 0-w-x-y-xx-z', () => {
+    assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
+    assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
+  });
+
   it('跨越母浪拐点的浪 → 无法判定级别关系', () => {
     const s = sketch(W2_ZZ, null, W4_TRI, null);
     const e = s.ends;
