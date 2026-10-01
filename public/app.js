@@ -3898,8 +3898,10 @@ function switchView(viewId, updateHash = true) {
       renderGoldChart();
     }
 
-    if ((viewId === 'view-wave-radar' || viewId === 'view-all') && window.WaveRadarModule) {
-      window.WaveRadarModule.onViewActivated();
+    if (viewId === 'view-wave-radar' || viewId === 'view-all') {
+      ensureWaveModule()
+        .then(m => m.onViewActivated())
+        .catch(e => console.warn('[WaveRadar] 模块加载失败:', e.message));
     }
 
     window.dispatchEvent(new Event('resize'));
@@ -4841,6 +4843,39 @@ function initMcClellanEvents() {
 }
 
 // ============================================================================
+// Module 8 按需加载: 只有进入波浪研判 (或全模块平铺) 时才下载其脚本 (~440 KB)
+// ============================================================================
+const WAVE_MODULE_SCRIPTS = ['/lightweight-charts.min.js', '/wave_engine.js', '/wave_ui.js'];
+let waveModulePromise = null;
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = resolve;
+    el.onerror = () => reject(new Error(`无法加载 ${src}`));
+    document.head.appendChild(el);
+  });
+}
+
+function ensureWaveModule() {
+  if (window.WaveRadarModule) return Promise.resolve(window.WaveRadarModule);
+  if (!waveModulePromise) {
+    waveModulePromise = WAVE_MODULE_SCRIPTS
+      .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve())
+      .then(() => {
+        window.WaveRadarModule.init();
+        return window.WaveRadarModule;
+      })
+      .catch(e => {
+        waveModulePromise = null; // 允许下次进入时重试
+        throw e;
+      });
+  }
+  return waveModulePromise;
+}
+
+// ============================================================================
 // Application Startup Initialization
 // ============================================================================
 initThemeController();
@@ -4852,9 +4887,6 @@ initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
 initMcClellanEvents();
 initNavigation();
-if (window.WaveRadarModule && typeof window.WaveRadarModule.init === 'function') {
-  window.WaveRadarModule.init();
-}
 loadMarketData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);

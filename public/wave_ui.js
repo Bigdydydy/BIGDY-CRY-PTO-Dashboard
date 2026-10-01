@@ -10,6 +10,7 @@
   let candleSeries = null;
   let zigzagSeries = null;
   let subwaveSeries = null;
+  let higherSeries = null; // 高一级别计数折线 (多级别同屏)
   let channelUpperSeries = null;
   let channelLowerSeries = null;
   let drawSeries = null;      // 用户画浪折线
@@ -23,11 +24,13 @@
   let activeCandidateIndex = 0;
   let activePriceLines = [];
   let currentRange = null; // { startTime, endTime, barsCount }
+  let initialLoadPromise = null; // 首次进入时的K线加载 (防止重复拉取)
 
   // 图表可见性控制开关
   let showMarkers = true;
   let showZigzag = true;
   let showSubwaves = false;
+  let showHigherDegree = true;
   let showChannel = false;
   let showMonitoring = true;
   let showTargets = true;
@@ -56,6 +59,8 @@
       volDownColor: isLight ? 'rgba(225, 29, 72, 0.35)' : 'rgba(244, 63, 94, 0.35)',
       zigzagColor: isLight ? '#ea580c' : '#ff5722',
       subwaveColor: isLight ? '#0284c7' : '#38bdf8',
+      higherColor: isLight ? 'rgba(124, 58, 237, 0.30)' : 'rgba(167, 139, 250, 0.35)',
+      higherLabelColor: isLight ? '#7c3aed' : '#a78bfa',
       channelColor: isLight ? 'rgba(234, 88, 12, 0.5)' : 'rgba(255, 87, 34, 0.45)',
       monitoringColor: isLight ? '#dc2626' : '#f43f5e',
       targetColor: isLight ? '#059669' : '#10b981'
@@ -234,6 +239,16 @@
       crosshairMarkerVisible: false
     });
 
+    // 高一级别计数折线 (粗半透明紫线，位于主折线之下；柳玉冬式多色嵌套)
+    const higher = safeCreateSeries(chart, 'Line', {
+      color: colors.higherColor,
+      lineWidth: 8,
+      lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false
+    });
+
     // 次级嵌套子浪折线 (细虚线，天蓝色)
     const subwave = safeCreateSeries(chart, 'Line', {
       color: colors.subwaveColor,
@@ -309,6 +324,7 @@
     candleSeries = candles;
     zigzagSeries = zigzag;
     subwaveSeries = subwave;
+    higherSeries = higher;
     channelUpperSeries = channelUpper;
     channelLowerSeries = channelLower;
     drawSeries = drawLine;
@@ -659,6 +675,7 @@
 
     if (zigzagSeries) zigzagSeries.applyOptions({ color: colors.zigzagColor });
     if (subwaveSeries) subwaveSeries.applyOptions({ color: colors.subwaveColor });
+    if (higherSeries) higherSeries.applyOptions({ color: colors.higherColor });
     if (channelUpperSeries) channelUpperSeries.applyOptions({ color: colors.channelColor });
     if (channelLowerSeries) channelLowerSeries.applyOptions({ color: colors.channelColor });
 
@@ -732,6 +749,142 @@
     throw lastError || new Error('无法连接到币安行情源');
   }
 
+  // ---------------------------------------------------------------------------
+  // 浏览器端研判 (默认路径): 服务端只提供有缓存的K线，计算放在 Web Worker，
+  // 避免 Render 免费实例 (0.1 CPU) 上一次研判阻塞整站十余秒，也不卡页面。
+  // ---------------------------------------------------------------------------
+  const WAVE_SUB_TFS = { '15m': [], '1h': ['15m'], '4h': ['1h', '15m'] };
+  const WAVE_HTF_TFS = { '15m': ['1h', '4h'], '1h': ['4h', '1d'], '4h': ['1d', '1w'] };
+  const AUX_TTL_MS = 120000;
+  const auxKlineCache = new Map();
+
+  /** 子周期 / 高周期辅助K线 (服务端缓存优先，失败直连币安)，浏览器内缓存2分钟 */
+  async function fetchAuxBars(symbol, tf, limit) {
+    const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
+    const key = `${clean}_${tf}_${limit}`;
+    const hit = auxKlineCache.get(key);
+    if (hit && Date.now() - hit.t < AUX_TTL_MS) return hit.bars;
+    let bars = null;
+    try {
+      const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${limit}`, { signal: AbortSignal.timeout(15000) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && Array.isArray(json.bars) && json.bars.length) bars = json.bars;
+      }
+    } catch (e) { /* 降级直连 */ }
+    if (!bars) {
+      try {
+        const rows = await fetchDirectPaged('https://fapi.binance.com/fapi/v1/klines', 1500, clean, tf, limit);
+        if (rows.length) bars = parseRawKlines(rows);
+      } catch (e) { bars = null; }
+    }
+    if (bars) auxKlineCache.set(key, { t: Date.now(), bars });
+    return bars;
+  }
+
+  let waveWorker = null; // null=未创建, false=不可用
+  let waveWorkerSeq = 0;
+  const waveWorkerPending = new Map();
+
+  function getWaveWorker() {
+    if (waveWorker === false) return null;
+    if (waveWorker) return waveWorker;
+    try {
+      const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js')});
+self.onmessage = function (e) {
+  var d = e.data;
+  var fn = d.fn === 'evaluateUserCount' ? 'evaluateUserCount' : 'analyzeWaves';
+  try { self.postMessage({ id: d.id, ok: true, result: self.LiuWaveEngine[fn](d.bars, d.symbol, d.opts) }); }
+  catch (err) { self.postMessage({ id: d.id, ok: false, error: String(err && err.message || err) }); }
+};`;
+      const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+      const w = new Worker(url);
+      w.onmessage = e => {
+        const job = waveWorkerPending.get(e.data.id);
+        if (!job) return;
+        waveWorkerPending.delete(e.data.id);
+        if (e.data.ok) job.resolve(e.data.result); else job.reject(new Error(e.data.error));
+      };
+      w.onerror = () => {
+        waveWorkerPending.forEach(job => job.reject(new Error('worker error')));
+        waveWorkerPending.clear();
+        try { w.terminate(); } catch (e) {}
+        waveWorker = false;
+      };
+      waveWorker = w;
+      return w;
+    } catch (e) {
+      waveWorker = false;
+      return null;
+    }
+  }
+
+  function analyzeInWorker(bars, symbol, opts, fn) {
+    const w = getWaveWorker();
+    if (!w) return Promise.reject(new Error('worker unavailable'));
+    const id = ++waveWorkerSeq;
+    return new Promise((resolve, reject) => {
+      waveWorkerPending.set(id, { resolve, reject });
+      w.postMessage({ id, fn: fn || 'analyzeWaves', bars, symbol, opts });
+      setTimeout(() => {
+        if (waveWorkerPending.has(id)) { waveWorkerPending.delete(id); reject(new Error('worker timeout')); }
+      }, 60000);
+    });
+  }
+
+  /** 浏览器端研判: Worker → 主线程 → 服务端接口 (最后兜底) */
+  async function analyzeClientSide(symbol, tf, bars, rangeOptions) {
+    const subTfs = WAVE_SUB_TFS[tf] || [];
+    const htfTfs = WAVE_HTF_TFS[tf] || [];
+    const [subs, htfs] = await Promise.all([
+      Promise.all(subTfs.map(t => fetchAuxBars(symbol, t, 1000))),
+      Promise.all(htfTfs.map(t => fetchAuxBars(symbol, t, 200)))
+    ]);
+    const opts = { timeframe: tf, subBars: {}, htfBars: {} };
+    subTfs.forEach((t, i) => { if (subs[i]) opts.subBars[t] = subs[i]; });
+    htfTfs.forEach((t, i) => { if (htfs[i]) opts.htfBars[t] = htfs[i]; });
+    if (rangeOptions && rangeOptions.startTime && rangeOptions.endTime) {
+      opts.startTime = rangeOptions.startTime;
+      opts.endTime = rangeOptions.endTime;
+    }
+    try {
+      return await analyzeInWorker(bars, symbol, opts);
+    } catch (e) {
+      if (window.LiuWaveEngine) return window.LiuWaveEngine.analyzeWaves(bars, symbol, opts);
+      throw e;
+    }
+  }
+
+  // 画浪评估的子浪判定周期 (由细到粗，与服务端 WAVE_USER_SUB_INTERVALS 一致)
+  const USER_SUB_TFS = { '15m': ['5m'], '1h': ['15m', '5m'], '4h': ['15m', '1h'] };
+  const TF_SEC = { '5m': 300, '15m': 900, '1h': 3600, '4h': 14400 };
+
+  /** 浏览器端画浪评估: Worker → 主线程；返回 null 表示本地不可用 (交给服务端) */
+  async function evaluateClientSide(symbol, tf, bars, tool, points) {
+    if (!window.LiuWaveEngine || !window.LiuWaveEngine.evaluateUserCount || !bars || !bars.length) return null;
+    // 子周期根数须覆盖画浪起点至今，按 1000 / 10000 两档取整以复用缓存
+    const firstTime = Math.min(...points.map(p => p.time));
+    const lastTime = bars[bars.length - 1].time;
+    const subTfs = USER_SUB_TFS[tf] || [];
+    const htfTfs = (WAVE_HTF_TFS[tf] || []).slice(0, 2);
+    const [subs, htfs] = await Promise.all([
+      Promise.all(subTfs.map(t => {
+        const need = Math.ceil((lastTime - firstTime) / TF_SEC[t]) + 200;
+        return fetchAuxBars(symbol, t, need <= 1000 ? 1000 : WAVE_BARS);
+      })),
+      Promise.all(htfTfs.map(t => fetchAuxBars(symbol, t, 200)))
+    ]);
+    const opts = { tool, points, timeframe: tf, subBars: {}, htfBars: {} };
+    subTfs.forEach((t, i) => { if (subs[i]) opts.subBars[t] = subs[i]; });
+    htfTfs.forEach((t, i) => { if (htfs[i]) opts.htfBars[t] = htfs[i]; });
+    try {
+      return await analyzeInWorker(bars, symbol, opts, 'evaluateUserCount');
+    } catch (e) {
+      // 输入类错误 (点序/方向/点数) 在主线程会同样抛出，交由调用方展示
+      return window.LiuWaveEngine.evaluateUserCount(bars, symbol, opts);
+    }
+  }
+
   /** 顶部「样本」标签: 实际根数与时间跨度 */
   function updateSampleLabel(bars, tf) {
     const el = document.getElementById('wave-sample-label');
@@ -753,6 +906,7 @@
     // 1. 清空图表上的所有波浪图层
     if (zigzagSeries) zigzagSeries.setData([]);
     if (subwaveSeries) subwaveSeries.setData([]);
+    if (higherSeries) higherSeries.setData([]);
     if (channelUpperSeries) channelUpperSeries.setData([]);
     if (channelLowerSeries) channelLowerSeries.setData([]);
     setChartMarkers(candleSeries, []);
@@ -876,25 +1030,10 @@
     const pivotDesc = document.getElementById('wave-pivot-desc');
     if (pivotPrice) pivotPrice.textContent = '$--,---';
     if (pivotDiff) pivotDiff.textContent = '等待选区...';
-    if (pivotDesc) pivotDesc.textContent = '选择有效 K 线区间后，将为您计算该浪型的核心防守生命线。';
+    if (pivotDesc) pivotDesc.textContent = '选择有效 K 线区间后，给出当前计数的失效位与确认位。';
+    const pivotConfirm = document.getElementById('wave-pivot-confirm');
+    if (pivotConfirm) { pivotConfirm.style.display = 'none'; pivotConfirm.innerHTML = ''; }
 
-    const cardBlockers = document.getElementById('card-wave-blockers');
-    if (cardBlockers) cardBlockers.style.display = 'none';
-
-    const scenariosList = document.getElementById('wave-scenarios-list');
-    if (scenariosList) {
-      scenariosList.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 12px 0;">框选分析后将输出第一、第二情景推演</div>`;
-    }
-
-    const tgtContainer = document.getElementById('wave-targets-list');
-    if (tgtContainer) {
-      tgtContainer.innerHTML = `<div class="wave-target-row"><span class="text-secondary">等待选区测算...</span></div>`;
-    }
-
-    const thesisText = document.getElementById('wave-thesis-text');
-    const bottomSignal = document.getElementById('wave-bottom-signal');
-    if (thesisText) thesisText.textContent = `请使用【🖱️ 框选分析模式】选择 ${currentTf.toUpperCase()} K 线行情走势区间以生成柳玉冬实战研判结论。`;
-    if (bottomSignal) bottomSignal.textContent = '';
     resetLiuSignalCards();
     renderStructureDetail(null);
   }
@@ -998,9 +1137,13 @@
       }));
       candleSeries.setData(candleData);
 
-      // 调用后端 API 或本地引擎执行波浪分析
+      // 浏览器端研判 (默认)；失败时才请求服务端研判接口兜底
       let analysis = null;
       try {
+        analysis = await analyzeClientSide(symbol, currentTf, currentBars, isCustomSlice ? rangeOptions : null);
+      } catch (clientErr) {
+        // 选区不合法等引擎异常直接抛给界面；仅在浏览器端无法计算时请求服务端
+        if (/选区|K线数据不足/.test(clientErr.message || '')) throw clientErr;
         const queryParams = new URLSearchParams({
           symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase(),
           interval: currentTf
@@ -1009,24 +1152,9 @@
           queryParams.append('startTime', rangeOptions.startTime);
           queryParams.append('endTime', rangeOptions.endTime);
         }
-        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, {
-          signal: AbortSignal.timeout(20000)
-        });
-        if (apiResp.ok) {
-          analysis = await apiResp.json();
-        }
-      } catch (e) {
-        // 后端若超时或不可用则降级至客户端 UMD 引擎 (极速稳定，绝不卡死页面)
-      }
-
-      if (!analysis || analysis.code !== 0) {
-        if (!window.LiuWaveEngine) throw new Error('波浪计算引擎尚未就绪');
-        const opts = { timeframe: currentTf };
-        if (isCustomSlice) {
-          opts.startTime = rangeOptions.startTime;
-          opts.endTime = rangeOptions.endTime;
-        }
-        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, opts);
+        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, { signal: AbortSignal.timeout(30000) });
+        if (apiResp.ok) analysis = await apiResp.json();
+        if (!analysis || analysis.code !== 0) throw clientErr;
       }
 
       currentAnalysis = analysis;
@@ -1087,6 +1215,7 @@
     if (!currentAnalysis || !currentAnalysis.candidates || currentAnalysis.candidates.length === 0) {
       if (zigzagSeries) zigzagSeries.setData([]);
       if (subwaveSeries) subwaveSeries.setData([]);
+      if (higherSeries) higherSeries.setData([]);
       if (channelUpperSeries) channelUpperSeries.setData([]);
       if (channelLowerSeries) channelLowerSeries.setData([]);
       setChartMarkers(candleSeries, []);
@@ -1130,6 +1259,12 @@
       } else {
         subwaveSeries.setData([]);
       }
+    }
+
+    // 2.5 多级别同屏: 高一级别计数 (与当前计数重合时不重复绘制)
+    if (higherSeries) {
+      const hc = higherDegreeCount(cand);
+      higherSeries.setData(showHigherDegree && hc ? hc.pivots.map(p => ({ time: p.time, value: p.price })) : []);
     }
 
     // 3. 绘制艾略特通道模块
@@ -1205,6 +1340,17 @@
   /**
    * 应用波浪标引 Markers (大浪圆标 + 嵌套小浪标引)
    */
+  /** 级别阶梯中的高一级别计数；与当前激活计数完全重合时返回 null (避免重复绘制) */
+  function higherDegreeCount(cand) {
+    const dl = currentAnalysis && currentAnalysis.degreeLadder;
+    const lvl = dl && dl.levels && dl.levels.find(l => l.degree === 'HIGHER');
+    const hc = lvl && lvl.count;
+    if (!hc || !hc.pivots || hc.pivots.length < 2) return null;
+    if (cand && cand.pivots && cand.pivots.length === hc.pivots.length &&
+      cand.pivots.every((p, i) => p.time === hc.pivots[i].time)) return null;
+    return hc;
+  }
+
   function applyMarkers(cand) {
     if (!candleSeries) return;
     if (!showMarkers || !cand || !cand.pivots) {
@@ -1244,6 +1390,24 @@
           shape: 'circle',
           text: sp.label ? `(${sp.label})` : '',
           size: 0.8
+        });
+      });
+    }
+
+    // 高一级别浪号: 用带括号的大写标注 (1)(2)…/(A)(B)(C)/(W)(X)(Y)，与本级别圆圈浪号区分
+    const hc = showHigherDegree ? higherDegreeCount(cand) : null;
+    if (hc) {
+      const hColor = getWaveChartColors().higherLabelColor;
+      hc.pivots.forEach((p, i) => {
+        const raw = String(hc.waveLabels[i] || '').replace('?', '');
+        if (!raw || raw === '0') return;
+        markers.push({
+          time: p.time,
+          position: p.type === 'high' ? 'aboveBar' : 'belowBar',
+          color: hColor,
+          shape: 'square',
+          text: `(${raw.toUpperCase()})${String(hc.waveLabels[i]).includes('?') ? '?' : ''} 大级别`,
+          size: 1
         });
       });
     }
@@ -1463,56 +1627,8 @@
       if (rs3) rs3.textContent = cand.rules.rule3_wave4_no_overlap !== false ? '严防死守' : '浪4底穿透浪1顶';
     }
 
-    // 核心监测点
-    const elPivotPrice = document.getElementById('wave-pivot-price');
-    const elPivotDiff = document.getElementById('wave-pivot-diff');
-    const elPivotDesc = document.getElementById('wave-pivot-desc');
-
-    if (cand.monitoringPivot) {
-      const pPrice = cand.monitoringPivot.price;
-      if (elPivotPrice) elPivotPrice.textContent = `$${pPrice.toLocaleString()}`;
-      if (elPivotDesc) elPivotDesc.textContent = cand.monitoringPivot.description || '';
-
-      if (elPivotDiff && curP > 0) {
-        const diff = curP - pPrice;
-        const pct = ((diff / pPrice) * 100).toFixed(2);
-        const isSafe = curP >= pPrice;
-        elPivotDiff.innerHTML = `距当前价: <strong style="color: ${isSafe ? 'var(--color-pos)' : 'var(--color-neg)'}">${diff >= 0 ? '+' : ''}$${Math.round(diff).toLocaleString()} (${pct}%)</strong> • 状态: <strong style="color: ${isSafe ? 'var(--color-pos)' : 'var(--color-neg)'}">${isSafe ? '防守有效' : '已跌破预警'}</strong>`;
-      }
-    }
-
-    // 斐波那契目标位
-    const tgtContainer = document.getElementById('wave-targets-list');
-    if (tgtContainer && cand.targets) {
-      tgtContainer.innerHTML = cand.targets.map(t => {
-        const diffPct = (((t.price - curP) / curP) * 100).toFixed(1);
-        const sign = t.price >= curP ? '+' : '';
-        return `
-          <div class="wave-target-row">
-            <span class="text-secondary">${t.label}</span>
-            <div style="text-align: right;">
-              <span class="wave-target-price">$${t.price.toLocaleString()}</span>
-              <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">(${sign}${diffPct}%)</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 4. 同步更新底部柳玉冬实战研判解读与监测点信号
-    if (window.LiuWaveEngine && typeof window.LiuWaveEngine.generateLiuCommentary === 'function') {
-      const activeCommentary = window.LiuWaveEngine.generateLiuCommentary(
-        cand,
-        curP,
-        currentAnalysis?.symbol || currentSymbol,
-        currentAnalysis?.timeframe || currentTf,
-        currentAnalysis
-      );
-      const elThesis = document.getElementById('wave-thesis-text');
-      const elBottomSignal = document.getElementById('wave-bottom-signal');
-      if (elThesis && activeCommentary) elThesis.textContent = activeCommentary.thesis;
-      if (elBottomSignal && activeCommentary) elBottomSignal.textContent = activeCommentary.bottomTopSignal;
-    }
+    // 核心监测点: 失效位 + 确认位 (方向与状态由引擎按价位所在一侧给出)
+    renderPivotCard(cand, curP);
 
     // 5. 动态穿透检测选中候选首浪的出身
     if (window.LiuWaveEngine && typeof window.LiuWaveEngine.analyzeOrigin === 'function' && currentBars && currentBars.length > 0) {
@@ -1685,55 +1801,6 @@
       }
     }
 
-    // 2. 阻碍诊断卡片 (为什么排除？)
-    const cardBlockers = document.getElementById('card-wave-blockers');
-    const blockersList = document.getElementById('wave-blockers-list');
-    if (cardBlockers && blockersList) {
-      const blockers = analysis.blockers || [];
-      if (blockers.length > 0) {
-        cardBlockers.style.display = 'block';
-        blockersList.innerHTML = blockers.map(b => `
-          <div class="blocker-item">${b}</div>
-        `).join('');
-      } else {
-        cardBlockers.style.display = 'none';
-      }
-    }
-
-    // 3. 发展可能性讨论 (情景分析)
-    const scenariosList = document.getElementById('wave-scenarios-list');
-    if (scenariosList) {
-      const scenarios = analysis.scenarios || [];
-      scenariosList.innerHTML = scenarios.map(s => `
-        <div class="scenario-card">
-          <div class="scenario-header">
-            <span>情景 ${s.rank || ''}: ${s.name}</span>
-            <span class="scenario-prob">概率 ${s.probability}%</span>
-          </div>
-          <div class="scenario-desc">${s.rationale || s.description || ''}</div>
-          <div class="scenario-pivots">
-            <div><span>确认触发点:</span> <strong>$${s.confirmTrigger ? s.confirmTrigger.toLocaleString() : '--'}</strong></div>
-            <div><span>失效临界位:</span> <strong>$${s.invalidationLevel ? s.invalidationLevel.toLocaleString() : '--'}</strong></div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // 4. 柳玉冬实战研判解读
-    const elThesis = document.getElementById('wave-thesis-text');
-    const elBottomSignal = document.getElementById('wave-bottom-signal');
-    const elQuote = document.getElementById('wave-quote-text');
-
-    if (analysis.commentary) {
-      if (elThesis) elThesis.textContent = analysis.commentary.thesis;
-      if (elBottomSignal) {
-        const extra = (analysis.commentary.liuLines || []).map(t => `· ${t}`).join('\n');
-        elBottomSignal.style.whiteSpace = 'pre-line';
-        elBottomSignal.textContent = analysis.commentary.bottomTopSignal + (extra ? `\n${extra}` : '');
-      }
-      if (elQuote) elQuote.textContent = analysis.commentary.quote;
-    }
-
     // 5. v3 柳氏实战信号 & 级别阶梯
     renderLiuSignals(analysis);
     renderDegreeLadder(analysis);
@@ -1815,6 +1882,51 @@
       </div>`;
   }
 
+  /** 柳玉冬核心监测点卡片: 失效位 (越过即计数失效) 与 确认位 (越过即确认本浪结束) */
+  function renderPivotCard(cand, curP) {
+    const elPrice = document.getElementById('wave-pivot-price');
+    const elDiff = document.getElementById('wave-pivot-diff');
+    const elDesc = document.getElementById('wave-pivot-desc');
+    const elLabel = document.getElementById('wave-pivot-label');
+    const elConfirm = document.getElementById('wave-pivot-confirm');
+    const fmt = v => `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    const verbOf = lv => lv.verb || (lv.price < curP ? '跌破' : '上破');
+    const distTxt = lv => {
+      if (!(curP > 0)) return '';
+      const pct = (lv.price / curP - 1) * 100;
+      return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    };
+    const mp = cand && cand.monitoringPivot;
+    if (!mp) {
+      if (elPrice) elPrice.textContent = '$--,---';
+      if (elDiff) elDiff.textContent = '该计数暂无明确失效位';
+      if (elDesc) elDesc.textContent = '';
+    } else {
+      const verb = verbOf(mp);
+      const ok = !mp.breached;
+      if (elLabel) elLabel.textContent = `失效位 · ${esc(mp.levelName || '')}（${verb}即当前计数失效）`;
+      if (elPrice) elPrice.textContent = fmt(mp.price);
+      if (elDiff) {
+        elDiff.innerHTML = `距现价 <strong>${distTxt(mp)}</strong>（在现价${mp.side === 'above' ? '上方' : '下方'}） • 状态：<strong style="color:${ok ? 'var(--color-pos)' : 'var(--color-neg)'}">${ok ? '未触发 · 计数有效' : `已${verb} · 计数存疑`}</strong>`;
+      }
+      if (elDesc) elDesc.textContent = `${verb} ${fmt(mp.price)} 则${mp.description || '当前计数失效'}。`;
+    }
+    const sp = cand && cand.secondaryPivot;
+    if (elConfirm) {
+      if (sp && isFinite(sp.price)) {
+        const verb = verbOf(sp);
+        elConfirm.style.display = 'block';
+        elConfirm.innerHTML = `
+          <div class="liu-signal-title"><span>${sp.role === 'reference' ? '参考位' : '确认位'} · ${esc(sp.levelName || '')}</span><span class="liu-chip ${sp.breached ? 'pos' : ''}">${sp.breached ? `已${verb}${sp.role === 'reference' ? '' : '·已确认'}` : (sp.role === 'reference' ? '未越过' : '未确认')}</span></div>
+          <div><strong>${fmt(sp.price)}</strong> · 距现价 ${distTxt(sp)}</div>
+          <div style="color:var(--text-muted);margin-top:2px">${verb}则${esc(sp.description || '')}</div>`;
+      } else {
+        elConfirm.style.display = 'none';
+        elConfirm.innerHTML = '';
+      }
+    }
+  }
+
   /** 主浪型卡片: 浪2/浪4 交替原则 与 联合形组成部分 */
   function renderStructureDetail(cand) {
     const el = document.getElementById('wave-structure-detail');
@@ -1834,6 +1946,11 @@
     if (comps && comps.length) {
       rows.push(`<div class="liu-signal-title" style="margin-top:${alt ? 8 : 0}px"><span>组成部分识别</span></div>`);
       rows.push(comps.map(c => `<div>${esc(c.label)} 浪：${esc(c.text)}${c.developing ? '（运行中）' : ''}</div>`).join(''));
+    }
+    const tws = (cand && cand.timeWindows) || [];
+    if (tws.length) {
+      rows.push(`<div class="liu-signal-title" style="margin-top:${rows.length ? 8 : 0}px"><span>时间规则 · 截止日期</span></div>`);
+      rows.push(tws.map(w => `<div style="${w.overdue ? 'color:var(--color-warn)' : ''}">${esc(w.text)}</div>`).join(''));
     }
     el.style.display = rows.length ? 'block' : 'none';
     el.innerHTML = rows.join('');
@@ -1861,7 +1978,8 @@
       const meta = l.pivotCount ? `<div style="font-size:0.6rem;color:var(--text-muted);font-weight:500">${l.pivotCount} 拐点</div>` : '';
       return `<div class="liu-ladder-row ${cls[l.degree] || ''}"><div class="deg">${esc(l.label)}${meta}</div><div>${txt}</div></div>`;
     }).join('');
-    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '');
+    const legend = '<div class="liu-nesting">图上同屏：<span style="color:#8b5cf6;font-weight:700">紫色粗线 (1)(A)</span> = 高一级别 · 彩色主线 ①Ⓐ = 本级别 · <span style="color:#06b6d4;font-weight:700">青色点线</span> = 小级别（开启「大浪嵌套小浪」）</div>';
+    el.innerHTML = rows + (dl.nesting ? `<div class="liu-nesting">${esc(dl.nesting.text)}</div>` : '') + legend;
   }
 
 
@@ -2001,6 +2119,16 @@
       btnSubwaves.addEventListener('click', () => {
         showSubwaves = !showSubwaves;
         btnSubwaves.classList.toggle('active', showSubwaves);
+        applyActiveCandidate(activeCandidateIndex);
+      });
+    }
+
+    // 多级别同屏开关 (高一级别计数)
+    const btnHigher = document.getElementById('btn-toggle-higher');
+    if (btnHigher) {
+      btnHigher.addEventListener('click', () => {
+        showHigherDegree = !showHigherDegree;
+        btnHigher.classList.toggle('active', showHigherDegree);
         applyActiveCandidate(activeCandidateIndex);
       });
     }
@@ -2323,22 +2451,25 @@
       interval: currentTf, tool,
       points: drawPoints.map(p => ({ time: p.time, price: p.price }))
     };
-    let res = null, err = null, offline = false;
+    // 浏览器端计算优先 (Render 免费档只有 0.1 CPU)，本地引擎不可用时才请求服务端
+    let res = null, err = null, offline = false, tried = false;
     try {
-      const r = await fetch('/api/wave/evaluate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body), signal: AbortSignal.timeout(30000)
-      });
-      const j = await r.json();
-      if (j && j.code === 0) res = j; else err = (j && j.error) || `HTTP ${r.status}`;
-      if (r.status >= 500) offline = true; // 后端取不到行情 → 本地引擎兜底
-    } catch (e) { offline = true; }
-    // 后端不可用时降级到浏览器引擎: 只有主周期K线，子浪判定精度降低
-    if (!res && offline && window.LiuWaveEngine && window.LiuWaveEngine.evaluateUserCount) {
+      res = await evaluateClientSide(currentSymbol, currentTf, currentBars, tool, body.points);
+      tried = !!res;
+    } catch (e) {
+      tried = true;
+      err = e.message; // 点位问题 (顺序/方向/点数)
+    }
+    if (!tried) {
       try {
-        res = window.LiuWaveEngine.evaluateUserCount(currentBars, currentSymbol, { tool, points: body.points, timeframe: currentTf });
-        res.localFallback = true;
-      } catch (e) { err = e.message; }
+        const r = await fetch('/api/wave/evaluate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body), signal: AbortSignal.timeout(30000)
+        });
+        const j = await r.json();
+        if (j && j.code === 0) res = j; else err = (j && j.error) || `HTTP ${r.status}`;
+        if (r.status >= 500) offline = true;
+      } catch (e) { offline = true; }
     }
     if (drawToolDone !== tool) return; // 评估期间用户已清除或重画
     if (!res) {
@@ -2359,7 +2490,7 @@
     renderUserOverlay();
     renderUserEval(res);
     setWaveStatus(`● 画浪评估：「${DRAW_TOOLS[tool].name}」按「${res.primary.name}」→ ${res.verdictLabel}` +
-      `${res.subTimeframes && res.subTimeframes.length ? ` · 子浪周期 ${res.subTimeframes.join('/')}` : ''}${res.localFallback ? ' · ⚠ 离线降级(无低周期数据)' : ''}`);
+      `${res.subTimeframes && res.subTimeframes.length ? ` · 子浪周期 ${res.subTimeframes.join('/')}` : ''}${res.subTimeframes && !res.subTimeframes.length ? ' · ⚠ 无低周期数据，子浪判定从略' : ''}`);
   }
 
   function renderUserEvalIdle() {
@@ -2493,9 +2624,6 @@
     init: function () {
       initEvents();
       initDrawEvents();
-      if (window.location.hash === '#wave-radar' || document.getElementById('view-wave-radar')?.classList.contains('active')) {
-        loadChartCandles(currentSymbol);
-      }
     },
     runAnalysis: runWaveAnalysis,
     loadCandles: loadChartCandles,
@@ -2506,7 +2634,9 @@
         initChart();
       }
       if (currentBars.length === 0) {
-        loadChartCandles(currentSymbol);
+        if (!initialLoadPromise) {
+          initialLoadPromise = loadChartCandles(currentSymbol).finally(() => { initialLoadPromise = null; });
+        }
       } else {
         const container = document.getElementById('wave-chart-container');
         if (container && waveChart) {

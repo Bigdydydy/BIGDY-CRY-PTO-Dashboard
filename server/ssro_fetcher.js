@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchWithTimeout } = require('./http_client');
+const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'ssro_chart.json');
 let inMemoryCache = null;
@@ -117,8 +117,10 @@ async function fetchBinanceBtcDaily(startDateStr = '2021-01-01') {
     const now = Date.now();
     const allKlines = [];
     while (start < now) {
-      const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${start}&limit=1000`;
-      const data = await fetchJson(url);
+      const pathAndQuery = `/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${start}&limit=1000`;
+      const res = await fetchBinanceSpot(pathAndQuery, { timeout: 12000, retries: 1 });
+      if (!res.ok) throw new Error(`HTTP ${res.status} from Binance ${pathAndQuery}`);
+      const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) break;
       allKlines.push(...data);
       const lastTime = data[data.length - 1][0];
@@ -385,10 +387,11 @@ async function getSsroData(force = false) {
 
   if (!force && !inMemoryCache && fs.existsSync(CACHE_FILE)) {
     try {
-      const stat = fs.statSync(CACHE_FILE);
-      if (now - stat.mtimeMs < CACHE_TTL_MS) {
-        inMemoryCache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-        lastFetchTime = stat.mtimeMs;
+      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      const cachedAt = cached && cached.updatedAt ? new Date(cached.updatedAt).getTime() : 0;
+      if (now - cachedAt < CACHE_TTL_MS) {
+        inMemoryCache = cached;
+        lastFetchTime = cachedAt;
         console.log('[SSRO] Served from warm disk cache');
         return inMemoryCache;
       }

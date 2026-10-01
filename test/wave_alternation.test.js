@@ -102,6 +102,29 @@ describe('Module 8 v3: 调整浪子形态识别与交替原则', () => {
     assert.strictEqual(comps[1].class.best.type, 'ZIGZAG');
   });
 
+  it('时间规则前瞻: 浪2运行中给出截止日期 (≤浪1用时×9, 手稿P34 M7)', () => {
+    const path = [100, 200, 160];
+    const { ev, pts } = build(path, [0, 1, 2]);
+    pts[2].open = true;
+    const g = _internal.mkGeom(pts);
+    const tw = _internal.buildTimeWindows('IMPULSE', g, 'DEVELOPING', ev);
+    const dl = tw.find(w => w.kind === 'deadline');
+    assert.ok(dl && dl.rule === 'M7');
+    assert.strictEqual(dl.maxBars, 9 * g.t[0]);
+    assert.strictEqual(dl.deadline, pts[1].time + 9 * g.t[0] * 3600);
+    assert.ok(/前结束/.test(dl.text));
+    assert.strictEqual(_internal.buildTimeWindows('IMPULSE', g, 'COMPLETED', ev).filter(w => w.kind === 'deadline').length, 0, '已完成的计数不再给截止日期');
+  });
+
+  it('时间规则前瞻: 收缩三角形给出边界交点日期（柳玉冬「交叉点在X日，必须在此之前突破」）', () => {
+    const path = [400, 370, 392, 376, 388, 380];
+    const { ev, pts } = build(path, [0, 1, 2, 3, 4, 5]);
+    const g = _internal.mkGeom(pts);
+    const apex = _internal.buildTimeWindows('TRIANGLE', g, 'COMPLETED', ev).find(w => w.kind === 'apex');
+    assert.ok(apex, '应给出三角形交点');
+    assert.ok(apex.deadline > pts[5].time);
+  });
+
   it('扩散平台形(穿头破脚): b浪越过a浪起点、c浪跌破a浪终点 → 硬规则通过并标注扩散平台形', () => {
     const P = (idx, price, type) => ({ idx, time: idx, price, type, confirmed: true });
     const pts = [P(0, 200, 'high'), P(10, 150, 'low'), P(22, 210, 'high'), P(34, 130, 'low')];
