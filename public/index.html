@@ -2046,6 +2046,20 @@
               </div>
             </div>
 
+            <!-- 画浪工具: 用户画浪 → 手稿铁律 + 15m 子浪证伪 + 柳氏监测点/目标 -->
+            <div class="wave-draw-toolbar" role="group" aria-label="画浪工具">
+              <span class="wave-draw-label">✏️ 画浪评估</span>
+              <button class="chart-tool-btn draw-tool-btn" data-tool="IMPULSE" title="推动浪：依次点击 0-1-2-3-4-5">推动浪 12345</button>
+              <button class="chart-tool-btn draw-tool-btn" data-tool="ABC" title="调整浪：依次点击 0-a-b-c">调整浪 abc</button>
+              <button class="chart-tool-btn draw-tool-btn" data-tool="WXY" title="联合调整：依次点击 0-w-x-y">wxy</button>
+              <button class="chart-tool-btn draw-tool-btn" data-tool="WXYXZ" title="三重调整：依次点击 0-w-x-y-x-z">wxyxz</button>
+              <button class="chart-tool-btn draw-tool-btn" data-tool="ABCDE" title="收缩三角形：依次点击 0-a-b-c-d-e">三角形 abcde</button>
+              <span class="wave-draw-sep"></span>
+              <button class="chart-tool-btn" id="btn-draw-undo" title="撤销上一个点 (Backspace)" disabled>撤销点</button>
+              <button class="chart-tool-btn" id="btn-draw-finish" title="未画完时提前评估 (Enter / 双击)，末浪按运行中处理" disabled>完成评估</button>
+              <button class="chart-tool-btn" id="btn-draw-clear" title="清除画浪">清除画浪</button>
+            </div>
+
             <!-- Range Selection Banner -->
             <div id="wave-range-banner" class="wave-range-banner" style="display: none;">
               <div class="range-banner-left">
@@ -2061,6 +2075,19 @@
 
           <!-- Right: Diagnostic & Liu Yudong Quantitative Radar -->
           <div class="wave-side-col">
+            <!-- 画浪评估 (用户画浪 → 铁律 / 15m 子浪 / 走势检验 / 监测点·失效位·目标) -->
+            <div class="bento-card" id="card-wave-user-eval">
+              <div class="card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div class="card-title-group">
+                    <h3>画浪评估 · 柳氏证伪</h3>
+                  </div>
+                  <span class="card-badge badge-neutral" id="wave-user-eval-badge">待画浪</span>
+                </div>
+              </div>
+              <div id="wave-user-eval-body" class="liu-signals-body"></div>
+            </div>
+
             <!-- 0. Parallel Candidate Waves Selector -->
             <div class="bento-card" id="card-wave-candidates">
               <div class="card-header">

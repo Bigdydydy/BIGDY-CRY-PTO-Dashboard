@@ -258,8 +258,6 @@
       g => ({ pass: g.t[1] <= 9 * g.t[0], detail: `浪2用时 ${g.t[1]} vs 浪1×9=${9 * g.t[0]}` })),
     rg('M8', C_TIME, true, null, 5, 'P43', '浪4时间超过浪3的2倍则否决原数浪', 1,
       g => ({ pass: g.t[3] <= 2 * g.t[2], detail: `浪4用时 ${g.t[3]} vs 浪3×2=${2 * g.t[2]}` })),
-    rg('M9', C_STRUCT, false, null, 2, 'P9-16', '出身检验：浪1内部应为五浪（驱动浪或引导楔形）', 2, null,
-      { struct: true, legs: [0], expect: ['5'] }),
     rg('G1', C_G_RATIO, false, null, 3, 'P34/P94', '浪2常见回撤为浪1的0.382~0.618倍', 1,
       g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.3 && r <= 0.7, detail: `回撤 ${fmtPct(r)}` }; }),
     rg('G2', C_G_RATIO, false, null, 3, 'P34', '浪2回撤超过浪1的80%则存疑', 1,
@@ -324,6 +322,22 @@
         }
         return { pass: worst <= EPS, detail: worst > EPS ? `浪4子浪切入浪1区 ${fmtNum(worst)}` : `浪4终点 ${fmtNum(g.p[4].price)} vs 浪1终点 ${fmtNum(g.p[1].price)}` };
       }, { slow: true }),
+    // 出身检验 (5-3-5-3-5): 浪1可为推动浪或引导楔形，浪3只能是推动浪，浪5可为推动浪或终结楔形
+    rg('M9', C_STRUCT, false, null, 2, 'P9-16', '出身检验：浪1内部应为五浪（推动浪或引导楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 0, '引导楔形')),
+    rg('M10', C_STRUCT, false, 'min', 4, 'P9-16 + 通用（EWI：楔形只出现在浪1/浪5/a浪/c浪）', '浪3内部应为五浪推动（不能是楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 2, null), { deferred: true }),
+    rg('M11', C_STRUCT, false, 'min', 6, 'P9-16 + 通用（EWI终结楔形）', '浪5内部应为五浪（推动浪或终结楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 4, '终结楔形'), { deferred: true }),
+    rg('M12', C_STRUCT, false, 'min', 6, 'P204 + 通用（EWI失败第五浪）', '失败第五浪（未越过浪3终点）内部仍须走满五浪，否则是浪4未完', 2,
+      (g, ev) => {
+        if (!truncatedFifth(g)) return { pass: true, neutral: true, detail: '浪5已越过浪3终点，非失败第五浪' };
+        return motiveLegCheck(g, ev, 4, '终结楔形');
+      }, { deferred: true }),
+    rg('G9', C_G_RATIO, false, null, 6, '通用（EWI失败第五浪）', '失败第五浪通常出现在特别强劲的浪3之后（浪3≥1.618×浪1）', 0.5,
+      g => truncatedFifth(g) && !g.p[5].open
+        ? { pass: g.l[2] >= 1.618 * g.l[0] - EPS, detail: `失败第五浪，浪3=浪1×${(g.l[2] / g.l[0]).toFixed(2)}` }
+        : { pass: true, neutral: true, detail: '浪5已越过浪3终点，非失败第五浪' }),
     rg('I2', C_G_PAT, false, null, 5, 'P85/P88 + 柳玉冬实战（赣锋2026-04-10「2浪是单锯齿，4浪是三角形」）', '交替原则：浪2与浪4宜一陡一横或一简一繁', 1,
       (g, ev) => {
         const alt = alternationFor(g, ev);
@@ -345,19 +359,26 @@
         const scale = g.l[0] / Math.max(1, g.p[3].idx - g.p[0].idx);
         return { pass: Math.abs(sA - sB) > 0.1 * scale, detail: `上轨斜率 ${sA.toFixed(4)} vs 下轨 ${sB.toFixed(4)}` };
       }),
-    rg('D3', C_G_RATIO, false, null, 6, '通用（EWI楔形条则）', '收缩楔形：浪3<浪1、浪4<浪2、浪5<浪3；扩散楔形反向且须一致', 1.5,
+    // 收缩/扩散由浪3与浪1之比决定，其后各浪须同向一致 (EWI 列为楔形定义)
+    rg('D3', C_PRICE, true, 'min', 5, '通用（EWI楔形条则）', '收缩楔形浪4<浪2、扩散楔形浪4>浪2（与浪3/浪1同向一致）', 1,
       g => {
         const contracting = g.l[2] < g.l[0];
-        const ok = contracting
-          ? (g.l[3] < g.l[1] + EPS && g.l[4] < g.l[2] + EPS)
-          : (g.l[3] > g.l[1] - EPS && g.l[4] > g.l[2] - EPS);
-        return { pass: ok, detail: `${contracting ? '收缩' : '扩散'}一致性 4/2=${(g.l[3] / g.l[1]).toFixed(2)} 5/3=${(g.l[4] / g.l[2]).toFixed(2)}` };
-      })
+        return { pass: contracting ? g.l[3] < g.l[1] + EPS : g.l[3] > g.l[1] - EPS, detail: `${contracting ? '收缩' : '扩散'} 3/1=${(g.l[2] / g.l[0]).toFixed(2)} 4/2=${(g.l[3] / g.l[1]).toFixed(2)}` };
+      }),
+    rg('D5', C_PRICE, true, 'min', 6, '通用（EWI楔形条则）', '收缩楔形浪5<浪3、扩散楔形浪5>浪3', 1,
+      g => {
+        const contracting = g.l[2] < g.l[0];
+        return { pass: contracting ? g.l[4] < g.l[2] + EPS : g.l[4] > g.l[2] - EPS, detail: `${contracting ? '收缩' : '扩散'} 5/3=${(g.l[4] / g.l[2]).toFixed(2)}` };
+      }),
+    rg('D4', C_STRUCT, false, 'min', 4, '通用（EWI：引导楔形5-3-5-3-5或3-3-3-3-3；终结楔形3-3-3-3-3）', '楔形浪1/3/5结构须一致，且与所处位置相符', 2,
+      (g, ev) => diagonalStructCheck(g, ev), { deferred: true })
   ];
 
   const ZIGZAG_RULES = [
-    rg('Z0', C_STRUCT, false, null, 2, 'P216', '出身检验：浪a内部应为五浪（驱动浪或引导楔形）', 2, null,
-      { struct: true, legs: [0], expect: ['5'] }),
+    rg('Z0', C_STRUCT, false, null, 2, 'P216', '出身检验：浪a内部应为五浪（推动浪或引导楔形）', 2,
+      (g, ev) => motiveLegCheck(g, ev, 0, '引导楔形')),
+    rg('Z7', C_STRUCT, false, 'min', 4, 'P216 + 通用（EWI终结楔形）', 'c浪内部应为五浪（推动浪或终结楔形）', 1.5,
+      (g, ev) => motiveLegCheck(g, ev, 2, '终结楔形'), { deferred: true }),
     rg('Z1', C_PRICE, true, 'min', 3, 'P213', 'b浪不小于a浪的20%', 1,
       g => ({ pass: g.l[1] >= 0.2 * g.l[0] - EPS, detail: `b/a=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('Z2', C_PRICE, true, null, 3, 'P213', 'b浪不能超过a浪起点', 1,
@@ -395,6 +416,8 @@
   const FLAT_RULES = [
     rg('F0', C_STRUCT, false, null, 2, 'P236/P251/P158', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
       { struct: true, legs: [0], expect: ['3'] }),
+    rg('F8', C_STRUCT, false, 'min', 4, 'P236 + 通用（EWI终结楔形）', 'c浪内部应为五浪（推动浪或终结楔形）', 1.5,
+      (g, ev) => motiveLegCheck(g, ev, 2, '终结楔形'), { deferred: true }),
     rg('F1', C_PRICE, true, 'min', 3, 'P234-235', 'b浪运行总量回撤不少于a浪运行总量的70%', 1,
       g => ({ pass: g.l[1] >= 0.7 * g.l[0] - EPS, detail: `b总量/a总量=${fmtPct(g.l[1] / g.l[0])}` })),
     rg('F2', C_PRICE, true, null, 3, 'P235', 'b浪运行总量小于a浪运行总量的2倍', 1,
@@ -505,6 +528,29 @@
       g => { const r1 = g.l[4] / g.l[3], r2 = g.l[4] / g.l[2]; return { pass: near(r1, [0.7], 0.25) || near(r2, [0.618], 0.25) || r1 < 0.9, detail: `e/d=${r1.toFixed(2)} e/c=${r2.toFixed(2)}` }; })
   ];
 
+  // 扩张三角形 (手稿第6章只讲收缩三角形；补主流 EWI 条则，标「通用」)：边界线 a-c 与 b-d 发散，
+  // 即 c 终点越过 a 终点、d 终点越过 b 终点；各段为三浪；位置与收缩三角形相同 (浪4、b浪、x浪、联合形末段)
+  const EXPANDING_TRIANGLE_RULES = [
+    rg('T0', C_STRUCT, false, null, 2, '通用（EWI扩张三角形3-3-3-3-3）', '出身检验：浪a内部应为三浪（调整浪结构）', 2, null,
+      { struct: true, legs: [0], expect: ['3'] }),
+    rg('E1', C_PRICE, true, 'min', 4, '通用（EWI扩张三角形）', '扩张三角形：c浪须大于b浪（c终点越过a终点，a-c线发散）', 1,
+      g => ({ pass: g.l[2] > g.l[1] + EPS, detail: `c/b=${(g.l[2] / g.l[1]).toFixed(2)}` })),
+    rg('E2', C_PRICE, true, 'min', 5, '通用（EWI扩张三角形）', '扩张三角形：d浪须大于c浪（d终点越过b终点，b-d线发散）', 1,
+      g => ({ pass: g.l[3] > g.l[2] + EPS, detail: `d/c=${(g.l[3] / g.l[2]).toFixed(2)}` })),
+    rg('E3', C_PRICE, true, 'min', 6, '通用（EWI扩张三角形）', '扩张三角形：e浪不小于d浪的50%', 1,
+      g => ({ pass: g.l[4] >= 0.5 * g.l[3] - EPS, detail: `e/d=${fmtPct(g.l[4] / g.l[3])}` })),
+    rg('EG1', C_G_RATIO, false, null, 3, '通用（EWI扩张三角形）', '扩张三角形b浪常大于a浪（各浪依次放大）', 1,
+      g => ({ pass: g.l[1] > g.l[0] - EPS, detail: `b/a=${(g.l[1] / g.l[0]).toFixed(2)}` })),
+    rg('EG2', C_G_RATIO, false, 'min', 6, '通用（EWI扩张三角形）', 'e浪常越过a-c线（e>d）', 1,
+      g => ({ pass: g.l[4] > g.l[3] - EPS, detail: `e/d=${(g.l[4] / g.l[3]).toFixed(2)}` })),
+    rg('EG3', C_G_RATIO, false, null, 5, '通用', '相邻各浪放大倍数常在1~1.618之间（远超则更像推动浪）', 1,
+      g => {
+        const rs = [];
+        for (let k = 1; k < g.l.length; k++) rs.push(g.l[k] / g.l[k - 1]);
+        return { pass: rs.slice(1).every(r => r <= 1.9), detail: rs.map(r => r.toFixed(2)).join(' / ') };
+      })
+  ];
+
   const DOUBLE_ZIGZAG_RULES = [
     rg('W0', C_STRUCT, false, null, 2, 'P362', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
       { struct: true, legs: [0], expect: ['3'] }),
@@ -579,7 +625,7 @@
       (g, ev) => {
         const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
         if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
-        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && /TRIANGLE/.test(c.class.best.type));
         return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
       }, { deferred: true }),
     rg('CG1', C_G_RATIO, false, 'min', 4, 'P131', 'y浪常见为w浪的1倍（扩展取点0-w-x）', 1,
@@ -611,7 +657,7 @@
       (g, ev) => {
         const comps = combinationComponents('COMBINATION', g, ev, g.p[g.p.length - 1].open ? 'RUNNING' : 'COMPLETED');
         if (!comps || !comps.some(c => c.class && c.class.best)) return { pass: true, neutral: true, detail: '组成部分结构不足未验' };
-        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && c.class.best.type === 'TRIANGLE');
+        const bad = comps.slice(0, -1).filter(c => c.class && c.class.best && /TRIANGLE/.test(c.class.best.type));
         return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
       }, { deferred: true }),
     rg('CG3', C_G_RATIO, false, 'min', 6, 'P132', 'z浪常见为y浪的1倍（扩展取点x-y-xx）', 1,
@@ -657,6 +703,7 @@
     ZIGZAG: { pts: 4, minDev: 3, name: '单锯齿调整浪', category: '调整浪', rules: ZIGZAG_RULES, labels: ['0', 'a', 'b', 'c'] },
     FLAT: { pts: 4, minDev: 3, name: '平台形调整浪', category: '调整浪', rules: FLAT_RULES, labels: ['0', 'a', 'b', 'c'] },
     TRIANGLE: { pts: 6, minDev: 4, name: '收缩三角形', category: '调整浪', rules: TRIANGLE_RULES, labels: ['0', 'a', 'b', 'c', 'd', 'e'] },
+    EXPANDING_TRIANGLE: { pts: 6, minDev: 4, name: '扩张三角形', category: '调整浪', rules: EXPANDING_TRIANGLE_RULES, labels: ['0', 'a', 'b', 'c', 'd', 'e'] },
     DOUBLE_ZIGZAG: { pts: 4, minDev: 4, name: '双锯齿调整浪', category: '联合调整', rules: DOUBLE_ZIGZAG_RULES, labels: ['0', 'w', 'x', 'y'] },
     TRIPLE_ZIGZAG: { pts: 6, minDev: 5, name: '三锯齿调整浪', category: '联合调整', rules: TRIPLE_ZIGZAG_RULES, labels: ['0', 'w', 'x', 'y', 'xx', 'z'] },
     COMBINATION: { pts: 4, minDev: 3, name: '双重横向整理', category: '联合调整', rules: COMBINATION_RULES, labels: ['0', 'w', 'x', 'y'] },
@@ -708,19 +755,22 @@
     const g = mkGeom(pts);
     const rules = kind === 'IMPULSE' ? MOTIVE_RULES.concat([IMPULSE_RULES[0]]) : MOTIVE_RULES.concat([DIAGONAL_RULES[0]]);
     for (const r of rules) {
-      if (r.struct || r.slow || (r.cat !== C_PRICE && r.cat !== C_TIME)) continue;
+      // 慢速规则 (如 I1 逐根扫描子浪) 在无K线时退化为端点检验，同样参与: 否则推动浪与楔形无从区分
+      if (r.struct || (r.cat !== C_PRICE && r.cat !== C_TIME)) continue;
       if (pts.length < r.need) continue;
       const res = r.test(g, null) || {};
       if (res.pass === false) {
         const open = !!pts[pts.length - 1].open;
-        if (!(open && r.pending === 'min')) return false;
+        if (!(open && r.pending === 'min' && r.need === pts.length)) return false;
       }
     }
     return true;
   }
 
   /** 在交替拐点序列 zp 上寻找覆盖全段的合规五浪计数 (允许跳点，严控防爆搜预算) */
-  function findMotiveCount(zp) {
+  function findMotiveCount(zp, kinds) {
+    kinds = kinds || ['IMPULSE', 'DIAGONAL'];
+    const ok = pts => kinds.some(k => motiveRulesOK(pts, k));
     const N = zp.length;
     if (N < 6) return false;
     let arr = zp;
@@ -735,19 +785,21 @@
     const last = len - 1;
     const path = [0];
     let budget = 2000;
+    let found = null;
 
     function rec(cur) {
       if (--budget <= 0) return false;
       if (path.length === 5) {
         if (((last - cur) & 1) === 0) return false;
         const pts = path.concat([last]).map(i => arr[i]);
-        return motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL');
+        if (ok(pts)) { found = pts; return true; }
+        return false;
       }
       for (let j = cur + 1; j < last; j++) {
         if (((j - cur) & 1) === 0) continue;
         path.push(j);
         const pts = path.map(i => arr[i]);
-        if (motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL')) {
+        if (ok(pts)) {
           if (rec(j)) return true;
         }
         path.pop();
@@ -755,7 +807,8 @@
       }
       return false;
     }
-    return rec(0);
+    // 返回找到的五浪拐点 (真值) 或 false
+    return rec(0) ? found : false;
   }
 
   /**
@@ -785,10 +838,79 @@
       const thr = Math.max(range * m, 1.2 * sAtr);
       const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
       if (anchored.length - 1 < 3) continue;
-      const is5 = anchored.length >= 6 && findMotiveCount(anchored);
-      return { label: is5 ? '5' : '3', subPivots: anchored, source: srcName };
+      const five = findMotiveTyped(anchored);
+      return { label: five ? '5' : '3', motive: five ? five.kind : null, subPivots: anchored, source: srcName };
     }
     return { label: 'unknown', subPivots: [], source: srcName };
+  }
+
+  /** 五浪计数并区分推动浪 / 楔形 (推动浪优先): {points, kind:'IMPULSE'|'DIAGONAL'} 或 null */
+  function findMotiveTyped(zp) {
+    if (zp.length < 6) return null;
+    const imp = findMotiveCount(zp, ['IMPULSE']);
+    if (imp) return { points: imp, kind: 'IMPULSE' };
+    const dia = findMotiveCount(zp, ['DIAGONAL']);
+    return dia ? { points: dia, kind: 'DIAGONAL' } : null;
+  }
+
+  /**
+   * 驱动段出身检验: 内部须为五浪。diagName 为该位置允许的楔形 ('引导楔形' / '终结楔形')，
+   * null 表示该位置不允许楔形 (浪3)。
+   */
+  function motiveLegCheck(g, ev, li, diagName) {
+    if (!ev || !ev.bars) return { pass: true, neutral: true, detail: '无K线数据未验' };
+    if (li + 1 >= g.p.length) return { pass: true, neutral: true, detail: '该浪尚未出现' };
+    const st = legStructure(g, li, ev);
+    const nm = g.p.length <= 4 ? `${'abc'[li]}浪` : `浪${li + 1}`;
+    const src = st.source ? `（${st.source}）` : '';
+    if (st.label === 'unknown') return { pass: true, neutral: true, detail: `${nm}小级别数据不足，结构未验证` };
+    if (st.label !== '5') return { pass: false, detail: `${nm}：非五浪${src}` };
+    if (st.motive === 'DIAGONAL' && !diagName) return { pass: false, detail: `${nm}只能数成楔形${src}——浪3不能是楔形` };
+    return { pass: true, detail: `${nm}：${st.motive === 'DIAGONAL' ? diagName : '五浪推动'}${src}` };
+  }
+
+  /** 失败第五浪 (截断): 浪5未越过浪3终点 */
+  function truncatedFifth(g) {
+    return g.p.length >= 6 && g.d * (g.p[5].price - g.p[3].price) <= 0;
+  }
+
+  /**
+   * 楔形所处位置: 引导楔形只出现在浪1/a浪 (新趋势起点)，终结楔形只出现在浪5/c浪 (同向趋势末端)。
+   * 取楔形起点之前 1.5 倍楔形长度 (至少 20 根) 的窗口:
+   *   起点是窗口内的反向极值 (上升楔形起点为窗口最低) → 新趋势起点 → 'LEADING'
+   *   窗口内已有更远的反向极值且窗口起点在起点反侧 (同向趋势已运行一段) → 'ENDING'
+   *   其余 (横盘 / 数据不足) → null
+   */
+  function diagonalRole(g, ev) {
+    const bars = ev && (ev.ctxBars || ev.bars);
+    if (!bars || bars.length < 10) return null;
+    const p0 = g.p[0], pN = g.p[g.p.length - 1], d = g.d;
+    const idxOf = t => { let i = bars.findIndex(b => b.time >= t); return i < 0 ? bars.length - 1 : i; };
+    const i0 = idxOf(p0.time), iN = idxOf(pN.time);
+    const from = i0 - Math.max(20, Math.round(1.5 * (iN - i0)));
+    if (from < 0) return null;
+    let ext = d > 0 ? Infinity : -Infinity;
+    for (let i = from; i < i0; i++) ext = d > 0 ? Math.min(ext, bars[i].low) : Math.max(ext, bars[i].high);
+    if (d * (p0.price - ext) <= EPS) return 'LEADING';
+    if (d * (p0.price - bars[from].close) > 0) return 'ENDING';
+    return null;
+  }
+
+  /** 楔形浪1/3/5结构一致性 (全为五浪=5-3-5-3-5 引导楔形；全为三浪=3-3-3-3-3) 及与位置相符 */
+  function diagonalStructCheck(g, ev) {
+    if (!ev || !ev.bars) return { pass: true, neutral: true, detail: '无K线数据未验' };
+    const n = g.p.length, lastOpen = !!g.p[n - 1].open;
+    // 运行中的末浪内部尚未走完，不参与一致性比较
+    const legs = [0, 2, 4].filter(li => li + 1 < n && !(lastOpen && li + 1 === n - 1)).map(li => ({ li, st: legStructure(g, li, ev) }));
+    const known = legs.filter(x => x.st.label !== 'unknown');
+    const role = diagonalRole(g, ev);
+    const roleTxt = role === 'LEADING' ? '位置：新趋势起点（浪1/a浪）' : role === 'ENDING' ? '位置：同向趋势末端（浪5/c浪）' : '位置不明';
+    const desc = known.map(x => `浪${x.li + 1}:${x.st.label === '5' ? '五浪' : '三浪'}`).join(' ');
+    if (known.length < 2) return { pass: true, neutral: true, detail: `子浪结构不足未验；${roleTxt}` };
+    const fives = known.filter(x => x.st.label === '5').length;
+    if (fives && fives < known.length) return { pass: false, detail: `${desc}——浪1/3/5结构不一致；${roleTxt}` };
+    if (fives && role === 'ENDING') return { pass: false, detail: `${desc}——5-3-5-3-5只能是引导楔形，但${roleTxt}` };
+    return { pass: true, detail: `${desc}（${fives ? '5-3-5-3-5' : '3-3-3-3-3'}）；${roleTxt}` };
   }
 
   function evalStructRule(r, g, ev) {
@@ -804,7 +926,7 @@
       const ok = st.label === 'unknown' || st.label === expect;
       if (!ok) allPass = false;
       const legName = (g.p.length === 4) ? 'abc'[li] : (g.p.length === 6 ? '12345'[li] : `${li + 1}`);
-      parts.push(`浪${legName}:${st.label === '5' ? '五浪' : st.label === '3' ? '非五浪' : '级别不足'}${st.source ? `(${st.source})` : ''}`);
+      parts.push(`浪${legName}:${st.label === '5' ? (st.motive === 'DIAGONAL' ? '五浪(楔形)' : '五浪') : st.label === '3' ? '非五浪' : '级别不足'}${st.source ? `(${st.source})` : ''}`);
     }
     if (!anyEval) return { pass: true, neutral: true, detail: '小级别数据不足，结构未验证' };
     return { pass: allPass, detail: parts.join(' ') };
@@ -816,22 +938,43 @@
   //     多个子级别阈值并行尝试，保留每种浪型的最佳匹配。数据不足如实返回空，不编造。
   // ---------------------------------------------------------------------------
 
-  const CORRECTIVE_TYPES = ['ZIGZAG', 'FLAT', 'TRIANGLE', 'DOUBLE_ZIGZAG', 'COMBINATION', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'];
+  const CORRECTIVE_TYPES = ['ZIGZAG', 'FLAT', 'TRIANGLE', 'EXPANDING_TRIANGLE', 'DOUBLE_ZIGZAG', 'COMBINATION', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'];
   // 陡峭(sharp)=锯齿族；横向(sideways)=平台/三角/联合。简单=单一形态；复杂=双重/三重
-  const CORR_FORM = { ZIGZAG: 'sharp', DOUBLE_ZIGZAG: 'sharp', TRIPLE_ZIGZAG: 'sharp', FLAT: 'sideways', TRIANGLE: 'sideways', COMBINATION: 'sideways', TRIPLE_COMBINATION: 'sideways' };
-  const CORR_COMPLEXITY = { ZIGZAG: 'simple', FLAT: 'simple', TRIANGLE: 'simple', DOUBLE_ZIGZAG: 'complex', TRIPLE_ZIGZAG: 'complex', COMBINATION: 'complex', TRIPLE_COMBINATION: 'complex' };
+  const CORR_FORM = { ZIGZAG: 'sharp', DOUBLE_ZIGZAG: 'sharp', TRIPLE_ZIGZAG: 'sharp', FLAT: 'sideways', TRIANGLE: 'sideways', EXPANDING_TRIANGLE: 'sideways', COMBINATION: 'sideways', TRIPLE_COMBINATION: 'sideways' };
+  const CORR_COMPLEXITY = { ZIGZAG: 'simple', FLAT: 'simple', TRIANGLE: 'simple', EXPANDING_TRIANGLE: 'simple', DOUBLE_ZIGZAG: 'complex', TRIPLE_ZIGZAG: 'complex', COMBINATION: 'complex', TRIPLE_COMBINATION: 'complex' };
   const FORM_TXT = { sharp: '陡', sideways: '横' };
   const CPLX_TXT = { simple: '简单', complex: '复杂' };
+
+  /**
+   * 主周期拐点在低周期中的精确时刻: 主K线 [t, t+主周期) 内创出该极值的那根低周期K线。
+   * 主周期K线时间为开盘时刻，极值可能发生在其内部任一时刻；不精化则低周期截段会漏掉终点极值。
+   */
+  function refineSubTime(s, p, mainTfSec) {
+    const t0 = p.time, t1 = p.time + mainTfSec;
+    let lo = 0, hi = s.bars.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (s.bars[mid].time < t0) lo = mid + 1; else hi = mid; }
+    let best = null;
+    for (let i = lo; i < s.bars.length && s.bars[i].time < t1; i++) {
+      const b = s.bars[i];
+      if (!best || (p.type === 'high' ? b.high > best.high : b.low < best.low)) best = b;
+    }
+    return best ? best.time : t0;
+  }
 
   /** 腿 pA→pB 的K线段: 优先更低周期数据源, 否则按时间截取主周期 */
   function legSegment(pA, pB, ev) {
     const t0 = pA.time, t1 = pB.time;
     if (ev.sources) {
+      // 画浪评估模式 (ev.refineSubTimes): 端点精化到低周期极值时刻，放宽单段根数上限，要求低周期数据完整覆盖该段
+      const refine = !!ev.refineSubTimes && ev.mainTfSec > 0;
+      const maxBars = ev.maxSubBars || 900;
       for (const s of ev.sources) {
         if (s.isMain) continue;
-        const b = s.bars.filter(x => x.time >= t0 && x.time <= t1);
-        if (b.length >= 12 && b.length <= 900 &&
-          (b[b.length - 1].time - b[0].time) >= 0.6 * (t1 - t0)) return { seg: b, srcName: s.name };
+        const a = refine ? refineSubTime(s, pA, ev.mainTfSec) : t0;
+        const z = refine ? refineSubTime(s, pB, ev.mainTfSec) : t1;
+        const b = s.bars.filter(x => x.time >= a && x.time <= z);
+        if (b.length >= 12 && b.length <= maxBars &&
+          (b[b.length - 1].time - b[0].time) >= (refine ? 0.9 : 0.6) * (z - a)) return { seg: b, srcName: s.name };
       }
     }
     // 按时间截取: 拐点 idx 相对于分析切片，调用方传入的 bars 可能是全量K线
@@ -927,7 +1070,7 @@
       return {
         type, name: PATTERNS[type].name, form: CORR_FORM[type], complexity: CORR_COMPLEXITY[type],
         score: Math.round(100 * h.score), complete: h.complete, subSwings: h.subSwings,
-        points: h.pts.map(q => ({ time: q.time, price: q.price }))
+        points: h.pts.map(q => ({ time: q.time, price: q.price, type: q.type }))
       };
     }).sort((a, b) => (Number(b.complete) - Number(a.complete)) || (b.score - a.score) ||
       (a.complexity === 'simple' ? -1 : 1) - (b.complexity === 'simple' ? -1 : 1));
@@ -964,7 +1107,7 @@
     if (n === 4) {
       // 浪3运行中: 由浪2形态预判浪4
       out.expectWave4 = f2 === 'sharp'
-        ? { form: 'sideways', types: ['FLAT', 'TRIANGLE', 'COMBINATION'], text: '浪2为陡峭锯齿 → 浪4预期横向：平台形 / 收缩三角形 / 联合形，回撤偏浅(0.236~0.382)、用时偏长' }
+        ? { form: 'sideways', types: ['FLAT', 'TRIANGLE', 'EXPANDING_TRIANGLE', 'COMBINATION'], text: '浪2为陡峭锯齿 → 浪4预期横向：平台形 / 三角形 / 联合形，回撤偏浅(0.236~0.382)、用时偏长' }
         : f2 === 'sideways'
           ? { form: 'sharp', types: ['ZIGZAG', 'DOUBLE_ZIGZAG'], text: '浪2为横向调整 → 浪4预期陡峭：单锯齿 / 双锯齿，回撤可较深、用时偏短' }
           : { form: null, types: [], text: r2 >= 0.5 ? '浪2回撤较深(≥0.5) → 浪4倾向浅而横' : '浪2回撤较浅 → 浪4倾向深而陡' };
@@ -1059,7 +1202,8 @@
 
     function account(r, res) {
 
-      const openSuppressed = lastOpen && r.pending === 'min' && res.pass === false;
+      // 最低要求类只在其最后一个涉及点 (第 need 个点) 即未确认末点时暂缓；更早的点已确认，照常否决
+      const openSuppressed = lastOpen && r.pending === 'min' && r.need === points.length && res.pass === false;
       const check = {
         id: r.id, cat: r.cat, page: r.page, text: r.text, hard: !!r.hard,
         pass: res.pass !== false, pending: !!res.pending, neutral: !!res.neutral,
@@ -1227,7 +1371,11 @@
         secondaryPivot = lvl(p[0].price, 'a浪起点·反转确认线', '确认原趋势已经反转');
       }
     } else if (type === 'TRIANGLE') {
-      if (n === 4) {
+      if (n === 3) {
+        [0.618, 0.786, 1].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `b浪≈${r}×a浪`, r)));
+        targets.push(tgt(p[1].price - d * 0.5 * l[0], 'b浪最低要求: 0.5×a浪(P302)', 0.5));
+        monitoringPivot = lvl(p[1].price - d * 1.5 * l[0], 'b浪上限: 1.5×a浪(P302/P310)', 'b浪超过a浪1.5倍则三角形假设作废');
+      } else if (n === 4) {
         targets.push(tgt(p[2].price + d * 0.618 * l[0], 'c浪≈0.618×a浪(P327)', 0.618));
         targets.push(tgt(p[2].price + d * 0.786 * l[0], 'c浪≈0.786×a浪', 0.786));
         monitoringPivot = lvl(p[1].price, 'b浪起点·c浪禁区', 'c浪大于b浪，三角形计数失效（手稿P302）');
@@ -1247,8 +1395,32 @@
         monitoringPivot = lvl(p[5].price, 'e浪终点·三角形防线', 'e浪仍在延长，“三角形已完成”需重估（手稿P352: 下一浪须从e浪终点起步）');
         secondaryPivot = lvl(bdNow, 'b-d趋势线·突破确认', '突破三角形，确认突破浪展开（手稿P349-350）；反扑回到区间内即判误');
       }
+    } else if (type === 'EXPANDING_TRIANGLE') {
+      if (n === 3) {
+        [1, 1.272].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `b浪≈${r}×a浪（扩张）`, r)));
+        monitoringPivot = lvl(p[1].price, 'a浪终点·c浪须越过此位', 'b浪继续延长不影响计数；c浪须越过a浪终点');
+      } else if (n === 4) {
+        targets.push(tgt(p[1].price, 'c浪最低要求: 越过a浪终点（扩张）', null));
+        [1.272, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[1], `c浪≈${r}×b浪`, r)));
+        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪防线', '回到b浪终点之外则b浪尚未结束');
+        secondaryPivot = lvl(p[1].price, 'a浪终点·发散要求', 'c浪越过a浪终点，a-c线发散');
+      } else if (n === 5) {
+        targets.push(tgt(p[2].price, 'd浪最低要求: 越过b浪终点（扩张）', null));
+        [1.272, 1.618].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `d浪≈${r}×c浪`, r)));
+        monitoringPivot = lvl(p[3].price, 'c浪终点·d浪防线', '越过c浪终点则c浪尚未结束');
+        secondaryPivot = lvl(p[2].price, 'b浪终点·发散要求', 'd浪越过b浪终点，b-d线发散');
+      } else if (status !== 'COMPLETED') {
+        targets.push(tgt(p[4].price + d * 0.5 * l[3], 'e浪最低要求: 0.5×d浪', 0.5));
+        [1, 1.272].forEach(r => targets.push(tgt(p[4].price + d * r * l[3], `e浪≈${r}×d浪（越过a-c线）`, r)));
+        monitoringPivot = lvl(p[4].price, 'd浪终点·e浪防线', '越过d浪终点则d浪尚未结束');
+      } else {
+        monitoringPivot = lvl(p[5].price, 'e浪终点·扩张三角形防线', 'e浪仍在延长，扩张三角形已完成的判断需重估');
+        secondaryPivot = lvl(p[4].price, 'd浪终点·反向确认线', '越过d浪终点，确认扩张三角形结束、下一浪展开');
+      }
     } else if (type === 'COMBINATION' || type === 'TRIPLE_COMBINATION') {
-      const triple = type === 'TRIPLE_COMBINATION';
+      // 三重形态只画到 y 浪 (n<5) 时，与双重形态的 w-x-y 取点相同
+      const triple = type === 'TRIPLE_COMBINATION' && n >= 5;
+      if (type === 'TRIPLE_COMBINATION' && n === 4) status = 'RUNNING';
       if (!triple && n === 3) {
         targets.push(tgt(p[1].price - d * 0.7 * l[0], 'x浪最低要求: 0.7×w浪(P50)', 0.7));
         [1.0, 1.382].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `x=w×${r}`, r)));
@@ -1274,8 +1446,13 @@
         secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '该调整大概率已经结束');
       }
     } else if (type === 'DOUBLE_ZIGZAG' || type === 'TRIPLE_ZIGZAG') {
-      const triple = type === 'TRIPLE_ZIGZAG';
-      if (!triple && n === 4 && status !== 'COMPLETED') {
+      const triple = type === 'TRIPLE_ZIGZAG' && n >= 5;
+      if (type === 'TRIPLE_ZIGZAG' && n === 4) status = 'RUNNING';
+      if (n === 3) {
+        [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(p[1].price - d * r * l[0], `x浪回撤w浪×${r}`, r)));
+        targets.push(tgt(p[1].price - d * 0.2 * l[0], 'x浪最低要求: 0.2×w浪(P362)', 0.2));
+        monitoringPivot = lvl(p[0].price, 'w浪起点·x浪禁区', '手稿P362: x浪及其子浪不能超过w浪起点');
+      } else if (!triple && n === 4 && status !== 'COMPLETED') {
         targets.push(tgt(p[2].price + d * 0.9 * l[0], 'y浪最低要求: 0.9×w浪(P372)', 0.9));
         [1, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `y=w×${r}`, r)));
         monitoringPivot = lvl(p[2].price, 'x浪终点·y浪禁区', 'y浪计数失效（手稿P372）');
@@ -1341,6 +1518,14 @@
         return { type: 'PARALLEL', baseLine: { pA: pt(p[2]), pB: pt(p[4]) }, parallelLine: { p: pt(p[3]) }, note: '推动浪辅助通道: 2-4 基线过浪3平行轨（仅供视觉参考，非波浪判定标准）' };
       }
       return { type: 'PARALLEL', baseLine: { pA: pt(p[0]), pB: pt(p[2]) }, parallelLine: { p: pt(p[1]) }, note: '早期辅助通道: 0-2 基线过浪1平行轨（仅供视觉参考，非波浪判定标准）' };
+    }
+    if (type === 'EXPANDING_TRIANGLE' && n >= 5) {
+      return {
+        type: 'CONVERGING',
+        upperLine: { pA: pt(p[1]), pB: pt(p[3]) },
+        lowerLine: { pA: pt(p[2]), pB: pt(p[4]) },
+        note: '扩张三角形边界发散线: a-c 与 b-d（仅供视觉参考，非波浪判定标准）'
+      };
     }
     if (type === 'TRIANGLE' && n >= 5) {
       return {
@@ -1463,14 +1648,15 @@
   function stageText(type, n, status) {
     const M = {
       IMPULSE: { 3: '浪2回撤中', 4: '浪3运行中', 5: '浪4调整中', 6: status === 'COMPLETED' ? '五浪完成·待调整' : '浪5运行中' },
-      DIAGONAL: { 5: '楔形浪4运行中', 6: status === 'COMPLETED' ? '楔形完成' : '楔形浪5运行中' },
+      DIAGONAL: { 3: '楔形浪2回撤中', 4: '楔形浪3运行中', 5: '楔形浪4运行中', 6: status === 'COMPLETED' ? '楔形完成' : '楔形浪5运行中' },
       ZIGZAG: { 3: 'b浪运行中', 4: status === 'COMPLETED' ? '锯齿完成' : 'c浪运行中' },
       FLAT: { 3: 'b浪运行中', 4: status === 'COMPLETED' ? '平台形完成' : 'c浪运行中' },
-      TRIANGLE: { 4: 'c浪收敛中', 5: 'd浪收敛中', 6: status === 'COMPLETED' ? '三角形完成·等待突破' : 'e浪收敛中' },
-      DOUBLE_ZIGZAG: { 4: status === 'COMPLETED' ? '双锯齿完成' : 'y浪运行中' },
-      TRIPLE_ZIGZAG: { 5: 'xx浪运行中', 6: status === 'COMPLETED' ? '三锯齿完成' : 'z浪运行中' },
+      TRIANGLE: { 3: 'b浪收敛中', 4: 'c浪收敛中', 5: 'd浪收敛中', 6: status === 'COMPLETED' ? '三角形完成·等待突破' : 'e浪收敛中' },
+      EXPANDING_TRIANGLE: { 3: 'b浪扩张中', 4: 'c浪扩张中', 5: 'd浪扩张中', 6: status === 'COMPLETED' ? '扩张三角形完成' : 'e浪扩张中' },
+      DOUBLE_ZIGZAG: { 3: 'x浪运行中', 4: status === 'COMPLETED' ? '双锯齿完成' : 'y浪运行中' },
+      TRIPLE_ZIGZAG: { 3: 'x浪运行中', 4: 'y浪运行中', 5: 'xx浪运行中', 6: status === 'COMPLETED' ? '三锯齿完成' : 'z浪运行中' },
       COMBINATION: { 3: 'x浪运行中', 4: status === 'COMPLETED' ? '双重横向整理完成' : 'y浪运行中' },
-      TRIPLE_COMBINATION: { 5: 'xx浪运行中', 6: status === 'COMPLETED' ? '三重横向整理完成' : 'z浪运行中' }
+      TRIPLE_COMBINATION: { 3: 'x浪运行中', 4: 'y浪运行中', 5: 'xx浪运行中', 6: status === 'COMPLETED' ? '三重横向整理完成' : 'z浪运行中' }
     };
     return (M[type] && M[type][n]) || '演化中';
   }
@@ -1526,14 +1712,34 @@
     let subtype = '';
     if (h.type === 'FLAT' && n === 4) subtype = flatSubtype(g);
     if (h.type === 'TRIANGLE' && n >= 3) subtype = triSubtype(g);
+    // 楔形角色: 5-3-5-3-5 只能是引导楔形；3-3-3-3-3 按所处位置区分引导 / 终结
+    let diagRole = null;
+    const structNotes = [];
+    const hasEv = !!(ev && ev.bars);
+    const legSt = li => (hasEv && li + 1 < n ? legStructure(g, li, ev) : null);
     if (h.type === 'DIAGONAL') {
-      const i0 = h.idxs[0];
-      const sameDirBefore = i0 >= 2 && (g.d * (pivs[i0 - 1].price - pivs[i0 - 2].price) > 0);
-      subtype = sameDirBefore ? '终结楔形倾向' : '引导楔形倾向';
+      const pos = diagonalRole(g, ev);
+      const odd = [0, 2, 4].filter(li => !(h.status !== 'COMPLETED' && li + 1 === n - 1)).map(legSt).filter(st => st && st.label !== 'unknown');
+      const all5 = odd.length >= 2 && odd.every(st => st.label === '5');
+      const all3 = odd.length >= 2 && odd.every(st => st.label === '3');
+      diagRole = all5 ? 'LEADING' : pos;
+      const shape = n >= 4 ? (g.l[2] < g.l[0] ? '收缩' : '扩散') : '';
+      const base = diagRole === 'LEADING' ? '引导楔形' : diagRole === 'ENDING' ? '终结楔形' : '楔形';
+      subtype = `${shape}${base}${all5 ? '（5-3-5-3-5）' : all3 ? '（3-3-3-3-3）' : ''}`;
+      if (all5 && pos === 'ENDING') structNotes.push('5-3-5-3-5 只能是引导楔形，但所处位置像趋势末端');
+      if (!diagRole) structNotes.push('位置不明：处于新趋势起点则为引导楔形，处于同向趋势末端则为终结楔形');
+    } else if (hasEv && (h.type === 'IMPULSE' || h.type === 'ZIGZAG' || h.type === 'FLAT')) {
+      const isImp = h.type === 'IMPULSE';
+      const first = isImp || h.type === 'ZIGZAG' ? legSt(0) : null;
+      const last = legSt(isImp ? 4 : 2);
+      if (first && first.motive === 'DIAGONAL') structNotes.push(`${isImp ? '浪1' : 'a浪'}为引导楔形`);
+      if (last && last.motive === 'DIAGONAL') structNotes.push(`${isImp ? '浪5' : 'c浪'}为终结楔形`);
     }
+    if (h.type === 'IMPULSE' && h.status === 'COMPLETED' && truncatedFifth(g)) structNotes.push('失败第五浪');
 
     const stage = stageText(h.type, n, h.status);
-    const name = `${subtype ? subtype : def.name}（${dirTxt}·${stage}）`;
+    const noteTxt = structNotes.filter(x => !/^位置不明|^5-3-5-3-5/.test(x)).join('·');
+    const name = `${subtype ? subtype : def.name}（${dirTxt}·${stage}${noteTxt ? '·' + noteTxt : ''}）`;
 
     const metrics = {};
     if (h.type === 'IMPULSE' || h.type === 'DIAGONAL') {
@@ -1544,7 +1750,7 @@
     } else if (h.type === 'ZIGZAG' || h.type === 'FLAT') {
       metrics.retrace_B = +(g.l[1] / g.l[0]).toFixed(3);
       if (n >= 4) metrics.ratio_C_A = +(g.l[2] / g.l[0]).toFixed(3);
-    } else if (h.type === 'TRIANGLE') {
+    } else if (h.type === 'TRIANGLE' || h.type === 'EXPANDING_TRIANGLE') {
       metrics.ratio_B_A = +(g.l[1] / g.l[0]).toFixed(3);
       if (n >= 4) metrics.ratio_C_B = +(g.l[2] / g.l[1]).toFixed(3);
       if (n >= 5) metrics.ratio_D_C = +(g.l[3] / g.l[2]).toFixed(3);
@@ -1565,7 +1771,19 @@
     }
 
     const levels = buildLevels(h.type, g, h.status, ev);
-    if (ev && ev.bars && h.status === 'COMPLETED' && h.type !== 'TRIANGLE') {
+    if (h.status === 'COMPLETED') {
+      // 终结楔形结束后通常急速回到楔形起点；引导楔形之后的浪2常深回撤 (EWI)
+      const endDiagStart = h.type === 'DIAGONAL' && diagRole === 'ENDING' ? g.p[0]
+        : structNotes.includes('浪5为终结楔形') ? g.p[4]
+          : structNotes.includes('c浪为终结楔形') ? g.p[2] : null;
+      if (endDiagStart) {
+        levels.targets.unshift(tgt(endDiagStart.price, '终结楔形起点：楔形结束后常急速回到此处（EWI）', null));
+      } else if (h.type === 'DIAGONAL' && diagRole === 'LEADING') {
+        const total = Math.abs(g.p[n - 1].price - g.p[0].price);
+        [0.618, 0.786].forEach(r => levels.targets.unshift(tgt(g.p[n - 1].price - g.d * r * total, `引导楔形后浪2常深回撤×${r}（EWI）`, r)));
+      }
+    }
+    if (ev && ev.bars && h.status === 'COMPLETED' && !/TRIANGLE/.test(h.type)) {
       // 柳玉冬「必须跌破4944才能确认橙线结束」: 结束确认看最后一浪内部最后一个小级别回撤点，
       // 主级别结构位 (浪4 / b浪终点) 保留为更大级别确认
       const st = legStructure(g, n - 2, ev);
@@ -1633,6 +1851,7 @@
       status: h.status, currentWave: stage,
       pivots: g.p.map(q => ({ idx: q.idx, time: q.time, price: q.price, type: q.type, confirmed: q.confirmed !== false })),
       waveLabels, subPivots,
+      structureNotes: structNotes, diagonalRole: diagRole,
       metrics, rules, ruleChecks: evalRes.checks.map(c => ({ id: c.id, category: CAT_NAMES[c.cat], page: c.page, text: c.text, hard: c.hard, pass: c.pass, pending: c.pending, detail: c.detail })),
       pendingCount: evalRes.pending.length,
       guidePct: evalRes.guide.weight ? Math.round(100 * evalRes.guide.weightGot / evalRes.guide.weight) : 0,
@@ -2702,7 +2921,7 @@
       return result;
     }
 
-    const ev = { bars: slice, highs, lows, sources, structCache: new Map() };
+    const ev = { bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map() };
     const blockMap = new Map();
     result.liuSignals = buildLiuSignals(slice, main.pivots, ev);
     const cands = collectCandidates(main.pivots, ev, slice.length, rangeExtrema, precedingContext, blockMap);
@@ -2804,6 +3023,627 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 9.5 用户画浪评估: 主周期(4H)上画浪 → 手稿铁律 → 低周期(15m/1h)子浪证伪 → 走势检验
+  //   柳玉冬判定一个浪型成立与否的次序:
+  //     ① 手稿铁律 (价格/时间硬规则) —— 违反即否决
+  //     ② 出身: 驱动段内部须为五浪、调整段内部为三浪 (「这个上涨不是推动浪，看作对黑线的反弹」
+  //        「红线走势是完美的5-3-5结构」「还在4子浪调整，再冲到5子浪才形成推动」)
+  //     ③ 走势检验: 画完之后是否越过终点 / 触及铁律位 (「如果不跌继续创新高，则红线不是abc反弹」)
+  //     ④ 前序: 调整浪不能收复被调整的前一段 (吃掉前段比例)
+  //   证伪须有确证: 期望五浪的段，任一子级别阈值能数成合规五浪即视为五浪；
+  //   期望三浪的段，只以最粗一级子浪结构判定，避免噪声拐点「数出」五浪。
+  // ---------------------------------------------------------------------------
+
+  const USER_TOOLS = {
+    IMPULSE: { name: '推动浪 12345', labels: ['0', '1', '2', '3', '4', '5'], types: ['IMPULSE', 'DIAGONAL'] },
+    ABC: { name: '调整浪 abc', labels: ['0', 'a', 'b', 'c'], types: ['ZIGZAG', 'FLAT'] },
+    WXY: { name: '调整浪 wxy', labels: ['0', 'w', 'x', 'y'], types: ['DOUBLE_ZIGZAG', 'COMBINATION'] },
+    WXYXZ: { name: '调整浪 wxyxz', labels: ['0', 'w', 'x', 'y', 'xx', 'z'], types: ['TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'] },
+    ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], types: ['TRIANGLE', 'EXPANDING_TRIANGLE'] }
+  };
+
+  // 各浪型逐段内部结构要求 ('5'=驱动五浪, '3'=调整三浪) 及手稿依据
+  const SUB_EXPECT = {
+    IMPULSE: { legs: ['5', '3', '5', '3', '5'], page: 'P9-16（5-3-5-3-5）' },
+    DIAGONAL_LEADING: { legs: ['5', '3', '5', '3', '5'], page: '通用（引导楔形5-3-5-3-5）' },
+    DIAGONAL_THREES: { legs: ['3', '3', '3', '3', '3'], page: '通用（终结楔形3-3-3-3-3；引导楔形亦可为3-3-3-3-3）' },
+    ZIGZAG: { legs: ['5', '3', '5'], page: 'P216（5-3-5）' },
+    FLAT: { legs: ['3', '3', '5'], page: 'P236（3-3-5）' },
+    TRIANGLE: { legs: ['3', '3', '3', '3', '3'], page: 'P272-276（3-3-3-3-3）' },
+    EXPANDING_TRIANGLE: { legs: ['3', '3', '3', '3', '3'], page: '通用（EWI扩张三角形3-3-3-3-3）' },
+    DOUBLE_ZIGZAG: { legs: ['3', '3', '3'], page: 'P362（w、y为锯齿）' },
+    COMBINATION: { legs: ['3', '3', '3'], page: 'P50/P158' },
+    TRIPLE_ZIGZAG: { legs: ['3', '3', '3', '3', '3'], page: 'P362/P385' },
+    TRIPLE_COMBINATION: { legs: ['3', '3', '3', '3', '3'], page: 'P51/P158' }
+  };
+
+  const VERDICTS = {
+    INVALID: '否决（违反手稿铁律）',
+    FALSIFIED_SUB: '小级别证伪（子浪结构不符）',
+    FALSIFIED_PRICE: '走势证伪（画完后的走势打破计数）',
+    DOUBT: '存疑',
+    VALID: '成立'
+  };
+
+  const SUB_ROMAN = ['0', 'i', 'ii', 'iii', 'iv', 'v'];
+
+  function fmtTs(t) {
+    if (!t && t !== 0) return '--';
+    return new Date(t * 1000).toISOString().slice(5, 16).replace('T', ' ');
+  }
+
+  function nearestBarIdx(bars, t) {
+    let lo = 0, hi = bars.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (bars[mid].time < t) lo = mid + 1; else hi = mid; }
+    if (lo > 0 && Math.abs(bars[lo - 1].time - t) <= Math.abs(bars[lo].time - t)) return lo - 1;
+    return lo;
+  }
+
+  function legNameOf(label) {
+    return /^\d$/.test(label) ? `浪${label}` : `${label}浪`;
+  }
+
+  /**
+   * 手画点吸附: 每个点在 ±w 根K线内取真实极值 (高点取 high、低点取 low)，不越过相邻点。
+   * 首段方向按用户点击价格判定，之后高低严格交替。
+   */
+  function snapUserPoints(bars, raw, labels) {
+    const n = raw.length;
+    const idx = raw.map(r => nearestBarIdx(bars, r.time));
+    for (let i = 1; i < n; i++) {
+      if (idx[i] <= idx[i - 1]) throw new Error(`第 ${i + 1} 个点须晚于第 ${i} 个点，且相邻两点不能落在同一根 K 线上`);
+    }
+    const d0 = raw[1].price >= raw[0].price ? 1 : -1;
+    const pts = [], adjustments = [];
+    for (let i = 0; i < n; i++) {
+      const type = ((i % 2 === 0) === (d0 > 0)) ? 'low' : 'high';
+      const gapL = i > 0 ? idx[i] - idx[i - 1] : Infinity;
+      const gapR = i < n - 1 ? idx[i + 1] - idx[i] : Infinity;
+      const w = Math.max(1, Math.min(6, Math.round(0.3 * Math.min(gapL, gapR))));
+      const lo = Math.max(i > 0 ? pts[i - 1].idx + 1 : 0, idx[i] - w);
+      const hi = Math.min(i < n - 1 ? idx[i + 1] - 1 : bars.length - 1, idx[i] + w);
+      let best = idx[i];
+      for (let k = lo; k <= hi; k++) {
+        if (type === 'high' ? bars[k].high > bars[best].high : bars[k].low < bars[best].low) best = k;
+      }
+      const price = type === 'high' ? bars[best].high : bars[best].low;
+      pts.push({ idx: best, time: bars[best].time, price, type, confirmed: true });
+      if (best !== idx[i] || Math.abs(price - raw[i].price) > 1e-6 * Math.max(1, Math.abs(price))) {
+        adjustments.push({ point: labels[i], fromTime: raw[i].time, fromPrice: raw[i].price, toTime: bars[best].time, toPrice: price, barsMoved: best - idx[i] });
+      }
+    }
+    for (let i = 1; i < n; i++) {
+      const up = pts[i].type === 'high';
+      if (up ? pts[i].price <= pts[i - 1].price : pts[i].price >= pts[i - 1].price) {
+        throw new Error(`${legNameOf(labels[i])}方向与画浪顺序不符：吸附后终点 ${fmtNum(pts[i].price)} ${up ? '不高于' : '不低于'}起点 ${fmtNum(pts[i - 1].price)}，请按高低交替的顺序点击`);
+      }
+    }
+    return { pts, adjustments };
+  }
+
+  /** 取点检验: 每段内部是否有K线越过该段起点/终点 (端点不是该段极值) */
+  function legEndpointIssues(bars, pts, labels) {
+    const issues = [];
+    for (let li = 0; li + 1 < pts.length; li++) {
+      const A = pts[li], B = pts[li + 1], up = B.type === 'high';
+      let overEnd = null, overStart = null;
+      for (let k = A.idx + 1; k < B.idx; k++) {
+        const e = up ? bars[k].high : bars[k].low, s = up ? bars[k].low : bars[k].high;
+        if ((up ? e > B.price : e < B.price) && (!overEnd || (up ? e > overEnd.price : e < overEnd.price))) overEnd = { idx: k, price: e };
+        if ((up ? s < A.price : s > A.price) && (!overStart || (up ? s < overStart.price : s > overStart.price))) overStart = { idx: k, price: s };
+      }
+      const nm = legNameOf(labels[li + 1]);
+      if (overEnd) {
+        issues.push({ leg: li, kind: 'END_NOT_EXTREME', price: overEnd.price, time: bars[overEnd.idx].time,
+          text: `${nm}内部${up ? '最高' : '最低'} ${fmtNum(overEnd.price)}（${fmtTs(bars[overEnd.idx].time)}）越过你标的终点 ${fmtNum(B.price)}：终点应取在该段真正的极值处（手稿：浪的价格=起点到终点）` });
+      }
+      if (overStart) {
+        issues.push({ leg: li, kind: 'START_NOT_EXTREME', price: overStart.price, time: bars[overStart.idx].time,
+          text: `${nm}内部${up ? '跌破' : '涨破'}了起点 ${fmtNum(A.price)}（至 ${fmtNum(overStart.price)}）：起点不是本段极值，除非为扩散平台形b浪的运行总量` });
+      }
+    }
+    return issues;
+  }
+
+  /**
+   * 子浪结构探测 (低周期优先): 返回最粗一级的结构判定 coarse、任一阈值下的合规五浪 any5，
+   * 以及严格五浪 strict5 —— 自然级别(最粗一级)恰为5段且逐点满足推动浪铁律 (不跳点)。
+   * 期望五浪的段用 any5 (证伪驱动段须确证其数不成五浪)；期望三浪的段用 strict5
+   * (拐点一多总能「挑」出合规五浪子集，只有清晰的五段推进才足以质疑调整段)。
+   */
+  const PROBE_MULTS = [0.30, 0.236, 0.18, 0.14, 0.10, 0.07, 0.05];
+  const PROBE_MAX_SWINGS = 13;
+
+  function probeLegStructure(pA, pB, ev) {
+    const { seg, srcName } = legSegment(pA, pB, ev);
+    const out = { source: srcName || null, bars: seg ? seg.length : 0, coarse: null, any5: null, strict5: false, noisy: false };
+    if (!seg || seg.length < 6) return out;
+    const range = Math.abs(pB.price - pA.price);
+    if (!(range > 0)) return out;
+    const sAtr = avgTR(seg) || range / seg.length;
+    const ps = { idx: 0, time: seg[0].time, price: pA.price, type: pA.type, confirmed: true };
+    const pe = { idx: seg.length - 1, time: seg[seg.length - 1].time, price: pB.price, type: pB.type, confirmed: true };
+    // 由粗到细寻找该段的「自然子级别」: 首个出现 ≥3 段的阈值即本段的子浪级别；
+    // 超过 13 段视为噪声级别 (低周期上逆向波动已与本段幅度相当)，不再细分
+    let lastThr = null;
+    for (const m of PROBE_MULTS) {
+      const thr = Math.max(range * m, 1.2 * sAtr);
+      if (thr === lastThr) continue;
+      lastThr = thr;
+      const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
+      const swings = anchored.length - 1;
+      if (swings < 3) continue;
+      if (swings > PROBE_MAX_SWINGS) { if (!out.coarse) out.noisy = true; break; }
+      const five = anchored.length >= 6 ? findMotiveTyped(anchored) : null;
+      if (!out.coarse) {
+        out.coarse = { label: five ? '5' : '3', swings, anchored, motive: five ? five.points : null };
+        out.strict5 = anchored.length === 6 && motiveRulesOK(anchored, 'IMPULSE');
+      }
+      if (five && !out.any5) out.any5 = { points: five.points, swings, kind: five.kind };
+      if (out.any5) break;
+    }
+    return out;
+  }
+
+  /** 运行中驱动段的小级别进度: 能否数成 0-1-2-3 (3子浪已现，尚欠4、5子浪) */
+  function motivePrefix123(zp) {
+    const last = zp.length - 1;
+    if (last < 3) return null;
+    for (let a = 1; a < last; a += 2) {
+      for (let b = a + 1; b < last; b += 2) {
+        const pts = [zp[0], zp[a], zp[b], Object.assign({}, zp[last], { open: true })];
+        if (motiveRulesOK(pts, 'IMPULSE') || motiveRulesOK(pts, 'DIAGONAL')) return pts;
+      }
+    }
+    return null;
+  }
+
+  function subLabeled(points, labels) {
+    return (points || []).map((q, i) => ({ time: q.time, price: q.price, type: q.type, label: labels[i] || '' }));
+  }
+
+  /** 单段子浪判定 → PASS / FAIL(strong) / DOUBT(medium) / RUNNING / UNKNOWN */
+  function judgeLeg(li, expect, probe, legName, running, corrClass) {
+    const src = probe.source || '主周期';
+    const base = { leg: li, name: legName, expect, source: probe.source, bars: probe.bars, running: !!running };
+    if (!probe.coarse && probe.noisy) {
+      // 即使取本段幅度的30%为阈值仍有13段以上的来回: 内部大幅重叠，这是调整浪的特征、不是推动浪的特征
+      if (expect === '3' || running) {
+        return Object.assign(base, { found: '3', status: running ? 'RUNNING' : 'PASS', severity: null, swings: PROBE_MAX_SWINGS + 1, subPoints: [],
+          text: `${legName}${running ? '运行中' : ''}：${src} 内部反复大幅重叠（逆向波动达本段幅度30%以上的来回超过13段）${expect === '3' ? '，属调整性质 ✓' : '，目前不像推动浪'}` });
+      }
+      return Object.assign(base, { found: '3', status: 'DOUBT', severity: 'medium', swings: PROBE_MAX_SWINGS + 1, subPoints: [],
+        text: `${legName}：${src} 内部反复大幅重叠（逆向波动达本段幅度30%以上的来回超过13段），不像推动浪，存疑` });
+    }
+    if (!probe.coarse) {
+      return Object.assign(base, { found: 'unknown', status: 'UNKNOWN', severity: null, swings: 0, subPoints: [],
+        text: `${legName}：${!probe.bars ? '低周期数据未覆盖该段，子浪无法验证' : !probe.source ? (probe.bars <= 4 ? '该段过短（低周期不足 12 根），子浪不可辨' : '低周期数据未完整覆盖该段（画浪起点过早），子浪无法在低周期验证') : probe.noisy ? `${src} 逆向波动与本段幅度相当，子浪级别不可辨（该段相对 ${src} 太小）` : `${src} 内部为单边推进，子浪不可辨`}` });
+    }
+    const swings = probe.coarse.swings;
+    if (expect === '5') {
+      if (probe.any5) {
+        return Object.assign(base, { found: '5', status: 'PASS', severity: null, swings: probe.any5.swings,
+          subPoints: subLabeled(probe.any5.points, SUB_ROMAN),
+          text: running
+            ? `${legName}运行中：${src} 已可数满五浪（i-v）✓——本段随时可能结束，以小级别监测点确认`
+            : `${legName}：${src} 可数为合规五浪（i-v）✓` });
+      }
+      if (running) {
+        const pre = motivePrefix123(probe.coarse.anchored);
+        return Object.assign(base, { found: '3', status: 'RUNNING', severity: null, swings,
+          subPoints: pre ? subLabeled(pre, SUB_ROMAN) : subLabeled(probe.coarse.anchored, []),
+          text: pre
+            ? `${legName}运行中：${src} 已现 i-ii-iii 子浪，尚欠 iv、v 子浪——「还在4子浪调整，再冲到5子浪才形成推动」`
+            : `${legName}运行中：${src} 目前只有 ${swings} 段，尚不能数成五浪；若最终走不出五浪，则这一段不是推动浪` });
+      }
+      return Object.assign(base, { found: '3', status: 'FAIL', severity: 'strong', swings,
+        subPoints: subLabeled(probe.coarse.anchored, []),
+        text: swings === 3
+          ? `${legName}：${src} 只走了3段，不是推动浪 ✗——按柳玉冬「不是推动浪，看作反弹/回调」，该段不能标为驱动段`
+          : `${legName}：${src} 内部 ${swings} 段无法数成合规五浪 ✗（浪2越起点/浪3最短/浪4切入等铁律不过）` });
+    }
+    // 期望三浪 (调整段)
+    const clsTxt = corrClass && corrClass.best ? `，形态：${describeClass(corrClass)}` : '';
+    const clsPts = corrClass && corrClass.best ? corrClass.best.points : null;
+    if (!probe.strict5) {
+      return Object.assign(base, { found: '3', status: running ? 'RUNNING' : 'PASS', severity: null, swings,
+        subPoints: clsPts ? subLabeled(clsPts, ['0', 'a', 'b', 'c', 'd', 'e']) : subLabeled(probe.coarse.anchored, []),
+        text: `${legName}${running ? '运行中' : ''}：${src} 内部为三浪调整结构${clsTxt} ✓` });
+    }
+    return Object.assign(base, { found: '5', status: 'DOUBT', severity: 'medium', swings,
+      subPoints: subLabeled(probe.coarse.anchored, SUB_ROMAN),
+      text: running
+        ? `${legName}运行中：${src} 内部已走出五浪——这只是${legName}的第一部分(a)，${legName}尚未结束`
+        : `${legName}：${src} 内部清晰可数为五浪，作为调整段存疑——更可能只是更大调整的a浪（${legName}未完），或趋势已反转` });
+  }
+
+  /**
+   * 走势检验: 画完之后的价格行为。
+   * ① 末点之后价格越过末点 → 末浪延伸，末点后移至新极值
+   * ② 末点之后的反向运动 → 未画完时视作下一浪运行中 (追加 open 点)
+   */
+  function projectLive(slice, pts, fullPts, atr) {
+    const n = pts.length, lastBar = slice.length - 1;
+    const live = pts.map(q => Object.assign({}, q));
+    let last = live[n - 1];
+    const d = last.type === 'high' ? 1 : -1;
+    let extension = null;
+    for (let i = last.idx + 1; i <= lastBar; i++) {
+      const v = d > 0 ? slice[i].high : slice[i].low;
+      if (d * (v - (extension ? extension.price : last.price)) > 0) extension = { idx: i, price: v };
+    }
+    if (extension) {
+      live[n - 1] = { idx: extension.idx, time: slice[extension.idx].time, price: extension.price, type: last.type, confirmed: true };
+      last = live[n - 1];
+    }
+    let rev = null;
+    for (let i = last.idx + 1; i <= lastBar; i++) {
+      const v = d > 0 ? slice[i].low : slice[i].high;
+      if (!rev || d * (rev.price - v) > 0) rev = { idx: i, price: v };
+    }
+    const lastLeg = Math.abs(last.price - live[n - 2].price);
+    const revSize = rev ? Math.abs(rev.price - last.price) : 0;
+    const revSignificant = !!rev && revSize >= Math.max(2 * atr, 0.1 * lastLeg);
+    let appended = false;
+    if (n < fullPts && revSignificant) {
+      live.push({ idx: rev.idx, time: slice[rev.idx].time, price: rev.price, type: d > 0 ? 'low' : 'high', confirmed: false, open: true });
+      appended = true;
+    }
+    const tail = live[live.length - 1];
+    if (tail.idx >= lastBar - 1) { tail.open = true; tail.confirmed = false; }
+    let status;
+    if (live.length < fullPts) status = 'DEVELOPING';
+    else status = (tail.open || !revSignificant) ? 'RUNNING' : 'COMPLETED';
+    return {
+      pts: live, status, appended,
+      extension: extension ? { fromPrice: pts[n - 1].price, toPrice: extension.price, time: slice[extension.idx].time } : null,
+      reverse: rev ? { price: rev.price, time: slice[rev.idx].time, size: revSize, ratioOfLastLeg: lastLeg > 0 ? +(revSize / lastLeg).toFixed(3) : null, significant: revSignificant } : null
+    };
+  }
+
+  /** 前序检验: 被调整的前一段 (主周期 Zigzag 上 p0 之前最近的反向拐点 → p0) */
+  function precedingSwing(bars, i0, p0) {
+    const from = Math.max(0, i0 - 300);
+    const seg = bars.slice(from, i0 + 1);
+    if (seg.length < 10) return null;
+    const pv = zigzagPivots(seg, 2 * (avgTR(seg) || 0));
+    for (let k = pv.length - 1; k >= 0; k--) {
+      if (pv[k].type !== p0.type && pv[k].idx < seg.length - 1) {
+        return { price: pv[k].price, time: pv[k].time, type: pv[k].type, length: Math.abs(p0.price - pv[k].price) };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 用户画浪评估主入口。
+   * options: { tool: 'IMPULSE'|'ABC'|'WXY'|'WXYXZ'|'ABCDE', points: [{time, price}],
+   *            timeframe, subBars: { '15m': [...], '1h': [...] }, htfBars, compare }
+   */
+  function evaluateUserCount(bars, symbol, options) {
+    options = options || {};
+    const tool = USER_TOOLS[options.tool];
+    if (!tool) throw new Error(`未知画浪工具「${options.tool}」，可选: ${Object.keys(USER_TOOLS).join(' / ')}`);
+    if (!bars || bars.length < 10) throw new Error('K线数据不足，无法评估画浪');
+    const raw = (options.points || [])
+      .filter(p => p && isFinite(p.time) && isFinite(p.price))
+      .map(p => ({ time: +p.time, price: +p.price }));
+    const fullPts = tool.labels.length;
+    if (raw.length < 3) throw new Error('至少需要 3 个点（起点 + 两段浪）才能评估');
+    if (raw.length > fullPts) throw new Error(`「${tool.name}」最多 ${fullPts} 个点`);
+
+    const timeframe = options.timeframe || '4h';
+    const tfSec = TF_SEC[timeframe] || 14400;
+    const i0Full = nearestBarIdx(bars, raw[0].time);
+    const sStart = Math.max(0, i0Full - 60);
+    const slice = bars.slice(sStart);
+    const highs = slice.map(b => b.high), lows = slice.map(b => b.low);
+    const atr = avgTR(slice);
+    const lastBar = slice.length - 1;
+    const currentPrice = slice[lastBar].close;
+    const labels = tool.labels;
+
+    const { pts, adjustments } = snapUserPoints(slice, raw, labels);
+    const n = pts.length;
+    if (pts[n - 1].idx >= lastBar - 1) { pts[n - 1].open = true; pts[n - 1].confirmed = false; }
+    const drawStatus = n < fullPts ? 'DEVELOPING' : (pts[n - 1].open ? 'RUNNING' : 'COMPLETED');
+    const endpointIssues = legEndpointIssues(slice, pts, labels);
+
+    // 低周期数据源: 由细到粗 (15m → 1h)，子浪判定优先最细且完整覆盖该段者
+    const sources = [{ name: timeframe, tfSec, bars: slice, isMain: true }];
+    const subMap = options.subBars || {};
+    for (const tf of Object.keys(subMap)) {
+      const arr = subMap[tf];
+      if (Array.isArray(arr) && arr.length >= 8 && (TF_SEC[tf] || 0) < tfSec) sources.push({ name: tf, tfSec: TF_SEC[tf] || 900, bars: arr });
+    }
+    sources.sort((a, b) => a.tfSec - b.tfSec);
+    const subNames = sources.filter(s => !s.isMain).map(s => s.name);
+    const mkEv = () => ({ bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map(), refineSubTimes: true, mainTfSec: tfSec, maxSubBars: 4000 });
+
+    const live = projectLive(slice, pts, fullPts, atr);
+    const lp = live.pts;
+
+    // 逐段子浪探测 (以走势检验后的端点为准: 末浪若已延伸则量到新极值)；结果按端点缓存，各浪型解读共用
+    const probeEv = mkEv();
+    const probeCache = new Map();
+    const probe = (a, b) => {
+      const k = a.time + '_' + b.time;
+      if (!probeCache.has(k)) {
+        // 最细周期噪声过大时退到次细周期 (15m → 1h)
+        let pr = probeLegStructure(a, b, probeEv);
+        const tried = new Set();
+        while (pr.noisy && pr.source && !tried.has(pr.source)) {
+          tried.add(pr.source);
+          const evNext = Object.assign({}, probeEv, { sources: sources.filter(s => s.isMain || !tried.has(s.name)) });
+          const next = probeLegStructure(a, b, evNext);
+          if (!next.source) break;
+          pr = next;
+        }
+        probeCache.set(k, pr);
+      }
+      return probeCache.get(k);
+    };
+
+    function subAnalysis(type, pointsUsed) {
+      let key = type;
+      if (type === 'DIAGONAL') {
+        let lead = 0, end = 0;
+        for (const li of [0, 2, 4]) {
+          if (li + 1 >= pointsUsed.length) continue;
+          const pr = probe(pointsUsed[li], pointsUsed[li + 1]);
+          if (pr.any5) lead++;
+          else if (pr.coarse) end++;
+        }
+        key = end > lead ? 'DIAGONAL_THREES' : 'DIAGONAL_LEADING';
+      }
+      // 各位置允许的楔形: 浪1/a浪=引导楔形，浪5/c浪=终结楔形，浪3不能是楔形
+      const diagAt = { IMPULSE: { 0: '引导楔形', 4: '终结楔形' }, ZIGZAG: { 0: '引导楔形', 2: '终结楔形' }, FLAT: { 2: '终结楔形' } }[type] || null;
+      const spec = SUB_EXPECT[key];
+      const legs = [];
+      const ev = mkEv();
+      for (let li = 0; li + 1 < pointsUsed.length; li++) {
+        const A = pointsUsed[li], B = pointsUsed[li + 1];
+        const pr = probe(A, B);
+        const expect = spec.legs[li];
+        const running = li + 1 === pointsUsed.length - 1 && !!B.open;
+        // 形态识别与结构判定用同一周期 (噪声段可能已退到 1h)
+        const evLeg = pr.source ? Object.assign(mkEv(), { sources: sources.filter(s => s.isMain || s.name === pr.source) }) : ev;
+        const corrClass = expect === '3' && pr.coarse ? classifyCorrectiveLeg(A, B, evLeg, running) : null;
+        const lbl = PATTERNS[type].labels[li + 1];
+        const L = judgeLeg(li, expect, pr, legNameOf(lbl), running, corrClass);
+        if (diagAt && L.found === '5' && pr.any5 && pr.any5.kind === 'DIAGONAL') {
+          const nm = diagAt[li];
+          if (nm) {
+            L.diagonal = nm;
+            L.text = L.text.replace('✓', `（${nm}）✓`);
+          } else {
+            Object.assign(L, { status: 'DOUBT', severity: 'medium',
+              text: `${legNameOf(lbl)}：${pr.source || '主周期'} 只能数成楔形、数不成推动浪——浪3不能是楔形，存疑` });
+          }
+        }
+        legs.push(L);
+      }
+      return { key, page: spec.page, legs };
+    }
+
+    /** 预置结构缓存: 让规则库中的出身检验(M9/Z0/F0...)与交替原则使用同一份低周期判定 */
+    function evFor(sub, pointsUsed) {
+      const ev = mkEv();
+      sub.legs.forEach(L => {
+        const A = pointsUsed[L.leg], B = pointsUsed[L.leg + 1];
+        const pr = probe(A, B);
+        const label = !pr.coarse ? (pr.noisy ? '3' : 'unknown') : L.expect === '5' ? (pr.any5 ? '5' : '3') : (pr.strict5 ? '5' : '3');
+        const subPivots = L.expect === '5' && pr.any5 ? pr.any5.points : pr.coarse ? pr.coarse.anchored : [];
+        const motive = label === '5' && pr.any5 ? pr.any5.kind : null;
+        ev.structCache.set(A.time + '_' + B.time, { label, motive, subPivots, source: pr.source });
+      });
+      return ev;
+    }
+
+    function interpret(type) {
+      const def = PATTERNS[type];
+      if (n > def.pts) return null;
+      const idxs = pts.map((_, i) => i);
+      const sub = subAnalysis(type, lp.slice(0, n));
+      const evD = evFor(sub, pts);
+      const drawnEval = evaluatePattern(type, pts, evD);
+      const drawnCand = buildCandidate({ type, idxs, status: drawStatus }, drawnEval, evD, pts);
+      let liveEval = null, liveCand = null, liveSub = sub;
+      if (lp.length <= def.pts) {
+        liveSub = live.appended ? subAnalysis(type, lp) : sub;
+        const evL = evFor(liveSub, lp);
+        liveEval = evaluatePattern(type, lp, evL);
+        liveCand = buildCandidate({ type, idxs: lp.map((_, i) => i), status: live.status }, liveEval, evL, lp);
+      }
+      if (type === 'DIAGONAL') {
+        // buildCandidate 已按结构与位置命名；用户画浪以所画各段的结构为准
+        const role = sub.key === 'DIAGONAL_LEADING' ? 'LEADING' : diagonalRole(mkGeom(pts), evD);
+        const shape = pts.length >= 4 ? (Math.abs(pts[3].price - pts[2].price) < Math.abs(pts[1].price - pts[0].price) ? '收缩' : '扩散') : '';
+        const nm = `${shape}${role === 'LEADING' ? '引导楔形' : role === 'ENDING' ? '终结楔形' : '楔形'}${sub.key === 'DIAGONAL_LEADING' ? '（5-3-5-3-5）' : '（3-3-3-3-3）'}`;
+        drawnCand.name = drawnCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
+        if (liveCand) liveCand.name = liveCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
+      }
+      const strong = sub.legs.filter(L => L.severity === 'strong');
+      const medium = sub.legs.filter(L => L.severity === 'medium');
+      return {
+        type, name: drawnCand.name, structureKey: sub.key, structurePage: sub.page,
+        hardFails: drawnEval.hardFails.map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail })),
+        pending: drawnEval.pending.map(c => ({ id: c.id, text: c.text, page: c.page })),
+        guidePct: drawnCand.guidePct,
+        legs: sub.legs, liveLegs: liveSub.legs,
+        strongCount: strong.length, mediumCount: medium.length,
+        drawn: drawnCand,
+        live: liveCand,
+        // 走势检验只在画完后的计数与所画不同 (末浪延伸 / 追加下一浪) 时才有新增信息
+        liveHardFails: liveEval && (live.appended || live.extension)
+          ? liveEval.hardFails.map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail })) : []
+      };
+    }
+
+    const rank = (a, b) => (a.hardFails.length - b.hardFails.length) || (a.strongCount - b.strongCount) ||
+      (a.liveHardFails.length - b.liveHardFails.length) || (a.mediumCount - b.mediumCount) || (b.guidePct - a.guidePct);
+    const interps = tool.types.map(interpret).filter(Boolean).sort(rank);
+    if (!interps.length) throw new Error(`「${tool.name}」无法容纳 ${n} 个点`);
+    const primary = interps[0];
+
+    // 同样的点按其它浪型解读 (柳玉冬改数: 「推动浪不成立，按楔形/三角形看」)
+    const alternatives = [];
+    // 画满时只与同点数浪型比较；未画满时任何能容纳这些点的浪型都可，优先更简单者 (点数少)
+    for (const type of Object.keys(PATTERNS)) {
+      if (tool.types.indexOf(type) >= 0) continue;
+      if (n === fullPts ? PATTERNS[type].pts !== n : PATTERNS[type].pts < n) continue;
+      const it = interpret(type);
+      if (it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length) alternatives.push(it);
+    }
+    alternatives.sort((a, b) => (PATTERNS[a.type].pts - PATTERNS[b.type].pts) || rank(a, b));
+
+    // 前序: 调整浪不得收复被调整的前一段
+    const prev = precedingSwing(bars, i0Full, Object.assign({}, pts[0], { idx: i0Full }));
+    let preceding = null;
+    if (prev && prev.length > 0) {
+      const d = pts[1].price > pts[0].price ? 1 : -1;
+      let far = pts[0].price;
+      for (const q of lp) if (d * (q.price - far) > 0) far = q.price;
+      const ratio = Math.abs(far - pts[0].price) / prev.length;
+      const corrective = PATTERNS[primary.type].category !== '驱动浪';
+      preceding = {
+        from: { price: prev.price, time: prev.time }, to: { price: pts[0].price, time: pts[0].time },
+        length: +prev.length.toFixed(4), ratio: +ratio.toFixed(3),
+        warning: corrective && ratio >= 1,
+        text: corrective
+          ? (ratio >= 1
+            ? `该调整已收复被调整的前一段（${fmtNum(prev.price)}→${fmtNum(pts[0].price)}）的 ${(ratio * 100).toFixed(0)}%：它不是对前一段的调整，或前一段不是同级别——要么改数为驱动浪，要么前一段只是更大调整的一部分`
+            : `该调整回撤前一段 ${(ratio * 100).toFixed(0)}%（${ratio >= 0.7 ? '≥0.7，平台形/联合形条件具备' : ratio >= 0.618 ? '达0.618，三角形b浪常见值' : '<0.618，仅支持锯齿类'}）`)
+          : `前一段 ${fmtNum(prev.price)}→${fmtNum(pts[0].price)}；本驱动浪已走出其 ${(ratio * 100).toFixed(0)}%${ratio >= 1 ? '（已越过前一段起点，具备新趋势的资格）' : ''}`
+      };
+    }
+
+    // 判决
+    const reasons = [];
+    primary.hardFails.forEach(f => reasons.push(`✗ ${f.text}（手稿${f.page}）：${f.detail}`));
+    primary.legs.filter(L => L.severity === 'strong').forEach(L => reasons.push(L.text));
+    if (!primary.hardFails.length && primary.liveHardFails.length) {
+      const L = labels[n - 1];
+      if (live.extension) reasons.push(`画完后价格越过你标的${legNameOf(L)}终点 ${fmtNum(live.extension.fromPrice)}，延伸至 ${fmtNum(live.extension.toPrice)}（${fmtTs(live.extension.time)}）`);
+      if (live.appended && live.reverse) reasons.push(`画完后的反向走势至 ${fmtNum(live.reverse.price)}（${fmtTs(live.reverse.time)}）按下一浪计入`);
+      primary.liveHardFails.forEach(f => reasons.push(`走势检验 ✗ ${f.text}（手稿${f.page}）：${f.detail}`));
+    }
+    const doubts = [];
+    primary.legs.filter(L => L.severity === 'medium').forEach(L => doubts.push(L.text));
+    endpointIssues.forEach(x => doubts.push(x.text));
+    if (preceding && preceding.warning) doubts.push(preceding.text);
+    if (live.extension && !primary.liveHardFails.length) {
+      doubts.push(`你标的终点 ${fmtNum(live.extension.fromPrice)} 之后价格已${pts[n - 1].type === 'high' ? '涨' : '跌'}到 ${fmtNum(live.extension.toPrice)}：末浪尚未在你标的位置结束，终点应后移`);
+    }
+    if (primary.guidePct < 40) doubts.push(`指引符合度仅 ${primary.guidePct}%：比率/时间与手稿常见值偏离较大`);
+    const verdict = primary.hardFails.length ? 'INVALID'
+      : primary.strongCount ? 'FALSIFIED_SUB'
+        : primary.liveHardFails.length ? 'FALSIFIED_PRICE'
+          : doubts.length ? 'DOUBT' : 'VALID';
+
+    // 监测点与失效位 (以走势检验后的计数为准；走势已证伪时只给出证伪事实)
+    const cand = primary.live || primary.drawn;
+    const ev = mkEv();
+    const liuSignals = lp.length >= 3 ? buildLiuSignals(slice, lp, ev) : null;
+    const side = price => price < currentPrice ? '跌破' : '涨破';
+    const invalidation = {};
+    if (cand.monitoringPivot) {
+      const mp = cand.monitoringPivot;
+      const sd = side(mp.price);
+      invalidation.structural = { price: mp.price, label: mp.levelName, side: sd, text: `${sd} ${fmtNum(mp.price)}（${mp.levelName}）：${(mp.description || '').replace(/^(跌破|涨破)/, sd)}` };
+    }
+    if (cand.secondaryPivot) {
+      const sp = cand.secondaryPivot;
+      invalidation.secondary = { price: sp.price, label: sp.levelName, text: `${fmtNum(sp.price)}（${sp.levelName}）：${sp.description}` };
+    }
+    const lastLegs = primary.liveLegs;
+    const runLeg = lastLegs[lastLegs.length - 1];
+    const tail = lp[lp.length - 1];
+    if (runLeg && runLeg.subPoints && runLeg.subPoints.length >= 3) {
+      // 小级别监测点: 当前段内最近一个与段起点同向的子浪拐点 (「监测点逐日随趋势上移」)
+      const startType = lp[lp.length - 2].type;
+      const cands = runLeg.subPoints.slice(1, -1).filter(q => q.type === startType);
+      const m = cands[cands.length - 1];
+      if (m) {
+        const up = tail.type === 'high';
+        invalidation.monitor = {
+          price: m.price, time: m.time, source: runLeg.source,
+          text: `小级别监测点 ${fmtNum(m.price)}（${runLeg.source || timeframe}）：不${up ? '跌破' : '涨破'}认为${runLeg.name}继续${up ? '涨' : '跌'}；${up ? '跌破' : '涨破'}则小级别见${up ? '顶' : '底'}`
+        };
+      }
+    }
+    if (!invalidation.monitor && liuSignals && liuSignals.monitorPoint) {
+      invalidation.monitor = { price: liuSignals.monitorPoint.price, time: liuSignals.monitorPoint.time, source: timeframe, text: liuSignals.monitorPoint.text };
+    }
+    if (liuSignals && liuSignals.monitorPoint) {
+      invalidation.confirm = { price: liuSignals.monitorPoint.confirmLevel, text: `确认位 ${fmtNum(liuSignals.monitorPoint.confirmLevel)}：越过才确认当前段结束（最大回撤判据）` };
+    }
+
+    // 引擎自动计数对照 (同一区间)
+    let engineView = null;
+    if (options.compare) {
+      try {
+        const a = analyzeWaves(bars, symbol, { startTime: pts[0].time, endTime: bars[bars.length - 1].time, timeframe, subBars: options.subBars, htfBars: options.htfBars });
+        if (a.pattern) {
+          engineView = {
+            name: a.pattern.name, baseType: a.pattern.baseType, probability: a.pattern.probability,
+            pivots: a.pattern.pivots.map(q => ({ time: q.time, price: q.price, type: q.type })), waveLabels: a.pattern.waveLabels,
+            sameAsUser: tool.types.indexOf(a.pattern.baseType) >= 0
+          };
+        }
+      } catch (e) { engineView = { error: e.message }; }
+    }
+
+    // 柳氏口吻研判
+    const dirTxt = pts[1].price > pts[0].price ? '上升' : '下跌';
+    const lines = [];
+    lines.push(`你画的是「${tool.name}」（${dirTxt}），按「${primary.name}」评估：${VERDICTS[verdict]}。`);
+    if (adjustments.length) lines.push(`已将 ${adjustments.map(a => a.point).join('、')} 点吸附到附近K线的真实高/低点。`);
+    reasons.forEach(r => lines.push(r));
+    const subSrc = Array.from(new Set(primary.legs.map(L => L.source).filter(Boolean)));
+    lines.push(`子浪结构（${subSrc.length ? subSrc.join('/') : '低周期数据不足'}，手稿${primary.structurePage}）：` +
+      primary.legs.map(L => `${L.name}${L.status === 'PASS' ? '✓' : L.status === 'FAIL' ? '✗' : L.status === 'DOUBT' ? '?' : L.status === 'RUNNING' ? '…' : '—'}`).join(' '));
+    if (live.appended && runLeg) lines.push(runLeg.text);
+    if (verdict !== 'VALID' && alternatives.length) lines.push(`同样的点按「${alternatives[0].name}」可以成立。`);
+    // 已被铁律否决的计数不再给监测点；已被证伪的计数不再给其结构防线
+    if (invalidation.monitor && verdict !== 'INVALID') lines.push(invalidation.monitor.text);
+    if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
+    const tgts = (cand.targets || []).slice(0, 3);
+    if (tgts.length && verdict !== 'INVALID' && verdict !== 'FALSIFIED_SUB') lines.push(`目标：${tgts.map(t => `${fmtNum(t.price)}（${t.label}）`).join('；')}`);
+    lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
+
+    return {
+      symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT',
+      tool: options.tool, toolName: tool.name, labels,
+      analysisTime: new Date().toISOString(), currentPrice,
+      subTimeframes: subNames,
+      points: pts.map((q, i) => ({ label: labels[i], time: q.time, price: q.price, type: q.type, open: !!q.open })),
+      adjustments, endpointIssues,
+      drawStatus, live: {
+        status: live.status, appended: live.appended, extension: live.extension, reverse: live.reverse,
+        points: lp.map((q, i) => ({ label: labels[i] || '', time: q.time, price: q.price, type: q.type, open: !!q.open }))
+      },
+      verdict, verdictLabel: VERDICTS[verdict], reasons, doubts,
+      primary: {
+        type: primary.type, name: primary.name, structure: primary.structureKey, structurePage: primary.structurePage,
+        hardFails: primary.hardFails, liveHardFails: primary.liveHardFails, pending: primary.pending,
+        guidePct: primary.guidePct, legs: primary.legs, liveLegs: primary.liveLegs,
+        ruleChecks: primary.drawn.ruleChecks, alternation: primary.drawn.alternation, components: primary.drawn.components
+      },
+      interpretations: interps.map(it => ({ type: it.type, name: it.name, hardFails: it.hardFails.length, strong: it.strongCount, medium: it.mediumCount, liveHardFails: it.liveHardFails.length, guidePct: it.guidePct })),
+      alternatives: alternatives.slice(0, 3).map(it => ({ type: it.type, name: it.name, guidePct: it.guidePct, labels: PATTERNS[it.type].labels })),
+      preceding,
+      invalidation,
+      targets: cand.targets || [],
+      fibLevels: cand.fibLevels || null,
+      candidate: cand,
+      liuSignals,
+      engineView,
+      commentary: { title: `${symbol} ${timeframe.toUpperCase()} 画浪评估`, lines }
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // 10. 兼容旧 API (测试与外部调用)
   // ---------------------------------------------------------------------------
 
@@ -2835,6 +3675,8 @@
   return {
     VERSION,
     analyzeWaves,
+    evaluateUserCount,
+    USER_TOOLS,
     findPivots,
     zigzagPivots,
     buildPivotDegrees,
@@ -2849,6 +3691,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });

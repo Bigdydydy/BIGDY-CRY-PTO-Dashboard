@@ -13,6 +13,9 @@
   let higherSeries = null; // 高一级别计数折线 (多级别同屏)
   let channelUpperSeries = null;
   let channelLowerSeries = null;
+  let drawSeries = null;      // 用户画浪折线
+  let drawSubSeries = null;   // 用户画浪的低周期(15m)子浪折线
+  let drawLiveSeries = null;  // 画完后的走势 (末浪延伸 / 下一浪运行中)
 
   let currentSymbol = 'BTC/USDT';
   let currentTf = '4h';
@@ -266,6 +269,20 @@
       crosshairMarkerVisible: true
     });
 
+    // 用户画浪图层: 15m 子浪(细点线) / 走势检验(灰虚线) / 用户画浪(粗实线，最上层)
+    const drawSub = safeCreateSeries(chart, 'Line', {
+      color: '#06b6d4', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+    });
+    const drawLive = safeCreateSeries(chart, 'Line', {
+      color: '#94a3b8', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+    });
+    const drawLine = safeCreateSeries(chart, 'Line', {
+      color: '#a855f7', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+    });
+
     // Crosshair HUD 悬停监听
     chart.subscribeCrosshairMove(param => {
       const hudO = document.getElementById('hud-o');
@@ -310,9 +327,14 @@
     higherSeries = higher;
     channelUpperSeries = channelUpper;
     channelLowerSeries = channelLower;
+    drawSeries = drawLine;
+    drawSubSeries = drawSub;
+    drawLiveSeries = drawLive;
 
     // 安装两步点击选区监听器
     setupTwoClickSelection(container);
+    // 安装画浪工具点击监听器
+    setupDrawing(container);
   }
 
   function formatBarTime(timestamp) {
@@ -468,7 +490,7 @@
     } else {
       tooltip.innerHTML = `
         <span>选区预览: <strong>${selectionHoverPoint.count}</strong> 根 K 线 (${selectionHoverPoint.count * 4}H)</span>
-        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">点击完成选择 · Esc 取消</span>
+        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">点击完成选择 · Esc / 右键取消</span>
       `;
     }
   }
@@ -484,7 +506,7 @@
 
       const btnDrag = document.getElementById('btn-drag-range');
       if (btnDrag) {
-        btnDrag.innerHTML = '🏁 移动预览并点击终点 (Esc 取消)';
+        btnDrag.innerHTML = '🏁 移动预览并点击终点 (Esc / 右键取消)';
         btnDrag.classList.add('active');
       }
       const statusMsg = document.getElementById('wave-status-msg');
@@ -771,7 +793,8 @@
       const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js')});
 self.onmessage = function (e) {
   var d = e.data;
-  try { self.postMessage({ id: d.id, ok: true, result: self.LiuWaveEngine.analyzeWaves(d.bars, d.symbol, d.opts) }); }
+  var fn = d.fn === 'evaluateUserCount' ? 'evaluateUserCount' : 'analyzeWaves';
+  try { self.postMessage({ id: d.id, ok: true, result: self.LiuWaveEngine[fn](d.bars, d.symbol, d.opts) }); }
   catch (err) { self.postMessage({ id: d.id, ok: false, error: String(err && err.message || err) }); }
 };`;
       const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
@@ -796,13 +819,13 @@ self.onmessage = function (e) {
     }
   }
 
-  function analyzeInWorker(bars, symbol, opts) {
+  function analyzeInWorker(bars, symbol, opts, fn) {
     const w = getWaveWorker();
     if (!w) return Promise.reject(new Error('worker unavailable'));
     const id = ++waveWorkerSeq;
     return new Promise((resolve, reject) => {
       waveWorkerPending.set(id, { resolve, reject });
-      w.postMessage({ id, bars, symbol, opts });
+      w.postMessage({ id, fn: fn || 'analyzeWaves', bars, symbol, opts });
       setTimeout(() => {
         if (waveWorkerPending.has(id)) { waveWorkerPending.delete(id); reject(new Error('worker timeout')); }
       }, 60000);
@@ -832,6 +855,36 @@ self.onmessage = function (e) {
     }
   }
 
+  // 画浪评估的子浪判定周期 (由细到粗，与服务端 WAVE_USER_SUB_INTERVALS 一致)
+  const USER_SUB_TFS = { '15m': ['5m'], '1h': ['15m', '5m'], '4h': ['15m', '1h'] };
+  const TF_SEC = { '5m': 300, '15m': 900, '1h': 3600, '4h': 14400 };
+
+  /** 浏览器端画浪评估: Worker → 主线程；返回 null 表示本地不可用 (交给服务端) */
+  async function evaluateClientSide(symbol, tf, bars, tool, points) {
+    if (!window.LiuWaveEngine || !window.LiuWaveEngine.evaluateUserCount || !bars || !bars.length) return null;
+    // 子周期根数须覆盖画浪起点至今，按 1000 / 10000 两档取整以复用缓存
+    const firstTime = Math.min(...points.map(p => p.time));
+    const lastTime = bars[bars.length - 1].time;
+    const subTfs = USER_SUB_TFS[tf] || [];
+    const htfTfs = (WAVE_HTF_TFS[tf] || []).slice(0, 2);
+    const [subs, htfs] = await Promise.all([
+      Promise.all(subTfs.map(t => {
+        const need = Math.ceil((lastTime - firstTime) / TF_SEC[t]) + 200;
+        return fetchAuxBars(symbol, t, need <= 1000 ? 1000 : WAVE_BARS);
+      })),
+      Promise.all(htfTfs.map(t => fetchAuxBars(symbol, t, 200)))
+    ]);
+    const opts = { tool, points, timeframe: tf, subBars: {}, htfBars: {} };
+    subTfs.forEach((t, i) => { if (subs[i]) opts.subBars[t] = subs[i]; });
+    htfTfs.forEach((t, i) => { if (htfs[i]) opts.htfBars[t] = htfs[i]; });
+    try {
+      return await analyzeInWorker(bars, symbol, opts, 'evaluateUserCount');
+    } catch (e) {
+      // 输入类错误 (点序/方向/点数) 在主线程会同样抛出，交由调用方展示
+      return window.LiuWaveEngine.evaluateUserCount(bars, symbol, opts);
+    }
+  }
+
   /** 顶部「样本」标签: 实际根数与时间跨度 */
   function updateSampleLabel(bars, tf) {
     const el = document.getElementById('wave-sample-label');
@@ -845,6 +898,7 @@ self.onmessage = function (e) {
    * 清除波浪图层与面板状态，恢复为待框选状态
    */
   function clearWaveAnalysisState() {
+    clearUserDrawing();
     currentAnalysis = null;
     activeCandidateIndex = 0;
     currentRange = null;
@@ -1041,6 +1095,7 @@ self.onmessage = function (e) {
    * 执行波浪分析 (支持全景实时解算与 2~750 根选区切片研判)
    */
   async function runWaveAnalysis(symbol = currentSymbol, rangeOptions = currentRange) {
+    if (drawTool || drawToolDone) clearUserDrawing(); // 智能扫描与画浪评估互斥
     currentSymbol = symbol;
     currentRange = rangeOptions;
     const btnScan = document.getElementById('btn-scan-waves');
@@ -1166,6 +1221,7 @@ self.onmessage = function (e) {
       setChartMarkers(candleSeries, []);
       renderPatternBadge(null, currentAnalysis);
       renderTradingViewHUD(null, currentAnalysis);
+      renderUserOverlay(); // 图层开关切换时重绘用户画浪
       return;
     }
     activeCandidateIndex = Math.max(0, Math.min(idx, currentAnalysis.candidates.length - 1));
@@ -1993,7 +2049,7 @@ self.onmessage = function (e) {
           }
           const statusMsg = document.getElementById('wave-status-msg');
           if (statusMsg) {
-            statusMsg.textContent = `🖱️ 选区模式：请在 ${currentTf.toUpperCase()} 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc 取消）`;
+            statusMsg.textContent = `🖱️ 选区模式：请在 ${currentTf.toUpperCase()} 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc / 右键取消）`;
           }
         }
       });
@@ -2125,10 +2181,467 @@ self.onmessage = function (e) {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 画浪工具: 用户在主图上画 12345 / abc / wxy / wxyxz / abcde
+  // → 引擎评估 (手稿铁律 → 15m 子浪证伪 → 走势检验) + 柳氏监测点 / 失效位 / 目标
+  // ---------------------------------------------------------------------------
+  const DRAW_TOOLS = {
+    IMPULSE: { name: '推动浪 12345', labels: ['0', '1', '2', '3', '4', '5'], marks: ['⓪', '①', '②', '③', '④', '⑤'] },
+    ABC: { name: '调整浪 abc', labels: ['0', 'a', 'b', 'c'], marks: ['⓪', 'Ⓐ', 'Ⓑ', 'Ⓒ'] },
+    WXY: { name: '调整浪 wxy', labels: ['0', 'w', 'x', 'y'], marks: ['⓪', 'Ⓦ', 'Ⓧ', 'Ⓨ'] },
+    WXYXZ: { name: '调整浪 wxyxz', labels: ['0', 'w', 'x', 'y', 'x', 'z'], marks: ['⓪', 'Ⓦ', 'Ⓧ', 'Ⓨ', 'Ⓧ', 'Ⓩ'] },
+    ABCDE: { name: '三角形 abcde', labels: ['0', 'a', 'b', 'c', 'd', 'e'], marks: ['⓪', 'Ⓐ', 'Ⓑ', 'Ⓒ', 'Ⓓ', 'Ⓔ'] }
+  };
+  const VERDICT_STYLE = {
+    VALID: { badge: 'badge-bull', chip: 'pos', color: '#10b981' },
+    DOUBT: { badge: 'badge-range', chip: 'warn', color: '#f59e0b' },
+    FALSIFIED_PRICE: { badge: 'badge-bear', chip: 'neg', color: '#ef4444' },
+    FALSIFIED_SUB: { badge: 'badge-bear', chip: 'neg', color: '#ef4444' },
+    INVALID: { badge: 'badge-bear', chip: 'neg', color: '#ef4444' }
+  };
+  const LEG_STATUS = {
+    PASS: { txt: '符合', cls: 'pos' }, FAIL: { txt: '证伪', cls: 'neg' }, DOUBT: { txt: '存疑', cls: 'warn' },
+    RUNNING: { txt: '运行中', cls: 'info' }, UNKNOWN: { txt: '数据不足', cls: '' }
+  };
+
+  let drawTool = null;        // 正在画的工具
+  let drawToolDone = null;    // 已画完的工具
+  let drawPoints = [];        // [{ index, time, rawPrice, type, price }]
+  let drawHover = null;
+  let userEval = null;
+  let userPriceLines = [];
+
+  function setWaveStatus(text) {
+    const el = document.getElementById('wave-status-msg');
+    if (el) el.textContent = text;
+  }
+
+  function chartRect() {
+    const el = waveChart && typeof waveChart.chartElement === 'function' ? waveChart.chartElement() : document.getElementById('wave-chart-container');
+    return el.getBoundingClientRect();
+  }
+
+  /** 首段方向由前两点的点击价格决定，之后高低交替；价格吸附到该K线的最高/最低价 */
+  function resnapDrawPoints(points) {
+    if (!points.length) return points;
+    const p0 = points[0];
+    let firstType;
+    if (points.length >= 2) firstType = points[1].rawPrice >= p0.rawPrice ? 'low' : 'high';
+    else {
+      const b = currentBars[p0.index];
+      firstType = Math.abs(p0.rawPrice - b.high) < Math.abs(p0.rawPrice - b.low) ? 'high' : 'low';
+    }
+    points.forEach((p, i) => {
+      const type = i % 2 === 0 ? firstType : (firstType === 'high' ? 'low' : 'high');
+      const b = currentBars[p.index];
+      p.type = type;
+      p.price = type === 'high' ? b.high : b.low;
+    });
+    return points;
+  }
+
+  function hitFromEvent(e) {
+    const rect = chartRect();
+    const hit = getBarFromCoordinate(e.clientX - rect.left);
+    const price = candleSeries ? candleSeries.coordinateToPrice(e.clientY - rect.top) : null;
+    if (!hit || price === null || price === undefined || !isFinite(price)) return null;
+    return { index: hit.index, time: hit.time, rawPrice: price };
+  }
+
+  function setupDrawing(container) {
+    let down = null;
+    container.addEventListener('mousedown', e => {
+      if (e.button === 0) down = { x: e.clientX, y: e.clientY };
+    });
+    container.addEventListener('mouseup', e => {
+      if (!drawTool || !down) return;
+      const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      down = null;
+      if (dist > 6) return; // 平移/缩放图表，不是点击
+      const hit = hitFromEvent(e);
+      if (hit) addDrawPoint(hit);
+    });
+    container.addEventListener('mousemove', e => {
+      if (!drawTool || !drawPoints.length) return;
+      const hit = hitFromEvent(e);
+      if (!hit || hit.index <= drawPoints[drawPoints.length - 1].index) { drawHover = null; renderDrawLine(); return; }
+      const preview = resnapDrawPoints(drawPoints.map(p => Object.assign({}, p)).concat([Object.assign({}, hit)]));
+      drawHover = preview[preview.length - 1];
+      renderDrawLine();
+    });
+    container.addEventListener('dblclick', () => {
+      if (drawTool && drawPoints.length >= 3) finishDrawing();
+    });
+  }
+
+  function addDrawPoint(hit) {
+    const tool = DRAW_TOOLS[drawTool];
+    const last = drawPoints[drawPoints.length - 1];
+    if (last && hit.index <= last.index) {
+      setWaveStatus('⚠ 画浪点须从左到右依次点击，且不能与上一个点落在同一根 K 线上');
+      return;
+    }
+    drawPoints.push(hit);
+    resnapDrawPoints(drawPoints);
+    drawHover = null;
+    renderUserOverlay();
+    updateDrawButtons();
+    if (drawPoints.length === tool.labels.length) {
+      finishDrawing();
+      return;
+    }
+    const next = tool.labels[drawPoints.length];
+    setWaveStatus(`✏️ ${tool.name}：已点 ${drawPoints.length}/${tool.labels.length}，下一个点「${next}」` +
+      `${drawPoints.length >= 3 ? '（≥3 点可按 Enter / 双击 提前评估，画到一半的浪按「运行中」评估）' : ''} · Backspace 撤销 · Esc / 右键取消`);
+  }
+
+  function updateDrawButtons() {
+    document.querySelectorAll('.draw-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === drawTool));
+    const btnUndo = document.getElementById('btn-draw-undo');
+    const btnFinish = document.getElementById('btn-draw-finish');
+    if (btnUndo) btnUndo.disabled = !drawTool || !drawPoints.length;
+    if (btnFinish) btnFinish.disabled = !drawTool || drawPoints.length < 3;
+    const container = document.getElementById('wave-chart-container');
+    if (container) container.style.cursor = drawTool ? 'crosshair' : 'default';
+  }
+
+  function startDrawing(tool) {
+    if (!currentBars.length) { setWaveStatus('⚠ K线尚未加载完成'); return; }
+    cancelRangeSelection();
+    clearWaveAnalysisState(); // 清空引擎扫描的候选图层与旧画浪，图上只留用户本次画的浪
+    drawTool = tool;
+    updateDrawButtons();
+    setWaveStatus(`✏️ ${DRAW_TOOLS[tool].name}：在 ${currentTf.toUpperCase()} 图上从起点 0 开始依次点击各浪终点（自动吸附到 K 线最高/最低价）· Esc / 右键取消`);
+  }
+
+  function exitDrawMode() {
+    drawTool = null;
+    drawHover = null;
+    updateDrawButtons();
+  }
+
+  function clearUserDrawing() {
+    drawTool = null;
+    drawToolDone = null;
+    drawPoints = [];
+    drawHover = null;
+    userEval = null;
+    if (drawSeries) drawSeries.setData([]);
+    if (drawSubSeries) drawSubSeries.setData([]);
+    if (drawLiveSeries) drawLiveSeries.setData([]);
+    removeUserPriceLines();
+    updateDrawButtons();
+    renderUserEvalIdle();
+  }
+
+  function removeUserPriceLines() {
+    userPriceLines.forEach(pl => { try { candleSeries.removePriceLine(pl); } catch (e) {} });
+    userPriceLines = [];
+  }
+
+  /** 低周期拐点时间 → 所在主周期K线时间 (折线须落在主图已有的时间点上) */
+  function mainBarTimeAtOrBefore(t) {
+    let lo = 0, hi = currentBars.length - 1, ans = currentBars.length ? currentBars[0].time : t;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (currentBars[mid].time <= t) { ans = currentBars[mid].time; lo = mid + 1; } else hi = mid - 1;
+    }
+    return ans;
+  }
+
+  function renderDrawLine() {
+    if (!drawSeries) return;
+    const pts = userEval ? userEval.points : drawPoints;
+    const data = pts.map(p => ({ time: p.time, value: p.price }));
+    if (drawTool && drawHover && (!data.length || drawHover.time > data[data.length - 1].time)) {
+      data.push({ time: drawHover.time, value: drawHover.price });
+    }
+    drawSeries.setData(data);
+  }
+
+  /** 重绘用户画浪图层 (画图中 / 评估完成后)，供图层开关调用 */
+  function renderUserOverlay() {
+    if (!candleSeries || !drawSeries) return;
+    const toolKey = drawTool || drawToolDone;
+    if (!toolKey) return;
+    const tool = DRAW_TOOLS[toolKey];
+    const style = userEval ? VERDICT_STYLE[userEval.verdict] : null;
+    const lineColor = style ? style.color : '#a855f7';
+    drawSeries.applyOptions({ color: lineColor, lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid });
+    renderDrawLine();
+
+    const markers = [];
+    const pts = userEval ? userEval.points : drawPoints;
+    if (showMarkers) {
+      pts.forEach((p, i) => {
+        const isHigh = p.type === 'high';
+        markers.push({
+          time: p.time, position: isHigh ? 'aboveBar' : 'belowBar', color: lineColor,
+          shape: isHigh ? 'arrowDown' : 'arrowUp',
+          text: `${tool.marks[i] || tool.labels[i]} $${Math.round(p.price).toLocaleString()}`, size: 1.3
+        });
+      });
+    }
+
+    const subData = [];
+    if (userEval) {
+      // 走势检验后的计数 (末浪延伸 / 下一浪运行中): 灰色虚线
+      const live = userEval.live;
+      const liveDiffers = live && (live.appended || live.extension);
+      if (drawLiveSeries) {
+        if (liveDiffers) {
+          const n = userEval.points.length;
+          const tail = live.points.slice(n - 2).map(p => ({ time: p.time, value: p.price }));
+          drawLiveSeries.setData(tail);
+          if (showMarkers && live.extension) {
+            markers.push({ time: live.extension.time, position: pts[n - 1].type === 'high' ? 'aboveBar' : 'belowBar', color: '#94a3b8', shape: 'circle', text: `延伸 $${Math.round(live.extension.toPrice).toLocaleString()}`, size: 0.9 });
+          }
+        } else drawLiveSeries.setData([]);
+      }
+      // 15m 子浪: 每段的低周期拐点映射到主图K线
+      (userEval.primary.liveLegs || []).forEach(L => {
+        const showLbl = showSubwaves || L.status === 'FAIL' || L.status === 'DOUBT' || L.status === 'RUNNING';
+        (L.subPoints || []).forEach((q, k) => {
+          const t = mainBarTimeAtOrBefore(q.time);
+          if (subData.length && t <= subData[subData.length - 1].time) {
+            // 同一根主K线内的多个子浪拐点只保留更极端者
+            const prev = subData[subData.length - 1];
+            if (t === prev.time && ((q.type === 'high' && q.price > prev.value) || (q.type === 'low' && q.price < prev.value))) prev.value = q.price;
+            return;
+          }
+          subData.push({ time: t, value: q.price });
+          if (showMarkers && showLbl && q.label && q.label !== '0' && k > 0 && k < L.subPoints.length - 1) {
+            markers.push({ time: t, position: q.type === 'high' ? 'aboveBar' : 'belowBar', color: '#06b6d4', shape: 'circle', text: `(${q.label})`, size: 0.6 });
+          }
+        });
+      });
+    } else if (drawLiveSeries) drawLiveSeries.setData([]);
+    if (drawSubSeries) drawSubSeries.setData(subData);
+
+    markers.sort((a, b) => a.time - b.time);
+    setChartMarkers(candleSeries, markers);
+
+    removeUserPriceLines();
+    if (userEval) {
+      const inv = userEval.invalidation || {};
+      const v = userEval.verdict;
+      if (showMonitoring && inv.structural && (v === 'VALID' || v === 'DOUBT')) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.structural.price, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `失效位 ${inv.structural.side || ''}` }));
+      }
+      if (showMonitoring && inv.monitor && v !== 'INVALID') {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || currentTf})` }));
+      }
+      if (showTargets && v !== 'INVALID' && v !== 'FALSIFIED_SUB') {
+        (userEval.targets || []).slice(0, 3).forEach(t => {
+          userPriceLines.push(candleSeries.createPriceLine({ price: t.price, color: getWaveChartColors().targetColor, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: `目标 ${t.label}` }));
+        });
+      }
+    }
+  }
+
+  async function finishDrawing() {
+    const tool = drawTool;
+    if (!tool || drawPoints.length < 3) return;
+    exitDrawMode();
+    drawToolDone = tool;
+    renderUserOverlay();
+    setWaveStatus(`⏳ 正在评估你画的「${DRAW_TOOLS[tool].name}」：手稿铁律 → 15m 子浪 → 画完后的走势检验…`);
+    const body = {
+      symbol: currentSymbol.replace(/[\/\-_]/g, '').toUpperCase(),
+      interval: currentTf, tool,
+      points: drawPoints.map(p => ({ time: p.time, price: p.price }))
+    };
+    // 浏览器端计算优先 (Render 免费档只有 0.1 CPU)，本地引擎不可用时才请求服务端
+    let res = null, err = null, offline = false, tried = false;
+    try {
+      res = await evaluateClientSide(currentSymbol, currentTf, currentBars, tool, body.points);
+      tried = !!res;
+    } catch (e) {
+      tried = true;
+      err = e.message; // 点位问题 (顺序/方向/点数)
+    }
+    if (!tried) {
+      try {
+        const r = await fetch('/api/wave/evaluate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body), signal: AbortSignal.timeout(30000)
+        });
+        const j = await r.json();
+        if (j && j.code === 0) res = j; else err = (j && j.error) || `HTTP ${r.status}`;
+        if (r.status >= 500) offline = true;
+      } catch (e) { offline = true; }
+    }
+    if (drawToolDone !== tool) return; // 评估期间用户已清除或重画
+    if (!res) {
+      renderUserEvalError(err || '网络连接超时');
+      if (!offline) {
+        // 点位问题 (顺序/方向)：保留已画的点并回到画浪模式，Backspace 修改后可再次评估
+        drawTool = tool;
+        drawToolDone = null;
+        updateDrawButtons();
+        renderUserOverlay();
+        setWaveStatus(`❌ ${err} · Backspace 撤销后重点，Enter 再次评估，Esc / 右键取消`);
+      } else {
+        setWaveStatus(`❌ 画浪评估失败：${err || '网络连接超时'}`);
+      }
+      return;
+    }
+    userEval = res;
+    renderUserOverlay();
+    renderUserEval(res);
+    setWaveStatus(`● 画浪评估：「${DRAW_TOOLS[tool].name}」按「${res.primary.name}」→ ${res.verdictLabel}` +
+      `${res.subTimeframes && res.subTimeframes.length ? ` · 子浪周期 ${res.subTimeframes.join('/')}` : ''}${res.subTimeframes && !res.subTimeframes.length ? ' · ⚠ 无低周期数据，子浪判定从略' : ''}`);
+  }
+
+  function renderUserEvalIdle() {
+    const card = document.getElementById('card-wave-user-eval');
+    const body = document.getElementById('wave-user-eval-body');
+    const badge = document.getElementById('wave-user-eval-badge');
+    if (badge) { badge.className = 'card-badge badge-neutral'; badge.textContent = '待画浪'; }
+    if (body) body.innerHTML = '<p class="liu-idle">选择上方画浪工具（推动浪 12345 / 调整浪 abc、wxy、wxyxz / 三角形 abcde），在图上依次点击各浪端点。引擎按手稿铁律、15 分钟子浪结构与画完后的走势逐项检验，并给出监测点、失效位与目标。</p>';
+    if (card) card.classList.remove('has-result');
+  }
+
+  function renderUserEvalError(msg) {
+    const body = document.getElementById('wave-user-eval-body');
+    const badge = document.getElementById('wave-user-eval-badge');
+    if (badge) { badge.className = 'card-badge badge-bear'; badge.textContent = '无法评估'; }
+    if (body) body.innerHTML = `<div class="liu-signal-row">${esc(msg)}</div>`;
+  }
+
+  function renderUserEval(r) {
+    const body = document.getElementById('wave-user-eval-body');
+    const badge = document.getElementById('wave-user-eval-badge');
+    const card = document.getElementById('card-wave-user-eval');
+    if (!body) return;
+    const st = VERDICT_STYLE[r.verdict] || VERDICT_STYLE.DOUBT;
+    if (badge) { badge.className = `card-badge ${st.badge}`; badge.textContent = r.verdictLabel; }
+    if (card) card.classList.add('has-result');
+
+    const lines = (r.commentary && r.commentary.lines) || [];
+    const verdictHtml = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>柳氏研判 · ${esc(r.primary.name)}</span><span class="liu-chip ${st.chip}">${esc(r.verdictLabel)}</span></div>
+        ${lines.map(l => `<div class="ue-line">${esc(l)}</div>`).join('')}
+      </div>`;
+
+    const legRows = (r.primary.legs || []).map(L => {
+      const s = LEG_STATUS[L.status] || LEG_STATUS.UNKNOWN;
+      return `<tr><td>${esc(L.name)}</td><td>${L.expect === '5' ? '五浪' : '三浪'}</td>` +
+        `<td>${L.found === '5' ? '五浪' : L.found === '3' ? `${L.swings > 13 ? '>13' : L.swings}段` : '—'}</td>` +
+        `<td>${esc(L.source || currentTf)}</td><td><span class="liu-chip ${s.cls}">${s.txt}</span></td></tr>` +
+        (L.status !== 'PASS' ? `<tr><td colspan="5" class="ue-note">${esc(L.text)}</td></tr>` : '');
+    }).join('');
+    const extraLeg = r.live && r.live.appended && r.primary.liveLegs && r.primary.liveLegs.length > r.primary.legs.length
+      ? r.primary.liveLegs[r.primary.liveLegs.length - 1] : null;
+    const subHtml = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>子浪结构 · ${esc((r.subTimeframes || []).join('/') || currentTf)}</span><span>手稿 ${esc(r.primary.structurePage || '')}</span></div>
+        <table class="liu-parts-table"><tr><td>段</td><td>要求</td><td>实测</td><td>周期</td><td>结论</td></tr>${legRows}</table>
+        ${extraLeg ? `<div class="ue-note">画完之后：${esc(extraLeg.text)}</div>` : ''}
+      </div>`;
+
+    const inv = r.invalidation || {};
+    const lvRows = [];
+    if (inv.monitor) lvRows.push(['监测点', inv.monitor.price, inv.monitor.text]);
+    if (inv.confirm) lvRows.push(['确认位', inv.confirm.price, inv.confirm.text]);
+    if (inv.structural) lvRows.push(['失效位', inv.structural.price, inv.structural.text]);
+    if (inv.secondary) lvRows.push(['次级防线', inv.secondary.price, inv.secondary.text]);
+    (r.targets || []).slice(0, 4).forEach(t => lvRows.push(['目标', t.price, t.label]));
+    const lvHtml = lvRows.length ? `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>监测点 · 失效位 · 目标</span><span>现价 ${fmtP(r.currentPrice)}</span></div>
+        <table class="liu-parts-table">${lvRows.map(x => `<tr><td>${x[0]}</td><td class="num">${fmtP(x[1])}</td><td>${esc(x[2])}</td></tr>`).join('')}</table>
+      </div>` : '';
+
+    const hard = (r.primary.ruleChecks || []).filter(c => c.hard);
+    const failed = hard.filter(c => !c.pass && !c.pending);
+    const rulesHtml = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>手稿铁律</span><span class="liu-chip ${failed.length ? 'neg' : 'pos'}">${hard.length - failed.length}/${hard.length} 通过</span></div>
+        ${failed.length ? failed.map(c => `<div class="ue-line">✗ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}</div>`).join('') : '<div class="ue-line">全部通过</div>'}
+        ${(r.primary.liveHardFails || []).length ? r.primary.liveHardFails.map(f => `<div class="ue-line">走势检验 ✗ ${esc(f.text)}（${esc(f.page)}）：${esc(f.detail)}</div>`).join('') : ''}
+      </div>`;
+
+    const other = [];
+    (r.interpretations || []).forEach(it => other.push(`${esc(it.name)}：铁律违规 ${it.hardFails} · 子浪证伪 ${it.strong} · 存疑 ${it.medium}`));
+    (r.alternatives || []).forEach(a => other.push(`同样的点按「${esc(a.name)}」可成立`));
+    if (r.engineView && r.engineView.name) other.push(`引擎自动计数：${esc(r.engineView.name)}（相对权重 ${r.engineView.probability ?? '--'}%）`);
+    if (r.preceding) other.push(`前序：${esc(r.preceding.text)}`);
+    (r.adjustments || []).forEach(a => other.push(`「${esc(a.point)}」点已吸附：${fmtP(a.fromPrice)} → ${fmtP(a.toPrice)}${a.barsMoved ? `（移动 ${a.barsMoved} 根）` : ''}`));
+    (r.endpointIssues || []).forEach(x => other.push(esc(x.text)));
+    const otherHtml = other.length ? `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>其它解读 · 取点</span></div>
+        ${other.map(t => `<div class="ue-line">${t}</div>`).join('')}
+      </div>` : '';
+
+    body.innerHTML = verdictHtml + subHtml + lvHtml + rulesHtml + otherHtml;
+  }
+
+  function initDrawEvents() {
+    document.querySelectorAll('.draw-tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tool = btn.dataset.tool;
+        if (drawTool === tool) { clearUserDrawing(); setWaveStatus('已取消画浪'); return; }
+        startDrawing(tool);
+      });
+    });
+    const btnUndo = document.getElementById('btn-draw-undo');
+    if (btnUndo) btnUndo.addEventListener('click', () => undoDrawPoint());
+    const btnFinish = document.getElementById('btn-draw-finish');
+    if (btnFinish) btnFinish.addEventListener('click', () => finishDrawing());
+    const btnClear = document.getElementById('btn-draw-clear');
+    if (btnClear) btnClear.addEventListener('click', () => { clearUserDrawing(); setChartMarkers(candleSeries, []); setWaveStatus('已清除画浪'); });
+    // 框选分析与画浪互斥
+    const btnDrag = document.getElementById('btn-drag-range');
+    if (btnDrag) btnDrag.addEventListener('click', () => { if (drawTool || drawToolDone) { clearUserDrawing(); setChartMarkers(candleSeries, []); } });
+
+    // 右键取消: 正在框选 / 正在画浪时取消当前操作 (已出结果的画浪评估不受影响)；其余情况保留浏览器右键菜单
+    const chartBox = document.getElementById('wave-chart-container');
+    if (chartBox) {
+      chartBox.addEventListener('contextmenu', e => {
+        if (drawTool) {
+          e.preventDefault();
+          clearUserDrawing();
+          setChartMarkers(candleSeries, []);
+          setWaveStatus('已取消画浪（右键）');
+        } else if (isSelectingRange) {
+          e.preventDefault();
+          cancelRangeSelection();
+          const statusMsg = document.getElementById('wave-status-msg');
+          if (statusMsg) statusMsg.textContent = '已取消选区操作（右键）';
+        }
+      }, true);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (!drawTool) return;
+      const tag = (e.target && e.target.tagName) || '';
+      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+      if (e.key === 'Escape') { clearUserDrawing(); setChartMarkers(candleSeries, []); setWaveStatus('已取消画浪'); }
+      else if (e.key === 'Enter' && drawPoints.length >= 3) { e.preventDefault(); finishDrawing(); }
+      else if (e.key === 'Backspace') { e.preventDefault(); undoDrawPoint(); }
+    });
+    renderUserEvalIdle();
+  }
+
+  function undoDrawPoint() {
+    if (!drawTool || !drawPoints.length) return;
+    drawPoints.pop();
+    resnapDrawPoints(drawPoints);
+    drawHover = null;
+    renderUserOverlay();
+    if (!drawPoints.length) { setChartMarkers(candleSeries, []); drawSeries.setData([]); }
+    updateDrawButtons();
+    setWaveStatus(`✏️ ${DRAW_TOOLS[drawTool].name}：已撤销，当前 ${drawPoints.length} 个点`);
+  }
+
   // 挂载全局接口供 app.js 联动
   window.WaveRadarModule = {
     init: function () {
       initEvents();
+      initDrawEvents();
     },
     runAnalysis: runWaveAnalysis,
     loadCandles: loadChartCandles,
