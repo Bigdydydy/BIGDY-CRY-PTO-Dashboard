@@ -491,17 +491,18 @@
         const maxT = Math.max.apply(null, g.t);
         return { pass: tA > g.p[5].idx && tA <= g.p[5].idx + maxT, detail: `交点距e ${Math.round(tA - g.p[5].idx)} 根K线 vs 上限 ${maxT}` };
       }),
+    // 越线只看本段自己的K线: 奔向的边界不计起点K线、离开的边界不计终点K线 (端点K线的另一端属于相邻的浪)
     rg('T11', C_PRICE, true, null, 5, 'P308', '收敛三角形：c/d浪子浪越过边界线不得超过前浪总量的10%', 1,
       (g, ev) => {
         if (!ev || !ev.highs) return { pass: true, neutral: true, detail: '无K线数据未验' };
         const ac = [g.p[1].idx, g.p[1].price, g.p[3].idx, g.p[3].price];
         const bd = [g.p[2].idx, g.p[2].price, g.p[4].idx, g.p[4].price];
         const o1 = Math.max(
-          lineOvershoot(ev.highs, ev.lows, g.p[2].idx, g.p[3].idx, ac[0], ac[1], ac[2], ac[3], g.d),
-          lineOvershoot(ev.highs, ev.lows, g.p[2].idx, g.p[3].idx, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[1] || 1);
+          lineOvershoot(ev.highs, ev.lows, g.p[2].idx + 1, g.p[3].idx, ac[0], ac[1], ac[2], ac[3], g.d),
+          lineOvershoot(ev.highs, ev.lows, g.p[2].idx, g.p[3].idx - 1, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[1] || 1);
         const o2 = Math.max(
-          lineOvershoot(ev.highs, ev.lows, g.p[3].idx, g.p[4].idx, ac[0], ac[1], ac[2], ac[3], g.d),
-          lineOvershoot(ev.highs, ev.lows, g.p[3].idx, g.p[4].idx, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[2] || 1);
+          lineOvershoot(ev.highs, ev.lows, g.p[3].idx, g.p[4].idx - 1, ac[0], ac[1], ac[2], ac[3], g.d),
+          lineOvershoot(ev.highs, ev.lows, g.p[3].idx + 1, g.p[4].idx, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[2] || 1);
         return { pass: o1 <= 0.1 + EPS && o2 <= 0.1 + EPS, detail: `c越线${fmtPct(o1)} d越线${fmtPct(o2)}` };
       }, { slow: true }),
     rg('T12', C_PRICE, true, null, 6, 'P308', '收敛三角形：e浪子浪越过边界线不得超过d浪总量的10%', 1,
@@ -510,8 +511,8 @@
         const ac = [g.p[1].idx, g.p[1].price, g.p[3].idx, g.p[3].price];
         const bd = [g.p[2].idx, g.p[2].price, g.p[4].idx, g.p[4].price];
         const o = Math.max(
-          lineOvershoot(ev.highs, ev.lows, g.p[4].idx, g.p[5].idx, ac[0], ac[1], ac[2], ac[3], g.d),
-          lineOvershoot(ev.highs, ev.lows, g.p[4].idx, g.p[5].idx, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[3] || 1);
+          lineOvershoot(ev.highs, ev.lows, g.p[4].idx + 1, g.p[5].idx, ac[0], ac[1], ac[2], ac[3], g.d),
+          lineOvershoot(ev.highs, ev.lows, g.p[4].idx, g.p[5].idx - 1, bd[0], bd[1], bd[2], bd[3], -g.d)) / (g.l[3] || 1);
         return { pass: o <= 0.1 + EPS, detail: `e越线${fmtPct(o)}` };
       }, { slow: true }),
     rg('T13', C_TIME, true, null, 5, 'P302', 'd浪时间不大于c浪的4倍', 1,
@@ -3087,16 +3088,31 @@
    * 手画点吸附: 每个点在 ±w 根K线内取真实极值 (高点取 high、低点取 low)，不越过相邻点。
    * 首段方向按用户点击价格判定，之后高低严格交替。
    */
-  function snapUserPoints(bars, raw, labels) {
+  /** 时间 t 所在的K线 (开盘时间 ≤ t 的最后一根)：低周期拐点落在哪根高周期K线里 */
+  function barIdxAtOrBefore(bars, t) {
+    let lo = 0, hi = bars.length - 1, ans = 0;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (bars[mid].time <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+    return ans;
+  }
+
+  /**
+   * pinned: { 点序号: {time, price} } —— 由子浪端点固定的拐点，不再吸附到附近极值。
+   * 子浪为三角形 / 扩散平台形等时，母浪拐点的正统位置 (e浪终点 / c浪终点) 并不是附近的极值。
+   */
+  function snapUserPoints(bars, raw, labels, pinned) {
     const n = raw.length;
-    const idx = raw.map(r => nearestBarIdx(bars, r.time));
+    const idx = raw.map((r, i) => pinned && pinned[i] ? barIdxAtOrBefore(bars, pinned[i].time) : nearestBarIdx(bars, r.time));
     for (let i = 1; i < n; i++) {
       if (idx[i] <= idx[i - 1]) throw new Error(`第 ${i + 1} 个点须晚于第 ${i} 个点，且相邻两点不能落在同一根 K 线上`);
     }
-    const d0 = raw[1].price >= raw[0].price ? 1 : -1;
+    const d0 = (pinned && pinned[1] ? pinned[1].price : raw[1].price) >= (pinned && pinned[0] ? pinned[0].price : raw[0].price) ? 1 : -1;
     const pts = [], adjustments = [];
     for (let i = 0; i < n; i++) {
       const type = ((i % 2 === 0) === (d0 > 0)) ? 'low' : 'high';
+      if (pinned && pinned[i]) {
+        pts.push({ idx: idx[i], time: bars[idx[i]].time, price: pinned[i].price, type, confirmed: true, pinned: true });
+        continue;
+      }
       const gapL = i > 0 ? idx[i] - idx[i - 1] : Infinity;
       const gapR = i < n - 1 ? idx[i + 1] - idx[i] : Infinity;
       const w = Math.max(1, Math.min(6, Math.round(0.3 * Math.min(gapL, gapR))));
@@ -3343,11 +3359,14 @@
     const currentPrice = slice[lastBar].close;
     const labels = tool.labels;
 
-    const { pts, adjustments } = snapUserPoints(slice, raw, labels);
+    // 多级别画浪: legOverrides[段序号] = 用户在该段画的子浪评估结果；pinned = 由子浪端点固定的拐点
+    const legOverrides = options.legOverrides || {};
+    const { pts, adjustments } = snapUserPoints(slice, raw, labels, options.pinned);
     const n = pts.length;
     if (pts[n - 1].idx >= lastBar - 1) { pts[n - 1].open = true; pts[n - 1].confirmed = false; }
     const drawStatus = n < fullPts ? 'DEVELOPING' : (pts[n - 1].open ? 'RUNNING' : 'COMPLETED');
-    const endpointIssues = legEndpointIssues(slice, pts, labels);
+    // 画了子浪的段，其内部结构由子浪评估 (三角形 e 浪、扩散平台 b 浪本就不是该段极值)
+    const endpointIssues = legEndpointIssues(slice, pts, labels).filter(x => !legOverrides[x.leg]);
 
     // 低周期数据源: 由细到粗 (15m → 1h)，子浪判定优先最细且完整覆盖该段者
     const sources = [{ name: timeframe, tfSec, bars: slice, isMain: true }];
@@ -3390,6 +3409,7 @@
         let lead = 0, end = 0;
         for (const li of [0, 2, 4]) {
           if (li + 1 >= pointsUsed.length) continue;
+          if (legOverrides[li]) { if (legOverrides[li].category === '5') lead++; else end++; continue; }
           const pr = probe(pointsUsed[li], pointsUsed[li + 1]);
           if (pr.any5) lead++;
           else if (pr.coarse) end++;
@@ -3410,6 +3430,10 @@
         const evLeg = pr.source ? Object.assign(mkEv(), { sources: sources.filter(s => s.isMain || s.name === pr.source) }) : ev;
         const corrClass = expect === '3' && pr.coarse ? classifyCorrectiveLeg(A, B, evLeg, running) : null;
         const lbl = PATTERNS[type].labels[li + 1];
+        if (legOverrides[li]) {
+          legs.push(overrideLeg(type, li, expect, legOverrides[li], legNameOf(lbl), running, B.price > A.price ? 1 : -1));
+          continue;
+        }
         const L = judgeLeg(li, expect, pr, legNameOf(lbl), running, corrClass);
         if (diagAt && L.found === '5' && pr.any5 && pr.any5.kind === 'DIAGONAL') {
           const nm = diagAt[li];
@@ -3431,6 +3455,12 @@
       const ev = mkEv();
       sub.legs.forEach(L => {
         const A = pointsUsed[L.leg], B = pointsUsed[L.leg + 1];
+        const ov = legOverrides[L.leg];
+        if (ov) {
+          // 子浪画浪即该段结构: 出身检验 (M9/Z0/F0…) 与楔形判定直接采用
+          ev.structCache.set(A.time + '_' + B.time, { label: ov.category, motive: ov.category === '5' ? (ov.type === 'DIAGONAL' ? 'DIAGONAL' : 'IMPULSE') : null, subPivots: (ov.points || []).map(q => ({ time: q.time, price: q.price, type: q.type })), source: `子浪画浪 ${ov.timeframe}` });
+          return;
+        }
         const pr = probe(A, B);
         const label = !pr.coarse ? (pr.noisy ? '3' : 'unknown') : L.expect === '5' ? (pr.any5 ? '5' : '3') : (pr.strict5 ? '5' : '3');
         const subPivots = L.expect === '5' && pr.any5 ? pr.any5.points : pr.coarse ? pr.coarse.anchored : [];
@@ -3644,6 +3674,233 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 9.6 多级别画浪: 同一张图上画母浪与子浪，整体评估
+  //   母子关系: 一个浪的时间跨度落在另一个浪的某一段之内 (容差为母浪周期的一根K线)，
+  //   它就是那一段的子浪；有多个可选母浪时取跨度最小者 (最近一级)。
+  //   评估由内向外: 先评估子浪，再把子浪的结论作为母浪该段的结构判定，并以子浪端点固定母浪拐点。
+  // ---------------------------------------------------------------------------
+
+  // 各浪型中允许三角形出现的段 (浪4、b浪、x浪、联合形最后一段；三角形 e 浪偶见三角形)
+  const TRIANGLE_SLOTS = { IMPULSE: [3], DIAGONAL: [], ZIGZAG: [1], FLAT: [1], TRIANGLE: [4], EXPANDING_TRIANGLE: [4],
+    DOUBLE_ZIGZAG: [1], TRIPLE_ZIGZAG: [1, 3], COMBINATION: [1, 2], TRIPLE_COMBINATION: [1, 3, 4] };
+  // 各浪型中允许楔形出现的段及角色 (引导楔形: 浪1 / a浪；终结楔形: 浪5 / c浪)
+  const DIAGONAL_SLOTS = { IMPULSE: { 0: 'LEADING', 4: 'ENDING' }, ZIGZAG: { 0: 'LEADING', 2: 'ENDING' }, FLAT: { 2: 'ENDING' } };
+  const ZIGZAG_FAMILY = ['ZIGZAG', 'DOUBLE_ZIGZAG', 'TRIPLE_ZIGZAG'];
+  const VERDICT_RANK = { VALID: 0, DOUBT: 1, FALSIFIED_PRICE: 2, FALSIFIED_SUB: 3, INVALID: 4, ERROR: 5 };
+  const SKETCH_SUB_TFS = { '5m': [], '15m': ['5m'], '1h': ['15m', '5m'], '4h': ['15m', '1h'] };
+
+  /** 母浪某段由用户画的子浪判定: 方向、类别 (五浪/三浪)、位置 (楔形/三角形) 与子浪自身判决 */
+  function overrideLeg(type, li, expect, ov, legName, running, legDir) {
+    const base = {
+      leg: li, name: legName, expect, source: `子浪画浪 ${ov.timeframe}`, bars: 0, running: !!running,
+      found: ov.category, swings: ov.category === '5' ? 5 : 3, userChild: ov.id, childType: ov.type,
+      subPoints: subLabeled(ov.points, ov.labels || [])
+    };
+    const nm = `你画的子浪「${ov.name}」（${ov.timeframe}）`;
+    const fail = text => Object.assign(base, { status: 'FAIL', severity: 'strong', text });
+    const doubt = text => Object.assign(base, { status: 'DOUBT', severity: 'medium', text });
+    if (ov.dir !== legDir) return fail(`${legName}：${nm}方向与该段相反 ✗`);
+    if (ov.category !== expect) {
+      return fail(`${legName}要求${expect === '5' ? '五浪（推动浪或楔形）' : '三浪调整'}，${nm}是${ov.category === '5' ? '驱动浪' : '调整浪'} ✗`);
+    }
+    if (ov.type === 'DIAGONAL') {
+      const role = (DIAGONAL_SLOTS[type] || {})[li];
+      if (!role) return fail(`${legName}：楔形只出现在浪1/a浪（引导楔形）或浪5/c浪（终结楔形），${nm}不能在这个位置 ✗`);
+      if (ov.diagRole && ov.diagRole !== role) {
+        return doubt(`${legName}应为${role === 'LEADING' ? '引导' : '终结'}楔形，${nm}按其结构与位置更像${ov.diagRole === 'LEADING' ? '引导' : '终结'}楔形，存疑`);
+      }
+    }
+    if (/TRIANGLE/.test(ov.type) && (TRIANGLE_SLOTS[type] || []).indexOf(li) < 0) {
+      return doubt(type === 'IMPULSE' && li === 1
+        ? `${legName}：${nm}——三角形通常不作为浪2（只出现在浪4、b浪、x浪或联合形最后一段），存疑；可考虑改数为浪4或b浪`
+        : `${legName}：${nm}——三角形通常只出现在浪4、b浪、x浪或联合形最后一段，存疑`);
+    }
+    if ((type === 'DOUBLE_ZIGZAG' || type === 'TRIPLE_ZIGZAG') && li % 2 === 0 && ZIGZAG_FAMILY.indexOf(ov.type) < 0) {
+      return doubt(`${legName}：双/三锯齿的组成部分应为锯齿形，${nm}存疑`);
+    }
+    if (ov.verdict === 'VALID') return Object.assign(base, { status: running ? 'RUNNING' : 'PASS', severity: null, text: `${legName}：${nm}成立 ✓` });
+    if (ov.verdict === 'DOUBT') return doubt(`${legName}：${nm}存疑${ov.reason ? '——' + ov.reason : ''}`);
+    return fail(`${legName}：${nm}${VERDICTS[ov.verdict] || '不成立'} ✗${ov.reason ? '——' + ov.reason : ''}`);
+  }
+
+  /**
+   * 由各浪的时间跨度推断母子关系 (只依赖用户点的时间，不依赖K线)。
+   * drawings: [{id, tool, timeframe, points:[{time, price}]}]
+   * 返回 { nodes: {id: {parentId, leg, depth}}, issues: {id: [{severity, text}]} }
+   */
+  function buildSketchTree(drawings) {
+    const info = {}, issues = {};
+    const span = d => d.points[d.points.length - 1].time - d.points[0].time;
+    const nameOf = d => (USER_TOOLS[d.tool] || { name: d.tool }).name;
+    drawings.forEach(d => { info[d.id] = { parentId: null, leg: null, depth: 0 }; issues[d.id] = []; });
+    for (const c of drawings) {
+      const c0 = c.points[0].time, cN = c.points[c.points.length - 1].time;
+      let best = null;
+      for (const p of drawings) {
+        if (p === c || span(p) <= span(c)) continue;
+        const tol = TF_SEC[p.timeframe] || 14400;
+        for (let k = 0; k + 1 < p.points.length; k++) {
+          const a = p.points[k].time, b = p.points[k + 1].time;
+          if (c0 >= a - tol && cN <= b + tol && (!best || span(p) < span(best.p))) best = { p, k };
+        }
+      }
+      if (best) {
+        info[c.id].parentId = best.p.id;
+        info[c.id].leg = best.k;
+        const tol = TF_SEC[best.p.timeframe] || 14400;
+        const a = best.p.points[best.k].time, b = best.p.points[best.k + 1].time;
+        const labels = (USER_TOOLS[best.p.tool] || { labels: [] }).labels;
+        const legName = legNameOf(labels[best.k + 1] || String(best.k + 1));
+        info[c.id].legName = legName;
+        info[c.id].pinStart = Math.abs(c0 - a) <= tol;
+        const full = c.points.length === (USER_TOOLS[c.tool] || { labels: [] }).labels.length;
+        info[c.id].pinEnd = full && Math.abs(cN - b) <= tol;
+        if (!info[c.id].pinStart) issues[c.id].push({ severity: 'medium', text: `子浪起点与母浪「${nameOf(best.p)}」${legName}的起点不在同一根母浪K线上：子浪应从${legName}起点开始` });
+        if (full && !info[c.id].pinEnd) issues[c.id].push({ severity: 'medium', text: `子浪已画满，但终点与母浪${legName}的终点不在同一根母浪K线上：子浪应覆盖${legName}全程` });
+        const lastLeg = best.k + 2 === best.p.points.length;
+        if (!full && !lastLeg) issues[c.id].push({ severity: 'medium', text: `母浪${legName}之后还有下一浪（${legName}已结束），但子浪只画了前 ${c.points.length - 1} 段` });
+      }
+    }
+    // 同一段两个子浪：保留跨度较大者，其余标出
+    const bySlot = {};
+    drawings.forEach(d => {
+      const it = info[d.id];
+      if (!it.parentId) return;
+      const key = it.parentId + '#' + it.leg;
+      (bySlot[key] = bySlot[key] || []).push(d);
+    });
+    Object.keys(bySlot).forEach(key => {
+      const list = bySlot[key].sort((x, y) => span(y) - span(x));
+      list.slice(1).forEach(d => {
+        info[d.id].duplicate = true;
+        issues[d.id].push({ severity: 'medium', text: `母浪同一段（${info[d.id].legName}）已有子浪「${nameOf(list[0])}」，本浪不参与母浪判定` });
+      });
+    });
+    // 深度
+    const depthOf = id => { let dpt = 0, cur = info[id]; const seen = new Set([id]); while (cur.parentId && !seen.has(cur.parentId)) { seen.add(cur.parentId); dpt++; cur = info[cur.parentId]; } return dpt; };
+    drawings.forEach(d => { info[d.id].depth = depthOf(d.id); });
+    // 时间交叉却互不包含: 跨越了另一个浪的拐点，无法判定级别
+    const isAncestor = (a, b) => { let cur = info[b].parentId; while (cur) { if (cur === a) return true; cur = info[cur].parentId; } return false; };
+    for (let i = 0; i < drawings.length; i++) {
+      for (let j = i + 1; j < drawings.length; j++) {
+        const A = drawings[i], B = drawings[j];
+        if (isAncestor(A.id, B.id) || isAncestor(B.id, A.id)) continue;
+        const tol = Math.max(TF_SEC[A.timeframe] || 14400, TF_SEC[B.timeframe] || 14400);
+        const ov = Math.min(A.points[A.points.length - 1].time, B.points[B.points.length - 1].time) - Math.max(A.points[0].time, B.points[0].time);
+        if (ov > tol) {
+          const small = span(A) <= span(B) ? A : B, big = small === A ? B : A;
+          issues[small.id].push({ severity: 'strong', text: `与「${nameOf(big)}」时间交叉，但不在它的任何一段之内（跨越了它的拐点）：无法判定两者的级别关系` });
+        }
+      }
+    }
+    return { nodes: info, issues };
+  }
+
+  function worstVerdict(list) {
+    return list.reduce((w, v) => (VERDICT_RANK[v] > VERDICT_RANK[w] ? v : w), 'VALID');
+  }
+
+  /**
+   * 多级别画浪整体评估。
+   * barsByTf: { '4h': [...], '1h': [...], '15m': [...], '5m': [...] }，每个画浪按自己的周期评估，子浪判定用更低周期。
+   * options.drawings: [{id, tool, timeframe, points:[{time, price}]}]
+   */
+  function evaluateUserSketch(barsByTf, symbol, options) {
+    options = options || {};
+    const drawings = (options.drawings || []).map((d, i) => ({
+      id: String(d.id !== undefined && d.id !== null ? d.id : i + 1), tool: d.tool, timeframe: d.timeframe || '4h',
+      points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price }))
+    }));
+    if (!drawings.length) throw new Error('还没有画浪');
+    drawings.forEach(d => {
+      if (!USER_TOOLS[d.tool]) throw new Error(`未知画浪工具「${d.tool}」`);
+      if (d.points.length < 2) throw new Error(`「${USER_TOOLS[d.tool].name}」至少需要 2 个点`);
+    });
+    const tree = buildSketchTree(drawings);
+    const nodes = drawings.map(d => Object.assign({ d, issues: tree.issues[d.id].slice(), result: null, error: null }, tree.nodes[d.id]));
+    const byId = {};
+    nodes.forEach(nd => { byId[nd.d.id] = nd; });
+
+    const finalOf = nd => nd.error ? 'ERROR' : worstVerdict([nd.result.verdict].concat(nd.issues.map(x => x.severity === 'strong' ? 'FALSIFIED_SUB' : x.severity === 'medium' ? 'DOUBT' : 'VALID')));
+    const evalOne = (d, extra) => {
+      const bars = barsByTf[d.timeframe];
+      if (!bars || !bars.length) throw new Error(`缺少 ${d.timeframe} K线`);
+      const sub = {};
+      (SKETCH_SUB_TFS[d.timeframe] || []).forEach(tf => { if (barsByTf[tf] && barsByTf[tf].length) sub[tf] = barsByTf[tf]; });
+      return evaluateUserCount(bars, symbol, Object.assign({ tool: d.tool, points: d.points, timeframe: d.timeframe, subBars: sub }, extra));
+    };
+
+    // 由内向外: 最深的子浪先评估
+    const order = nodes.slice().sort((a, b) => b.depth - a.depth);
+    for (const nd of order) {
+      const kids = nodes.filter(c => c.parentId === nd.d.id && !c.duplicate);
+      const legOverrides = {}, pinned = {};
+      kids.forEach(c => {
+        if (c.error || !c.result) {
+          nd.issues.push({ severity: 'medium', text: `${c.legName}的子浪无法评估（${c.error || '无结果'}），该段按低周期自动判定` });
+          return;
+        }
+        const r = c.result, cp = r.points;
+        const fv = finalOf(c);
+        const reason = fv === 'VALID' ? '' : (r.reasons[0] || c.issues.map(x => x.text)[0] || r.doubts[0] || '');
+        legOverrides[c.leg] = {
+          id: c.d.id, timeframe: c.d.timeframe, type: r.primary.type, name: r.primary.name,
+          category: PATTERNS[r.primary.type].category === '驱动浪' ? '5' : '3',
+          verdict: fv, reason, dir: cp[1].price > cp[0].price ? 1 : -1,
+          points: cp, labels: r.labels,
+          diagRole: /引导楔形/.test(r.primary.name) ? 'LEADING' : /终结楔形/.test(r.primary.name) ? 'ENDING' : null
+        };
+        if (c.pinStart) pinned[c.leg] = { time: cp[0].time, price: cp[0].price };
+        if (c.pinEnd && r.drawStatus !== 'DEVELOPING') pinned[c.leg + 1] = { time: cp[cp.length - 1].time, price: cp[cp.length - 1].price };
+      });
+      try {
+        nd.result = evalOne(nd.d, { legOverrides, pinned });
+      } catch (e) {
+        // 固定拐点可能与母浪自身的取点冲突 (例如子浪端点落在相邻母浪K线上)：退回不固定再试
+        if (Object.keys(pinned).length) {
+          try {
+            nd.result = evalOne(nd.d, { legOverrides });
+            nd.issues.push({ severity: 'medium', text: `子浪端点无法与母浪拐点对齐（${e.message}），母浪拐点按自身取点评估` });
+          } catch (e2) { nd.error = e2.message; }
+        } else nd.error = e.message;
+      }
+      // 交替原则 (指引): 浪2与浪4的子浪一陡一横或一简一繁
+      if (nd.result && /IMPULSE|DIAGONAL/.test(nd.result.primary.type) && legOverrides[1] && legOverrides[3]) {
+        const a = legOverrides[1], b = legOverrides[3];
+        const fa = CORR_FORM[a.type], fb = CORR_FORM[b.type], ca = CORR_COMPLEXITY[a.type], cb = CORR_COMPLEXITY[b.type];
+        const ok = fa !== fb || ca !== cb;
+        nd.issues.push({ severity: 'info', text: ok
+          ? `交替原则：浪2「${a.name}」（${FORM_TXT[fa]}·${CPLX_TXT[ca]}）与浪4「${b.name}」（${FORM_TXT[fb]}·${CPLX_TXT[cb]}）形成交替 ✓`
+          : `交替原则：浪2「${a.name}」与浪4「${b.name}」同为${FORM_TXT[fa]}·${CPLX_TXT[ca]}，没有交替（指引，P85/P88）` });
+      }
+    }
+
+    const out = nodes.map(nd => {
+      const fv = finalOf(nd);
+      return {
+        id: nd.d.id, tool: nd.d.tool, toolName: USER_TOOLS[nd.d.tool].name, timeframe: nd.d.timeframe,
+        parentId: nd.parentId, parentLeg: nd.leg, parentLegName: nd.legName || null, depth: nd.depth, duplicate: !!nd.duplicate,
+        issues: nd.issues, verdict: fv, verdictLabel: fv === 'ERROR' ? '无法评估' : VERDICTS[fv],
+        name: nd.result ? nd.result.primary.name : USER_TOOLS[nd.d.tool].name,
+        error: nd.error, result: nd.result
+      };
+    });
+    const verdict = worstVerdict(out.map(x => x.verdict));
+    const roots = out.filter(x => !x.parentId);
+    const lines = [];
+    out.slice().sort((a, b) => a.depth - b.depth).forEach(x => {
+      const where = x.parentId ? `${byId[x.parentId] ? (USER_TOOLS[byId[x.parentId].d.tool] || {}).name : ''}·${x.parentLegName}的子浪` : '母浪';
+      lines.push(`${'　'.repeat(x.depth)}${where}「${x.name}」（${x.timeframe}）：${x.verdictLabel}`);
+    });
+    lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
+    return {
+      symbol, mode: 'USER_SKETCH', engineVersion: VERSION, analysisTime: new Date().toISOString(),
+      verdict, verdictLabel: verdict === 'ERROR' ? '部分无法评估' : VERDICTS[verdict],
+      roots: roots.map(x => x.id), nodes: out, lines
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // 10. 兼容旧 API (测试与外部调用)
   // ---------------------------------------------------------------------------
 
@@ -3676,6 +3933,8 @@
     VERSION,
     analyzeWaves,
     evaluateUserCount,
+    evaluateUserSketch,
+    buildSketchTree,
     USER_TOOLS,
     findPivots,
     zigzagPivots,
