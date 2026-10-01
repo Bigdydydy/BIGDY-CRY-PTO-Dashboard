@@ -5510,3 +5510,40 @@ body {
 @media (max-width: 640px) {
   .liu-ladder-row { grid-template-columns: 1fr; }
 }
+
+/* 画浪工具栏 & 画浪评估卡片 */
+.wave-draw-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 10px 0;
+}
+.wave-draw-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}
+.wave-draw-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+  margin: 0 2px;
+}
+.wave-draw-toolbar .chart-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ue-line {
+  font-size: 0.7rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.ue-note {
+  font-size: 0.65rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.liu-parts-table td.ue-note { border-top: none; padding-top: 0; }

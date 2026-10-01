@@ -20,7 +20,7 @@ const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
-const { analyzeWaves } = require('./wave_engine');
+const { analyzeWaves, evaluateUserCount, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -65,6 +65,13 @@ const WAVE_SUB_INTERVALS = {
   '1h': ['15m'],
   '4h': ['1h', '15m']
 };
+// 画浪评估的子浪判定周期 (由细到粗)：4H 画浪 → 15m 子浪，覆盖不足时退至 1h
+const WAVE_USER_SUB_INTERVALS = {
+  '15m': ['5m'],
+  '1h': ['15m', '5m'],
+  '4h': ['15m', '1h']
+};
+const WAVE_TF_SEC = { '5m': 300, '15m': 900, '1h': 3600, '4h': 14400 };
 const WAVE_HTF_INTERVALS = {
   '15m': ['1h', '4h'],
   '1h': ['4h', '1d'],
@@ -625,6 +632,89 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] wave-analysis:', err);
       sendJsonResponse(req, res, 502, { code: 502, error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/wave/evaluate (Module 8: 用户画浪评估 — 4H 画浪 + 15m 子浪证伪 + 柳氏监测点/目标)
+  if (pathname === '/api/wave/evaluate' && req.method === 'POST') {
+    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    if (!checkWaveRateLimit(clientIp)) {
+      sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
+      return;
+    }
+
+    let payload;
+    try {
+      payload = await parseJsonBody(req);
+    } catch (e) {
+      sendJsonResponse(req, res, 400, { code: 400, error: 'Invalid JSON request payload' });
+      return;
+    }
+
+    const rawSymbol = (payload.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
+      sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
+      return;
+    }
+    const interval = payload.interval || '4h';
+    if (!WAVE_INTERVALS.includes(interval)) {
+      sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
+      return;
+    }
+    if (!USER_TOOLS[payload.tool]) {
+      sendJsonResponse(req, res, 400, { code: 400, error: `画浪工具须为 ${Object.keys(USER_TOOLS).join(' / ')}` });
+      return;
+    }
+    const points = Array.isArray(payload.points) ? payload.points : [];
+    if (points.length < 3 || points.length > 6 || !points.every(p => p && Number.isFinite(+p.time) && Number.isFinite(+p.price))) {
+      sendJsonResponse(req, res, 400, { code: 400, error: '画浪点须为 3~6 个 {time, price}' });
+      return;
+    }
+
+    try {
+      const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
+      // 子周期根数须覆盖画浪起点至今；按档位取整以复用 K 线缓存
+      const nowSec = Math.floor(Date.now() / 1000);
+      const firstTime = Math.min(...points.map(p => +p.time));
+      const subLimit = tf => {
+        const need = Math.ceil((nowSec - firstTime) / WAVE_TF_SEC[tf]) + 200;
+        const tier = [1500, 3000, 6000, WAVE_MAX_BARS].find(x => x >= need) || WAVE_MAX_BARS;
+        return tier;
+      };
+      const subTfs = WAVE_USER_SUB_INTERVALS[interval] || [];
+      const htfTfs = (WAVE_HTF_INTERVALS[interval] || []).slice(0, 2);
+
+      let mainBars, subResults, htfResults;
+      try {
+        [mainBars, subResults, htfResults] = await Promise.all([
+          fetchBinanceKlines(rawSymbol, interval, WAVE_MAX_BARS),
+          Promise.all(subTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, subLimit(tf)).catch(() => null))),
+          Promise.all(htfTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 200).catch(() => null)))
+        ]);
+      } catch (fetchErr) {
+        console.error('[API Error] wave-evaluate klines:', fetchErr);
+        sendJsonResponse(req, res, 502, { code: 502, error: fetchErr.message });
+        return;
+      }
+      const subBars = {};
+      subTfs.forEach((tf, i) => { if (subResults[i]) subBars[tf] = subResults[i]; });
+      const htfBars = {};
+      htfTfs.forEach((tf, i) => { if (htfResults[i]) htfBars[tf] = htfResults[i]; });
+
+      const result = evaluateUserCount(mainBars, displaySymbol, {
+        tool: payload.tool,
+        points: points.map(p => ({ time: +p.time, price: +p.price })),
+        timeframe: interval,
+        subBars,
+        htfBars,
+        compare: payload.compare !== false
+      });
+      sendJsonResponse(req, res, 200, { code: 0, ...result });
+    } catch (err) {
+      console.error('[API Error] wave-evaluate:', err);
+      // 输入类错误 (点序/方向/点数) 直接回给用户
+      sendJsonResponse(req, res, 422, { code: 422, error: err.message });
     }
     return;
   }
