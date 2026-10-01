@@ -490,7 +490,7 @@
     } else {
       tooltip.innerHTML = `
         <span>选区预览: <strong>${selectionHoverPoint.count}</strong> 根 K 线 (${selectionHoverPoint.count * 4}H)</span>
-        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">点击完成选择 · Esc 取消</span>
+        <span style="display:block; font-size:0.68rem; color:var(--text-muted); margin-top:2px;">点击完成选择 · Esc / 右键取消</span>
       `;
     }
   }
@@ -506,7 +506,7 @@
 
       const btnDrag = document.getElementById('btn-drag-range');
       if (btnDrag) {
-        btnDrag.innerHTML = '🏁 移动预览并点击终点 (Esc 取消)';
+        btnDrag.innerHTML = '🏁 移动预览并点击终点 (Esc / 右键取消)';
         btnDrag.classList.add('active');
       }
       const statusMsg = document.getElementById('wave-status-msg');
@@ -2049,7 +2049,7 @@ self.onmessage = function (e) {
           }
           const statusMsg = document.getElementById('wave-status-msg');
           if (statusMsg) {
-            statusMsg.textContent = `🖱️ 选区模式：请在 ${currentTf.toUpperCase()} 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc 取消）`;
+            statusMsg.textContent = `🖱️ 选区模式：请在 ${currentTf.toUpperCase()} 图表上单击设定【分析起点】（支持最大 750 根 K 线，Esc / 右键取消）`;
           }
         }
       });
@@ -2292,7 +2292,7 @@ self.onmessage = function (e) {
     }
     const next = tool.labels[drawPoints.length];
     setWaveStatus(`✏️ ${tool.name}：已点 ${drawPoints.length}/${tool.labels.length}，下一个点「${next}」` +
-      `${drawPoints.length >= 3 ? '（≥3 点可按 Enter / 双击 提前评估，画到一半的浪按「运行中」评估）' : ''} · Backspace 撤销 · Esc 取消`);
+      `${drawPoints.length >= 3 ? '（≥3 点可按 Enter / 双击 提前评估，画到一半的浪按「运行中」评估）' : ''} · Backspace 撤销 · Esc / 右键取消`);
   }
 
   function updateDrawButtons() {
@@ -2311,7 +2311,7 @@ self.onmessage = function (e) {
     clearWaveAnalysisState(); // 清空引擎扫描的候选图层与旧画浪，图上只留用户本次画的浪
     drawTool = tool;
     updateDrawButtons();
-    setWaveStatus(`✏️ ${DRAW_TOOLS[tool].name}：在 ${currentTf.toUpperCase()} 图上从起点 0 开始依次点击各浪终点（自动吸附到 K 线最高/最低价）· Esc 取消`);
+    setWaveStatus(`✏️ ${DRAW_TOOLS[tool].name}：在 ${currentTf.toUpperCase()} 图上从起点 0 开始依次点击各浪终点（自动吸附到 K 线最高/最低价）· Esc / 右键取消`);
   }
 
   function exitDrawMode() {
@@ -2480,7 +2480,7 @@ self.onmessage = function (e) {
         drawToolDone = null;
         updateDrawButtons();
         renderUserOverlay();
-        setWaveStatus(`❌ ${err} · Backspace 撤销后重点，Enter 再次评估，Esc 取消`);
+        setWaveStatus(`❌ ${err} · Backspace 撤销后重点，Enter 再次评估，Esc / 右键取消`);
       } else {
         setWaveStatus(`❌ 画浪评估失败：${err || '网络连接超时'}`);
       }
@@ -2596,6 +2596,24 @@ self.onmessage = function (e) {
     // 框选分析与画浪互斥
     const btnDrag = document.getElementById('btn-drag-range');
     if (btnDrag) btnDrag.addEventListener('click', () => { if (drawTool || drawToolDone) { clearUserDrawing(); setChartMarkers(candleSeries, []); } });
+
+    // 右键取消: 正在框选 / 正在画浪时取消当前操作 (已出结果的画浪评估不受影响)；其余情况保留浏览器右键菜单
+    const chartBox = document.getElementById('wave-chart-container');
+    if (chartBox) {
+      chartBox.addEventListener('contextmenu', e => {
+        if (drawTool) {
+          e.preventDefault();
+          clearUserDrawing();
+          setChartMarkers(candleSeries, []);
+          setWaveStatus('已取消画浪（右键）');
+        } else if (isSelectingRange) {
+          e.preventDefault();
+          cancelRangeSelection();
+          const statusMsg = document.getElementById('wave-status-msg');
+          if (statusMsg) statusMsg.textContent = '已取消选区操作（右键）';
+        }
+      }, true);
+    }
 
     window.addEventListener('keydown', e => {
       if (!drawTool) return;
