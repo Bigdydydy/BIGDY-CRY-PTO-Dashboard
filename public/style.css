@@ -5547,3 +5547,47 @@ body {
   color: var(--text-muted);
 }
 .liu-parts-table td.ue-note { border-top: none; padding-top: 0; }
+
+/* Module 8 · 多级别画浪: 「评估全部」按钮与画板列表 */
+.wave-draw-toolbar .draw-eval-btn:not(:disabled) {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  font-weight: 700;
+}
+.wave-sketch-list {
+  margin: 8px 0 4px 0;
+  font-size: 0.7rem;
+}
+.wave-sketch-list:empty { display: none; }
+.wave-sketch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  margin-top: 3px;
+}
+.wave-sketch-row.clickable { cursor: pointer; }
+.wave-sketch-row.clickable:hover { background: var(--bg-hover, rgba(127, 127, 127, 0.08)); }
+.wave-sketch-row.selected { border-color: var(--accent-primary); }
+.wave-sketch-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.wave-sketch-meta { color: var(--text-muted); white-space: nowrap; }
+.wave-sketch-del {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.wave-sketch-del:hover { color: var(--color-neg); }

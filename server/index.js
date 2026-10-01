@@ -20,7 +20,7 @@ const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
-const { analyzeWaves, evaluateUserCount, USER_TOOLS } = require('./wave_engine');
+const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -95,6 +95,8 @@ const WAVE_INTERVALS = ['15m', '1h', '4h'];
 // 浏览器端研判所需的高周期背景 (仅限少量根数)
 const WAVE_AUX_INTERVALS = ['1d', '1w'];
 const WAVE_AUX_MAX_BARS = 500;
+// 子浪判定的最细周期 (1H 上画的浪用 5m 判子浪)：只作K线源，不作研判周期
+const WAVE_SUB_ONLY_INTERVALS = ['5m'];
 const WAVE_SUB_INTERVALS = {
   '15m': [],
   '1h': ['15m'],
@@ -596,7 +598,7 @@ async function handleApiRequest(req, res, parsedUrl) {
 
     const interval = parsedUrl.query?.interval || '4h';
     const isAux = WAVE_AUX_INTERVALS.includes(interval);
-    if (!WAVE_INTERVALS.includes(interval) && !isAux) {
+    if (!WAVE_INTERVALS.includes(interval) && !isAux && !WAVE_SUB_ONLY_INTERVALS.includes(interval)) {
       sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
       return;
     }
@@ -709,6 +711,36 @@ async function handleApiRequest(req, res, parsedUrl) {
       sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
     }
+    // 多级别画浪 (母浪 + 子浪)：payload.drawings = [{id, tool, timeframe, points}]
+    if (Array.isArray(payload.drawings)) {
+      const drawings = payload.drawings.slice(0, 20);
+      const bad = drawings.find(d => !d || !USER_TOOLS[d.tool] || !WAVE_INTERVALS.includes(d.timeframe) ||
+        !Array.isArray(d.points) || d.points.length < 2 || d.points.length > 6 ||
+        !d.points.every(p => p && Number.isFinite(+p.time) && Number.isFinite(+p.price)));
+      if (!drawings.length || bad) {
+        sendJsonResponse(req, res, 400, { code: 400, error: `画浪数据无效：每个浪须为 ${WAVE_INTERVALS.join('/')} 周期、${Object.keys(USER_TOOLS).join(' / ')} 工具、2~6 个 {time, price}` });
+        return;
+      }
+      try {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const firstTime = Math.min(...drawings.map(d => Math.min(...d.points.map(p => +p.time))));
+        const tfs = new Set();
+        drawings.forEach(d => { tfs.add(d.timeframe); (WAVE_USER_SUB_INTERVALS[d.timeframe] || []).forEach(t => tfs.add(t)); });
+        const list = Array.from(tfs);
+        const fetched = await Promise.all(list.map(tf =>
+          fetchBinanceKlines(rawSymbol, tf, Math.min(WAVE_MAX_BARS, Math.ceil((nowSec - firstTime) / WAVE_TF_SEC[tf]) + 300)).catch(() => null)));
+        const barsByTf = {};
+        list.forEach((tf, i) => { if (fetched[i]) barsByTf[tf] = fetched[i]; });
+        const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
+        const result = evaluateUserSketch(barsByTf, displaySymbol, { drawings });
+        sendJsonResponse(req, res, 200, { code: 0, ...result });
+      } catch (err) {
+        console.error('[API Error] wave-evaluate sketch:', err);
+        sendJsonResponse(req, res, 422, { code: 422, error: err.message });
+      }
+      return;
+    }
+
     const interval = payload.interval || '4h';
     if (!WAVE_INTERVALS.includes(interval)) {
       sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
