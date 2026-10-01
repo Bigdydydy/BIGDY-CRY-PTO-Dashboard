@@ -139,28 +139,78 @@ function checkWaveRateLimit(clientIp) {
 const WAVE_MAX_BARS = 10000;
 const waveKlineInflight = new Map();
 
+const KLINE_SEC = { '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800 };
+
+/** 币安格式的一页K线: [[openTimeMs, o, h, l, c, v], ...] (升序) */
+function binanceSource(name, base, pageMax) {
+  return {
+    name, pageMax,
+    async page(symbol, interval, limit, endTimeMs) {
+      const url = `${base}?symbol=${symbol}&interval=${interval}&limit=${limit}${endTimeMs ? `&endTime=${endTimeMs}` : ''}`;
+      const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }, signal: AbortSignal.timeout(8000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const rows = await response.json();
+      if (!Array.isArray(rows)) throw new Error('非数组响应');
+      return rows;
+    }
+  };
+}
+
+// 币安在部分云服务器出口 IP 上会限流 / 拒绝 (Render 共享出口)：备用 Bybit、OKX 的 USDT 永续K线
+const BYBIT_INTERVAL = { '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D', '1w': 'W' };
+const bybitSource = {
+  name: 'Bybit 永续', pageMax: 1000, maxPages: 10,
+  async page(symbol, interval, limit, endTimeMs) {
+    const iv = BYBIT_INTERVAL[interval];
+    if (!iv) throw new Error(`不支持 ${interval}`);
+    const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=${iv}&limit=${limit}${endTimeMs ? `&end=${endTimeMs}` : ''}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const json = await response.json();
+    if (!json || json.retCode !== 0 || !json.result || !Array.isArray(json.result.list)) throw new Error(`retCode ${json && json.retCode}`);
+    return json.result.list.map(r => [+r[0], r[1], r[2], r[3], r[4], r[5]]).reverse();
+  }
+};
+const OKX_INTERVAL = { '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1Dutc', '1w': '1Wutc' };
+const okxSource = {
+  name: 'OKX 永续', pageMax: 100, maxPages: 30,
+  async page(symbol, interval, limit, endTimeMs) {
+    const bar = OKX_INTERVAL[interval];
+    if (!bar) throw new Error(`不支持 ${interval}`);
+    const instId = symbol.replace(/USDT$/, '-USDT-SWAP');
+    // after = 返回早于该时间戳的K线 (向前分页)
+    const url = `https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=${bar}&limit=${limit}${endTimeMs ? `&after=${endTimeMs + 1}` : ''}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const json = await response.json();
+    if (!json || json.code !== '0' || !Array.isArray(json.data)) throw new Error(`code ${json && json.code}`);
+    return json.data.map(r => [+r[0], r[1], r[2], r[3], r[4], r[5]]).reverse();
+  }
+};
+
 const KLINE_SOURCES = [
-  { base: 'https://fapi.binance.com/fapi/v1/klines', pageMax: 1500 },
-  { base: 'https://data-api.binance.vision/api/v3/klines', pageMax: 1000 },
-  { base: 'https://api.binance.com/api/v3/klines', pageMax: 1000 }
+  binanceSource('币安合约', 'https://fapi.binance.com/fapi/v1/klines', 1500),
+  binanceSource('币安现货镜像', 'https://data-api.binance.vision/api/v3/klines', 1000),
+  binanceSource('币安现货', 'https://api.binance.com/api/v3/klines', 1000),
+  bybitSource,
+  okxSource
 ];
 
+/** 从一个源按 endTime 向前分页拼接最新的 limit 根 (备用源有页数上限，可能少于 limit) */
 async function fetchKlinePages(source, symbol, interval, limit) {
   const rows = [];
-  let endTime = null;
-  while (rows.length < limit) {
+  let endTime = null, pages = 0;
+  while (rows.length < limit && (!source.maxPages || pages < source.maxPages)) {
     const pageLimit = Math.min(source.pageMax, limit - rows.length);
-    const url = `${source.base}?symbol=${symbol}&interval=${interval}&limit=${pageLimit}${endTime ? `&endTime=${endTime}` : ''}`;
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!response.ok) {
-      if (!rows.length) throw new Error(`HTTP ${response.status}`);
+    let page;
+    try {
+      page = await source.page(symbol, interval, pageLimit, endTime);
+    } catch (e) {
+      if (!rows.length) throw e;
       break; // 已拿到的较新数据仍可用
     }
-    const page = await response.json();
-    if (!Array.isArray(page) || !page.length) break;
+    pages++;
+    if (!page.length) break;
     rows.unshift(...page);
     if (page.length < pageLimit) break; // 已到上市首日
     endTime = page[0][0] - 1;
@@ -168,8 +218,20 @@ async function fetchKlinePages(source, symbol, interval, limit) {
   return rows;
 }
 
+function rowsToBars(rows) {
+  return rows.map(b => ({
+    time: Math.floor(b[0] / 1000),
+    open: parseFloat(b[1]),
+    high: parseFloat(b[2]),
+    low: parseFloat(b[3]),
+    close: parseFloat(b[4]),
+    volume: parseFloat(b[5])
+  }));
+}
+
 // 缓存只按固定档位存放，避免 ?limit= 任意取值造成缓存键无限增长
 const KLINE_TIERS = [200, 1000, WAVE_MAX_BARS];
+const KLINE_FRESH_MS = 120000;
 
 async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
   limit = Math.max(1, Math.min(WAVE_MAX_BARS, parseInt(limit, 10) || 1000));
@@ -178,43 +240,71 @@ async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
   return bars.length > limit ? bars.slice(bars.length - limit) : bars;
 }
 
+/** 依次尝试各个源；全部失败时错误信息列出每个源的失败原因 */
+async function fetchFromSources(symbol, interval, limit, preferred) {
+  const order = preferred ? [preferred].concat(KLINE_SOURCES.filter(s => s !== preferred)) : KLINE_SOURCES;
+  const errors = [];
+  for (const source of order) {
+    try {
+      const rows = await fetchKlinePages(source, symbol, interval, limit);
+      if (rows.length) return { rows, source };
+      errors.push(`${source.name}: 空数据`);
+    } catch (e) {
+      errors.push(`${source.name}: ${e.message}`);
+    }
+  }
+  console.error('[Wave Klines]', symbol, interval, limit, errors.join(' | '));
+  throw new Error(`未能拉取到 ${interval} K 线（${errors.join('；')}）`);
+}
+
+/**
+ * 档位缓存 + 增量更新 + 出错回退旧缓存:
+ * - 2 分钟内直接返回缓存；更大档位的新鲜缓存可直接切片；
+ * - 过期后只补拉最新一页并与缓存拼接 (请求量从 7 页降到 1 页，减少被限流)；
+ * - 拉取全部失败时返回旧缓存，而不是报错。
+ */
 async function fetchKlineTier(symbol, interval, limit) {
   const cacheKey = `${symbol}_${interval}_${limit}`;
   const cached = waveKlineCache.get(cacheKey);
   const now = Date.now();
-  if (cached && now - cached.timestamp < 120000) {
-    return cached.data;
-  }
+  if (cached && now - cached.timestamp < KLINE_FRESH_MS) return cached.data;
   // 同一标的/周期/根数的并发请求合并为一次 (图表与研判接口常同时触发)
   if (waveKlineInflight.has(cacheKey)) return waveKlineInflight.get(cacheKey);
 
   const task = (async () => {
-    // 优先采用币安 Futures 合约行情通道 (fapi.binance.com)，降级回退至公共现货源
-    let rawData = null;
-    for (const source of KLINE_SOURCES) {
-      try {
-        const rows = await fetchKlinePages(source, symbol, interval, limit);
-        if (rows.length) { rawData = rows; break; }
-      } catch (e) {
-        // try next
+    for (const t of KLINE_TIERS) {
+      const big = t > limit && waveKlineCache.get(`${symbol}_${interval}_${t}`);
+      if (big && now - big.timestamp < KLINE_FRESH_MS && big.data.length >= limit) {
+        const data = big.data.slice(-limit);
+        waveKlineCache.set(cacheKey, { timestamp: big.timestamp, data, source: big.source });
+        return data;
       }
     }
-
-    if (!rawData || !Array.isArray(rawData)) {
-      throw new Error(`未能从币安行情源拉取到 ${interval} K 线数据，请稍后重试`);
+    if (cached && cached.data.length) {
+      const sec = KLINE_SEC[interval] || 3600;
+      const last = cached.data[cached.data.length - 1].time;
+      const need = Math.ceil((now / 1000 - last) / sec) + 2;
+      if (need <= 1000) {
+        try {
+          const { rows, source } = await fetchFromSources(symbol, interval, need, cached.source);
+          const fresh = rowsToBars(rows);
+          const data = cached.data.filter(b => b.time < fresh[0].time).concat(fresh).slice(-limit);
+          waveKlineCache.set(cacheKey, { timestamp: Date.now(), data, source });
+          return data;
+        } catch (e) {
+          return cached.data; // 增量也失败: 先用旧缓存
+        }
+      }
     }
-
-    const bars = rawData.map(b => ({
-      time: Math.floor(b[0] / 1000),
-      open: parseFloat(b[1]),
-      high: parseFloat(b[2]),
-      low: parseFloat(b[3]),
-      close: parseFloat(b[4]),
-      volume: parseFloat(b[5])
-    }));
-
-    waveKlineCache.set(cacheKey, { timestamp: Date.now(), data: bars });
-    return bars;
+    try {
+      const { rows, source } = await fetchFromSources(symbol, interval, limit);
+      const data = rowsToBars(rows);
+      waveKlineCache.set(cacheKey, { timestamp: Date.now(), data, source });
+      return data;
+    } catch (e) {
+      if (cached && cached.data.length) return cached.data;
+      throw e;
+    }
   })();
   waveKlineInflight.set(cacheKey, task);
   try {
@@ -222,6 +312,13 @@ async function fetchKlineTier(symbol, interval, limit) {
   } finally {
     waveKlineInflight.delete(cacheKey);
   }
+}
+
+/** 当前缓存使用的行情源名称 (响应里告诉前端是否用了备用源) */
+function klineSourceName(symbol, interval, limit) {
+  const tier = KLINE_TIERS.find(t => t >= limit) || WAVE_MAX_BARS;
+  const c = waveKlineCache.get(`${symbol}_${interval}_${tier}`);
+  return c && c.source ? c.source.name : null;
 }
 
 // MIME types for static serving
@@ -613,6 +710,7 @@ async function handleApiRequest(req, res, parsedUrl) {
         symbol: rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT',
         interval,
         count: bars.length,
+        source: klineSourceName(rawSymbol, interval, limit),
         bars
       });
     } catch (err) {
@@ -968,5 +1066,5 @@ module.exports = {
   server,
   startServer,
   sendJsonResponse,
-  _internal: { fetchBinanceKlines, waveKlineCache, KLINE_TIERS, noteApiActivity, isServerIdle }
+  _internal: { fetchBinanceKlines, fetchKlinePages, KLINE_SOURCES, waveKlineCache, KLINE_TIERS, noteApiActivity, isServerIdle }
 };
