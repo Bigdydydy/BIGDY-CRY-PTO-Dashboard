@@ -726,6 +726,111 @@
     throw lastError || new Error('无法连接到币安行情源');
   }
 
+  // ---------------------------------------------------------------------------
+  // 浏览器端研判 (默认路径): 服务端只提供有缓存的K线，计算放在 Web Worker，
+  // 避免 Render 免费实例 (0.1 CPU) 上一次研判阻塞整站十余秒，也不卡页面。
+  // ---------------------------------------------------------------------------
+  const WAVE_SUB_TFS = { '15m': [], '1h': ['15m'], '4h': ['1h', '15m'] };
+  const WAVE_HTF_TFS = { '15m': ['1h', '4h'], '1h': ['4h', '1d'], '4h': ['1d', '1w'] };
+  const AUX_TTL_MS = 120000;
+  const auxKlineCache = new Map();
+
+  /** 子周期 / 高周期辅助K线 (服务端缓存优先，失败直连币安)，浏览器内缓存2分钟 */
+  async function fetchAuxBars(symbol, tf, limit) {
+    const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
+    const key = `${clean}_${tf}_${limit}`;
+    const hit = auxKlineCache.get(key);
+    if (hit && Date.now() - hit.t < AUX_TTL_MS) return hit.bars;
+    let bars = null;
+    try {
+      const resp = await fetch(`/api/wave/klines?symbol=${clean}&interval=${tf}&limit=${limit}`, { signal: AbortSignal.timeout(15000) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && Array.isArray(json.bars) && json.bars.length) bars = json.bars;
+      }
+    } catch (e) { /* 降级直连 */ }
+    if (!bars) {
+      try {
+        const rows = await fetchDirectPaged('https://fapi.binance.com/fapi/v1/klines', 1500, clean, tf, limit);
+        if (rows.length) bars = parseRawKlines(rows);
+      } catch (e) { bars = null; }
+    }
+    if (bars) auxKlineCache.set(key, { t: Date.now(), bars });
+    return bars;
+  }
+
+  let waveWorker = null; // null=未创建, false=不可用
+  let waveWorkerSeq = 0;
+  const waveWorkerPending = new Map();
+
+  function getWaveWorker() {
+    if (waveWorker === false) return null;
+    if (waveWorker) return waveWorker;
+    try {
+      const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js')});
+self.onmessage = function (e) {
+  var d = e.data;
+  try { self.postMessage({ id: d.id, ok: true, result: self.LiuWaveEngine.analyzeWaves(d.bars, d.symbol, d.opts) }); }
+  catch (err) { self.postMessage({ id: d.id, ok: false, error: String(err && err.message || err) }); }
+};`;
+      const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+      const w = new Worker(url);
+      w.onmessage = e => {
+        const job = waveWorkerPending.get(e.data.id);
+        if (!job) return;
+        waveWorkerPending.delete(e.data.id);
+        if (e.data.ok) job.resolve(e.data.result); else job.reject(new Error(e.data.error));
+      };
+      w.onerror = () => {
+        waveWorkerPending.forEach(job => job.reject(new Error('worker error')));
+        waveWorkerPending.clear();
+        try { w.terminate(); } catch (e) {}
+        waveWorker = false;
+      };
+      waveWorker = w;
+      return w;
+    } catch (e) {
+      waveWorker = false;
+      return null;
+    }
+  }
+
+  function analyzeInWorker(bars, symbol, opts) {
+    const w = getWaveWorker();
+    if (!w) return Promise.reject(new Error('worker unavailable'));
+    const id = ++waveWorkerSeq;
+    return new Promise((resolve, reject) => {
+      waveWorkerPending.set(id, { resolve, reject });
+      w.postMessage({ id, bars, symbol, opts });
+      setTimeout(() => {
+        if (waveWorkerPending.has(id)) { waveWorkerPending.delete(id); reject(new Error('worker timeout')); }
+      }, 60000);
+    });
+  }
+
+  /** 浏览器端研判: Worker → 主线程 → 服务端接口 (最后兜底) */
+  async function analyzeClientSide(symbol, tf, bars, rangeOptions) {
+    const subTfs = WAVE_SUB_TFS[tf] || [];
+    const htfTfs = WAVE_HTF_TFS[tf] || [];
+    const [subs, htfs] = await Promise.all([
+      Promise.all(subTfs.map(t => fetchAuxBars(symbol, t, 1000))),
+      Promise.all(htfTfs.map(t => fetchAuxBars(symbol, t, 200)))
+    ]);
+    const opts = { timeframe: tf, subBars: {}, htfBars: {} };
+    subTfs.forEach((t, i) => { if (subs[i]) opts.subBars[t] = subs[i]; });
+    htfTfs.forEach((t, i) => { if (htfs[i]) opts.htfBars[t] = htfs[i]; });
+    if (rangeOptions && rangeOptions.startTime && rangeOptions.endTime) {
+      opts.startTime = rangeOptions.startTime;
+      opts.endTime = rangeOptions.endTime;
+    }
+    try {
+      return await analyzeInWorker(bars, symbol, opts);
+    } catch (e) {
+      if (window.LiuWaveEngine) return window.LiuWaveEngine.analyzeWaves(bars, symbol, opts);
+      throw e;
+    }
+  }
+
   /** 顶部「样本」标签: 实际根数与时间跨度 */
   function updateSampleLabel(bars, tf) {
     const el = document.getElementById('wave-sample-label');
@@ -976,9 +1081,13 @@
       }));
       candleSeries.setData(candleData);
 
-      // 调用后端 API 或本地引擎执行波浪分析
+      // 浏览器端研判 (默认)；失败时才请求服务端研判接口兜底
       let analysis = null;
       try {
+        analysis = await analyzeClientSide(symbol, currentTf, currentBars, isCustomSlice ? rangeOptions : null);
+      } catch (clientErr) {
+        // 选区不合法等引擎异常直接抛给界面；仅在浏览器端无法计算时请求服务端
+        if (/选区|K线数据不足/.test(clientErr.message || '')) throw clientErr;
         const queryParams = new URLSearchParams({
           symbol: symbol.replace(/[\/\-_]/g, '').toUpperCase(),
           interval: currentTf
@@ -987,24 +1096,9 @@
           queryParams.append('startTime', rangeOptions.startTime);
           queryParams.append('endTime', rangeOptions.endTime);
         }
-        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, {
-          signal: AbortSignal.timeout(20000)
-        });
-        if (apiResp.ok) {
-          analysis = await apiResp.json();
-        }
-      } catch (e) {
-        // 后端若超时或不可用则降级至客户端 UMD 引擎 (极速稳定，绝不卡死页面)
-      }
-
-      if (!analysis || analysis.code !== 0) {
-        if (!window.LiuWaveEngine) throw new Error('波浪计算引擎尚未就绪');
-        const opts = { timeframe: currentTf };
-        if (isCustomSlice) {
-          opts.startTime = rangeOptions.startTime;
-          opts.endTime = rangeOptions.endTime;
-        }
-        analysis = window.LiuWaveEngine.analyzeWaves(currentBars, symbol, opts);
+        const apiResp = await fetch(`/api/wave/analysis?${queryParams.toString()}`, { signal: AbortSignal.timeout(30000) });
+        if (apiResp.ok) analysis = await apiResp.json();
+        if (!analysis || analysis.code !== 0) throw clientErr;
       }
 
       currentAnalysis = analysis;

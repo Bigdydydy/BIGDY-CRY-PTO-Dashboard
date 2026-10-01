@@ -60,6 +60,9 @@ const waveKlineCache = new Map();
 
 // Module 8 波浪引擎支持的研判周期，严格限定为 15m / 1h / 4h (方案 B 主路径)
 const WAVE_INTERVALS = ['15m', '1h', '4h'];
+// 浏览器端研判所需的高周期背景 (仅限少量根数)
+const WAVE_AUX_INTERVALS = ['1d', '1w'];
+const WAVE_AUX_MAX_BARS = 500;
 const WAVE_SUB_INTERVALS = {
   '15m': [],
   '1h': ['15m'],
@@ -538,12 +541,14 @@ async function handleApiRequest(req, res, parsedUrl) {
     }
 
     const interval = parsedUrl.query?.interval || '4h';
-    if (!WAVE_INTERVALS.includes(interval)) {
+    const isAux = WAVE_AUX_INTERVALS.includes(interval);
+    if (!WAVE_INTERVALS.includes(interval) && !isAux) {
       sendJsonResponse(req, res, 400, { code: 400, error: `波浪理论研判限定 ${WAVE_INTERVALS.join('/')} 时间框架` });
       return;
     }
 
-    const limit = Math.min(parseInt(parsedUrl.query?.limit, 10) || WAVE_MAX_BARS, WAVE_MAX_BARS);
+    const maxBars = isAux ? WAVE_AUX_MAX_BARS : WAVE_MAX_BARS;
+    const limit = Math.min(parseInt(parsedUrl.query?.limit, 10) || maxBars, maxBars);
 
     try {
       const bars = await fetchBinanceKlines(rawSymbol, interval, limit);
@@ -634,7 +639,30 @@ async function handleApiRequest(req, res, parsedUrl) {
 
 /**
  * Handle static file serving
+ * 首次请求时把文件读入内存并预先 gzip，按 mtime/size 失效；
+ * 带 ETag，浏览器以 no-cache 方式每次校验，未变化则 304 不重复下载。
  */
+const staticCache = new Map();
+const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.svg']);
+
+function loadStaticEntry(filePath, stats) {
+  const cached = staticCache.get(filePath);
+  if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) return cached;
+  const raw = fs.readFileSync(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const gz = COMPRESSIBLE.has(ext) && raw.length > 1024 ? zlib.gzipSync(raw, { level: 9 }) : null;
+  const entry = {
+    mtimeMs: stats.mtimeMs,
+    size: stats.size,
+    raw,
+    gz,
+    etag: `"${crypto.createHash('md5').update(raw).digest('hex')}"`,
+    contentType: MIME_TYPES[ext] || 'application/octet-stream'
+  };
+  staticCache.set(filePath, entry);
+  return entry;
+}
+
 function handleStaticRequest(req, res, parsedUrl) {
   let reqPath = parsedUrl.pathname;
   if (reqPath === '/' || reqPath === '') {
@@ -643,6 +671,11 @@ function handleStaticRequest(req, res, parsedUrl) {
 
   const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
   const filePath = path.join(PUBLIC_DIR, safePath);
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('404 Not Found');
+    return;
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
@@ -651,16 +684,38 @@ function handleStaticRequest(req, res, parsedUrl) {
       return;
     }
 
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    let entry;
+    try {
+      entry = loadStaticEntry(filePath, stats);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('500 Internal Server Error');
+      return;
+    }
 
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-    fs.createReadStream(filePath).pipe(res);
+    const headers = {
+      'Content-Type': entry.contentType,
+      'Cache-Control': 'no-cache',
+      'ETag': entry.etag,
+      'Vary': 'Accept-Encoding'
+    };
+    const inm = req.headers['if-none-match'];
+    if (inm && inm.split(',').map(t => t.trim()).includes(entry.etag)) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    const acceptsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+    if (entry.gz && acceptsGzip) {
+      headers['Content-Encoding'] = 'gzip';
+      headers['Content-Length'] = entry.gz.length;
+      res.writeHead(200, headers);
+      res.end(entry.gz);
+      return;
+    }
+    headers['Content-Length'] = entry.raw.length;
+    res.writeHead(200, headers);
+    res.end(entry.raw);
   });
 }
 
