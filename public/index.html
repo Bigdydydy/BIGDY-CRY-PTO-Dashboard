@@ -227,7 +227,7 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">08/</span>柳玉冬波浪研判</span>
-              <span class="nav-desc">4H 铁律检验 · 监测点 · 艾略特通道</span>
+              <span class="nav-desc">多级别画浪 · 铁律证伪 · 监测点</span>
             </div>
           </button>
         </nav>
@@ -1919,319 +1919,90 @@
           <div class="card-header">
             <div class="card-title-group">
               <span class="card-module-tag">08 ELLIOTT WAVE THEORY &amp; LIU YUDONG RADAR</span>
-              <h2>柳玉冬波浪理论智能研判系统 (4H 基准 · 币安合约)</h2>
-              <span class="card-subtitle-inline">三大铁律严格核验 • “出身决定命运”微观穿透 (1H/15m) • 艾略特通道 • 关键监测点 • 并列候选浪型推演</span>
-            </div>
-            <div class="header-controls">
-              <div class="tp-header-badges">
-                <span class="tp-regime-pill" id="wave-header-regime-pill">-- 待选区</span>
-                <span class="tp-score-pill" id="wave-header-score-pill">最高匹配: --分</span>
-                <span class="tz-badge" id="wave-update-time">更新中... (UTC+8)</span>
-              </div>
+              <h2>柳玉冬波浪理论 · 多级别画浪评估 (币安合约)</h2>
+              <span class="card-subtitle-inline">在图上画母浪与子浪 • 手稿铁律 • 低周期子浪证伪 • 母子级别一致性 • 监测点 / 失效位 / 目标</span>
             </div>
           </div>
 
           <div class="card-body">
-            <!-- 5-KPI Top Scorecard Grid -->
-            <div class="wave-kpi-grid">
-              <!-- KPI 1: Primary Pattern -->
-              <div class="bento-card wave-kpi-card">
-                <div class="kpi-card-header">
-                  <span class="kpi-label">最优主导浪型</span>
-                  <span class="kpi-badge" id="kpi-wave-primary-badge">待选区</span>
-                </div>
-                <div class="kpi-main-val" id="kpi-wave-primary-name" style="font-size: 1.12rem; font-weight: 700;">待选区研判</div>
-                <div class="kpi-sub-meta" id="kpi-wave-primary-cat">请点击【🖱️ 框选分析模式】选取 2~750 根 K 线</div>
-              </div>
-
-              <!-- KPI 2: Composite Score -->
-              <div class="bento-card wave-kpi-card">
-                <div class="kpi-card-header">
-                  <span class="kpi-label">综合匹配得分</span>
-                  <span class="kpi-badge">六维置信度</span>
-                </div>
-                <div class="kpi-main-val text-pos" id="kpi-wave-primary-score">-- 分</div>
-                <div class="kpi-meter-bar">
-                  <div class="kpi-meter-fill" id="kpi-wave-score-bar" style="width: 0%;"></div>
-                </div>
-                <div class="kpi-sub-meta">铁律50% + 出身15% + 斐波15% + 通道10% + 对称10%</div>
-              </div>
-
-              <!-- KPI 3: Key Monitoring Pivot -->
-              <div class="bento-card wave-kpi-card">
-                <div class="kpi-card-header">
-                  <span class="kpi-label">核心监测点生命线</span>
-                  <span class="kpi-badge" style="color: var(--accent-primary);">做底/反转基准</span>
-                </div>
-                <div class="kpi-main-val text-highlight" id="kpi-wave-pivot-price">$--,---</div>
-                <div class="kpi-sub-meta" id="kpi-wave-pivot-status">等待框选区间</div>
-              </div>
-
-              <!-- KPI 4: Micro Origin Verification -->
-              <div class="bento-card wave-kpi-card">
-                <div class="kpi-card-header">
-                  <span class="kpi-label">“出身决定命运”微观校验</span>
-                  <span class="kpi-badge">1H/15m 穿透</span>
-                </div>
-                <div class="kpi-main-val" id="kpi-wave-origin-status" style="font-size: 1.05rem;">待框选检测</div>
-                <div class="kpi-sub-meta" id="kpi-wave-origin-desc">选取波段后穿透微观 1H/15m 结构</div>
-              </div>
-
-              <!-- KPI 5: Primary Scenario Probability -->
-              <div class="bento-card wave-kpi-card">
-                <div class="kpi-card-header">
-                  <span class="kpi-label">第一情景推演概率</span>
-                  <span class="kpi-badge">推演倾向</span>
-                </div>
-                <div class="kpi-main-val text-cyan" id="kpi-wave-scenario-prob">--%</div>
-                <div class="kpi-sub-meta" id="kpi-wave-scenario-name">等待选区确认</div>
-              </div>
-            </div>
-
-            <!-- Control & Indicator Bar -->
+            <!-- Control Bar -->
             <div class="wave-control-bar">
-          <div class="wave-control-left">
-            <div class="wave-symbol-group" role="group" aria-label="选择标的">
-              <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
-              <button class="wave-symbol-btn" data-symbol="ETH/USDT">ETH / USDT</button>
-            </div>
-            <div class="wave-symbol-group" role="group" aria-label="选择周期">
-              <button class="wave-symbol-btn wave-tf-btn" data-interval="15m">15m</button>
-              <button class="wave-symbol-btn wave-tf-btn" data-interval="1h">1H</button>
-              <button class="wave-symbol-btn wave-tf-btn active" data-interval="4h">4H</button>
-            </div>
-            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 周期: <strong id="wave-tf-label">4H (4小时)</strong></span>
-            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 样本: <strong id="wave-sample-label">最多 10000 根 K线</strong></span>
-            <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 计算架构: <strong>方案 B (币安合约 4H/1H/15m 全量+选区研判)</strong></span>
-          </div>
-          <div class="wave-control-right">
-            <button class="btn-refresh" id="btn-scan-waves">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
-                <path d="M23 4v6h-6"></path>
-                <path d="M1 20v-6h6"></path>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-              <span>智能扫描波浪</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Wave Layout: Left Chart + Right Quantitative Diagnostic -->
-        <div class="wave-grid-layout">
-          <!-- Left: Lightweight Charts View -->
-          <div class="bento-card wave-chart-card">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
-              <div>
-                <div class="card-title-group">
-                  <div class="card-icon" style="background: rgba(234, 88, 12, 0.12); color: var(--accent-primary);">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
-                    </svg>
-                  </div>
-                  <h3>4H 交互式 K 线图与波浪标引 (Lightweight Charts)</h3>
+              <div class="wave-control-left">
+                <div class="wave-symbol-group" role="group" aria-label="选择标的">
+                  <button class="wave-symbol-btn active" data-symbol="BTC/USDT">BTC / USDT</button>
+                  <button class="wave-symbol-btn" data-symbol="ETH/USDT">ETH / USDT</button>
                 </div>
-                <p class="card-desc" id="wave-status-msg">● 正在拉取 4H K 线 (最多 10000 根) 并加载柳玉冬波浪模型...</p>
-              </div>
-
-              <div class="chart-tools-group">
-                <button class="chart-tool-btn" id="btn-drag-range" title="两步点击框选任意区间分析 (最大750根K线)">🖱️ 框选分析模式</button>
-                <button class="chart-tool-btn" id="btn-reset-range" title="完全重置图表至无波浪预设状态，准备选取新的K线区域">↺ 重置图表 (清空波浪)</button>
-                <button class="chart-tool-btn active" id="btn-toggle-higher" title="多级别同屏：同时显示高一级别计数（紫色粗线，(1)(A)(W) 括号浪号）">多级别同屏</button>
-                <button class="chart-tool-btn" id="btn-toggle-subwaves" title="切换大级别波浪内部嵌套的小级别次级子浪">大浪嵌套小浪</button>
-                <button class="chart-tool-btn" id="btn-toggle-channel" title="切换艾略特辅助通道线 (仅作视觉投影参考，不作为波浪判定标准)">艾略特通道</button>
-                <button class="chart-tool-btn active" id="btn-toggle-markers" title="切换图表上的浪型标注 ①-⑤/(A)-(C)">浪型标引</button>
-                <button class="chart-tool-btn active" id="btn-toggle-zigzag" title="切换波浪分笔折线">分笔折线</button>
-                <button class="chart-tool-btn active" id="btn-toggle-invalidation" title="切换关键监测点与防守水平虚线">核心监测点</button>
-                <button class="chart-tool-btn active" id="btn-toggle-targets" title="切换斐波那契投射目标水平线">目标区间</button>
-              </div>
-            </div>
-
-            <!-- 画浪工具: 用户画浪 → 手稿铁律 + 15m 子浪证伪 + 柳氏监测点/目标 -->
-            <div class="wave-draw-toolbar" role="group" aria-label="画浪工具">
-              <span class="wave-draw-label">✏️ 画浪评估</span>
-              <button class="chart-tool-btn draw-tool-btn" data-tool="IMPULSE" title="推动浪：依次点击 0-1-2-3-4-5">推动浪 12345</button>
-              <button class="chart-tool-btn draw-tool-btn" data-tool="ABC" title="调整浪：依次点击 0-a-b-c">调整浪 abc</button>
-              <button class="chart-tool-btn draw-tool-btn" data-tool="WXY" title="联合调整：依次点击 0-w-x-y">wxy</button>
-              <button class="chart-tool-btn draw-tool-btn" data-tool="WXYXZ" title="三重调整：依次点击 0-w-x-y-x-z">wxyxz</button>
-              <button class="chart-tool-btn draw-tool-btn" data-tool="ABCDE" title="收缩三角形：依次点击 0-a-b-c-d-e">三角形 abcde</button>
-              <span class="wave-draw-sep"></span>
-              <button class="chart-tool-btn" id="btn-draw-undo" title="撤销上一个点 (Backspace)" disabled>撤销点</button>
-              <button class="chart-tool-btn" id="btn-draw-finish" title="未画完时提前评估 (Enter / 双击)，末浪按运行中处理" disabled>完成评估</button>
-              <button class="chart-tool-btn" id="btn-draw-clear" title="清除画浪">清除画浪</button>
-            </div>
-
-            <!-- Range Selection Banner -->
-            <div id="wave-range-banner" class="wave-range-banner" style="display: none;">
-              <div class="range-banner-left">
-                <span class="range-pulse-dot"></span>
-                <span>当前选定分析区间：<strong id="wave-range-text">--</strong></span>
-              </div>
-              <button class="chart-tool-btn btn-sm" id="btn-cancel-range" title="清空所有波浪预设并退出选区">退出选区并清空</button>
-            </div>
-
-            <!-- Lightweight Charts Container -->
-            <div id="wave-chart-container"></div>
-          </div>
-
-          <!-- Right: Diagnostic & Liu Yudong Quantitative Radar -->
-          <div class="wave-side-col">
-            <!-- 画浪评估 (用户画浪 → 铁律 / 15m 子浪 / 走势检验 / 监测点·失效位·目标) -->
-            <div class="bento-card" id="card-wave-user-eval">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>画浪评估 · 柳氏证伪</h3>
-                  </div>
-                  <span class="card-badge badge-neutral" id="wave-user-eval-badge">待画浪</span>
+                <div class="wave-symbol-group" role="group" aria-label="选择周期">
+                  <button class="wave-symbol-btn wave-tf-btn" data-interval="15m">15m</button>
+                  <button class="wave-symbol-btn wave-tf-btn" data-interval="1h">1H</button>
+                  <button class="wave-symbol-btn wave-tf-btn active" data-interval="4h">4H</button>
                 </div>
-              </div>
-              <div id="wave-user-eval-body" class="liu-signals-body"></div>
-            </div>
-
-            <!-- 0. Parallel Candidate Waves Selector -->
-            <div class="bento-card" id="card-wave-candidates">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>并列候选浪型判定 (点击切换图表)</h3>
-                  </div>
-                  <span class="card-badge" id="candidate-count-badge">待选区</span>
-                </div>
-              </div>
-              <div id="wave-candidates-list" class="wave-candidates-list" style="margin-top: 10px;">
-                <div class="wave-idle-prompt">
-                  <span class="idle-icon">🎯</span>
-                  <div class="idle-title">等待框选分析</div>
-                  <p class="idle-desc">
-                    请点击上方 <strong>【🖱️ 框选分析模式】</strong>，在 4H 图表中单击起点并移动至终点（2 ~ 750 根 K 线），系统将对所选范围执行三大铁律与并列形态研判。
-                  </p>
-                </div>
+                <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 周期: <strong id="wave-tf-label">4H (4小时)</strong></span>
+                <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 样本: <strong id="wave-sample-label">最多 10000 根 K线</strong></span>
+                <span class="wave-pill-tag"><span class="wave-tag-dot"></span> 切换周期时已画的浪保留，可在低周期画子浪</span>
               </div>
             </div>
 
-            <!-- 1. Origin Analysis ("出身决定命运") -->
-            <div class="bento-card" id="card-wave-origin">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>“出身决定命运”微观校验 (1H/15m)</h3>
-                  </div>
-                  <span class="card-badge badge-neutral" id="wave-origin-badge">待选区</span>
-                </div>
-              </div>
-              <p style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.5; margin: 8px 0 0 0;" id="wave-origin-text">
-                尚未选取分析区间。点击图表上方【🖱️ 框选分析模式】选取 K 线范围后，将穿透检验起点第一笔的微观 1H/15m 驱动结构。
-              </p>
-            </div>
-
-            <!-- 1.5 Preceding Context Analysis ("承前启后·大级别脉络") -->
-            <div class="bento-card" id="card-wave-preceding">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>承前启后 · 前序浪型大级别脉络</h3>
-                  </div>
-                  <span class="card-badge badge-neutral" id="wave-preceding-badge">观当下必先审前身</span>
-                </div>
-              </div>
-              <div style="font-size: 0.74rem; color: var(--text-primary); line-height: 1.5; margin: 8px 0 0 0;" id="wave-preceding-text">
-                尚未选取分析区间。选取波段后，引擎将自动穿透选区前序同级别与大级别行情的驱动/调整性质，确立当前波段的顺势与反弹属性。
-              </div>
-            </div>
-
-            <!-- 2. Active Wave Status & Iron Rules -->
-            <div class="bento-card">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>当前选中主浪型详情</h3>
-                  </div>
-                  <span class="card-badge badge-neutral" id="wave-regime-badge">待选区</span>
-                </div>
-              </div>
-              <div style="margin-top: 6px;">
-                <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="wave-regime-name">--</div>
-                <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 4px; font-weight: 600;" id="wave-current-stage">请先在图表中框选行情范围</div>
-
-                <div style="margin-top: 14px;">
-                  <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">柳玉冬波浪三大铁律核验</div>
-                  <div class="rule-check-list">
-                    <div class="rule-check-item">
-                      <div class="rule-check-left">
-                        <span class="rule-dot-idle" id="rule-dot-1"></span>
-                        <span>铁律 1: 浪2终点不能破浪1起点</span>
+            <div class="wave-grid-layout">
+              <!-- Left: Chart -->
+              <div class="bento-card wave-chart-card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                  <div>
+                    <div class="card-title-group">
+                      <div class="card-icon" style="background: rgba(234, 88, 12, 0.12); color: var(--accent-primary);">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
+                        </svg>
                       </div>
-                      <span class="text-secondary" id="rule-status-1" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
+                      <h3 id="wave-chart-title">4H K 线图 · 画浪</h3>
                     </div>
-                    <div class="rule-check-item">
-                      <div class="rule-check-left">
-                        <span class="rule-dot-idle" id="rule-dot-2"></span>
-                        <span>铁律 2: 浪3不能是最短驱动浪</span>
+                    <p class="card-desc" id="wave-status-msg">● 正在拉取 K 线…</p>
+                  </div>
+                  <div class="chart-tools-group">
+                    <button class="chart-tool-btn active" id="btn-toggle-markers" title="显示 / 隐藏浪号标注">浪号标注</button>
+                    <button class="chart-tool-btn" id="btn-toggle-subwaves" title="显示引擎在低周期探测到的子浪拐点（没画子浪的段）">低周期子浪</button>
+                    <button class="chart-tool-btn active" id="btn-toggle-invalidation" title="显示所选浪的监测点与失效位">监测点 / 失效位</button>
+                    <button class="chart-tool-btn active" id="btn-toggle-targets" title="显示所选浪的目标位">目标位</button>
+                  </div>
+                </div>
+
+                <!-- 画浪工具 -->
+                <div class="wave-draw-toolbar" role="group" aria-label="画浪工具">
+                  <span class="wave-draw-label">✏️ 画浪</span>
+                  <button class="chart-tool-btn draw-tool-btn" data-tool="IMPULSE" title="推动浪 / 楔形：依次点击 0-1-2-3-4-5">推动浪 12345</button>
+                  <button class="chart-tool-btn draw-tool-btn" data-tool="ABC" title="锯齿形 / 平台形：依次点击 0-a-b-c">abc</button>
+                  <button class="chart-tool-btn draw-tool-btn" data-tool="WXY" title="双锯齿 / 双重横向整理：依次点击 0-w-x-y">wxy</button>
+                  <button class="chart-tool-btn draw-tool-btn" data-tool="WXYXZ" title="三锯齿 / 三重横向整理：依次点击 0-w-x-y-x-z">wxyxz</button>
+                  <button class="chart-tool-btn draw-tool-btn" data-tool="ABCDE" title="三角形（收缩 / 扩张）：依次点击 0-a-b-c-d-e">三角形 abcde</button>
+                  <span class="wave-draw-sep"></span>
+                  <button class="chart-tool-btn" id="btn-draw-undo" title="画浪中撤销上一个点；否则删除最后画的浪 (Backspace)" disabled>撤销</button>
+                  <button class="chart-tool-btn" id="btn-draw-finish" title="未画满时结束当前这个浪 (双击)，末浪按运行中处理" disabled>结束本浪</button>
+                  <button class="chart-tool-btn draw-eval-btn" id="btn-draw-evaluate" title="对图上所有的浪（母浪与子浪）做整体评估 (Enter)" disabled>评估全部</button>
+                  <button class="chart-tool-btn" id="btn-draw-clear" title="清除图上所有的浪" disabled>清除全部</button>
+                </div>
+
+                <div id="wave-chart-container"></div>
+              </div>
+
+              <!-- Right: Sketch & Evaluation -->
+              <div class="wave-side-col">
+                <div class="bento-card" id="card-wave-user-eval">
+                  <div class="card-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                      <div class="card-title-group">
+                        <h3>画浪评估 · 柳氏证伪</h3>
                       </div>
-                      <span class="text-secondary" id="rule-status-2" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
-                    </div>
-                    <div class="rule-check-item">
-                      <div class="rule-check-left">
-                        <span class="rule-dot-idle" id="rule-dot-3"></span>
-                        <span>铁律 3: 浪4底绝不进入浪1顶 (无重叠)</span>
-                      </div>
-                      <span class="text-secondary" id="rule-status-3" style="font-family: var(--font-mono); font-size: 0.72rem;">待检测</span>
+                      <span class="card-badge badge-neutral" id="wave-user-eval-badge">待画浪</span>
                     </div>
                   </div>
-                  <div class="liu-signal-row" id="wave-structure-detail" style="display: none; margin-top: 10px;"></div>
+                  <div id="wave-sketch-list" class="wave-sketch-list"></div>
+                  <div id="wave-user-eval-body" class="liu-signals-body"></div>
                 </div>
               </div>
             </div>
+          </div> <!-- /.card-body -->
 
-            <!-- 3. 柳玉冬核心监测点: 失效位 (越过即当前计数失效) + 确认位 (越过即确认本浪结束) -->
-            <div class="bento-card">
-              <div class="card-header">
-                <div class="card-title-group">
-                  <h3>柳玉冬核心监测点</h3>
-                </div>
-              </div>
-              <div class="wave-pivot-highlight-box">
-                <div style="font-size: 0.7rem; color: var(--text-muted);" id="wave-pivot-label">失效位（越过即当前计数失效）</div>
-                <div class="wave-pivot-price" id="wave-pivot-price">$--,---</div>
-                <div class="wave-pivot-diff" id="wave-pivot-diff">等待选区...</div>
-              </div>
-              <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; margin-top: 10px;" id="wave-pivot-desc">
-                选择有效 K 线区间后，给出当前计数的失效位与确认位。
-              </p>
-              <div class="liu-signal-row" id="wave-pivot-confirm" style="display: none; margin-top: 8px;"></div>
-            </div>
-
-            <!-- 3.5 柳氏实战信号 (v3: 监测点战法 / 最大回撤 / 吃掉0.7 / 调整分部 / 出身) -->
-            <div class="bento-card" id="card-wave-liu-signals">
-              <div class="card-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                  <div class="card-title-group">
-                    <h3>柳氏实战信号 · 当前段</h3>
-                  </div>
-                  <span class="card-badge badge-neutral" id="wave-liu-signal-badge">待研判</span>
-                </div>
-              </div>
-              <div id="wave-liu-signals-body" class="liu-signals-body">
-                <p class="liu-idle">研判后显示：监测点战法、最大回撤判据、吃掉前段0.618/0.7、调整分部投射与出身检验。</p>
-              </div>
-            </div>
-
-            <!-- 3.6 级别阶梯 (大级别 → 本级别 → 当前段小级别) -->
-            <div class="bento-card" id="card-wave-degree-ladder">
-              <div class="card-header">
-                <div class="card-title-group">
-                  <h3>级别阶梯 · 嵌套计数</h3>
-                </div>
-              </div>
-              <div id="wave-degree-ladder-body" class="liu-ladder">
-                <p class="liu-idle">研判后显示高一级别、本级别与当前段小级别的嵌套关系。</p>
-              </div>
-            </div>
-
-          </div>
-        </div> <!-- /.card-body -->
-
-      </section> <!-- /#module-wave-radar -->
+        </section> <!-- /#module-wave-radar -->
     </div> <!-- /#view-wave-radar -->
 
 </main> <!-- /#main-viewport -->

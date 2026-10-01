@@ -3790,7 +3790,7 @@ const VIEW_TITLES = {
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
-  'view-wave-radar': '柳玉冬波浪理论智能研判 (4H)',
+  'view-wave-radar': '柳玉冬波浪理论 · 多级别画浪评估',
   'view-all': '全模块平铺画卷'
 };
 
