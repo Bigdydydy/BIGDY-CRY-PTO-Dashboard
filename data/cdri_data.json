@@ -1,26 +1,26 @@
 {
   "performance": {
-    "price": 63,
+    "price": 64,
     "level": "高风险",
     "levelEn": "High Risk",
     "color": "#ffc800",
-    "yesterday": 60,
+    "yesterday": 61,
     "yesterdayRisk": {
-      "level": "中性波动",
-      "levelEn": "Neutral Volatility",
-      "color": "#93ea2a",
-      "bg": "rgba(147, 234, 42, 0.15)",
-      "border": "#93ea2a"
-    },
-    "week": 64,
-    "weekRisk": {
       "level": "高风险",
       "levelEn": "High Risk",
       "color": "#ffc800",
       "bg": "rgba(255, 200, 0, 0.15)",
       "border": "#ffc800"
     },
-    "month": 65,
+    "week": 60,
+    "weekRisk": {
+      "level": "中性波动",
+      "levelEn": "Neutral Volatility",
+      "color": "#93ea2a",
+      "bg": "rgba(147, 234, 42, 0.15)",
+      "border": "#93ea2a"
+    },
+    "month": 63,
     "monthRisk": {
       "level": "高风险",
       "levelEn": "High Risk",
@@ -1721,7 +1721,9 @@
       1790467200,
       1790553600,
       1790640000,
-      1790726400
+      1790726400,
+      1790812800,
+      1790899200
     ],
     "dates": [
       "2022-03-05",
@@ -3394,7 +3396,9 @@
       "2026-09-27",
       "2026-09-28",
       "2026-09-29",
-      "2026-09-30"
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02"
     ],
     "valueList": [
       48,
@@ -5067,7 +5071,9 @@
       59,
       61,
       60,
-      63
+      61,
+      61,
+      64
     ],
     "priceList": [
       39375.1,
@@ -6740,9 +6746,11 @@
       84432.9,
       83461,
       83624.5,
-      84209.3
+      83576.9,
+      84829.6,
+      87011.7
     ]
   },
-  "updatedAt": "2026-09-30 22:12:12",
-  "timestamp": 1790777532843
+  "updatedAt": "2026-10-02 21:38:40",
+  "timestamp": 1790948320909
 }

@@ -1450,10 +1450,11 @@
                   <th>净 Delta</th>
                   <th>净 Vega</th>
                   <th>腿数</th>
+                  <th>收益模拟</th>
                 </tr>
               </thead>
               <tbody id="whale-table-body">
-                <tr><td colspan="7" class="text-center">加载巨鲸大单中...</td></tr>
+                <tr><td colspan="8" class="text-center">加载巨鲸大单中...</td></tr>
               </tbody>
             </table>
           </div>
@@ -2141,6 +2142,76 @@
     </div>
   </div> <!-- /#trade-modal-backdrop -->
 
+  <!-- Dedicated PnL View Modal for Module 4 Options Payoff (BTC Standard) -->
+  <div class="modal-backdrop" id="pnl-modal-backdrop">
+    <div class="modal-card pnl-modal-card" id="pnl-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-title-top">
+            <span class="modal-tag pnl-tag">PNL PAYOFF VIEW</span>
+            <h3 id="pnl-modal-title">期权收益结构模拟 (PnL View)</h3>
+            <span class="inverse-pill-badge" title="基于 Deribit 币本位反向期权非线性到期结算函数">⚡ BTC 币本位结算</span>
+          </div>
+          <div class="modal-time-meta" id="pnl-modal-meta">--</div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-pnl-modal" aria-label="关闭">&times;</button>
+      </div>
+
+      <div class="modal-body pnl-modal-body">
+        <!-- 1. Top KPI Metrics Grid -->
+        <div class="pnl-kpi-grid">
+          <div class="pnl-kpi-card">
+            <span class="pnl-kpi-lbl">最大理论盈利 (BTC)</span>
+            <span class="pnl-kpi-val text-pos" id="pnl-kpi-max-profit">--</span>
+            <span class="pnl-kpi-sub" id="pnl-kpi-max-profit-usd">--</span>
+          </div>
+          <div class="pnl-kpi-card">
+            <span class="pnl-kpi-lbl">最大理论亏损 (BTC)</span>
+            <span class="pnl-kpi-val text-neg" id="pnl-kpi-max-loss">--</span>
+            <span class="pnl-kpi-sub" id="pnl-kpi-max-loss-usd">--</span>
+          </div>
+          <div class="pnl-kpi-card">
+            <span class="pnl-kpi-lbl">损益平衡点 (BEP)</span>
+            <span class="pnl-kpi-val text-highlight" id="pnl-kpi-bep">--</span>
+            <span class="pnl-kpi-sub" id="pnl-kpi-bep-distance">距标的偏离度</span>
+          </div>
+          <div class="pnl-kpi-card">
+            <span class="pnl-kpi-lbl">初始净现金流</span>
+            <span class="pnl-kpi-val" id="pnl-kpi-cashflow">--</span>
+            <span class="pnl-kpi-sub" id="pnl-kpi-cashflow-desc">--</span>
+          </div>
+        </div>
+
+        <!-- 2. Option Legs Ribbon / Chips -->
+        <div class="pnl-legs-ribbon" id="pnl-legs-ribbon">
+          <!-- Dynamically injected leg tags -->
+        </div>
+
+        <!-- 3. ECharts Payoff Chart -->
+        <div class="pnl-chart-wrapper">
+          <div class="pnl-chart-header">
+            <span class="pnl-chart-title">📈 到期净收益曲线 (到期结算标的现货价格 vs 净收益)</span>
+            <div class="pnl-chart-legend-hints">
+              <span class="pnl-hint-dot pnl-dot-profit"></span> 盈利区
+              <span class="pnl-hint-dot pnl-dot-loss"></span> 亏损区
+              <span class="pnl-hint-dot pnl-dot-spot"></span> 标的现货
+              <span class="pnl-hint-dot pnl-dot-bep"></span> 盈亏平衡点
+            </div>
+          </div>
+          <div id="pnl-chart-container" style="width: 100%; height: 380px;"></div>
+        </div>
+
+        <!-- 4. Mathematical & Curvature Annotation Note -->
+        <div class="pnl-math-note">
+          <div class="pnl-note-title">ℹ️ Deribit 币本位结算机制与非线性曲率说明</div>
+          <p id="pnl-note-desc">
+            本模拟采用 Deribit 反向期权（Inverse Option）到期损益模型：看涨期权到期单腿 BTC 收益公式为 max(1 - K/S, 0)，无论现货价格上涨至多高，单张多头收益严格收敛于 1.0 BTC；看跌期权到期单腿 BTC 收益公式为 max(K/S - 1, 0)，当现货价格深度暴跌向 0 靠拢时，以 BTC 计量的收益率呈双曲非线性发散，具备强尾部凸性对冲保护效应。
+          </p>
+        </div>
+      </div>
+    </div>
+  </div> <!-- /#pnl-modal-backdrop -->
+
   <!-- Toast Notification -->
   <div class="toast-notification" id="toast-notification"></div>
 
@@ -2217,6 +2288,7 @@
 
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
+  <script src="/pnl_engine.js"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
   <script src="/app.js?v=20260913_1"></script>
 </body>

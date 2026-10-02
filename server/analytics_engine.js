@@ -1950,8 +1950,59 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     if (b.timingProfile?.is0DTE) zeroDteCount++;
   }
 
+  // 资金聚集画像：对冰山组与独立大单按「到期日 × 策略构型」做名义额加权归集；
+  // 冰山组优先统计，其内部若含有单笔巨鲸则以 blockId 去重，避免双重计入
+  const MONTH_CN = { JAN: '1月', FEB: '2月', MAR: '3月', APR: '4月', MAY: '5月', JUN: '6月', JUL: '7月', AUG: '8月', SEP: '9月', OCT: '10月', NOV: '11月', DEC: '12月' };
+  const fmtExpiryCn = e => {
+    const m = /^(\d{1,2})([A-Z]{3})(\d{2})$/.exec(e || '');
+    return m ? `${MONTH_CN[m[2]]}${+m[1]}日交割（${e}）` : e;
+  };
+  const dominantExpiry = (legs, fallbackName) => {
+    const w = {};
+    for (const l of legs || []) {
+      let exp = l.expiryStr && l.expiryStr !== 'UNKNOWN' ? l.expiryStr : null;
+      if (!exp) { const m = /-(\d{1,2}[A-Z]{3}\d{2})-/.exec(l.instrument || ''); exp = m && m[1]; }
+      if (!exp) continue;
+      w[exp] = (w[exp] || 0) + (l.notionalM || 1);
+    }
+    const top = Object.entries(w).sort((a, b) => b[1] - a[1])[0];
+    if (top) return top[0];
+    const m = /-(\d{1,2}[A-Z]{3}\d{2})-/.exec(fallbackName || '');
+    return m ? m[1] : null;
+  };
+  const clusteredIds = new Set();
+  for (const c of icebergClusters) (c.blockIds || []).forEach(id => clusteredIds.add(id));
+  const concItems = [];
+  for (const c of icebergClusters) {
+    concItems.push({ usd: c.clusterNotionalUSD || 0, name: c.strategyNameZh || '未识别构型', expiry: dominantExpiry(c.legs, c.instrument) });
+  }
+  for (const b of whaleBlocks) {
+    if (clusteredIds.has(b.blockId)) continue;
+    concItems.push({ usd: b.notionalUSD || 0, name: b.strategyNameZh || '未识别构型', expiry: dominantExpiry(b.legs) });
+  }
+  const concTotal = concItems.reduce((s, x) => s + x.usd, 0);
+  let concentrationText = '样本过少，暂无法归集大资金构型意图。';
+  if (concTotal > 0) {
+    const topBy = key => {
+      const m = {};
+      for (const x of concItems) { const k = key(x); if (!k) continue; m[k] = (m[k] || 0) + x.usd; }
+      return Object.entries(m).sort((a, b) => b[1] - a[1])[0] || null;
+    };
+    const topE = topBy(x => x.expiry);
+    const topS = topBy(x => x.name);
+    const ePct = topE ? Math.round((topE[1] / concTotal) * 100) : 0;
+    const sPct = topS ? Math.round((topS[1] / concTotal) * 100) : 0;
+    const expPart = topE && ePct >= 40
+      ? `到期日集中于 ${fmtExpiryCn(topE[0])}（占名义额 ${ePct}%）`
+      : '到期日分布分散';
+    const stratPart = topS && sPct >= 25
+      ? `构型以【${topS[0]}】为主（占 ${sPct}%）`
+      : `构型分散，最大单一构型仅占 ${sPct}%，未见一致性意图`;
+    concentrationText = `大资金名义额${expPart}，${stratPart}。`;
+  }
+
   const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : '过去 30 天历史沉淀'));
-  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。微观性质穿透显示：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。大资金目前主要集中在 9 月底交割（25SEP26）的深度虚值看涨牛市价差（Call Spread）与卖出看跌期权（Short Put），显示主流期权做市与宏观机构对近端下跌空间有较强防护信心，倾向于在低波震荡中吃进 Theta 时间价值。`;
+  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。微观性质穿透显示：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。${concentrationText}`;
 
   return {
     whaleBlocks,

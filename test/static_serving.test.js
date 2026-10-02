@@ -55,6 +55,12 @@ describe('静态资源: 预压缩 + ETag 校验缓存 (Render 免费实例减负
     assert.ok(res.body.equals(fs.readFileSync(path.join(__dirname, '..', 'server', 'wave_engine.js'))));
   });
 
+  it('/pnl_engine.js 正常静态提供且与 public/pnl_engine.js 内容一致', async () => {
+    const res = await get('/pnl_engine.js');
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.body.equals(fs.readFileSync(path.join(__dirname, '..', 'public', 'pnl_engine.js'))));
+  });
+
   it('K线缓存只按 200/1000/10000 三档存放，任意 limit 从档位切片', async () => {
     const realFetch = global.fetch;
     let calls = 0;

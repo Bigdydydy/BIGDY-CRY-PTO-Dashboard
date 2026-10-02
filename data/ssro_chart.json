@@ -1,33 +1,33 @@
 {
   "code": 0,
-  "updatedAt": "2026-09-30T14:12:14.010Z",
+  "updatedAt": "2026-10-02T13:38:43.131Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
-    "date": "2026-09-30",
-    "btcPrice": 84167.11,
-    "stableCap": 310455416490,
-    "stableCapBillions": "310.46",
-    "ssr": 5.442,
-    "ssro200": 1.916,
-    "ssro50": 1.012,
+    "date": "2026-10-02",
+    "btcPrice": 87072.83,
+    "stableCap": 310777261643,
+    "stableCapBillions": "310.78",
+    "ssr": 5.624,
+    "ssro200": 2.253,
+    "ssro50": 1.44,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.2593835448622229,
-      "priceUsd": 310455416490
+      "change24h": 0.09492860833055926,
+      "priceUsd": 310777261643
     },
     "quantEvaluation": {
-      "zScore": 1.916,
-      "zone": "moderately_overbought",
-      "label": "偏热警戒 (买力消耗)",
-      "colorClass": "text-amber",
-      "signal": "BTC 相对稳定币市值扩张较为激进，增量流动性承接开始收紧，建议注意阶段性止盈。"
+      "zScore": 2.253,
+      "zone": "extreme_overbought",
+      "label": "购买力衰竭 (顶部风险)",
+      "colorClass": "text-red",
+      "signal": "BTC 涨速脱离稳定币总量扩张斜率，稳定币买盘承接力过度透支，警惕流动性挤压或顶部回调。"
     }
   },
   "summary": {
-    "totalDays": 2099,
+    "totalDays": 2101,
     "startDate": "2021-01-01",
-    "endDate": "2026-09-30",
+    "endDate": "2026-10-02",
     "minSsro200": -3.193,
     "maxSsro200": 4.111
   },
@@ -29406,17 +29406,45 @@
     },
     {
       "date": "2026-09-30",
-      "btcPrice": 84167.11,
-      "stableCap": 310455416490,
-      "ssr": 5.442,
-      "ssro200": 1.916,
+      "btcPrice": 83623.6,
+      "stableCap": 311200297805,
+      "ssr": 5.394,
+      "ssro200": 1.812,
       "sma200": 4.577,
       "stdev200": 0.451,
-      "upper2_200": 5.48,
+      "upper2_200": 5.479,
       "lower2_200": 3.675,
-      "ssro50": 1.012,
-      "sma50": 5.039,
-      "stdev50": 0.398
+      "ssro50": 0.896,
+      "sma50": 5.038,
+      "stdev50": 0.397
+    },
+    {
+      "date": "2026-10-01",
+      "btcPrice": 84880.05,
+      "stableCap": 310711423887,
+      "ssr": 5.484,
+      "ssro200": 1.982,
+      "sma200": 4.581,
+      "stdev200": 0.455,
+      "upper2_200": 5.492,
+      "lower2_200": 3.67,
+      "ssro50": 1.097,
+      "sma50": 5.064,
+      "stdev50": 0.382
+    },
+    {
+      "date": "2026-10-02",
+      "btcPrice": 87072.83,
+      "stableCap": 310777261643,
+      "ssr": 5.624,
+      "ssro200": 2.253,
+      "sma200": 4.586,
+      "stdev200": 0.461,
+      "upper2_200": 5.508,
+      "lower2_200": 3.663,
+      "ssro50": 1.44,
+      "sma50": 5.093,
+      "stdev50": 0.369
     }
   ]
 }

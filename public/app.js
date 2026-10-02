@@ -102,6 +102,10 @@ function reloadAllChartsForTheme() {
     try { cdriChartInstance.dispose(); } catch (e) {}
     cdriChartInstance = null;
   }
+  if (typeof pnlChartInstance !== 'undefined' && pnlChartInstance) {
+    try { pnlChartInstance.dispose(); } catch (e) {}
+    pnlChartInstance = null;
+  }
 
   // Trigger all module chart re-renders
   if (typeof renderMacroChart === 'function' && typeof rawMacroData !== 'undefined' && rawMacroData) {
@@ -788,6 +792,12 @@ function renderIcebergsList(clusters) {
             <span class="c-val text-highlight">$${(Number(c.clusterNotionalM) || 0).toFixed(2)}M</span>
           </div>
         </div>
+        <div class="cluster-card-actions">
+          <span class="cluster-tap-hint">点击卡片穿透分腿明细 →</span>
+          <button class="btn-pv-action-pill" onclick="event.stopPropagation(); openPnLViewModal('iceberg', ${Number(globalIdx)})" title="模拟该组拆单合成头寸在到期日的 BTC 币本位盈亏曲线 (PnL View)">
+            📊 PV 收益曲线
+          </button>
+        </div>
       </div>
     `;
   });
@@ -848,6 +858,11 @@ function renderWhaleSinglesList(blocks) {
         <td>${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</td>
         <td>${(Number(b.netVegaUSD) || 0) >= 0 ? '+' : ''}$${Math.round(Number(b.netVegaUSD) || 0).toLocaleString()}</td>
         <td>${Number(b.legCount) || 0} 腿</td>
+        <td>
+          <button class="btn-pv-action" onclick="event.stopPropagation(); openPnLViewModal('whale', ${Number(globalIdx)})" title="模拟该大单在到期日的 BTC 币本位盈亏曲线 (PnL View)">
+            📊 PV 曲线
+          </button>
+        </td>
       </tr>
     `;
 
@@ -884,7 +899,10 @@ function renderWhaleSinglesList(blocks) {
           </div>
         </div>
         <div class="wmc-footer">
-          <span class="wmc-tap-hint">点击穿透希腊字母与战略意图 →</span>
+          <span class="wmc-tap-hint">点击穿透意图 →</span>
+          <button class="btn-pv-action-pill" onclick="event.stopPropagation(); openPnLViewModal('whale', ${Number(globalIdx)})" title="模拟到期 BTC 盈亏曲线">
+            📊 PV 曲线
+          </button>
         </div>
       </div>
     `;
@@ -1119,6 +1137,335 @@ btnCloseModal.addEventListener('click', closeModal);
 tradeModalBackdrop.addEventListener('click', (e) => {
   if (e.target === tradeModalBackdrop) closeModal();
 });
+
+// ==========================================
+// Dedicated Module 4 PnL Payoff View Controller (BTC Standard)
+// ==========================================
+let pnlChartInstance = null;
+
+function closePnLModal() {
+  const elModal = document.getElementById('pnl-modal-backdrop');
+  if (elModal) elModal.classList.remove('open');
+}
+
+window.closePnLModal = closePnLModal;
+
+const btnClosePnlModal = document.getElementById('btn-close-pnl-modal');
+const pnlModalBackdrop = document.getElementById('pnl-modal-backdrop');
+if (btnClosePnlModal) btnClosePnlModal.addEventListener('click', closePnLModal);
+if (pnlModalBackdrop) {
+  pnlModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === pnlModalBackdrop) closePnLModal();
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closePnLModal();
+  }
+});
+
+window.openPnLViewModal = function(type, idx) {
+  const isIceberg = (type === 'iceberg');
+  let item = null;
+  if (isIceberg) {
+    const clusters = currentMarketData?.blockTrades?.icebergClusters || [];
+    item = clusters[idx];
+  } else {
+    const blocks = currentMarketData?.blockTrades?.whaleBlocks || [];
+    item = blocks[idx];
+  }
+  if (!item) return;
+
+  const elModal = document.getElementById('pnl-modal-backdrop');
+  const elTitle = document.getElementById('pnl-modal-title');
+  const elMeta = document.getElementById('pnl-modal-meta');
+  const elMaxProfit = document.getElementById('pnl-kpi-max-profit');
+  const elMaxProfitUsd = document.getElementById('pnl-kpi-max-profit-usd');
+  const elMaxLoss = document.getElementById('pnl-kpi-max-loss');
+  const elMaxLossUsd = document.getElementById('pnl-kpi-max-loss-usd');
+  const elBep = document.getElementById('pnl-kpi-bep');
+  const elBepDistance = document.getElementById('pnl-kpi-bep-distance');
+  const elCashflow = document.getElementById('pnl-kpi-cashflow');
+  const elCashflowDesc = document.getElementById('pnl-kpi-cashflow-desc');
+  const elLegsRibbon = document.getElementById('pnl-legs-ribbon');
+  const elChartDom = document.getElementById('pnl-chart-container');
+
+  if (!elModal) return;
+
+  // 1. Prepare normalized legs
+  let legs = [];
+  if (isIceberg) {
+    if (item.legs && item.legs.length > 0) {
+      legs = item.legs.map(l => ({
+        instrument: l.instrument,
+        direction: l.direction,
+        amount: Number(l.amount || 0),
+        price: Number(l.price || 0),
+        strike: Number(l.strike || (l.instrument.match(/-(\d+)-[CP]/) ? l.instrument.match(/-(\d+)-[CP]/)[1] : 80000)),
+        isCall: l.isCall ?? (String(l.instrument).endsWith('-C') || String(l.instrument).includes('-C-'))
+      }));
+    } else {
+      const strikeMatch = item.instrument ? item.instrument.match(/-(\d+)-[CP]/) : null;
+      legs = [{
+        instrument: item.instrument,
+        direction: item.direction,
+        amount: Number(item.totalContracts || 0),
+        price: Number(item.avgPrice || 0),
+        strike: Number(item.strike || (strikeMatch ? strikeMatch[1] : 80000)),
+        isCall: item.instrument ? item.instrument.endsWith('-C') : true
+      }];
+    }
+  } else {
+    legs = (item.legs || []).map(l => ({
+      instrument: l.instrument,
+      direction: l.direction,
+      amount: Number(l.amount || 0),
+      price: Number(l.price || 0),
+      strike: Number(l.strike || (l.instrument.match(/-(\d+)-[CP]/) ? l.instrument.match(/-(\d+)-[CP]/)[1] : 80000)),
+      isCall: l.isCall ?? (String(l.instrument).endsWith('-C') || String(l.instrument).includes('-C-'))
+    }));
+  }
+
+  // 2. Resolve underlying spot price
+  const spotPrice = Number(item.legs?.[0]?.indexPrice) ||
+                    Number(item.indexPrice) ||
+                    Number(currentMarketData?.indexPrice) ||
+                    86500;
+
+  // 3. Header title and time metadata
+  const idText = isIceberg ? `${item.instrument} 机构拆单` : item.blockId;
+  const stratText = item.strategyNameZh || '期权组合结构';
+  if (elTitle) elTitle.textContent = `${idText} • ${stratText} 收益结构模拟`;
+
+  const timeText = isIceberg
+    ? `时间窗: ${formatTimeWindowUTC8(item.startTimeUTC8 || item.startTime, item.endTimeUTC8 || item.endTime, item.durationMin)}`
+    : `成交时间: ${item.dateTimeUTC8 || item.dateTime || formatUTC8(item.timestamp)} (UTC+8)`;
+  const notionalVal = Number(item.notionalUSDM || item.clusterNotionalM) || 0;
+  if (elMeta) {
+    elMeta.textContent = `${timeText} • 名义价值: $${notionalVal.toFixed(2)}M • 标的现货参考: $${Math.round(spotPrice).toLocaleString()} • 共 ${legs.length} 腿`;
+  }
+
+  // 4. Render legs ribbon
+  if (elLegsRibbon) {
+    let ribbonHtml = '<span style="font-size:0.7rem; color:#71717a; font-weight:600; margin-right:4px;">组合分腿明细:</span>';
+    legs.forEach(leg => {
+      const isBuy = String(leg.direction).toLowerCase() === 'buy';
+      const dirCls = isBuy ? 'leg-buy' : 'leg-sell';
+      const dirLbl = isBuy ? 'BUY' : 'SELL';
+      const amt = Number(leg.amount || 0).toLocaleString();
+      const pBtc = Number(leg.price || 0).toFixed(4);
+      ribbonHtml += `
+        <div class="pnl-leg-chip ${dirCls}">
+          <strong>${dirLbl}</strong> ${amt} ₿ × <span>${escapeHtml(leg.instrument)}</span>
+          <span style="opacity:0.85;">@ ${pBtc} ₿</span>
+        </div>
+      `;
+    });
+    elLegsRibbon.innerHTML = ribbonHtml;
+  }
+
+  // 5. Compute PnL Curve via PnLEngine
+  if (!window.PnLEngine) {
+    console.error('PnLEngine not loaded');
+    return;
+  }
+  const curve = window.PnLEngine.generatePnLCurve(legs, spotPrice);
+  if (!curve) return;
+
+  // 6. Update KPI Metrics Cards
+  // Max Profit
+  if (curve.isCappedUpside) {
+    const profitBtc = curve.maxPnl;
+    const profitUsd = profitBtc * spotPrice;
+    if (elMaxProfit) elMaxProfit.textContent = `${profitBtc >= 0 ? '+' : ''}${profitBtc.toFixed(3)} BTC`;
+    if (elMaxProfitUsd) elMaxProfitUsd.textContent = `≈ ${profitUsd >= 0 ? '+' : ''}$${Math.round(profitUsd).toLocaleString()}`;
+  } else {
+    if (elMaxProfit) elMaxProfit.textContent = '理论无上限';
+    if (elMaxProfitUsd) elMaxProfitUsd.textContent = '看涨上行随币价发散';
+  }
+
+  // Max Loss
+  if (curve.isCappedDownside) {
+    const lossBtc = curve.minPnl;
+    const lossUsd = lossBtc * spotPrice;
+    if (elMaxLoss) elMaxLoss.textContent = `${lossBtc.toFixed(3)} BTC`;
+    if (elMaxLossUsd) elMaxLossUsd.textContent = `≈ $${Math.round(lossUsd).toLocaleString()}`;
+  } else {
+    if (elMaxLoss) elMaxLoss.textContent = '理论深度亏损';
+    if (elMaxLossUsd) elMaxLossUsd.textContent = '极端暴跌或裸空头寸';
+  }
+
+  // Breakeven Points
+  if (curve.breakevens.length > 0) {
+    if (elBep) elBep.textContent = curve.breakevens.map(b => `$${b.toLocaleString()}`).join(' / ');
+    if (elBepDistance && spotPrice) {
+      const distStrs = curve.breakevens.map(b => {
+        const diff = ((b - spotPrice) / spotPrice) * 100;
+        return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
+      });
+      elBepDistance.textContent = `较现货 ($${Math.round(spotPrice).toLocaleString()}): ${distStrs.join(' / ')}`;
+    }
+  } else {
+    if (elBep) elBep.textContent = curve.minPnl >= 0 ? '全域盈利' : '全域亏损';
+    if (elBepDistance) elBepDistance.textContent = '区间内无零轴交叉点';
+  }
+
+  // Initial Cash Flow (BTC)
+  const cfBtc = curve.initialCashFlowBTC;
+  if (elCashflow) {
+    const cfSign = cfBtc >= 0 ? '+' : '';
+    elCashflow.textContent = `${cfSign}${cfBtc.toFixed(4)} BTC`;
+    elCashflow.className = cfBtc >= 0 ? 'pnl-kpi-val text-pos' : 'pnl-kpi-val text-neg';
+  }
+  if (elCashflowDesc) {
+    const cfUsd = Math.round(cfBtc * spotPrice);
+    const usdSign = cfUsd >= 0 ? '+' : '';
+    const desc = cfBtc >= 0 ? '净收入权利金 (Net Credit)' : '净支付权利金 (Net Debit)';
+    elCashflowDesc.textContent = `${desc} ≈ ${usdSign}$${usdSign ? Math.abs(cfUsd).toLocaleString() : cfUsd.toLocaleString()}`;
+  }
+
+  // 7. Open Modal
+  elModal.classList.add('open');
+
+  // 8. Render ECharts Payoff Chart
+  if (elChartDom && window.echarts) {
+    if (!pnlChartInstance) {
+      pnlChartInstance = echarts.init(elChartDom, getEchartsTheme());
+      window.addEventListener('resize', () => {
+        if (pnlChartInstance) pnlChartInstance.resize();
+      });
+    }
+
+    const themeColors = getChartThemeColors();
+    const xData = curve.series.map(d => d.S);
+    const yData = curve.series.map(d => Number(d.pnlBtc.toFixed(4)));
+
+    // MarkLines
+    const markLineData = [
+      {
+        yAxis: 0,
+        lineStyle: { color: 'rgba(255, 255, 255, 0.45)', type: 'dashed', width: 1.5 },
+        label: { show: true, formatter: '0 BTC 损益平衡基准', position: 'insideEndTop', color: '#a1a1aa', fontSize: 11 }
+      }
+    ];
+
+    if (spotPrice) {
+      markLineData.push({
+        xAxis: Math.round(spotPrice),
+        lineStyle: { color: '#38bdf8', type: 'dotted', width: 2 },
+        label: { show: true, formatter: `现货 $${Math.round(spotPrice).toLocaleString()}`, position: 'start', color: '#38bdf8', fontSize: 11 }
+      });
+    }
+
+    curve.breakevens.forEach((bep, i) => {
+      markLineData.push({
+        xAxis: bep,
+        lineStyle: { color: '#eab308', type: 'dashed', width: 1.5 },
+        label: { show: true, formatter: `BEP${curve.breakevens.length > 1 ? (i + 1) : ''}: $${bep.toLocaleString()}`, position: 'end', color: '#eab308', fontSize: 11 }
+      });
+    });
+
+    const option = {
+      backgroundColor: 'transparent',
+      animation: true,
+      animationDuration: 300,
+      grid: {
+        top: 36,
+        left: 68,
+        right: 40,
+        bottom: 46,
+        containLabel: false
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: themeColors.tooltipBg,
+        borderColor: themeColors.tooltipBorder,
+        textStyle: { color: themeColors.tooltipText, fontSize: 12 },
+        formatter: function(params) {
+          if (!params || !params.length) return '';
+          const pt = params[0];
+          const S = Number(pt.axisValue);
+          const pnlBtc = Number(pt.data);
+          const pnlUsd = pnlBtc * S;
+          const isPos = pnlBtc >= 0;
+          const col = isPos ? '#4ade80' : '#f87171';
+          const sign = isPos ? '+' : '';
+          return `
+            <div style="font-family: var(--font-mono); padding: 4px 6px;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: #fafafa; margin-bottom: 6px;">
+                到期标的现货价格: <span style="color: #38bdf8;">$${S.toLocaleString()}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 14px; margin-bottom: 3px;">
+                <span style="color: #a1a1aa;">BTC 币本位净损益:</span>
+                <strong style="color: ${col};">${sign}${pnlBtc.toFixed(4)} BTC</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 14px;">
+                <span style="color: #a1a1aa;">折合 USD 现值参考:</span>
+                <strong style="color: ${col};">${sign}$${Math.round(pnlUsd).toLocaleString()}</strong>
+              </div>
+            </div>
+          `;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: xData,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: themeColors.axisLine } },
+        axisLabel: {
+          color: themeColors.textSecondary,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          formatter: val => `$${Number(val).toLocaleString()}`
+        },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { lineStyle: { color: themeColors.axisLine } },
+        axisLabel: {
+          color: themeColors.textSecondary,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          formatter: val => `${val >= 0 ? '+' : ''}${val.toFixed(2)} ₿`
+        },
+        splitLine: {
+          show: true,
+          lineStyle: { color: themeColors.gridLine, type: 'dashed' }
+        }
+      },
+      visualMap: {
+        show: false,
+        dimension: 1,
+        pieces: [
+          { lte: 0, color: '#ef4444' },
+          { gt: 0, color: '#22c55e' }
+        ]
+      },
+      series: [
+        {
+          name: '到期净收益 (BTC)',
+          type: 'line',
+          smooth: true,
+          data: yData,
+          lineStyle: { width: 3 },
+          areaStyle: { opacity: 0.16 },
+          markLine: {
+            symbol: ['none', 'none'],
+            data: markLineData
+          }
+        }
+      ]
+    };
+
+    pnlChartInstance.setOption(option, true);
+    setTimeout(() => {
+      if (pnlChartInstance) pnlChartInstance.resize();
+    }, 60);
+  }
+};
 
 // Event Listeners
 btnRefresh.addEventListener('click', () => {

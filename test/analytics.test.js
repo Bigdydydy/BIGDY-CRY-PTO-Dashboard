@@ -1363,6 +1363,14 @@ describe('Module 4: 大宗交易开平仓推断与末日 0DTE 行为分类引擎
       assert.ok(result.paragraph.includes('微观性质穿透显示'));
       assert.ok(result.paragraph.includes('全新建仓'));
       assert.ok(result.paragraph.includes('平仓离场'));
+
+      // 聚集画像必须由数据推导，不得出现旧的硬编码结论句
+      assert.ok(result.paragraph.includes('大资金名义额到期日集中于 12月26日交割（26DEC26）'),
+        'paragraph should report the dominant expiry computed from trades');
+      assert.ok(result.paragraph.includes('单腿买入看涨'),
+        'paragraph should report the dominant strategy computed from trades');
+      assert.ok(!result.paragraph.includes('较强防护信心'),
+        'stale hardcoded conclusion sentence must be gone');
     });
   });
 });
