@@ -1,0 +1,49 @@
+name: Crypto McClellan Daily Update
+
+on:
+  schedule:
+    # 每天 UTC 23:30：在 UTC 日收盘前 30 分钟采集，记录值最接近真实日收盘，
+    # 与 close_to_close 涨跌口径一致；次日运行时当日收盘即成为基准
+    - cron: '30 23 * * *'
+  workflow_dispatch: # 允许在 Actions 页面手动触发补跑
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mcclellan-daily
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pipeline dependencies
+        run: pip install -r scripts/crypto_mcclellan/requirements.txt
+
+      - name: Run breadth pipeline (collect + compute + export JSON)
+        working-directory: scripts/crypto_mcclellan
+        run: python export_to_json.py
+
+      - name: Commit and push updated dataset
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/crypto_mcclellan.json \
+                  scripts/crypto_mcclellan/data/ \
+                  scripts/crypto_mcclellan/output/
+          if git diff --cached --quiet; then
+            echo "No data changes; skipping commit."
+          else
+            git commit -m "chore(mcclellan): daily breadth data update [skip ci]"
+            git push
+          fi
