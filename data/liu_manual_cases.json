@@ -4,144 +4,639 @@
   "cases": [
     {
       "id": "btc-2023-01-13",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2023-01-13T03:15:00Z", "timeframe": "1d",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2023-01-13T03:15:00Z",
+      "timeframe": "1d",
       "source": "https://x.com/wugudehaore/status/1613736346417532930",
       "summary": "回顾：2022-06-27 提出 17622 不是底，2022-11-08 跌破兑现；2022-12-16（蓝点）起提出 10000 刀大反弹，三个方案中两个为上涨、一个先跌到红框再涨，没有做空的理由。",
       "labels": "历史高点⑤(2021-11) → 绿 (a)(b)(c) → 橙 (W)(X)(Y)(2022-03) → 蓝 (1)~(5)(2022-06) → 紫 (W)(X)(Y)(X)(Z)(2022-08) → 黑线下跌 → 青 (1)~(5) 小级别上涨",
       "calls": [
-        { "kind": "level_break", "price": 17622, "side": "below", "said": "2022-06-27", "claim": "17622 不是底，会被跌破" },
-        { "kind": "target_move", "from": "2022-12-16", "fromPrice": null, "move": 10000, "direction": "up", "claim": "约 10000 美元的大反弹" }
+        {
+          "kind": "level_break",
+          "price": 17622,
+          "side": "below",
+          "said": "2022-06-27",
+          "claim": "17622 不是底，会被跌破"
+        },
+        {
+          "kind": "target_move",
+          "from": "2022-12-16",
+          "fromPrice": null,
+          "move": 10000,
+          "direction": "up",
+          "claim": "约 10000 美元的大反弹"
+        }
       ]
     },
     {
       "id": "btc-2023-06-13",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2023-06-13T04:18:00Z", "timeframe": "1d",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2023-06-13T04:18:00Z",
+      "timeframe": "1d",
       "source": "https://x.com/wugudehaore/status/1668472838028951554",
       "summary": "15476--31000 的三个可能：(1) 推动浪前三浪，红线为浪4，极限价格 25250，极限时间 6 月 23 日，任一条件不满足即否定；(2) w 浪反弹，红线为 x 浪，不跌破 15476，须吃掉 15476--31000 的 0.3--0.7 且低于 25250（25250--20133 之间）；(3) abc 反弹，红线为 z 浪，跌破 15476。尚无做底迹象。",
       "labels": "(Y)=15476(2022-11) → 绿 1-2-3-4-5(至 2023-02) → 黑 W-X-Y(至 2023-03 约 19600) → 橙 1-2-3-4-5(至 2023-04 约 31000) → 红线回调",
       "pivots": [
-        { "label": "(Y)", "type": "low", "window": ["2022-11-05", "2022-11-25"] },
-        { "label": "5(橙)", "type": "high", "window": ["2023-04-05", "2023-04-20"] }
+        {
+          "label": "(Y)",
+          "type": "low",
+          "window": [
+            "2022-11-05",
+            "2022-11-25"
+          ]
+        },
+        {
+          "label": "5(橙)",
+          "type": "high",
+          "window": [
+            "2023-04-05",
+            "2023-04-20"
+          ]
+        }
       ],
       "scenarios": [
-        { "name": "推动浪的前三浪，红线为浪4", "invalidIf": [{ "kind": "price", "side": "below", "price": 25250 }, { "kind": "time", "notAfter": "2023-06-23" }] },
-        { "name": "w 浪反弹，红线为 x 浪", "zone": [20133, 25250], "invalidIf": [{ "kind": "price", "side": "below", "price": 15476 }] },
-        { "name": "abc 反弹，红线为 z 浪", "requires": [{ "kind": "price", "side": "below", "price": 15476 }] }
+        {
+          "name": "推动浪的前三浪，红线为浪4",
+          "invalidIf": [
+            {
+              "kind": "price",
+              "side": "below",
+              "price": 25250
+            },
+            {
+              "kind": "time",
+              "notAfter": "2023-06-23"
+            }
+          ]
+        },
+        {
+          "name": "w 浪反弹，红线为 x 浪",
+          "zone": [
+            20133,
+            25250
+          ],
+          "invalidIf": [
+            {
+              "kind": "price",
+              "side": "below",
+              "price": 15476
+            }
+          ]
+        },
+        {
+          "name": "abc 反弹，红线为 z 浪",
+          "requires": [
+            {
+              "kind": "price",
+              "side": "below",
+              "price": 15476
+            }
+          ]
+        }
       ]
     },
     {
       "id": "btc-2026-01-02",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-01-02T02:15:00Z", "timeframe": "1d",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-01-02T02:15:00Z",
+      "timeframe": "1d",
       "source": "https://x.com/wugudehaore/status/2006912264151134223",
       "summary": "93616--91568 之间是压力带。蓝点（2025-11 约 80.5k）开始的上升趋势线今天在 86550，是监测点；连续两天低于趋势线即确认跌破，然后将会下跌。",
       "labels": "III(2025-01 约 109k) → IV(2025-04 约 74.5k) → V(2025-08 约 124k)",
       "pivots": [
-        { "label": "III", "type": "high", "window": ["2025-01-10", "2025-02-05"] },
-        { "label": "IV", "type": "low", "window": ["2025-03-25", "2025-04-15"] },
-        { "label": "V", "type": "high", "window": ["2025-08-05", "2025-08-25"] },
-        { "label": "蓝点", "type": "low", "window": ["2025-11-15", "2025-11-30"] }
+        {
+          "label": "III",
+          "type": "high",
+          "window": [
+            "2025-01-10",
+            "2025-02-05"
+          ]
+        },
+        {
+          "label": "IV",
+          "type": "low",
+          "window": [
+            "2025-03-25",
+            "2025-04-15"
+          ]
+        },
+        {
+          "label": "V",
+          "type": "high",
+          "window": [
+            "2025-08-05",
+            "2025-08-25"
+          ]
+        },
+        {
+          "label": "蓝点",
+          "type": "low",
+          "window": [
+            "2025-11-15",
+            "2025-11-30"
+          ]
+        }
       ],
       "calls": [
-        { "kind": "trendline_break", "monitor": 86550, "side": "below", "confirm": "连续两天低于趋势线", "then": "down" },
-        { "kind": "resistance", "zone": [91568, 93616] }
+        {
+          "kind": "trendline_break",
+          "monitor": 86550,
+          "side": "below",
+          "confirm": "连续两天低于趋势线",
+          "then": "down"
+        },
+        {
+          "kind": "resistance",
+          "zone": [
+            91568,
+            93616
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-01-31",
+      "time": "2026-01-31T12:00:00Z",
+      "timeframe": "4h",
+      "source": "用户提供截图",
+      "summary": "价格低于 85477 不可能使红点做底；多头退无可退，再不冲高就会失败，破前低并到达 78513。",
+      "labels": "绿 II-III-IV-V（V 约 124k，2025-08；蓝圈为 2025-10 的 126k）→ 橙 a-b-c → 蓝线下跌至红点",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 85477,
+          "side": "above",
+          "claim": "涨回 85477 以上红点才可能做底"
+        },
+        {
+          "kind": "level_break",
+          "price": 78513,
+          "side": "below",
+          "claim": "不冲高就破前低到达 78513"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-02-03",
+      "time": "2026-02-03T12:00:00Z",
+      "timeframe": "4h",
+      "source": "用户提供截图",
+      "summary": "78012 已突破，认为反弹已进行；价格维持在 76350 以上还能继续反弹；74502 做底有很小的可能性；压力 82490。",
+      "labels": "橙 a(约 94.5k)-b(约 90.5k)-c(约 97.9k，2026-01-14) → 蓝线下跌至约 74.5k",
+      "calls": [
+        {
+          "kind": "level_hold",
+          "price": 76350,
+          "side": "below",
+          "claim": "维持 76350 以上还能继续反弹"
+        },
+        {
+          "kind": "level_break",
+          "price": 82490,
+          "side": "above",
+          "claim": "压力 82490"
+        }
       ]
     },
     {
       "id": "btc-2026-03-21",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-03-21T10:56:00Z", "timeframe": "4h",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-03-21T10:56:00Z",
+      "timeframe": "4h",
       "source": "https://x.com/wugudehaore/status/2035309677559603475",
       "summary": "黑线向下跌了 3 段，第三段是第一段的 2.382 倍。蓝点开始的上涨不是推动浪，也不符合引导楔形，是调整浪；不能认为蓝点是底，黑线仍可能跌第五段。只有涨破 73400 才能避免第五段下跌。",
       "labels": "黑 (a)(b)(c)(126k→约 80.5k) → 橙 a-b-c(至约 97.5k) → 蓝 (i)~(v)(至约 60k，2026-02) → 红线三段反弹(至约 76k) → 黑线下跌三段至蓝点(约 68.7k)",
       "calls": [
-        { "kind": "level_break", "price": 73400, "side": "above", "claim": "涨破才能避免第五段下跌；否则还会再跌一段" }
+        {
+          "kind": "level_break",
+          "price": 73400,
+          "side": "above",
+          "claim": "涨破才能避免第五段下跌；否则还会再跌一段"
+        }
       ]
     },
     {
       "id": "btc-2026-03-31",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-03-31T10:33:00Z", "timeframe": "4h",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-03-31T10:33:00Z",
+      "timeframe": "4h",
       "source": "https://x.com/wugudehaore/status/2039290057304281185",
       "summary": "只有涨破 69636 才能结束 76000 开始的下跌。当前监测 69636，涨破后压力在 71788。反弹以后仍有可能再次下跌。",
       "calls": [
-        { "kind": "level_break", "price": 69636, "side": "above", "claim": "涨破则 76000 起的下跌结束" },
-        { "kind": "resistance", "price": 71788 }
+        {
+          "kind": "level_break",
+          "price": 69636,
+          "side": "above",
+          "claim": "涨破则 76000 起的下跌结束"
+        },
+        {
+          "kind": "resistance",
+          "price": 71788
+        }
       ]
     },
     {
       "id": "btc-2026-05-12",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-05-12T10:09:00Z", "timeframe": "4h",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-05-12T10:09:00Z",
+      "timeframe": "4h",
       "source": "https://x.com/wugudehaore/status/2054141835048808852",
       "summary": "从 64938 开始走出三段：绿线 + 蓝线 + 紫线。紫线较符合终结楔形；终结楔形的 5 子浪或者高于 3 子浪最高点，或者低于 3 子浪最高点但必须吃掉 4 子浪的 0.8；目前已吃掉 0.85，紫线可以完成，但通常 5 子浪高于 3 子浪后再完成。绿蓝紫上涨的结束确认是从最高点下跌 4648。",
       "labels": "64938 起：绿 ①~⑤ → 蓝回调 → 紫 ①~⑤（终结楔形）",
       "calls": [
-        { "kind": "end_confirm_drop", "drop": 4648, "from": "最高点", "claim": "从最高点下跌 4648 即确认绿蓝紫上涨结束" }
+        {
+          "kind": "end_confirm_drop",
+          "drop": 4648,
+          "from": "最高点",
+          "claim": "从最高点下跌 4648 即确认绿蓝紫上涨结束"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-05-17",
+      "time": "2026-05-17T12:00:00Z",
+      "timeframe": "1h",
+      "source": "用户提供截图",
+      "summary": "78550 冲破认为暂时止跌；但还不够，必须从 77609 开始走出向上的推动浪（通常需要冲过 78846 且回撤不跌破 78328）才可能使 77609 做底；做不到还会跌。",
+      "labels": "1H：紫 ①-⑤（4-20 至 5-15），黑线下跌至 77609",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 78846,
+          "side": "above",
+          "claim": "冲过 78846 才可能使 77609 做底"
+        },
+        {
+          "kind": "level_break",
+          "price": 77609,
+          "side": "below",
+          "claim": "做不到还会跌（跌破 77609）"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-06-09",
+      "time": "2026-06-09T12:00:00Z",
+      "timeframe": "4h",
+      "source": "用户提供截图",
+      "summary": "红点开始是针对蓝点到红点的反弹，应比红线那个反弹小一个级别；最近的压力在 68003，再高的压力在 70761；反弹后再跌。",
+      "labels": "(V)(2025-10 约 126k) → 黑 (a)(b)(c)（约 80.5k）→ 橙 a-b-c（约 97.5k）→ 蓝 (i)~(v)（约 60k，2-06）→ 红 (w)(x)(y)（约 82.8k，5-06 蓝点）→ 红点（约 59k，6-05）",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 68003,
+          "side": "above",
+          "claim": "最近压力 68003（反弹后再跌）"
+        },
+        {
+          "kind": "level_break",
+          "price": 59080,
+          "side": "below",
+          "claim": "反弹后再跌（跌破红点）"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-06-26",
+      "time": "2026-06-26T12:00:00Z",
+      "timeframe": "1d",
+      "source": "用户提供截图",
+      "summary": "黑线看作 w 浪，橙线看作 x 浪，绿线看作 y 浪；y 浪需是单锯齿 5-3-5；yc 浪应到 56769 以下，且需在 9 月 26 日之前完成；y 浪以后是 xx 浪反弹，或开始新的上涨冲破 126000；当前红点没有见底迹象。",
+      "labels": "(V) → 黑 a-b-c = w（约 80.5k）→ 橙 a-b-c = x（约 97.5k）→ 绿 y：①~⑤ = a（2-06 约 60k）、W-X-b（5-06 约 82.8k）、①~⑤ = c（红点）",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 56769,
+          "side": "below",
+          "claim": "yc 浪应到 56769 以下（9 月 26 日前）"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-07-01",
+      "time": "2026-07-01T12:00:00Z",
+      "timeframe": "1h",
+      "source": "用户提供截图",
+      "summary": "青 5 子浪进行了 5 段（紫红线），其中紫红 4 符合三角形；紫红 5 起点在 60582；目前的反弹不超过 60582 还有下跌动力；青 5 子浪结束以后反弹开始。",
+      "labels": "绿 ⓑ（5-06 蓝点）→ 紫 1-2-3-4-5 → 紫红 (i)~(v)（(iv) 为三角形）",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 60582,
+          "side": "above",
+          "claim": "超过 60582 则下跌结束、反弹开始"
+        }
       ]
     },
     {
       "id": "btc-2026-07-16",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-07-16T10:08:00Z", "timeframe": "4h",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-07-16T10:08:00Z",
+      "timeframe": "4h",
       "source": "https://x.com/wugudehaore/status/2077696980374175934",
       "summary": "橙线是第一段，绿线是第二段，红线是第三段。只要不低于 62029 就认为会继续上涨；监测点在 65909，高于它表示青线这段下跌结束，进行反弹；但这个反弹如果走不出驱动浪就是 xx 浪，以后还要跌。",
       "labels": "紫 ①~⑤ 下跌：①(05-23 约 74k) ②(05-27 约 78k) ③(06-06 约 59k) ④(06-16 约 67.7k) ⑤(07-01 约 57.6k)；之后 橙 → 绿 A-B-C → 红",
       "pivots": [
-        { "label": "0", "type": "high", "window": ["2026-05-05", "2026-05-14"] },
-        { "label": "①", "type": "low", "window": ["2026-05-19", "2026-05-26"] },
-        { "label": "②", "type": "high", "window": ["2026-05-25", "2026-05-31"] },
-        { "label": "③", "type": "low", "window": ["2026-06-03", "2026-06-10"] },
-        { "label": "④", "type": "high", "window": ["2026-06-13", "2026-06-19"] },
-        { "label": "⑤", "type": "low", "window": ["2026-06-26", "2026-07-04"] }
+        {
+          "label": "0",
+          "type": "high",
+          "window": [
+            "2026-05-05",
+            "2026-05-14"
+          ]
+        },
+        {
+          "label": "①",
+          "type": "low",
+          "window": [
+            "2026-05-19",
+            "2026-05-26"
+          ]
+        },
+        {
+          "label": "②",
+          "type": "high",
+          "window": [
+            "2026-05-25",
+            "2026-05-31"
+          ]
+        },
+        {
+          "label": "③",
+          "type": "low",
+          "window": [
+            "2026-06-03",
+            "2026-06-10"
+          ]
+        },
+        {
+          "label": "④",
+          "type": "high",
+          "window": [
+            "2026-06-13",
+            "2026-06-19"
+          ]
+        },
+        {
+          "label": "⑤",
+          "type": "low",
+          "window": [
+            "2026-06-26",
+            "2026-07-04"
+          ]
+        }
       ],
-      "count": { "tool": "IMPULSE", "labels": ["0", "①", "②", "③", "④", "⑤"] },
+      "count": {
+        "tool": "IMPULSE",
+        "labels": [
+          "0",
+          "①",
+          "②",
+          "③",
+          "④",
+          "⑤"
+        ]
+      },
       "calls": [
-        { "kind": "level_hold", "price": 62029, "side": "below", "claim": "不低于则继续上涨" },
-        { "kind": "level_break", "price": 65909, "side": "above", "claim": "高于则这段下跌结束、进行反弹" }
+        {
+          "kind": "level_hold",
+          "price": 62029,
+          "side": "below",
+          "claim": "不低于则继续上涨"
+        },
+        {
+          "kind": "level_break",
+          "price": 65909,
+          "side": "above",
+          "claim": "高于则这段下跌结束、进行反弹"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-08-04",
+      "time": "2026-08-04T12:00:00Z",
+      "timeframe": "4h",
+      "source": "用户提供截图",
+      "summary": "黑线不是下降的起始，是个调整浪；62209 开始不是推动浪，走出了 3 段（双锯齿），认为是黑线的反弹；突破 64925 才能结束黑线；从蓝点开始看作 xx 浪反弹，之后是 z 浪下跌，z 浪以后是大反弹。",
+      "labels": "红 Ⓦ Ⓧ ⓑ → 紫 ①~④ 至蓝点（7-01）→ 绿线上涨 → 黑线调整",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 64925,
+          "side": "above",
+          "claim": "突破 64925 才能结束黑线"
+        }
       ]
     },
     {
       "id": "btc-2026-08-14",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-08-14T09:28:00Z", "timeframe": "1d",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-08-14T09:28:00Z",
+      "timeframe": "1d",
       "source": "https://x.com/wugudehaore/status/2088196019301589062",
       "summary": "蓝点开始是 xx 浪或 b 浪，红线 + 绿线都是 xx 浪的一部分。当前涨不过 63158 的话有动力跌向 61234。xx 浪可以是任意一种调整浪；如果是 xx 浪，以后是 z 浪下跌，z 浪需大于等于 xx 浪；z 浪结束时间在 11 月 28 日到 12 月 7 日之间（之后大级别上涨）。",
       "labels": "(III) → (IV)(2025-04 约 74.5k) → (V)(2025-10 约 126k) → 黑 Ⓦ(2025-11 约 80.5k) Ⓧ(2026-01 约 97.5k) Ⓨ(2026-07-01 约 56.8k)",
       "pivots": [
-        { "label": "(V)", "type": "high", "window": ["2025-09-25", "2025-10-15"] },
-        { "label": "Ⓦ", "type": "low", "window": ["2025-11-15", "2025-11-30"] },
-        { "label": "Ⓧ", "type": "high", "window": ["2026-01-05", "2026-01-25"] },
-        { "label": "Ⓨ", "type": "low", "window": ["2026-06-26", "2026-07-04"] }
+        {
+          "label": "(V)",
+          "type": "high",
+          "window": [
+            "2025-09-25",
+            "2025-10-15"
+          ]
+        },
+        {
+          "label": "Ⓦ",
+          "type": "low",
+          "window": [
+            "2025-11-15",
+            "2025-11-30"
+          ]
+        },
+        {
+          "label": "Ⓧ",
+          "type": "high",
+          "window": [
+            "2026-01-05",
+            "2026-01-25"
+          ]
+        },
+        {
+          "label": "Ⓨ",
+          "type": "low",
+          "window": [
+            "2026-06-26",
+            "2026-07-04"
+          ]
+        }
       ],
-      "count": { "tool": "WXY", "labels": ["(V)", "Ⓦ", "Ⓧ", "Ⓨ"] },
+      "count": {
+        "tool": "WXY",
+        "labels": [
+          "(V)",
+          "Ⓦ",
+          "Ⓧ",
+          "Ⓨ"
+        ]
+      },
       "calls": [
-        { "kind": "level_break", "price": 63158, "side": "above", "invert": true, "claim": "涨不过则有动力跌向 61234" },
-        { "kind": "time_window", "from": "2026-11-28", "to": "2026-12-07", "claim": "z 浪结束时间" }
+        {
+          "kind": "level_break",
+          "price": 63158,
+          "side": "above",
+          "invert": true,
+          "claim": "涨不过则有动力跌向 61234"
+        },
+        {
+          "kind": "time_window",
+          "from": "2026-11-28",
+          "to": "2026-12-07",
+          "claim": "z 浪结束时间"
+        }
+      ]
+    },
+    {
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "id": "btc-2026-08-17",
+      "time": "2026-08-17T12:00:00Z",
+      "timeframe": "1d",
+      "source": "用户提供截图",
+      "summary": "y-c 继续延伸的方案：红点到蓝点只是 y-c-1，从蓝点 57710 开始的反弹是 y-c-2，然后还有 y-c-3、y-c-4、y-c-5；该假设能满足 56769 这个 w 浪 0.9 倍；但必须在 9 月 26 日之前结束 y-c-5（示意图下探至约 42k）。",
+      "labels": "(III)(IV)(V) → 黑 (w)(x)(y)；y 内部 I-II-III-IV 与 a-b-c",
+      "calls": [
+        {
+          "kind": "level_break",
+          "price": 56769,
+          "side": "below",
+          "claim": "y-c 延伸方案：9 月 26 日前跌破 56769"
+        }
       ]
     },
     {
       "id": "btc-2026-10-02",
-      "code": "BTC", "binance": "BTCUSDT", "time": "2026-10-02T12:00:00Z", "timeframe": "4h",
+      "code": "BTC",
+      "binance": "BTCUSDT",
+      "time": "2026-10-02T12:00:00Z",
+      "timeframe": "4h",
       "source": "用户转述",
-      "monitors": [80026],
+      "monitors": [
+        80026
+      ],
       "summary": "2026-07-01 低点 57640 以来的五浪：1 浪至 07-21 高点，2 浪至 08-03 低点，3 浪至 09-04 高点，4 浪至 09-17 低点 74887，5 浪自 74887 起。87397 之后的回撤是整个五浪结束后的调整，还是浪 5 的第 (ii) 子浪，以 80026 判断。",
       "pivots": [
-        { "label": "0", "type": "low", "window": ["2026-06-28", "2026-07-04"] },
-        { "label": "1", "type": "high", "window": ["2026-07-15", "2026-07-26"] },
-        { "label": "2", "type": "low", "window": ["2026-07-28", "2026-08-07"] },
-        { "label": "3", "type": "high", "window": ["2026-08-28", "2026-09-08"] },
-        { "label": "4", "type": "low", "window": ["2026-09-12", "2026-09-20"] },
-        { "label": "5", "type": "high", "window": ["2026-09-20", "2026-10-02"] }
+        {
+          "label": "0",
+          "type": "low",
+          "window": [
+            "2026-06-28",
+            "2026-07-04"
+          ]
+        },
+        {
+          "label": "1",
+          "type": "high",
+          "window": [
+            "2026-07-15",
+            "2026-07-26"
+          ]
+        },
+        {
+          "label": "2",
+          "type": "low",
+          "window": [
+            "2026-07-28",
+            "2026-08-07"
+          ]
+        },
+        {
+          "label": "3",
+          "type": "high",
+          "window": [
+            "2026-08-28",
+            "2026-09-08"
+          ]
+        },
+        {
+          "label": "4",
+          "type": "low",
+          "window": [
+            "2026-09-12",
+            "2026-09-20"
+          ]
+        },
+        {
+          "label": "5",
+          "type": "high",
+          "window": [
+            "2026-09-20",
+            "2026-10-02"
+          ]
+        }
       ],
-      "count": { "tool": "IMPULSE", "labels": ["0", "1", "2", "3", "4", "5"] },
-      "scenarios": ["五浪完成，进入针对 57640 以来上涨的调整", "浪 5 的第 (ii) 子浪，之后还有 (iii)(iv)(v)"]
+      "count": {
+        "tool": "IMPULSE",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "scenarios": [
+        "五浪完成，进入针对 57640 以来上涨的调整",
+        "浪 5 的第 (ii) 子浪，之后还有 (iii)(iv)(v)"
+      ]
     }
   ],
   "revisions": [
     {
-      "from": "btc-2026-01-02", "to": "btc-2026-08-14",
+      "from": "btc-2026-01-02",
+      "to": "btc-2026-08-14",
       "what": "大级别浪 V 的位置：2025-08 约 124k → 2025-10 约 126k",
       "why": "图上未说明。推测：10 月新高越过 8 月高点，浪 V 的终点须取在真实极值上（若把 10 月看作扩散平台 b 浪，则其后的下跌须是 c 浪五浪，而实际下跌被数成 W-X-Y）。"
     },
     {
-      "from": "btc-2026-08-14", "to": "btc-2026-10-02",
+      "from": "btc-2026-08-14",
+      "to": "btc-2026-10-02",
       "what": "2026-07-01 起的上涨：xx 浪或 b 浪（调整浪） → 五浪推动",
       "why": "8-14 的条件是涨不过 63158 则跌向 61234；价格涨破并走出五段至 87k，结构符合推动浪。按柳玉冬「有推动浪才有做底的可能」，走成推动浪就不再是 xx 浪。"
+    },
+    {
+      "from": "btc-2026-06-09",
+      "to": "btc-2026-06-26",
+      "what": "2-06 至 5-06 的上涨：(w)(x)(y) → 绿 y 浪内部的 W-X-b",
+      "why": "同一段走势在不同帖子里标成不同级别的名称；6-26 把它降为 y 浪的 b，以便让绿线成为 5-3-5 的单锯齿 y 浪"
+    },
+    {
+      "from": "btc-2026-08-17",
+      "to": "btc-2026-10-02",
+      "what": "y-c 延伸到 9-26 前跌破 56769 的方案 → 7-01 以来五浪上涨",
+      "why": "价格没有下跌，反而涨到 87k；y-c 延伸方案的时间期限 9-26 已过"
     }
   ]
 }
