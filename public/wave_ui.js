@@ -517,19 +517,147 @@ self.onmessage = function (e) {
     return { index: hit.index, time: hit.time, rawPrice: price };
   }
 
+  // 放大镜: 画浪或拖动端点时按下左键，图表以光标所在K线为中心放大 (该K线保持在光标下)，
+  // 按住可微调，松开落点后恢复原来的显示范围
+  const LOUPE_BARS = 30;
+  let loupe = null;
+  /** anchor: 放大后保持在光标下的K线序号 (拖动时取被抓的端点，默认取光标处) */
+  function loupeOpen(x, anchor) {
+    if (!waveChart || loupe) return;
+    const ts = waveChart.timeScale();
+    const range = ts.getVisibleLogicalRange();
+    const l = anchor !== undefined ? anchor : ts.coordinateToLogical(x);
+    if (!range || l === null || l === undefined) return;
+    loupe = { range: { from: range.from, to: range.to } };
+    waveChart.applyOptions({ handleScroll: false, handleScale: false });
+    if (range.to - range.from <= LOUPE_BARS * 1.5) return false; // 已经够细，不再放大
+    const f = Math.max(0, Math.min(1, x / Math.max(1, ts.width())));
+    ts.setVisibleLogicalRange({ from: l - f * LOUPE_BARS, to: l + (1 - f) * LOUPE_BARS });
+    return true;
+  }
+  function loupeClose() {
+    if (!loupe) return;
+    const r = loupe.range;
+    loupe = null;
+    waveChart.applyOptions({ handleScroll: true, handleScale: true });
+    waveChart.timeScale().setVisibleLogicalRange(r);
+  }
+
+  /** 光标附近 (10px 内) 已画浪的端点；只有画在当前周期的浪可以拖动 */
+  function pointNear(e) {
+    if (!waveChart || !candleSeries || !currentBars.length) return null;
+    const rect = chartRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const ts = waveChart.timeScale();
+    let best = null;
+    sketch.forEach(d => {
+      // 与图上显示一致: 评估后为引擎吸附后的拐点
+      const nd = nodeOf(d.id);
+      const shown = nd && nd.result && nd.result.points && nd.result.points.length === d.points.length ? nd.result.points : d.points;
+      shown.forEach((p, i) => {
+        const dp = displayPoint(p, d.timeframe);
+        if (!dp) return;
+        const px = ts.timeToCoordinate(dp.time), py = candleSeries.priceToCoordinate(p.price);
+        if (px === null || py === null) return;
+        const dist = Math.hypot(px - x, py - y);
+        if (dist <= 10 && (!best || dist < best.dist)) best = { d, i, dist, movable: d.timeframe === currentTf };
+      });
+    });
+    return best;
+  }
+
+  let drag = null;
+  /** 开始拖动: 已评估的浪先采用引擎吸附后的拐点，与图上显示一致；与它重合的其它浪端点 (母浪 / 子浪共用的拐点) 一起移动 */
+  function startDrag(hp, x) {
+    const nd = nodeOf(hp.d.id);
+    const hadEval = !!sketchEval;
+    if (nd && nd.result && nd.result.points && nd.result.points.length === hp.d.points.length) {
+      hp.d.points = nd.result.points.map((q, k) => ({ time: q.time, price: q.price, type: q.type, fixed: !!hp.d.points[k].fixed }));
+    }
+    const p = hp.d.points[hp.i];
+    const linked = [];
+    sketch.forEach(d => {
+      if (d.timeframe !== currentTf) return;
+      d.points.forEach((q, k) => { if (q.time === p.time && Math.abs(q.price - p.price) < 1e-9) linked.push({ d, i: k }); });
+    });
+    const pIdx = barIdxAtOrBefore(p.time);
+    drag = { linked, hadEval, before: linked.map(L => Object.assign({}, L.d.points[L.i])), pIdx, x0: x };
+    evalToken++;
+    sketchEval = null;
+    // 端点按光标的像素位移 ÷ 每根K线宽度移动 (放大后被抓的端点就在光标下)，不会先跳到光标处
+    drag.zoomed = loupeOpen(x, pIdx);
+    setWaveStatus('✋ 拖动端点：左右移动换K线（不越过相邻点），价格取该K线的高/低点；松开后固定在这根K线上，不再自动吸附 · Esc 取消');
+  }
+  function moveDrag(e) {
+    const ts = waveChart.timeScale();
+    const v = ts.getVisibleLogicalRange();
+    if (!v || (drag.zoomed && v.to - v.from > LOUPE_BARS * 1.2)) return; // 放大要等图表重绘才生效
+    const spacing = ts.width() / Math.max(1, v.to - v.from);
+    const hit = { index: drag.pIdx + Math.round((e.clientX - chartRect().left - drag.x0) / spacing) };
+    let lo = 0, hi = currentBars.length - 1;
+    drag.linked.forEach(L => {
+      const pts = L.d.points;
+      if (L.i > 0) lo = Math.max(lo, barIdxAtOrBefore(pts[L.i - 1].time) + 1);
+      if (L.i < pts.length - 1) hi = Math.min(hi, barIdxAtOrBefore(pts[L.i + 1].time) - 1);
+    });
+    if (lo > hi) return;
+    const k = Math.max(lo, Math.min(hi, hit.index));
+    const b = currentBars[k];
+    drag.linked.forEach(L => {
+      const q = L.d.points[L.i];
+      L.d.points[L.i] = { time: b.time, price: q.type === 'high' ? b.high : b.low, type: q.type, fixed: true };
+    });
+    renderChart();
+  }
+  function endDrag(cancel) {
+    const dr = drag;
+    drag = null;
+    loupeClose();
+    if (cancel) dr.linked.forEach((L, k) => { L.d.points[L.i] = dr.before[k]; });
+    const moved = dr.linked.some((L, k) => L.d.points[L.i].time !== dr.before[k].time);
+    invalidateEval();
+    if (cancel || !moved) {
+      setWaveStatus(cancel ? '已取消拖动' : '端点没有移动');
+      if (dr.hadEval) evaluateAll(); // 恢复拖动前的评估
+      return;
+    }
+    const p = dr.linked[0].d.points[dr.linked[0].i];
+    setWaveStatus(`✓ 端点已移到 ${fmtP(p.price)}，固定在这根K线上${dr.hadEval ? '，正在重新评估…' : '，点「评估全部」评估'}`);
+    if (dr.hadEval) evaluateAll();
+  }
+  function cancelDrag() { if (drag) endDrag(true); }
+
   function setupDrawing(container) {
-    let down = null;
-    container.addEventListener('mousedown', e => { if (e.button === 0) down = { x: e.clientX, y: e.clientY }; });
-    container.addEventListener('mouseup', e => {
-      if (!drawTool || !down) return;
-      const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-      down = null;
-      if (dist > 6) return; // 平移/缩放图表，不是点击
-      const hit = hitFromEvent(e);
+    let down = false;
+    // 捕获阶段: 先于图表自身的平移处理，按下时就关掉平移
+    container.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      const x = e.clientX - chartRect().left;
+      if (drawTool) { down = true; loupeOpen(x); return; }
+      const hp = pointNear(e);
+      if (!hp) return;
+      if (!hp.movable) { setWaveStatus(`该浪画在 ${hp.d.timeframe.toUpperCase()}，切换到 ${hp.d.timeframe.toUpperCase()} 后才能拖动它的端点`); return; }
+      e.preventDefault();
+      e.stopPropagation();
+      startDrag(hp, x);
+    }, true);
+    window.addEventListener('mouseup', e => {
+      if (drag) { endDrag(false); return; }
+      if (!down) return;
+      down = false;
+      const inside = container.contains(e.target);
+      const hit = drawTool && inside ? hitFromEvent(e) : null; // 在放大的视图里取点，再恢复
+      loupeClose();
       if (hit) addDrawPoint(hit);
     });
     container.addEventListener('mousemove', e => {
-      if (!drawTool || !drawPoints.length) return;
+      if (drag) { moveDrag(e); return; }
+      if (!drawTool) {
+        const hp = pointNear(e);
+        container.style.cursor = hp ? (hp.movable ? 'grab' : 'not-allowed') : 'default';
+        return;
+      }
+      if (!drawPoints.length) return;
       const hit = hitFromEvent(e);
       if (!hit || hit.index <= drawPoints[drawPoints.length - 1].index) { drawHover = null; renderActive(); return; }
       const preview = resnapDrawPoints(drawPoints.map(p => Object.assign({}, p)).concat([Object.assign({}, hit)]));
@@ -539,8 +667,10 @@ self.onmessage = function (e) {
     container.addEventListener('dblclick', () => { if (drawTool && drawPoints.length >= 3) commitDrawing(); });
     // 右键取消正在画的浪；没有在画时保留浏览器右键菜单
     container.addEventListener('contextmenu', e => {
+      if (drag) { e.preventDefault(); cancelDrag(); return; }
       if (!drawTool) return;
       e.preventDefault();
+      loupeClose();
       cancelDrawing('已取消正在画的浪（右键）');
     }, true);
   }
@@ -570,8 +700,8 @@ self.onmessage = function (e) {
     drawHover = null;
     updateDrawButtons();
     renderChart();
-    setWaveStatus(`✏️ ${DRAW_TOOLS[tool].name}（${currentTf.toUpperCase()}）：从起点 0 开始依次点击各浪终点（自动吸附到 K 线最高/最低价）。` +
-      `画在某个浪的一段之内即为它的子浪 · Esc / 右键取消`);
+    setWaveStatus(`✏️ ${DRAW_TOOLS[tool].name}（${currentTf.toUpperCase()}）：从起点 0 开始依次点击各浪终点（按下时图表放大，松开落点，自动吸附到 K 线最高/最低价）。` +
+      `画在某个浪的一段之内即为它的子浪 · 画完后可拖动端点修改 · Esc / 右键取消`);
   }
 
   function cancelDrawing(msg) {
@@ -707,7 +837,7 @@ self.onmessage = function (e) {
     }
     if (!sketch.length) return;
     const token = ++evalToken;
-    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, type: d.type || null, points: d.points.map(p => ({ time: p.time, price: p.price })),
+    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, type: d.type || null, points: d.points.map(p => ({ time: p.time, price: p.price, fixed: !!p.fixed })),
       prev: (lifeOf(d) || {}).snap || null }));
     setWaveStatus(`⏳ 正在整体评估 ${drawings.length} 个浪：每个浪的铁律 / 低周期子浪 / 走势检验，以及母子级别一致性…`);
     const badge = document.getElementById('wave-user-eval-badge');
@@ -1156,7 +1286,8 @@ self.onmessage = function (e) {
       if (!waveViewVisible()) return;
       const tag = (e.target && e.target.tagName) || '';
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-      if (e.key === 'Escape' && drawTool) cancelDrawing('已取消正在画的浪');
+      if (e.key === 'Escape' && drag) cancelDrag();
+      else if (e.key === 'Escape' && drawTool) { loupeClose(); cancelDrawing('已取消正在画的浪'); }
       else if (e.key === 'Enter') {
         if (drawTool && drawPoints.length >= 3) { e.preventDefault(); commitDrawing(); }
         else if (!drawTool && sketch.length) { e.preventDefault(); evaluateAll(); }
@@ -1174,6 +1305,8 @@ self.onmessage = function (e) {
     updateTheme: updateTheme,
     /** 只读: 当前画板与整体评估 (调试 / 自动化检查用) */
     getSketch: () => JSON.parse(JSON.stringify({ timeframe: currentTf, sketch, evaluation: sketchEval })),
+    /** 只读: 图表当前可见的K线序号范围与绘图区宽度 (调试用) */
+    getView: x => waveChart ? Object.assign({ width: waveChart.timeScale().width(), logicalAtX: x !== undefined ? waveChart.timeScale().coordinateToLogical(x) : undefined }, waveChart.timeScale().getVisibleLogicalRange()) : null,
     onViewActivated: function () {
       if (!waveChart) {
         restoreSketch(currentSymbol);

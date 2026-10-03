@@ -3229,7 +3229,8 @@
       }
       const gapL = i > 0 ? idx[i] - idx[i - 1] : Infinity;
       const gapR = i < n - 1 ? idx[i + 1] - idx[i] : Infinity;
-      const w = Math.max(1, Math.min(6, Math.round(0.3 * Math.min(gapL, gapR))));
+      // 用户拖动过的点 (fixed) 固定在所放的K线上，只取该K线的高/低点
+      const w = raw[i].fixed ? 0 : Math.max(1, Math.min(6, Math.round(0.3 * Math.min(gapL, gapR))));
       const lo = Math.max(i > 0 ? pts[i - 1].idx + 1 : 0, idx[i] - w);
       const hi = Math.min(i < n - 1 ? idx[i + 1] - 1 : bars.length - 1, idx[i] + w);
       let best = idx[i];
@@ -3467,7 +3468,7 @@
     if (!bars || bars.length < 10) throw new Error('K线数据不足，无法评估画浪');
     const raw = (options.points || [])
       .filter(p => p && isFinite(p.time) && isFinite(p.price))
-      .map(p => ({ time: +p.time, price: +p.price }));
+      .map(p => ({ time: +p.time, price: +p.price, fixed: !!p.fixed }));
     const fullPts = tool.labels.length;
     if (raw.length < 3) throw new Error('至少需要 3 个点（起点 + 两段浪）才能评估');
     if (raw.length > fullPts) throw new Error(`「${tool.name}」最多 ${fullPts} 个点`);
@@ -4048,7 +4049,7 @@
     options = options || {};
     const drawings = (options.drawings || []).map((d, i) => ({
       id: String(d.id !== undefined && d.id !== null ? d.id : i + 1), tool: d.tool, timeframe: d.timeframe || '4h', type: d.type || null,
-      points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price })),
+      points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price, fixed: !!p.fixed })),
       prev: d.prev && isFinite(d.prev.at) ? d.prev : null
     }));
     if (!drawings.length) throw new Error('还没有画浪');
