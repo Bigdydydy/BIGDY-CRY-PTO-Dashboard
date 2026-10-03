@@ -179,4 +179,4 @@ async function main() {
 }
 
 if (require.main === module) main();
-module.exports = { writeTable };
+module.exports = { writeTable, klines, resolve, lowerBound };

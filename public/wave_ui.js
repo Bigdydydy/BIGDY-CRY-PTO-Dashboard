@@ -618,6 +618,7 @@ self.onmessage = function (e) {
 
   /** 画板变化后，之前的整体评估作废 */
   function invalidateEval() {
+    saveSketch();
     evalToken++;
     sketchEval = null;
     selectedId = null;
@@ -652,6 +653,51 @@ self.onmessage = function (e) {
   }
 
   // ---------------------------------------------------------------------------
+  // 本机保存: 每个标的一份画板；每个画法 (标的 + 周期 + 工具 + 指定浪型 + 各点) 一份评估快照与改判记录
+  // ---------------------------------------------------------------------------
+  const STORE_SKETCH = 'wave8.sketch.v1';
+  const STORE_LIFE = 'wave8.lifecycle.v1';
+  function storeGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function storeSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 隐私模式 / 存储已满 */ } }
+  function saveSketch() {
+    const all = storeGet(STORE_SKETCH) || {};
+    all[currentSymbol] = { seq: sketchSeq, drawings: sketch };
+    storeSet(STORE_SKETCH, all);
+  }
+  function restoreSketch(symbol) {
+    const s = (storeGet(STORE_SKETCH) || {})[symbol];
+    sketch = s && Array.isArray(s.drawings)
+      ? s.drawings.filter(d => d && DRAW_TOOLS[d.tool] && TF_SEC[d.timeframe] && Array.isArray(d.points) && d.points.length >= 2) : [];
+    sketchSeq = Math.max((s && s.seq) || 0, 0, ...sketch.map(d => +String(d.id).replace(/\D/g, '') || 0));
+  }
+  function drawKey(d) {
+    return [currentSymbol, d.timeframe, d.tool, d.type || '', d.points.map(p => `${p.time}:${p.price}`).join(',')].join('|');
+  }
+  function lifeOf(d) { return d ? (storeGet(STORE_LIFE) || {})[drawKey(d)] || null : null; }
+  /** 记下本次评估: 有新K线才更新快照，改判事件追加到该画法的记录里 */
+  function recordLife(res) {
+    const all = storeGet(STORE_LIFE) || {};
+    res.nodes.forEach(nd => {
+      const d = sketch.find(x => x.id === nd.id);
+      if (!d || !nd.snapshot) return;
+      const k = drawKey(d);
+      const cur = all[k] || { first: nd.snapshot.at, log: [] };
+      cur.seen = Date.now();
+      all[k] = cur;
+      if (cur.snap && !(nd.snapshot.at > cur.snap.at)) return;
+      if (nd.lifecycle && nd.lifecycle.events.length) cur.log.push({ at: nd.snapshot.at, since: nd.lifecycle.since, events: nd.lifecycle.events });
+      cur.log = cur.log.slice(-30);
+      cur.snap = nd.snapshot;
+    });
+    Object.keys(all).sort((a, b) => (all[b].seen || 0) - (all[a].seen || 0)).slice(60).forEach(k => { delete all[k]; });
+    storeSet(STORE_LIFE, all);
+  }
+  function fmtT(t) {
+    const d = new Date(t * 1000), z = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;
+  }
+
+  // ---------------------------------------------------------------------------
   // 整体评估
   // ---------------------------------------------------------------------------
   async function evaluateAll() {
@@ -661,7 +707,8 @@ self.onmessage = function (e) {
     }
     if (!sketch.length) return;
     const token = ++evalToken;
-    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, type: d.type || null, points: d.points.map(p => ({ time: p.time, price: p.price })) }));
+    const drawings = sketch.map(d => ({ id: d.id, tool: d.tool, timeframe: d.timeframe, type: d.type || null, points: d.points.map(p => ({ time: p.time, price: p.price })),
+      prev: (lifeOf(d) || {}).snap || null }));
     setWaveStatus(`⏳ 正在整体评估 ${drawings.length} 个浪：每个浪的铁律 / 低周期子浪 / 走势检验，以及母子级别一致性…`);
     const badge = document.getElementById('wave-user-eval-badge');
     if (badge) { badge.className = 'card-badge badge-neutral'; badge.textContent = '评估中…'; }
@@ -691,6 +738,7 @@ self.onmessage = function (e) {
       setWaveStatus(`❌ 评估失败：${err}`);
       return;
     }
+    recordLife(res);
     sketchEval = res;
     selectedId = res.roots[0] || (res.nodes[0] && res.nodes[0].id) || null;
     renderChart();
@@ -976,11 +1024,14 @@ self.onmessage = function (e) {
       </div>` : '';
 
     const hard = (r.primary.ruleChecks || []).filter(c => c.hard);
-    const failed = hard.filter(c => !c.pass && !c.pending);
+    const failed = hard.filter(c => !c.pass && !c.pending && !c.near);
+    const nearly = hard.filter(c => c.near);
     const rulesHtml = `
       <div class="liu-signal-row">
-        <div class="liu-signal-title"><span>手稿铁律</span><span class="liu-chip ${failed.length ? 'neg' : 'pos'}">${hard.length - failed.length}/${hard.length} 通过</span></div>
-        ${failed.length ? failed.map(c => `<div class="ue-line">✗ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}</div>`).join('') : '<div class="ue-line">全部通过</div>'}
+        <div class="liu-signal-title"><span>手稿铁律</span><span class="liu-chip ${failed.length ? 'neg' : nearly.length ? 'warn' : 'pos'}">${hard.length - failed.length - nearly.length}/${hard.length} 通过</span></div>
+        ${failed.length || nearly.length ? '' : '<div class="ue-line">全部通过</div>'}
+        ${failed.map(c => `<div class="ue-line">✗ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}</div>`).join('')}
+        ${nearly.map(c => `<div class="ue-line">≈ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}，只差阈值的 ${(100 * c.margin).toFixed(1)}%（容差带内，判存疑）</div>`).join('')}
         ${(r.primary.liveHardFails || []).map(f => `<div class="ue-line">走势检验 ✗ ${esc(f.text)}（${esc(f.page)}）：${esc(f.detail)}</div>`).join('')}
       </div>`;
 
@@ -996,7 +1047,17 @@ self.onmessage = function (e) {
         ${other.map(t => `<div class="ue-line">${t}</div>`).join('')}
       </div>` : '';
 
-    return verdictHtml + typeHtml + subHtml + lvHtml + rulesHtml + otherHtml;
+    // 计数记录: 同一画法历次评估之间的改判与触发它的价格事件 (本机保存)
+    const life = lifeOf(sketch.find(x => x.id === nd.id));
+    const log = life ? life.log.slice().reverse() : [];
+    const lifeHtml = `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>计数记录</span><span>${life ? `首次评估 ${esc(fmtT(life.first))} · 本机保存` : '本机保存'}</span></div>
+        ${log.length ? log.map(x => x.events.map(e => `<div class="ue-line">${esc(fmtT(x.at))} · ${esc(e.text)}</div>`).join('')).join('')
+          : `<div class="ue-note">${life && life.snap && life.snap.at !== life.first ? `自 ${esc(fmtT(life.first))} 以来浪型、判决都没有变化` : '首次评估。之后再评估同一画法时，会记下上次预测的结局、浪型或判决的改变，以及触发改变的价格事件'}</div>`}
+      </div>`;
+
+    return verdictHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
   }
 
   // ---------------------------------------------------------------------------
@@ -1014,7 +1075,11 @@ self.onmessage = function (e) {
         const sym = btn.dataset.symbol;
         if (!sym || sym === currentSymbol) return;
         symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
-        if (sketch.length || drawTool) clearSketch(); // 换标的: 画的浪不再适用
+        // 换标的: 当前画板已保存，换成该标的上次的画板
+        if (drawTool) cancelDrawing();
+        currentSymbol = sym;
+        restoreSketch(sym);
+        invalidateEval();
         loadChartCandles(sym);
       });
     });
@@ -1081,6 +1146,7 @@ self.onmessage = function (e) {
         const next = btn.dataset.force || null;
         if ((d.type || null) === next) return;
         d.type = next;
+        saveSketch();
         const keep = d.id;
         evaluateAll().then(() => { if (nodeOf(keep)) { selectedId = keep; renderChart(); renderPanel(); } });
       });
@@ -1109,7 +1175,12 @@ self.onmessage = function (e) {
     /** 只读: 当前画板与整体评估 (调试 / 自动化检查用) */
     getSketch: () => JSON.parse(JSON.stringify({ timeframe: currentTf, sketch, evaluation: sketchEval })),
     onViewActivated: function () {
-      if (!waveChart) initChart();
+      if (!waveChart) {
+        restoreSketch(currentSymbol);
+        initChart();
+        updateDrawButtons();
+        renderPanel();
+      }
       if (currentBars.length === 0) {
         if (!initialLoadPromise) initialLoadPromise = loadChartCandles(currentSymbol).finally(() => { initialLoadPromise = null; });
       } else {
