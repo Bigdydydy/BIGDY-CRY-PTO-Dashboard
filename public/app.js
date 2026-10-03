@@ -106,6 +106,9 @@ function reloadAllChartsForTheme() {
     try { pnlChartInstance.dispose(); } catch (e) {}
     pnlChartInstance = null;
   }
+  if (typeof pnlViewState !== 'undefined' && pnlViewState && document.getElementById('pnl-modal-backdrop')?.classList.contains('open')) {
+    renderPnLView({ resetChart: true });
+  }
 
   // Trigger all module chart re-renders
   if (typeof renderMacroChart === 'function' && typeof rawMacroData !== 'undefined' && rawMacroData) {
@@ -1166,306 +1169,484 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// PV view state: legs are fixed per opened block; days / IV shift / unit come from the controls.
+let pnlViewState = null;
+let pnlRenderPending = false;
+
+function normalizePnLLeg(l, fallbackIv) {
+  const parsed = window.PnLEngine.parseInstrument(l.instrument);
+  return {
+    instrument: l.instrument,
+    direction: l.direction,
+    amount: Number(l.amount || 0),
+    price: Number(l.price || 0),
+    strike: Number(l.strike) || parsed?.strike || 0,
+    isCall: l.isCall ?? parsed?.isCall ?? String(l.instrument).endsWith('-C'),
+    expiryMs: parsed?.expiryMs || null,
+    iv: Number(l.iv) || fallbackIv,
+    tradeIv: Number(l.iv) || null,
+    markPrice: null,
+    carry: 0
+  };
+}
+
+/**
+ * Swap in live Deribit marks: mark IV drives the curves / Greeks and each expiry's forward basis
+ * (carry) makes T+0 theoretical prices line up with Deribit's mark price.
+ * Falls back to trade-time IV when the request fails or a leg has no mark (e.g. expired).
+ */
+async function loadPnLLiveMarks(state) {
+  const names = [...new Set(state.legs.map(l => l.instrument))];
+  state.ivSource = { kind: 'loading' };
+  try {
+    const resp = await fetch(`/api/option-marks?currency=BTC&instruments=${encodeURIComponent(names.join(','))}`);
+    const json = await resp.json();
+    if (!resp.ok || json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    if (pnlViewState !== state) return; // modal re-opened on another block meanwhile
+
+    const indexNow = Number(json.indexPrice) || state.spotNow;
+    let matched = 0;
+    state.legs.forEach(leg => {
+      const m = json.marks?.[leg.instrument];
+      if (!m) return;
+      matched++;
+      leg.iv = m.markIv;
+      leg.markPrice = m.markPrice;
+      leg.carry = leg.expiryMs ? window.PnLEngine.impliedCarry(m.underlyingPrice, indexNow, leg.expiryMs, state.nowMs) : 0;
+    });
+    if (Number(json.indexPrice) > 0) state.spotNow = Number(json.indexPrice);
+    state.ivSource = { kind: matched ? 'live' : 'trade', matched, total: state.legs.length, timestamp: json.timestamp, stale: !!json.stale };
+  } catch (err) {
+    if (pnlViewState !== state) return;
+    console.warn('[PV] live option marks unavailable, using trade IV:', err.message);
+    state.ivSource = { kind: 'error' };
+  }
+  renderPnLView();
+}
+
+function describePnLIvSource(src) {
+  if (!src || src.kind === 'loading') return 'IV: 成交时 (正在获取 Deribit 实时 mark IV…)';
+  if (src.kind === 'error') return 'IV: 成交时 (实时 mark IV 获取失败)';
+  if (src.kind === 'trade') return 'IV: 成交时 (合约无实时报价)';
+  const partial = src.matched < src.total ? `，${src.total - src.matched} 腿无报价用成交 IV` : '';
+  return `IV: Deribit 实时 mark ${formatUTC8TimeOnly(src.timestamp)}${src.stale ? ' (缓存)' : ''}${partial}`;
+}
+
+function formatPnLValue(v, unit, digits = 4) {
+  const sign = v >= 0 ? '+' : '-';
+  if (unit === 'USD') return `${sign}$${Math.round(Math.abs(v)).toLocaleString()}`;
+  return `${sign}${Math.abs(v).toFixed(digits)} ₿`;
+}
+
+function formatPnLAxis(v, unit) {
+  const abs = Math.abs(v);
+  const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+  if (unit === 'USD') {
+    if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
+    if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(0)}K`;
+    return `${sign}$${abs.toFixed(0)}`;
+  }
+  return `${sign}${abs.toFixed(abs >= 100 ? 0 : 2)} ₿`;
+}
+
+function setPnLText(id, text, className) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (className !== undefined) el.className = className;
+}
+
+function schedulePnLRender() {
+  if (pnlRenderPending) return;
+  pnlRenderPending = true;
+  requestAnimationFrame(() => {
+    pnlRenderPending = false;
+    renderPnLView();
+  });
+}
+
+function syncPnLControls() {
+  const s = pnlViewState;
+  if (!s) return;
+  const elDays = document.getElementById('pnl-days-slider');
+  const elIv = document.getElementById('pnl-iv-slider');
+  if (elDays) elDays.value = String(s.days);
+  if (elIv) elIv.value = String(s.ivShift);
+  document.querySelectorAll('#pnl-unit-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.unit === s.unit);
+  });
+}
+
+(function wirePnLControls() {
+  const elDays = document.getElementById('pnl-days-slider');
+  const elIv = document.getElementById('pnl-iv-slider');
+  const elReset = document.getElementById('pnl-reset-btn');
+  if (elDays) elDays.addEventListener('input', () => {
+    if (!pnlViewState) return;
+    pnlViewState.days = Number(elDays.value) || 0;
+    schedulePnLRender();
+  });
+  if (elIv) elIv.addEventListener('input', () => {
+    if (!pnlViewState) return;
+    pnlViewState.ivShift = Number(elIv.value) || 0;
+    schedulePnLRender();
+  });
+  if (elReset) elReset.addEventListener('click', () => {
+    if (!pnlViewState) return;
+    pnlViewState.days = 0;
+    pnlViewState.ivShift = 0;
+    syncPnLControls();
+    renderPnLView();
+  });
+  document.querySelectorAll('#pnl-unit-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!pnlViewState) return;
+      pnlViewState.unit = btn.dataset.unit === 'USD' ? 'USD' : 'BTC';
+      syncPnLControls();
+      renderPnLView();
+    });
+  });
+})();
+
 window.openPnLViewModal = function(type, idx) {
   const isIceberg = (type === 'iceberg');
-  let item = null;
-  if (isIceberg) {
-    const clusters = currentMarketData?.blockTrades?.icebergClusters || [];
-    item = clusters[idx];
-  } else {
-    const blocks = currentMarketData?.blockTrades?.whaleBlocks || [];
-    item = blocks[idx];
-  }
-  if (!item) return;
-
+  const item = isIceberg
+    ? (currentMarketData?.blockTrades?.icebergClusters || [])[idx]
+    : (currentMarketData?.blockTrades?.whaleBlocks || [])[idx];
   const elModal = document.getElementById('pnl-modal-backdrop');
-  const elTitle = document.getElementById('pnl-modal-title');
-  const elMeta = document.getElementById('pnl-modal-meta');
-  const elMaxProfit = document.getElementById('pnl-kpi-max-profit');
-  const elMaxProfitUsd = document.getElementById('pnl-kpi-max-profit-usd');
-  const elMaxLoss = document.getElementById('pnl-kpi-max-loss');
-  const elMaxLossUsd = document.getElementById('pnl-kpi-max-loss-usd');
-  const elBep = document.getElementById('pnl-kpi-bep');
-  const elBepDistance = document.getElementById('pnl-kpi-bep-distance');
-  const elCashflow = document.getElementById('pnl-kpi-cashflow');
-  const elCashflowDesc = document.getElementById('pnl-kpi-cashflow-desc');
-  const elLegsRibbon = document.getElementById('pnl-legs-ribbon');
-  const elChartDom = document.getElementById('pnl-chart-container');
-
-  if (!elModal) return;
-
-  // 1. Prepare normalized legs
-  let legs = [];
-  if (isIceberg) {
-    if (item.legs && item.legs.length > 0) {
-      legs = item.legs.map(l => ({
-        instrument: l.instrument,
-        direction: l.direction,
-        amount: Number(l.amount || 0),
-        price: Number(l.price || 0),
-        strike: Number(l.strike || (l.instrument.match(/-(\d+)-[CP]/) ? l.instrument.match(/-(\d+)-[CP]/)[1] : 80000)),
-        isCall: l.isCall ?? (String(l.instrument).endsWith('-C') || String(l.instrument).includes('-C-'))
-      }));
-    } else {
-      const strikeMatch = item.instrument ? item.instrument.match(/-(\d+)-[CP]/) : null;
-      legs = [{
-        instrument: item.instrument,
-        direction: item.direction,
-        amount: Number(item.totalContracts || 0),
-        price: Number(item.avgPrice || 0),
-        strike: Number(item.strike || (strikeMatch ? strikeMatch[1] : 80000)),
-        isCall: item.instrument ? item.instrument.endsWith('-C') : true
-      }];
-    }
-  } else {
-    legs = (item.legs || []).map(l => ({
-      instrument: l.instrument,
-      direction: l.direction,
-      amount: Number(l.amount || 0),
-      price: Number(l.price || 0),
-      strike: Number(l.strike || (l.instrument.match(/-(\d+)-[CP]/) ? l.instrument.match(/-(\d+)-[CP]/)[1] : 80000)),
-      isCall: l.isCall ?? (String(l.instrument).endsWith('-C') || String(l.instrument).includes('-C-'))
-    }));
+  if (!item || !elModal) return;
+  if (!window.PnLEngine) {
+    console.error('PnLEngine not loaded');
+    return;
   }
 
-  // 2. Resolve underlying spot price
-  const spotPrice = Number(item.legs?.[0]?.indexPrice) ||
-                    Number(item.indexPrice) ||
-                    Number(currentMarketData?.indexPrice) ||
-                    86500;
+  // 1. Normalized legs (expiry parsed from the instrument name, IV from the trade)
+  const fallbackIv = Number(currentMarketData?.atmIv?.iv1m) || 50;
+  const rawLegs = (item.legs && item.legs.length > 0)
+    ? item.legs
+    : [{
+        instrument: item.instrumentRaw || item.instrument,
+        direction: item.direction,
+        amount: item.totalContracts,
+        price: item.avgPrice,
+        strike: item.strike,
+        iv: item.iv
+      }];
+  const legs = rawLegs.map(l => normalizePnLLeg(l, fallbackIv)).filter(l => l.strike > 0 && l.amount > 0);
+  if (!legs.length) return;
+
+  // 2. Spot: cost basis stays at the trade, the view is anchored at the current index
+  const entrySpot = Number(item.legs?.[0]?.indexPrice) || Number(item.indexPrice) || 0;
+  const spotNow = Number(currentMarketData?.indexPrice) || entrySpot || 85000;
+
+  pnlViewState = {
+    legs,
+    spotNow,
+    nowMs: Date.now(),
+    days: 0,
+    ivShift: 0,
+    unit: pnlViewState?.unit || 'BTC',
+    ivSource: { kind: 'loading' }
+  };
 
   // 3. Header title and time metadata
   const idText = isIceberg ? `${item.instrument} 机构拆单` : item.blockId;
   const stratText = item.strategyNameZh || '期权组合结构';
-  if (elTitle) elTitle.textContent = `${idText} • ${stratText} 收益结构模拟`;
+  setPnLText('pnl-modal-title', `${idText} • ${stratText} 收益结构模拟`);
 
   const timeText = isIceberg
     ? `时间窗: ${formatTimeWindowUTC8(item.startTimeUTC8 || item.startTime, item.endTimeUTC8 || item.endTime, item.durationMin)}`
     : `成交时间: ${item.dateTimeUTC8 || item.dateTime || formatUTC8(item.timestamp)} (UTC+8)`;
   const notionalVal = Number(item.notionalUSDM || item.clusterNotionalM) || 0;
-  if (elMeta) {
-    elMeta.textContent = `${timeText} • 名义价值: $${notionalVal.toFixed(2)}M • 标的现货参考: $${Math.round(spotPrice).toLocaleString()} • 共 ${legs.length} 腿`;
-  }
+  const entryText = entrySpot ? ` • 成交时指数: $${Math.round(entrySpot).toLocaleString()}` : '';
+  setPnLText('pnl-modal-meta', `${timeText} • 名义价值: $${notionalVal.toFixed(2)}M${entryText} • 当前指数: $${Math.round(spotNow).toLocaleString()} • 共 ${legs.length} 腿`);
 
-  // 4. Render legs ribbon
-  if (elLegsRibbon) {
-    let ribbonHtml = '<span style="font-size:0.7rem; color:#71717a; font-weight:600; margin-right:4px;">组合分腿明细:</span>';
-    legs.forEach(leg => {
-      const isBuy = String(leg.direction).toLowerCase() === 'buy';
-      const dirCls = isBuy ? 'leg-buy' : 'leg-sell';
-      const dirLbl = isBuy ? 'BUY' : 'SELL';
-      const amt = Number(leg.amount || 0).toLocaleString();
-      const pBtc = Number(leg.price || 0).toFixed(4);
-      ribbonHtml += `
-        <div class="pnl-leg-chip ${dirCls}">
-          <strong>${dirLbl}</strong> ${amt} ₿ × <span>${escapeHtml(leg.instrument)}</span>
-          <span style="opacity:0.85;">@ ${pBtc} ₿</span>
-        </div>
-      `;
-    });
-    elLegsRibbon.innerHTML = ribbonHtml;
+  // 4. Date slider spans today -> nearest unexpired expiry
+  const probe = window.PnLEngine.generatePnLView(legs, { spotPrice: spotNow, nowMs: pnlViewState.nowMs, numPoints: 10 });
+  pnlViewState.maxDays = probe.maxDays;
+  const elDays = document.getElementById('pnl-days-slider');
+  if (elDays) {
+    elDays.max = String(Math.max(probe.maxDays, 0.01));
+    elDays.step = 'any';
+    elDays.disabled = !(probe.maxDays > 0);
   }
+  setPnLText('pnl-days-expiry-lbl', probe.nearestExpiryMs ? `到期 ${formatUTC8(probe.nearestExpiryMs, false).slice(5)}` : '已全部到期');
+  syncPnLControls();
 
-  // 5. Compute PnL Curve via PnLEngine
-  if (!window.PnLEngine) {
-    console.error('PnLEngine not loaded');
-    return;
-  }
-  const curve = window.PnLEngine.generatePnLCurve(legs, spotPrice);
-  if (!curve) return;
-
-  // 6. Update KPI Metrics Cards
-  // Max Profit
-  if (curve.isCappedUpside) {
-    const profitBtc = curve.maxPnl;
-    const profitUsd = profitBtc * spotPrice;
-    if (elMaxProfit) elMaxProfit.textContent = `${profitBtc >= 0 ? '+' : ''}${profitBtc.toFixed(3)} BTC`;
-    if (elMaxProfitUsd) elMaxProfitUsd.textContent = `≈ ${profitUsd >= 0 ? '+' : ''}$${Math.round(profitUsd).toLocaleString()}`;
-  } else {
-    if (elMaxProfit) elMaxProfit.textContent = '理论无上限';
-    if (elMaxProfitUsd) elMaxProfitUsd.textContent = '看涨上行随币价发散';
-  }
-
-  // Max Loss
-  if (curve.isCappedDownside) {
-    const lossBtc = curve.minPnl;
-    const lossUsd = lossBtc * spotPrice;
-    if (elMaxLoss) elMaxLoss.textContent = `${lossBtc.toFixed(3)} BTC`;
-    if (elMaxLossUsd) elMaxLossUsd.textContent = `≈ $${Math.round(lossUsd).toLocaleString()}`;
-  } else {
-    if (elMaxLoss) elMaxLoss.textContent = '理论深度亏损';
-    if (elMaxLossUsd) elMaxLossUsd.textContent = '极端暴跌或裸空头寸';
-  }
-
-  // Breakeven Points
-  if (curve.breakevens.length > 0) {
-    if (elBep) elBep.textContent = curve.breakevens.map(b => `$${b.toLocaleString()}`).join(' / ');
-    if (elBepDistance && spotPrice) {
-      const distStrs = curve.breakevens.map(b => {
-        const diff = ((b - spotPrice) / spotPrice) * 100;
-        return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
-      });
-      elBepDistance.textContent = `较现货 ($${Math.round(spotPrice).toLocaleString()}): ${distStrs.join(' / ')}`;
-    }
-  } else {
-    if (elBep) elBep.textContent = curve.minPnl >= 0 ? '全域盈利' : '全域亏损';
-    if (elBepDistance) elBepDistance.textContent = '区间内无零轴交叉点';
-  }
-
-  // Initial Cash Flow (BTC)
-  const cfBtc = curve.initialCashFlowBTC;
-  if (elCashflow) {
-    const cfSign = cfBtc >= 0 ? '+' : '';
-    elCashflow.textContent = `${cfSign}${cfBtc.toFixed(4)} BTC`;
-    elCashflow.className = cfBtc >= 0 ? 'pnl-kpi-val text-pos' : 'pnl-kpi-val text-neg';
-  }
-  if (elCashflowDesc) {
-    const cfUsd = Math.round(cfBtc * spotPrice);
-    const usdSign = cfUsd >= 0 ? '+' : '';
-    const desc = cfBtc >= 0 ? '净收入权利金 (Net Credit)' : '净支付权利金 (Net Debit)';
-    elCashflowDesc.textContent = `${desc} ≈ ${usdSign}$${usdSign ? Math.abs(cfUsd).toLocaleString() : cfUsd.toLocaleString()}`;
-  }
-
-  // 7. Open Modal
   elModal.classList.add('open');
+  renderPnLView({ resetChart: true });
+  loadPnLLiveMarks(pnlViewState);
+};
 
-  // 8. Render ECharts Payoff Chart
-  if (elChartDom && window.echarts) {
-    if (!pnlChartInstance) {
-      pnlChartInstance = echarts.init(elChartDom, getEchartsTheme());
-      window.addEventListener('resize', () => {
-        if (pnlChartInstance) pnlChartInstance.resize();
-      });
-    }
+function renderPnLView({ resetChart = false } = {}) {
+  const s = pnlViewState;
+  const E = window.PnLEngine;
+  if (!s || !E) return;
 
-    const themeColors = getChartThemeColors();
-    const xData = curve.series.map(d => d.S);
-    const yData = curve.series.map(d => Number(d.pnlBtc.toFixed(4)));
+  const evalMs = s.nowMs + s.days * E.MS_PER_DAY;
+  const view = E.generatePnLView(s.legs, { spotPrice: s.spotNow, nowMs: s.nowMs, evalMs, ivShiftPct: s.ivShift });
+  if (!view) return;
+  const spotPrice = s.spotNow;
 
-    // MarkLines
-    const markLineData = [
-      {
-        yAxis: 0,
-        lineStyle: { color: 'rgba(255, 255, 255, 0.45)', type: 'dashed', width: 1.5 },
-        label: { show: true, formatter: '0 BTC 损益平衡基准', position: 'insideEndTop', color: '#a1a1aa', fontSize: 11 }
-      }
-    ];
+  // 1. Control labels
+  const atExpiry = view.nearestExpiryMs && view.evalMs >= view.nearestExpiryMs;
+  const evalDate = formatUTC8(view.evalMs, false);
+  let daysLabel = '今天 (T+0)';
+  if (atExpiry) daysLabel = `到期 · ${evalDate}`;
+  else if (s.days > 0) daysLabel = `T+${s.days.toFixed(s.days < 10 ? 1 : 0)} 天 · ${evalDate}`;
+  setPnLText('pnl-days-label', daysLabel);
+  setPnLText('pnl-iv-label', `${s.ivShift >= 0 ? '+' : ''}${s.ivShift}%`);
 
-    if (spotPrice) {
-      markLineData.push({
-        xAxis: Math.round(spotPrice),
-        lineStyle: { color: '#38bdf8', type: 'dotted', width: 2 },
-        label: { show: true, formatter: `现货 $${Math.round(spotPrice).toLocaleString()}`, position: 'start', color: '#38bdf8', fontSize: 11 }
-      });
-    }
+  // 2. KPI cards (expiry curve, BTC with USD reference at current spot)
+  if (view.isProfitCapped) {
+    const profitUsd = view.maxPnl * spotPrice;
+    setPnLText('pnl-kpi-max-profit', `${view.maxPnl >= 0 ? '+' : ''}${view.maxPnl.toFixed(3)} BTC`);
+    setPnLText('pnl-kpi-max-profit-usd', `≈ ${profitUsd >= 0 ? '+' : '-'}$${Math.abs(Math.round(profitUsd)).toLocaleString()}`);
+  } else {
+    setPnLText('pnl-kpi-max-profit', '理论无上限');
+    setPnLText('pnl-kpi-max-profit-usd', '净买入 Put：币价趋零时 BTC 收益发散');
+  }
 
-    curve.breakevens.forEach((bep, i) => {
-      markLineData.push({
-        xAxis: bep,
-        lineStyle: { color: '#eab308', type: 'dashed', width: 1.5 },
-        label: { show: true, formatter: `BEP${curve.breakevens.length > 1 ? (i + 1) : ''}: $${bep.toLocaleString()}`, position: 'end', color: '#eab308', fontSize: 11 }
-      });
+  if (view.isLossCapped) {
+    const lossUsd = view.minPnl * spotPrice;
+    setPnLText('pnl-kpi-max-loss', `${view.minPnl.toFixed(3)} BTC`);
+    setPnLText('pnl-kpi-max-loss-usd', `≈ ${lossUsd >= 0 ? '+' : '-'}$${Math.abs(Math.round(lossUsd)).toLocaleString()}`);
+  } else {
+    setPnLText('pnl-kpi-max-loss', '理论深度亏损');
+    setPnLText('pnl-kpi-max-loss-usd', '净卖出 Put：币价趋零时 BTC 亏损发散');
+  }
+
+  if (view.breakevens.length > 0) {
+    setPnLText('pnl-kpi-bep', view.breakevens.map(b => `$${b.toLocaleString()}`).join(' / '));
+    const distStrs = view.breakevens.map(b => {
+      const diff = ((b - spotPrice) / spotPrice) * 100;
+      return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
     });
+    setPnLText('pnl-kpi-bep-distance', `较现价 ($${Math.round(spotPrice).toLocaleString()}): ${distStrs.join(' / ')}`);
+  } else {
+    setPnLText('pnl-kpi-bep', view.minPnl >= 0 ? '全域盈利' : '全域亏损');
+    setPnLText('pnl-kpi-bep-distance', '区间内无零轴交叉点');
+  }
 
-    const option = {
-      backgroundColor: 'transparent',
-      animation: true,
-      animationDuration: 300,
-      grid: {
-        top: 36,
-        left: 68,
-        right: 40,
-        bottom: 46,
-        containLabel: false
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: themeColors.tooltipBg,
-        borderColor: themeColors.tooltipBorder,
-        textStyle: { color: themeColors.tooltipText, fontSize: 12 },
-        formatter: function(params) {
-          if (!params || !params.length) return '';
-          const pt = params[0];
-          const S = Number(pt.axisValue);
-          const pnlBtc = Number(pt.data);
-          const pnlUsd = pnlBtc * S;
-          const isPos = pnlBtc >= 0;
-          const col = isPos ? '#4ade80' : '#f87171';
-          const sign = isPos ? '+' : '';
+  const cfBtc = view.initialCashFlowBTC;
+  const cfUsd = Math.round(cfBtc * spotPrice);
+  setPnLText('pnl-kpi-cashflow', `${cfBtc >= 0 ? '+' : ''}${cfBtc.toFixed(4)} BTC`, cfBtc >= 0 ? 'pnl-kpi-val text-pos' : 'pnl-kpi-val text-neg');
+  setPnLText('pnl-kpi-cashflow-desc', `${cfBtc >= 0 ? '净收入权利金 (Net Credit)' : '净支付权利金 (Net Debit)'} ≈ ${cfUsd >= 0 ? '+' : '-'}$${Math.abs(cfUsd).toLocaleString()}`);
+
+  // 3. Virtual positions & Greeks at the current index, simulated date and IV shift
+  renderPnLPositions(s, view);
+
+  // 4. Chart
+  renderPnLChart(s, view, resetChart);
+}
+
+function renderPnLPositions(s, view) {
+  const elBody = document.getElementById('pnl-positions-body');
+  const elFoot = document.getElementById('pnl-positions-foot');
+  if (!elBody || !elFoot) return;
+  const pf = window.PnLEngine.evaluatePortfolio(s.legs, s.spotNow, view.evalMs, s.ivShift);
+  const pnlCls = v => (v >= 0 ? 'text-pos' : 'text-neg');
+  const signed = (v, d) => `${v >= 0 ? '+' : ''}${v.toFixed(d)}`;
+
+  elBody.innerHTML = s.legs.map((leg, i) => {
+    const r = pf.legs[i];
+    const isBuy = String(leg.direction).toLowerCase() === 'buy';
+    const expiredTag = r.expired ? '<span class="pnl-expired-tag">已到期</span>' : '';
+    const ivText = r.expired ? '--' : `${(r.sigma * 100).toFixed(1)}%`;
+    const ivTitle = leg.tradeIv ? `成交时 IV ${leg.tradeIv.toFixed(1)}%` : '';
+    const markText = leg.markPrice != null ? leg.markPrice.toFixed(4) : '--';
+    return `
+      <tr>
+        <td>${escapeHtml(leg.instrument)}${expiredTag}</td>
+        <td><span class="pnl-dir-badge ${isBuy ? 'leg-buy' : 'leg-sell'}">${isBuy ? 'BUY' : 'SELL'}</span></td>
+        <td>${leg.amount.toLocaleString()}</td>
+        <td>${leg.price.toFixed(4)}</td>
+        <td>${markText}</td>
+        <td title="${ivTitle}">${ivText}</td>
+        <td>${r.valueBtc.toFixed(4)}</td>
+        <td class="${pnlCls(r.pnlBtc)}">${signed(r.pnlBtc, 4)}</td>
+        <td>${signed(r.posDelta, 2)}</td>
+        <td>${signed(r.posNetDelta, 2)}</td>
+        <td>${signed(r.posGamma, 5)}</td>
+        <td>${signed(r.posVegaUsd, 0)}</td>
+        <td>${signed(r.posThetaUsd, 0)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const t = pf.totals;
+  elFoot.innerHTML = `
+    <tr>
+      <td colspan="7">组合合计 (≈ ${formatPnLValue(t.pnlBtc * s.spotNow, 'USD')})</td>
+      <td class="${pnlCls(t.pnlBtc)}">${signed(t.pnlBtc, 4)}</td>
+      <td>${signed(t.delta, 2)}</td>
+      <td>${signed(t.netDelta, 2)}</td>
+      <td>${signed(t.gamma, 5)}</td>
+      <td>${signed(t.vegaUsd, 0)}</td>
+      <td>${signed(t.thetaUsd, 0)}</td>
+    </tr>
+  `;
+
+  const ivText = s.ivShift ? ` · IV ${s.ivShift > 0 ? '+' : ''}${s.ivShift}%` : '';
+  setPnLText('pnl-greeks-meta', `按现价 $${Math.round(s.spotNow).toLocaleString()} · ${formatUTC8(view.evalMs, false)} (UTC+8)${ivText} · ${describePnLIvSource(s.ivSource)}`);
+}
+
+function renderPnLChart(s, view, resetChart) {
+  const elChartDom = document.getElementById('pnl-chart-container');
+  if (!elChartDom || !window.echarts) return;
+
+  if (!pnlChartInstance) {
+    pnlChartInstance = echarts.init(elChartDom, getEchartsTheme());
+    resetChart = true;
+    window.addEventListener('resize', () => {
+      if (pnlChartInstance) pnlChartInstance.resize();
+    });
+  }
+
+  const unit = s.unit;
+  const themeColors = getChartThemeColors();
+  const simColor = themeColors.isLight ? '#7c3aed' : '#a78bfa';
+  const toUnit = (btc, S) => (unit === 'USD' ? Number((btc * S).toFixed(2)) : Number(btc.toFixed(6)));
+  // Value x-axis with [S, pnl] pairs: markLine xAxis values (spot / BEP) are prices that are not
+  // necessarily sampled points, which a category axis can't resolve (ECharts throws on 'coord').
+  const expData = view.series.map(p => [p.S, toUnit(p.expBtc, p.S)]);
+  const simData = view.series.map(p => [p.S, toUnit(p.simBtc, p.S)]);
+  const expVals = expData.map(d => d[1]);
+  const spotPrice = s.spotNow;
+
+  const markLineData = [
+    {
+      yAxis: 0,
+      lineStyle: { color: themeColors.gridLineStrong, type: 'dashed', width: 1.5 },
+      label: { show: true, formatter: `0 ${unit === 'USD' ? 'USD' : 'BTC'} 损益平衡基准`, position: 'insideEndTop', color: themeColors.textSecondary, fontSize: 11 }
+    },
+    {
+      xAxis: Math.round(spotPrice),
+      lineStyle: { color: '#38bdf8', type: 'dotted', width: 2 },
+      label: { show: true, formatter: `现价 $${Math.round(spotPrice).toLocaleString()}`, position: 'start', color: '#38bdf8', fontSize: 11 }
+    }
+  ];
+  view.breakevens.forEach((bep, i) => {
+    markLineData.push({
+      xAxis: bep,
+      lineStyle: { color: '#eab308', type: 'dashed', width: 1.5 },
+      label: { show: true, formatter: `BEP${view.breakevens.length > 1 ? (i + 1) : ''}: $${bep.toLocaleString()}`, position: 'end', color: '#eab308', fontSize: 11 }
+    });
+  });
+
+  const simName = view.evalMs > view.nowMs ? `模拟 (${formatUTC8(view.evalMs, false).slice(5)})` : '模拟 (T+0)';
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { top: 30, left: 76, right: 40, bottom: 72, containLabel: false },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: themeColors.tooltipBg,
+      borderColor: themeColors.tooltipBorder,
+      textStyle: { color: themeColors.tooltipText, fontSize: 12 },
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        const S = Number(params[0].data[0]);
+        const rows = params.map(pt => {
+          const v = Number(pt.data[1]);
+          const col = v >= 0 ? '#4ade80' : '#f87171';
+          const other = unit === 'USD' ? formatPnLValue(v / S, 'BTC') : formatPnLValue(v * S, 'USD');
           return `
-            <div style="font-family: var(--font-mono); padding: 4px 6px;">
-              <div style="font-size: 0.8rem; font-weight: 600; color: #fafafa; margin-bottom: 6px;">
-                到期标的现货价格: <span style="color: #38bdf8;">$${S.toLocaleString()}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 14px; margin-bottom: 3px;">
-                <span style="color: #a1a1aa;">BTC 币本位净损益:</span>
-                <strong style="color: ${col};">${sign}${pnlBtc.toFixed(4)} BTC</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 14px;">
-                <span style="color: #a1a1aa;">折合 USD 现值参考:</span>
-                <strong style="color: ${col};">${sign}$${Math.round(pnlUsd).toLocaleString()}</strong>
-              </div>
+            <div style="display: flex; justify-content: space-between; gap: 14px; margin-bottom: 3px;">
+              <span style="color: ${themeColors.textSecondary};">${pt.marker}${pt.seriesName}:</span>
+              <span><strong style="color: ${col};">${formatPnLValue(v, unit)}</strong>
+                <span style="color: ${themeColors.textMuted}; margin-left: 6px;">${other}</span></span>
             </div>
           `;
-        }
+        }).join('');
+        return `
+          <div style="font-family: var(--font-mono); padding: 4px 6px;">
+            <div style="font-size: 0.8rem; font-weight: 600; color: ${themeColors.tooltipTitle}; margin-bottom: 6px;">
+              标的价格: <span style="color: #38bdf8;">$${S.toLocaleString()}</span>
+              <span style="color: ${themeColors.textMuted}; font-weight: 400;">(${S >= spotPrice ? '+' : ''}${(((S - spotPrice) / spotPrice) * 100).toFixed(1)}%)</span>
+            </div>
+            ${rows}
+          </div>
+        `;
+      }
+    },
+    legend: { show: false },
+    xAxis: {
+      type: 'value',
+      min: view.minS,
+      max: view.maxS,
+      axisLine: { lineStyle: { color: themeColors.axisLine } },
+      axisLabel: {
+        color: themeColors.textSecondary,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        formatter: val => `$${Number(val).toLocaleString()}`
       },
-      xAxis: {
-        type: 'category',
-        data: xData,
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: themeColors.axisLine } },
-        axisLabel: {
-          color: themeColors.textSecondary,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          formatter: val => `$${Number(val).toLocaleString()}`
-        },
-        splitLine: { show: false }
+      splitLine: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: themeColors.axisLine } },
+      axisLabel: {
+        color: themeColors.textSecondary,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        formatter: val => formatPnLAxis(val, unit)
       },
-      yAxis: {
-        type: 'value',
-        axisLine: { lineStyle: { color: themeColors.axisLine } },
-        axisLabel: {
-          color: themeColors.textSecondary,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          formatter: val => `${val >= 0 ? '+' : ''}${val.toFixed(2)} ₿`
-        },
-        splitLine: {
-          show: true,
-          lineStyle: { color: themeColors.gridLine, type: 'dashed' }
-        }
-      },
-      visualMap: {
-        show: false,
-        dimension: 1,
-        pieces: [
-          { lte: 0, color: '#ef4444' },
-          { gt: 0, color: '#22c55e' }
-        ]
-      },
-      series: [
-        {
-          name: '到期净收益 (BTC)',
-          type: 'line',
-          smooth: true,
-          data: yData,
-          lineStyle: { width: 3 },
-          areaStyle: { opacity: 0.16 },
-          markLine: {
-            symbol: ['none', 'none'],
-            data: markLineData
-          }
-        }
+      splitLine: { show: true, lineStyle: { color: themeColors.gridLine, type: 'dashed' } }
+    },
+    dataZoom: [
+      // Slider only: an 'inside' dataZoom swallows wheel events (even with zoomOnMouseWheel: 'ctrl'),
+      // which would stop the modal body from scrolling while the cursor is over the chart
+      { type: 'slider', xAxisIndex: 0, filterMode: 'filter', height: 18, bottom: 12, labelFormatter: val => `$${Math.round(val).toLocaleString()}` }
+    ],
+    visualMap: {
+      show: false,
+      seriesIndex: 0,
+      dimension: 1,
+      // Pieces must have finite bounds: ECharts 5.5 throws ('coord' of undefined) when building the
+      // line gradient from open-ended (-Infinity/Infinity) pieces, which leaves the chart blank.
+      pieces: [
+        { gte: Math.min(...expVals, 0) - 1, lte: 0, color: '#ef4444' },
+        { gt: 0, lte: Math.max(...expVals, 0) + 1, color: '#22c55e' }
       ]
-    };
+    },
+    series: [
+      {
+        name: '到期',
+        type: 'line',
+        smooth: false,
+        showSymbol: false,
+        data: expData,
+        lineStyle: { width: 2 },
+        areaStyle: { opacity: 0.12 },
+        markLine: { symbol: ['none', 'none'], silent: true, data: markLineData },
+        z: 2
+      },
+      {
+        name: simName,
+        type: 'line',
+        smooth: false,
+        showSymbol: false,
+        data: simData,
+        lineStyle: { width: 2.5, color: simColor },
+        itemStyle: { color: simColor },
+        z: 3
+      }
+    ]
+  };
 
+  if (resetChart) {
     pnlChartInstance.setOption(option, true);
     setTimeout(() => {
       if (pnlChartInstance) pnlChartInstance.resize();
     }, 60);
+  } else {
+    // Keep the user's zoom window while sliders move
+    pnlChartInstance.setOption(option, { replaceMerge: ['series'] });
   }
-};
+}
 
 // Event Listeners
 btnRefresh.addEventListener('click', () => {

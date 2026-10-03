@@ -20,6 +20,7 @@ const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
+const { getOptionMarks, pickInstruments } = require('./option_marks');
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
@@ -457,6 +458,29 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] market-data:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/option-marks?currency=BTC&instruments=BTC-30OCT26-100000-C,...
+  // Live Deribit mark IV / mark price / expiry forward for the Module 4 PV view
+  if (pathname === '/api/option-marks' && req.method === 'GET') {
+    try {
+      const currency = String(parsedUrl.query?.currency || 'BTC').toUpperCase();
+      if (!/^[A-Z]{2,6}$/.test(currency)) {
+        sendJsonResponse(req, res, 400, { code: -1, error: 'invalid currency' });
+        return;
+      }
+      const instruments = String(parsedUrl.query?.instruments || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 200);
+      const snapshot = await getOptionMarks(currency);
+      sendJsonResponse(req, res, 200, { code: 0, ...pickInstruments(snapshot, instruments) });
+    } catch (err) {
+      console.error('[API Error] option-marks:', err.message);
+      sendJsonResponse(req, res, 502, { code: -1, error: err.message });
     }
     return;
   }

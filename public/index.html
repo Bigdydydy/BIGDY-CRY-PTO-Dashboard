@@ -2161,17 +2161,17 @@
         <!-- 1. Top KPI Metrics Grid -->
         <div class="pnl-kpi-grid">
           <div class="pnl-kpi-card">
-            <span class="pnl-kpi-lbl">最大理论盈利 (BTC)</span>
+            <span class="pnl-kpi-lbl">到期最大盈利 (BTC)</span>
             <span class="pnl-kpi-val text-pos" id="pnl-kpi-max-profit">--</span>
             <span class="pnl-kpi-sub" id="pnl-kpi-max-profit-usd">--</span>
           </div>
           <div class="pnl-kpi-card">
-            <span class="pnl-kpi-lbl">最大理论亏损 (BTC)</span>
+            <span class="pnl-kpi-lbl">到期最大亏损 (BTC)</span>
             <span class="pnl-kpi-val text-neg" id="pnl-kpi-max-loss">--</span>
             <span class="pnl-kpi-sub" id="pnl-kpi-max-loss-usd">--</span>
           </div>
           <div class="pnl-kpi-card">
-            <span class="pnl-kpi-lbl">损益平衡点 (BEP)</span>
+            <span class="pnl-kpi-lbl">到期盈亏平衡点 (BEP)</span>
             <span class="pnl-kpi-val text-highlight" id="pnl-kpi-bep">--</span>
             <span class="pnl-kpi-sub" id="pnl-kpi-bep-distance">距标的偏离度</span>
           </div>
@@ -2182,30 +2182,86 @@
           </div>
         </div>
 
-        <!-- 2. Option Legs Ribbon / Chips -->
-        <div class="pnl-legs-ribbon" id="pnl-legs-ribbon">
-          <!-- Dynamically injected leg tags -->
-        </div>
-
-        <!-- 3. ECharts Payoff Chart -->
-        <div class="pnl-chart-wrapper">
-          <div class="pnl-chart-header">
-            <span class="pnl-chart-title">📈 到期净收益曲线 (到期结算标的现货价格 vs 净收益)</span>
-            <div class="pnl-chart-legend-hints">
-              <span class="pnl-hint-dot pnl-dot-profit"></span> 盈利区
-              <span class="pnl-hint-dot pnl-dot-loss"></span> 亏损区
-              <span class="pnl-hint-dot pnl-dot-spot"></span> 标的现货
-              <span class="pnl-hint-dot pnl-dot-bep"></span> 盈亏平衡点
+        <!-- 2. PV Controls: PnL unit / simulated date (T+n) / IV shift -->
+        <div class="pnl-controls">
+          <div class="pnl-ctl-group">
+            <span class="pnl-ctl-lbl">盈亏单位</span>
+            <div class="pnl-unit-toggle" id="pnl-unit-toggle">
+              <button type="button" data-unit="BTC" class="active">BTC</button>
+              <button type="button" data-unit="USD">USD</button>
             </div>
           </div>
-          <div id="pnl-chart-container" style="width: 100%; height: 380px;"></div>
+          <div class="pnl-ctl-group pnl-ctl-slider">
+            <div class="pnl-ctl-row">
+              <span class="pnl-ctl-lbl">模拟日期</span>
+              <span class="pnl-ctl-val" id="pnl-days-label">今天 (T+0)</span>
+            </div>
+            <input type="range" id="pnl-days-slider" min="0" max="1" step="0.01" value="0" aria-label="模拟日期">
+            <div class="pnl-slider-ends"><span>今天</span><span id="pnl-days-expiry-lbl">到期</span></div>
+          </div>
+          <div class="pnl-ctl-group pnl-ctl-slider">
+            <div class="pnl-ctl-row">
+              <span class="pnl-ctl-lbl" title="相对调整：+20% 表示每条腿的 IV × 1.2">IV 调整</span>
+              <span class="pnl-ctl-val" id="pnl-iv-label">+0%</span>
+            </div>
+            <input type="range" id="pnl-iv-slider" min="-80" max="300" step="5" value="0" aria-label="IV 调整">
+            <div class="pnl-slider-ends"><span>-80%</span><span>+300%</span></div>
+          </div>
+          <button type="button" class="pnl-reset-btn" id="pnl-reset-btn" title="重置为今天 / IV +0%">↺ 重置</button>
         </div>
 
-        <!-- 4. Mathematical & Curvature Annotation Note -->
+        <!-- 3. ECharts Payoff Chart: Simulated (T+n) vs Expiry -->
+        <div class="pnl-chart-wrapper">
+          <div class="pnl-chart-header">
+            <span class="pnl-chart-title" id="pnl-chart-title">📈 PnL View · 标的价格 vs 组合盈亏</span>
+            <div class="pnl-chart-legend-hints">
+              <span class="pnl-hint-line pnl-line-sim"></span> 模拟 (T+n)
+              <span class="pnl-hint-line pnl-line-exp"></span> 到期
+              <span class="pnl-hint-dot pnl-dot-spot"></span> 现价
+              <span class="pnl-hint-dot pnl-dot-bep"></span> 到期盈亏平衡点
+            </div>
+          </div>
+          <div id="pnl-chart-container" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <!-- 4. Virtual Positions & Greeks -->
+        <div class="pnl-positions">
+          <div class="pnl-positions-head">
+            <span class="pnl-positions-title">虚拟持仓 &amp; Greeks</span>
+            <span class="pnl-positions-meta" id="pnl-greeks-meta">--</span>
+          </div>
+          <div class="pnl-table-scroll">
+            <table class="pnl-positions-table">
+              <thead>
+                <tr>
+                  <th>合约</th>
+                  <th>方向</th>
+                  <th>数量</th>
+                  <th>成交价 (₿)</th>
+                  <th title="Deribit 实时标记价格">Mark 价 (₿)</th>
+                  <th title="Deribit 实时 mark IV（无报价时用成交时 IV），含上方 IV 调整">IV</th>
+                  <th>理论价 (₿)</th>
+                  <th>盈亏 (₿)</th>
+                  <th title="Black-Scholes Delta (BTC)">Delta</th>
+                  <th title="币本位权利金调整后的 Delta：Δ − 期权价格(BTC)">Δ*</th>
+                  <th>Gamma</th>
+                  <th title="IV 每变动 1 个点的美元价值变化">Vega ($)</th>
+                  <th title="每日时间价值衰减 (美元)">Theta ($)</th>
+                </tr>
+              </thead>
+              <tbody id="pnl-positions-body"></tbody>
+              <tfoot id="pnl-positions-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5. Model Note -->
         <div class="pnl-math-note">
-          <div class="pnl-note-title">ℹ️ Deribit 币本位结算机制与非线性曲率说明</div>
+          <div class="pnl-note-title">ℹ️ 模型说明（Deribit 币本位反向期权）</div>
           <p id="pnl-note-desc">
-            本模拟采用 Deribit 反向期权（Inverse Option）到期损益模型：看涨期权到期单腿 BTC 收益公式为 max(1 - K/S, 0)，无论现货价格上涨至多高，单张多头收益严格收敛于 1.0 BTC；看跌期权到期单腿 BTC 收益公式为 max(K/S - 1, 0)，当现货价格深度暴跌向 0 靠拢时，以 BTC 计量的收益率呈双曲非线性发散，具备强尾部凸性对冲保护效应。
+            到期曲线：Call 单张收益 max(1 − K/S, 0)，币价再高也收敛于 1 BTC；Put 单张收益 max(K/S − 1, 0)，币价趋近 0 时以 BTC 计的收益双曲发散。
+            模拟曲线：与 Deribit 标记价格同口径，未到期合约按该到期日远期价 F 的 Black-Scholes 美元价格 ÷ F 计价（r = 0，远期升水随剩余期限收敛至 0），IV 取 Deribit 实时 mark IV（获取失败或无报价时回退为成交时 IV），并叠加上方的 IV 调整。
+            多到期日组合的「到期」曲线取最近一个到期日，更远到期的腿保留时间价值；已到期的腿按横轴假设价格的内在价值计。成本均为成交价，现价标线为当前 BTC 指数价格。
           </p>
         </div>
       </div>
@@ -2290,6 +2346,6 @@
   <script src="/echarts.min.js"></script>
   <script src="/pnl_engine.js"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20260913_1"></script>
+  <script src="/app.js?v=20261003_3"></script>
 </body>
 </html>
