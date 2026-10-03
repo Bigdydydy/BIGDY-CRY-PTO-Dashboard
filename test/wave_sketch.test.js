@@ -120,6 +120,33 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(sk.nodes[0].result.primary.type, 'FLAT');
   });
 
+  it('重新定性: 画成 abc 反弹，但起点以来已走成五浪推动 → 提出新趋势、判为存疑', () => {
+    // 100 起的上涨: 110 → 105 → 122 → 116 → 130 (五浪)，用户只把 100-110-105-122 画成 abc
+    const v = [120, 100, 110, 105, 122, 116, 130, 126];
+    const bars = build(v);
+    const pts = [1, 2, 3, 4].map(k => pt(v, k, 3600));
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', points: pts, timeframe: '1h', subBars: { '15m': bars['15m'] } });
+    assert.ok(r.reclassify, '应提出重新定性');
+    assert.strictEqual(r.reclassify.to, 'IMPULSE');
+    assert.notStrictEqual(r.verdict, 'VALID');
+    assert.ok(r.commentary.lines.some(l => /重新定性/.test(l)));
+    // 真正的推动浪画法不触发
+    const imp = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', points: [1, 2, 3, 4, 5, 6].map(k => pt(v, k, 3600)), timeframe: '1h', subBars: { '15m': bars['15m'] } });
+    assert.strictEqual(imp.reclassify, null);
+  });
+
+  it('标准化预测: 目标与失效位分处现价两侧，带期限与随机游走基准', () => {
+    const v = [120, 100, 110, 105, 122, 116, 124];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', points: [1, 2, 3, 4, 5].map(k => pt(v, k, 3600)), timeframe: '1h', subBars: { '15m': bars['15m'] } });
+    const f = r.forecast;
+    assert.ok(f, '应给出预测');
+    const px = r.currentPrice;
+    assert.ok((f.target.price - px) * (f.invalidation.price - px) < 0, '目标与失效位分处现价两侧');
+    assert.ok(f.deadline > bars['1h'][bars['1h'].length - 1].time);
+    assert.ok(f.randomWalkPct > 0 && f.randomWalkPct < 100);
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
