@@ -2584,6 +2584,9 @@
     { pattern: '联合形', role: 'x', min: 0.7, typical: 1, max: 1.5, need: 'x浪须≥0.7（C1），≤1.5（C2）', rules: 'C1/C2' }
   ];
 
+  // 监测点的子浪级别候选 (本段幅度的倍数，由粗到细)
+  const MONITOR_DEGREE_MULTS = [0.30, 0.236, 0.18, 0.14, 0.10, 0.07, 0.05];
+
   function buildLiuSignals(slice, pivs, ev) {
     const n = pivs ? pivs.length : 0;
     if (n < 3 || !slice || !slice.length) return null;
@@ -2622,14 +2625,25 @@
     };
 
     // 2. 监测点战法: 当前段内小级别拐点(逐日上移)
+    //    子浪级别取「自然子级别」: 由粗到细第一个能把本段分出 ≥3 段的阈值 (与子浪探测一致)。
+    //    语料回放 (scripts/liu_threads/monitor_roles.js, 按时间前 60% 训练 / 后 40% 检验) 中，
+    //    它比固定的「本段幅度 6%」更有用: 检验段有用率 47.1% → 54.9%，破位准确率 40.9% → 47.2%。
     const seg = slice.slice(O.idx, X.idx + 1);
     let monitor = null;
     if (seg.length >= 4) {
       const segAtr = avgTR(seg) || S / seg.length;
-      const thr = Math.max(0.8 * segAtr, 0.06 * S);
-      const zp = anchorZigzag(zigzagPivots(seg, thr),
+      const anchor = zp0 => anchorZigzag(zp0,
         { idx: 0, time: O.time, price: O.price, type: O.type },
         { idx: seg.length - 1, time: X.time, price: X.price, type: X.type });
+      let zp = null, lastThr = null;
+      for (const m of MONITOR_DEGREE_MULTS) {
+        const thr = Math.max(0.8 * segAtr, m * S);
+        if (thr === lastThr) continue;
+        lastThr = thr;
+        const cand = anchor(zigzagPivots(seg, thr));
+        if (cand.length - 1 >= 3) { zp = cand; break; }
+      }
+      if (!zp) zp = anchor(zigzagPivots(seg, Math.max(0.8 * segAtr, 0.06 * S)));
       for (let k = zp.length - 2; k >= 1; k--) {
         if (zp[k].type === O.type) { monitor = { price: zp[k].price, time: zp[k].time, idx: O.idx + zp[k].idx }; break; }
       }
@@ -3169,6 +3183,8 @@
    */
   const PROBE_MULTS = [0.30, 0.236, 0.18, 0.14, 0.10, 0.07, 0.05];
   const PROBE_MAX_SWINGS = 13;
+  // 期望五浪的段 (常有延长浪) 在超过 13 段的那一级仍尝试数五浪，上限 25 段
+  const PROBE_FIVE_MAX_SWINGS = 25;
 
   function probeLegStructure(pA, pB, ev) {
     const { seg, srcName } = legSegment(pA, pB, ev);
@@ -3189,7 +3205,15 @@
       const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
       const swings = anchored.length - 1;
       if (swings < 3) continue;
-      if (swings > PROBE_MAX_SWINGS) { if (!out.coarse) out.noisy = true; break; }
+      if (swings > PROBE_MAX_SWINGS) {
+        if (!out.coarse) out.noisy = true;
+        // 浪3等延长浪内部常超过 13 段：结构判定到此为止，但这一级仍可能数得出合规五浪 (BTC 2026-05-26→06-05 的浪3: 19 段)
+        else if (!out.any5 && swings <= PROBE_FIVE_MAX_SWINGS) {
+          const five = findMotiveTyped(anchored);
+          if (five) out.any5 = { points: five.points, swings, kind: five.kind };
+        }
+        break;
+      }
       const five = anchored.length >= 6 ? findMotiveTyped(anchored) : null;
       if (!out.coarse) {
         out.coarse = { label: five ? '5' : '3', swings, anchored, motive: five ? five.points : null };

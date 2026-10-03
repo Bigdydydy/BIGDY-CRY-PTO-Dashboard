@@ -9,3 +9,6 @@ __pycache__/
 
 # 离线校准输出 (scripts/liu_threads/replay_liu_threads.js 生成)
 data/liu_replay_summary.json
+data/liu_monitor_tuning.json
+data/liu_monitor_roles.json
+data/liu_manual_check.txt
