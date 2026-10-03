@@ -54,6 +54,61 @@
   // 候选排序/裁剪配置: 数据驱动的可变候选数 (可被 options.ranking 浅覆盖)
   const RANKING = { temperature: 5, minRel: 0.15, maxCands: 5, minCands: 1 };
 
+  // ---------------------------------------------------------------------------
+  // 计数的标准化预测与历史命中率 (scripts/wave_track_record.js 回放生成)
+  //   预测: 期限前先到目标位 (命中) 还是先破失效位 (失败)；到期两者都未发生为过期。
+  //   随机游走下先到目标的概率 = 失效位距离 / (失效位距离 + 目标距离)，
+  //   命中率与之相比才有意义 (目标近的计数命中率天然高)。
+  //   factor = (命中 + K) / (期望命中 + K)，向 1 收缩，限制在 [0.6, 1.5]。
+  // ---------------------------------------------------------------------------
+  const TRACK_SHRINK_K = 15;
+  // 「重新定性」的对照检验结果 (scripts/liu_threads/reclassify_control.js)
+  const RECLASSIFY = { maxSwings: 9, firePct: 63, basePct: 52 };
+  // <TRACK_RECORD> 由 scripts/wave_track_record.js 生成，勿手改
+  const TRACK_RECORD = {"generatedAt":"2026-10-03","source":"BTCUSDT/ETHUSDT 4H，每 18 根回放，前 3 名候选，去重后 1611 条预测","keys":{"ZIGZAG|RUNNING":{"resolved":370,"hits":276,"misses":94,"expired":60,"expected":278.05},"IMPULSE|RUNNING":{"resolved":215,"hits":172,"misses":43,"expired":21,"expected":153.65},"ZIGZAG|COMPLETED":{"resolved":160,"hits":117,"misses":43,"expired":27,"expected":109.9},"COMBINATION|RUNNING":{"resolved":115,"hits":81,"misses":34,"expired":15,"expected":79.32},"DIAGONAL|RUNNING":{"resolved":107,"hits":93,"misses":14,"expired":15,"expected":88.31},"COMBINATION|COMPLETED":{"resolved":96,"hits":80,"misses":16,"expired":1,"expected":79.48},"IMPULSE|COMPLETED":{"resolved":82,"hits":51,"misses":31,"expired":7,"expected":50.86},"TRIPLE_COMBINATION|RUNNING":{"resolved":67,"hits":51,"misses":16,"expired":9,"expected":49.19},"TRIPLE_COMBINATION|COMPLETED":{"resolved":42,"hits":34,"misses":8,"expired":0,"expected":33.18},"FLAT|RUNNING":{"resolved":35,"hits":31,"misses":4,"expired":1,"expected":29.5},"DOUBLE_ZIGZAG|RUNNING":{"resolved":34,"hits":16,"misses":18,"expired":4,"expected":16.76},"FLAT|COMPLETED":{"resolved":34,"hits":24,"misses":10,"expired":2,"expected":25.13},"EXPANDING_TRIANGLE|RUNNING":{"resolved":19,"hits":13,"misses":6,"expired":5,"expected":13.04},"DIAGONAL|COMPLETED":{"resolved":15,"hits":14,"misses":1,"expired":2,"expected":11.26},"TRIANGLE|RUNNING":{"resolved":12,"hits":11,"misses":1,"expired":0,"expected":9.06},"TRIPLE_ZIGZAG|RUNNING":{"resolved":11,"hits":6,"misses":5,"expired":5,"expected":7.13},"DOUBLE_ZIGZAG|COMPLETED":{"resolved":6,"hits":5,"misses":1,"expired":0,"expected":3.78},"TRIANGLE|COMPLETED":{"resolved":1,"hits":0,"misses":1,"expired":2,"expected":0.04},"TRIPLE_ZIGZAG|COMPLETED":{"resolved":0,"hits":0,"misses":0,"expired":1,"expected":0}}};
+  // </TRACK_RECORD>
+
+  function trackKeyOf(c) {
+    const stage = c.status === 'COMPLETED' ? 'COMPLETED' : 'RUNNING';
+    return `${c.baseType}|${stage}`;
+  }
+
+  /** 历史命中率 (无记录时 null) */
+  function trackRecordOf(c) {
+    const r = TRACK_RECORD.keys[trackKeyOf(c)];
+    if (!r || !r.resolved) return null;
+    const factor = Math.max(0.6, Math.min(1.5, (r.hits + TRACK_SHRINK_K) / (r.expected + TRACK_SHRINK_K)));
+    return {
+      key: trackKeyOf(c), resolved: r.resolved, hits: r.hits, expected: +r.expected.toFixed(1), expired: r.expired,
+      hitPct: Math.round(100 * r.hits / r.resolved), expectedPct: Math.round(100 * r.expected / r.resolved),
+      factor: +factor.toFixed(3)
+    };
+  }
+
+  /**
+   * 候选计数的标准化预测: 目标位取现价之外最近的一个目标，失效位取计数的失效位 (monitoringPivot)，
+   * 两者须分处现价两侧；期限 = 本计数跨度 (24~180 根K线)，有更早的硬时间规则截止日则取截止日。
+   */
+  function buildForecast(c, lastBar, tfSec) {
+    const px = lastBar && lastBar.close;
+    const inv = c.monitoringPivot;
+    if (!isFinite(px) || !inv || !isFinite(inv.price) || Math.abs(inv.price - px) <= EPS) return null;
+    const dir = inv.price < px ? 1 : -1;
+    const tg = (c.targets || []).filter(t => isFinite(t.price) && dir * (t.price - px) > EPS)
+      .sort((a, b) => Math.abs(a.price - px) - Math.abs(b.price - px))[0];
+    if (!tg) return null;
+    const spanBars = Math.max(24, Math.min(180, c.span || 60));
+    let deadline = lastBar.time + spanBars * tfSec;
+    (c.timeWindows || []).forEach(w => { if (w.kind === 'deadline' && w.deadline > lastBar.time && w.deadline < deadline) deadline = w.deadline; });
+    const dT = Math.abs(tg.price - px), dI = Math.abs(inv.price - px);
+    return {
+      key: trackKeyOf(c), direction: dir > 0 ? 'UP' : 'DOWN', from: px, issuedAt: lastBar.time,
+      target: { price: tg.price, label: tg.label }, invalidation: { price: inv.price, label: inv.levelName }, deadline,
+      randomWalkPct: Math.round(100 * dI / (dI + dT)),
+      text: `${fmtTs(deadline)} 之前先${dir > 0 ? '涨到' : '跌到'} ${fmtNum(tg.price)}（${tg.label}）为命中；先${dir > 0 ? '跌破' : '涨破'} ${fmtNum(inv.price)}（${inv.levelName}）为失败`
+    };
+  }
+
   function fmtNum(n) {
     if (n === null || n === undefined || isNaN(n)) return '--';
     return Number(n.toFixed(2)).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -2940,6 +2995,13 @@
     const blockMap = new Map();
     result.liuSignals = buildLiuSignals(slice, main.pivots, ev);
     const cands = collectCandidates(main.pivots, ev, slice.length, rangeExtrema, precedingContext, blockMap);
+    // 标准化预测 + 历史命中率校准: 历史上同类计数「先到目标」多于随机游走期望的升权，少于的降权
+    const lastBarT = slice[slice.length - 1];
+    for (const c of cands) {
+      c.forecast = buildForecast(c, lastBarT, TF_SEC[timeframe] || 14400);
+      c.trackRecord = trackRecordOf(c);
+      if (options.calibrate !== false && c.trackRecord) c.rawScore = (c.rawScore || 0) + ranking.temperature * Math.log(c.trackRecord.factor);
+    }
 
     const candCmp = (a, b) => {
       // 1. rawScore 优先 (未封顶的指引加成与背景契合分；显示分已封顶不作排序键)
@@ -3593,6 +3655,40 @@
       doubts.push(`你标的终点 ${fmtNum(live.extension.fromPrice)} 之后价格已${pts[n - 1].type === 'high' ? '涨' : '跌'}到 ${fmtNum(live.extension.toPrice)}：末浪尚未在你标的位置结束，终点应后移`);
     }
     if (primary.guidePct < 40) doubts.push(`指引符合度仅 ${primary.guidePct}%：比率/时间与手稿常见值偏离较大`);
+
+    // 重新定性: 画成调整浪 (xx 浪 / b 浪 / abc 反弹)，但起点以来同方向的走势已在低周期走成推动浪，
+    // 或前三浪已现推动特征 (浪3 ≥ 1.618×浪1，手稿 ZG8)，则更可能是新趋势而不是调整
+    // (柳玉冬 2026-08-04 / 08-14 / 08-17 连续把 07-01 起的上涨看作 xx 浪、等 z 浪下跌，之后五浪涨到 87k)
+    // 对照检验 (scripts/liu_threads/reclassify_control.js，BTC/ETH 4H 共 1092 个 0-a-b-c 三段):
+    //   低周期五浪由 ≤9 段摆动构成时，之后先突破极值 (延续) 63%，不触发的 52%；摆动更多时与不触发无差别，故不计入；
+    //   1-2-3 前缀 (浪3 ≥ 1.618×浪1) 在两个标的上结论相反，无预测力，只作提示、不计入存疑
+    let reclassify = null;
+    if (PATTERNS[primary.type].category !== '驱动浪') {
+      const d0 = pts[1].price > pts[0].price ? 1 : -1;
+      let ext = null;
+      for (let k = pts[0].idx + 1; k <= lastBar; k++) {
+        const v = d0 > 0 ? slice[k].high : slice[k].low;
+        if (!ext || d0 * (v - ext.price) > 0) ext = { idx: k, time: slice[k].time, price: v };
+      }
+      if (ext && ext.idx - pts[0].idx >= 6) {
+        const prR = probe(pts[0], { idx: ext.idx, time: ext.time, price: ext.price, type: d0 > 0 ? 'high' : 'low' });
+        const dirTxtR = d0 > 0 ? '上涨' : '下跌';
+        if (prR.any5 && prR.any5.kind === 'IMPULSE' && prR.any5.swings <= RECLASSIFY.maxSwings) {
+          reclassify = { basis: 'FIVE', to: 'IMPULSE', extreme: { price: ext.price, time: ext.time }, source: prR.source, swings: prR.any5.swings, coarse: prR.coarse ? prR.coarse.label : null, strict5: prR.strict5,
+            text: `起点 ${fmtNum(pts[0].price)} 以来的${dirTxtR}（至 ${fmtNum(ext.price)}）在 ${prR.source || timeframe} 上已走成合规五浪推动：不像 xx 浪 / b 浪这类调整，更可能是新趋势（「有推动浪才有做底的可能」；回测中同类情形 ${RECLASSIFY.firePct}% 之后继续越过极值，未出现此信号的 ${RECLASSIFY.basePct}%）` };
+        } else if (prR.coarse) {
+          const pre = motivePrefix123(prR.coarse.anchored);
+          if (pre) {
+            const l1 = Math.abs(pre[1].price - pre[0].price), l3 = Math.abs(pre[3].price - pre[2].price);
+            if (l3 >= 1.618 * l1 - EPS) {
+              reclassify = { basis: 'PREFIX', to: 'IMPULSE', weak: true, extreme: { price: ext.price, time: ext.time }, source: prR.source,
+                text: `起点 ${fmtNum(pts[0].price)} 以来的${dirTxtR}在 ${prR.source || timeframe} 上已现 1-2-3 推动特征，第三段是第一段的 ${(l3 / l1).toFixed(2)} 倍（≥1.618，手稿 ZG8）：有发展为推动浪、成为新趋势的可能（回测中此信号无预测力，仅作提示）` };
+            }
+          }
+        }
+      }
+      if (reclassify && !reclassify.weak) doubts.push(reclassify.text);
+    }
     const verdict = primary.hardFails.length ? 'INVALID'
       : primary.strongCount ? 'FALSIFIED_SUB'
         : primary.liveHardFails.length ? 'FALSIFIED_PRICE'
@@ -3662,6 +3758,12 @@
       primary.legs.map(L => `${L.name}${L.status === 'PASS' ? '✓' : L.status === 'FAIL' ? '✗' : L.status === 'DOUBT' ? '?' : L.status === 'RUNNING' ? '…' : '—'}`).join(' '));
     if (live.appended && runLeg) lines.push(runLeg.text);
     if (verdict !== 'VALID' && alternatives.length) lines.push(`同样的点按「${alternatives[0].name}」可以成立。`);
+    if (reclassify) lines.push(`重新定性：${reclassify.text}`);
+    // 标准化预测 (否定条件 + 期限) 与历史命中率
+    const forecast = verdict === 'INVALID' ? null : buildForecast(cand, slice[lastBar], tfSec);
+    const trackRecord = trackRecordOf({ baseType: primary.type, status: cand.status });
+    if (forecast) lines.push(`可检验的预测：${forecast.text}；随机游走下先到目标的概率约 ${forecast.randomWalkPct}%`);
+    if (trackRecord) lines.push(`历史记录（${TRACK_RECORD.source || '回放'}）：同类计数先到目标 ${trackRecord.hitPct}%，随机游走期望 ${trackRecord.expectedPct}%（${trackRecord.resolved} 次）`);
     // 已被铁律否决的计数不再给监测点；已被证伪的计数不再给其结构防线
     if (invalidation.monitor && verdict !== 'INVALID') lines.push(invalidation.monitor.text);
     if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
@@ -3673,6 +3775,7 @@
       symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT',
       tool: options.tool, toolName: tool.name, labels,
       forcedType: forced, toolTypes: tool.types.map(t => ({ type: t, name: PATTERNS[t].name })),
+      forecast, trackRecord, reclassify,
       analysisTime: new Date().toISOString(), currentPrice,
       subTimeframes: subNames,
       points: pts.map((q, i) => ({ label: labels[i], time: q.time, price: q.price, type: q.type, open: !!q.open })),
