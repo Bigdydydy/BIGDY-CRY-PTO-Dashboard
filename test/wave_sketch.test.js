@@ -174,6 +174,19 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.deepStrictEqual(E.diffEvaluation(prev, Object.assign({}, prev), bars, null).events, [], '没有新K线不记');
   });
 
+  it('拖动固定的点 (fixed) 不再吸附到附近极值，只取所在K线的高/低点', () => {
+    const v = [96, 100, 120, 110, 125, 113];
+    const bars = build(v);
+    const pts = [1, 2, 3, 4].map(k => pt(v, k, 3600));
+    pts[1] = { time: pts[1].time - 2 * 3600, price: 119 }; // a 浪终点放在真实高点左边 2 根
+    const run = fixed => E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', points: pts.map((p, i) => i === 1 ? Object.assign({}, p, { fixed }) : p), timeframe: '1h', subBars: { '15m': bars['15m'] } });
+    const free = run(false), fixed = run(true);
+    assert.notStrictEqual(free.points[1].time, pts[1].time, '未固定: 吸附到附近的高点');
+    assert.ok(free.points[1].price > fixed.points[1].price);
+    assert.strictEqual(fixed.points[1].time, pts[1].time, '固定: 留在所放的K线');
+    const b = bars['1h'].find(x => x.time === pts[1].time);
+    assert.strictEqual(fixed.points[1].price, b.high, '价格取该K线的最高价');
+  });
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
