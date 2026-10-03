@@ -171,6 +171,18 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.ok(contracting.hardFails.some(c => c.id === 'E1'));
   });
 
+  it('延长浪内部超过 13 段时仍能数出五浪 (BTC 2026-05-26→06-05 浪3，柳玉冬 07-16 计数)', () => {
+    const fx = require('./fixtures/btc_2026_wave3_15m.json');
+    const bars = fx.bars.map(([time, open, high, low, close]) => ({ time, open, high, low, close }));
+    const top = bars.reduce((m, b) => (b.high > m.high ? b : m), bars[0]);
+    const bot = bars.reduce((m, b) => (b.low < m.low ? b : m), bars[0]);
+    const pr = E._internal.probeLegStructure({ time: top.time, price: top.high, type: 'high' }, { time: bot.time, price: bot.low, type: 'low' },
+      { bars, sources: [{ name: '15m', tfSec: 900, bars }] });
+    assert.strictEqual(pr.coarse.swings, 3, '最粗一级只有 3 段');
+    assert.ok(pr.any5, '在更细一级 (19 段) 可数成合规五浪');
+    assert.strictEqual(pr.any5.kind, 'IMPULSE');
+  });
+
   it('楔形规则: 收缩楔形浪4须小于浪2 (D3)、浪5须小于浪3 (D5)', () => {
     const mk = arr => arr.map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' }));
     // 3<1 (收缩)，但 4(16) > 2(12)

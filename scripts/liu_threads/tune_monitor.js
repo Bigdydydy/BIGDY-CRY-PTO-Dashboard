@@ -123,7 +123,7 @@ async function collectCases() {
     }
   }
   if (fs.existsSync(MANUAL)) {
-    for (const c of JSON.parse(fs.readFileSync(MANUAL, 'utf8')).cases) {
+    for (const c of JSON.parse(fs.readFileSync(MANUAL, 'utf8')).cases.filter(x => Array.isArray(x.monitors) && x.monitors.length)) {
       cases.push(Object.assign({ source: 'manual' }, c, { ts: Math.floor(Date.parse(c.time) / 1000), date: c.time.slice(0, 10) }));
     }
   }

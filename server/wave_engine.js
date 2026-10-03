@@ -3183,6 +3183,8 @@
    */
   const PROBE_MULTS = [0.30, 0.236, 0.18, 0.14, 0.10, 0.07, 0.05];
   const PROBE_MAX_SWINGS = 13;
+  // 期望五浪的段 (常有延长浪) 在超过 13 段的那一级仍尝试数五浪，上限 25 段
+  const PROBE_FIVE_MAX_SWINGS = 25;
 
   function probeLegStructure(pA, pB, ev) {
     const { seg, srcName } = legSegment(pA, pB, ev);
@@ -3203,7 +3205,15 @@
       const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
       const swings = anchored.length - 1;
       if (swings < 3) continue;
-      if (swings > PROBE_MAX_SWINGS) { if (!out.coarse) out.noisy = true; break; }
+      if (swings > PROBE_MAX_SWINGS) {
+        if (!out.coarse) out.noisy = true;
+        // 浪3等延长浪内部常超过 13 段：结构判定到此为止，但这一级仍可能数得出合规五浪 (BTC 2026-05-26→06-05 的浪3: 19 段)
+        else if (!out.any5 && swings <= PROBE_FIVE_MAX_SWINGS) {
+          const five = findMotiveTyped(anchored);
+          if (five) out.any5 = { points: five.points, swings, kind: five.kind };
+        }
+        break;
+      }
       const five = anchored.length >= 6 ? findMotiveTyped(anchored) : null;
       if (!out.coarse) {
         out.coarse = { label: five ? '5' : '3', swings, anchored, motive: five ? five.points : null };

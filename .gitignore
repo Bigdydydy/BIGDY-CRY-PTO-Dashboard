@@ -11,3 +11,4 @@ __pycache__/
 data/liu_replay_summary.json
 data/liu_monitor_tuning.json
 data/liu_monitor_roles.json
+data/liu_manual_check.txt
