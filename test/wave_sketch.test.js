@@ -147,6 +147,33 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.ok(f.randomWalkPct > 0 && f.randomWalkPct < 100);
   });
 
+  it('容差带: 比率规则差阈值不到容差 → 存疑；超出容差或 tolerance=0 → 否决', () => {
+    const run = (c, tol) => {
+      const v = [96, 100, 120, 110, c, 113];
+      const bars = build(v);
+      return E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', forceType: 'ZIGZAG', points: [1, 2, 3, 4].map(k => pt(v, k, 3600)), timeframe: '1h', subBars: { '15m': bars['15m'] }, tolerance: tol });
+    };
+    const near = run(118.6); // c/b = 0.86，差 0.9 的 4.4%
+    assert.strictEqual(near.verdict, 'DOUBT');
+    assert.deepStrictEqual(near.primary.nearFails.map(x => x.id), ['Z3']);
+    assert.ok(near.doubts.some(t => /接近阈值/.test(t)));
+    assert.strictEqual(run(118.6, 0).verdict, 'INVALID');
+    assert.strictEqual(run(117.5).verdict, 'INVALID'); // c/b = 0.75，差 16.7%
+  });
+
+  it('计数生命周期: 上次预测的结局、阶段与判决变化及触发的价格事件', () => {
+    const bars = [100, 101, 103, 99, 96, 97].map((c, i) => ({ time: 1000 + i * 3600, open: c, close: c, high: c + 0.5, low: c - 0.5 }));
+    const prev = { at: 1000, verdict: 'VALID', verdictLabel: '成立', type: 'ZIGZAG', name: '单锯齿（c浪运行中）', reclassify: null, issues: [],
+      forecast: { direction: 'UP', issuedAt: 1000, deadline: 1000 + 10 * 3600, target: { price: 105, label: 'c=a' }, invalidation: { price: 97, label: 'b浪终点' } } };
+    const now = { at: 1000 + 5 * 3600, verdict: 'FALSIFIED_PRICE', verdictLabel: '走势否定', type: 'ZIGZAG', name: '单锯齿（锯齿完成）', reclassify: null, issues: [], forecast: null };
+    const lc = E.diffEvaluation(prev, now, bars, null);
+    const kinds = lc.events.map(e => e.kind);
+    assert.deepStrictEqual(kinds, ['MISS', 'STAGE', 'VERDICT']);
+    assert.strictEqual(lc.events[0].time, 1000 + 4 * 3600, '第 5 根K线最低 95.5 先跌破 97');
+    assert.ok(/97/.test(lc.events[1].text) && /触发/.test(lc.events[1].text));
+    assert.deepStrictEqual(E.diffEvaluation(prev, Object.assign({}, prev), bars, null).events, [], '没有新K线不记');
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);

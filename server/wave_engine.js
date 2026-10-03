@@ -65,7 +65,7 @@
   // 「重新定性」的对照检验结果 (scripts/liu_threads/reclassify_control.js)
   const RECLASSIFY = { maxSwings: 9, firePct: 63, basePct: 52 };
   // <TRACK_RECORD> 由 scripts/wave_track_record.js 生成，勿手改
-  const TRACK_RECORD = {"generatedAt":"2026-10-03","source":"BTCUSDT/ETHUSDT 4H，每 18 根回放，前 3 名候选，去重后 1611 条预测","keys":{"ZIGZAG|RUNNING":{"resolved":370,"hits":276,"misses":94,"expired":60,"expected":278.05},"IMPULSE|RUNNING":{"resolved":215,"hits":172,"misses":43,"expired":21,"expected":153.65},"ZIGZAG|COMPLETED":{"resolved":160,"hits":117,"misses":43,"expired":27,"expected":109.9},"COMBINATION|RUNNING":{"resolved":115,"hits":81,"misses":34,"expired":15,"expected":79.32},"DIAGONAL|RUNNING":{"resolved":107,"hits":93,"misses":14,"expired":15,"expected":88.31},"COMBINATION|COMPLETED":{"resolved":96,"hits":80,"misses":16,"expired":1,"expected":79.48},"IMPULSE|COMPLETED":{"resolved":82,"hits":51,"misses":31,"expired":7,"expected":50.86},"TRIPLE_COMBINATION|RUNNING":{"resolved":67,"hits":51,"misses":16,"expired":9,"expected":49.19},"TRIPLE_COMBINATION|COMPLETED":{"resolved":42,"hits":34,"misses":8,"expired":0,"expected":33.18},"FLAT|RUNNING":{"resolved":35,"hits":31,"misses":4,"expired":1,"expected":29.5},"DOUBLE_ZIGZAG|RUNNING":{"resolved":34,"hits":16,"misses":18,"expired":4,"expected":16.76},"FLAT|COMPLETED":{"resolved":34,"hits":24,"misses":10,"expired":2,"expected":25.13},"EXPANDING_TRIANGLE|RUNNING":{"resolved":19,"hits":13,"misses":6,"expired":5,"expected":13.04},"DIAGONAL|COMPLETED":{"resolved":15,"hits":14,"misses":1,"expired":2,"expected":11.26},"TRIANGLE|RUNNING":{"resolved":12,"hits":11,"misses":1,"expired":0,"expected":9.06},"TRIPLE_ZIGZAG|RUNNING":{"resolved":11,"hits":6,"misses":5,"expired":5,"expected":7.13},"DOUBLE_ZIGZAG|COMPLETED":{"resolved":6,"hits":5,"misses":1,"expired":0,"expected":3.78},"TRIANGLE|COMPLETED":{"resolved":1,"hits":0,"misses":1,"expired":2,"expected":0.04},"TRIPLE_ZIGZAG|COMPLETED":{"resolved":0,"hits":0,"misses":0,"expired":1,"expected":0}}};
+  const TRACK_RECORD = {"generatedAt":"2026-10-03","source":"BTCUSDT/ETHUSDT 4H，每 18 根回放，前 3 名候选，去重后 1593 条预测","keys":{"TRIPLE_COMBINATION|COMPLETED":{"resolved":51,"hits":43,"misses":8,"expired":1,"expected":40.67},"COMBINATION|COMPLETED":{"resolved":103,"hits":86,"misses":17,"expired":2,"expected":84.82},"FLAT|COMPLETED":{"resolved":32,"hits":24,"misses":8,"expired":1,"expected":23.98},"ZIGZAG|COMPLETED":{"resolved":142,"hits":107,"misses":35,"expired":25,"expected":98.86},"IMPULSE|RUNNING":{"resolved":254,"hits":201,"misses":53,"expired":28,"expected":182.19},"ZIGZAG|RUNNING":{"resolved":289,"hits":225,"misses":64,"expired":33,"expected":219.96},"COMBINATION|RUNNING":{"resolved":145,"hits":106,"misses":39,"expired":16,"expected":100.01},"TRIPLE_COMBINATION|RUNNING":{"resolved":90,"hits":70,"misses":20,"expired":5,"expected":66.01},"IMPULSE|COMPLETED":{"resolved":103,"hits":66,"misses":37,"expired":7,"expected":65.31},"DIAGONAL|RUNNING":{"resolved":124,"hits":107,"misses":17,"expired":14,"expected":101.89},"DIAGONAL|COMPLETED":{"resolved":19,"hits":19,"misses":0,"expired":5,"expected":14.43},"TRIANGLE|RUNNING":{"resolved":14,"hits":13,"misses":1,"expired":0,"expected":10.5},"FLAT|RUNNING":{"resolved":26,"hits":23,"misses":3,"expired":0,"expected":22.96},"EXPANDING_TRIANGLE|RUNNING":{"resolved":29,"hits":19,"misses":10,"expired":7,"expected":20.25},"DOUBLE_ZIGZAG|RUNNING":{"resolved":6,"hits":2,"misses":4,"expired":0,"expected":2.68},"TRIPLE_ZIGZAG|RUNNING":{"resolved":7,"hits":5,"misses":2,"expired":0,"expected":4.37},"TRIANGLE|COMPLETED":{"resolved":1,"hits":0,"misses":1,"expired":2,"expected":0.04},"TRIPLE_ZIGZAG|COMPLETED":{"resolved":0,"hits":0,"misses":0,"expired":1,"expected":0}}};
   // </TRACK_RECORD>
 
   function trackKeyOf(c) {
@@ -87,7 +87,8 @@
 
   /**
    * 候选计数的标准化预测: 目标位取现价之外最近的一个目标，失效位取计数的失效位 (monitoringPivot)，
-   * 两者须分处现价两侧；期限 = 本计数跨度 (24~180 根K线)，有更早的硬时间规则截止日则取截止日。
+   * 两者须分处现价两侧；期限 = 本计数跨度 (24~180 根K线)。
+   * 不再取时间规则截止日: 回测中取截止日的预测过期率翻倍 (24% vs 12%)、命中/期望更低 (0.997 vs 1.029)
    */
   function buildForecast(c, lastBar, tfSec) {
     const px = lastBar && lastBar.close;
@@ -98,8 +99,7 @@
       .sort((a, b) => Math.abs(a.price - px) - Math.abs(b.price - px))[0];
     if (!tg) return null;
     const spanBars = Math.max(24, Math.min(180, c.span || 60));
-    let deadline = lastBar.time + spanBars * tfSec;
-    (c.timeWindows || []).forEach(w => { if (w.kind === 'deadline' && w.deadline > lastBar.time && w.deadline < deadline) deadline = w.deadline; });
+    const deadline = lastBar.time + spanBars * tfSec;
     const dT = Math.abs(tg.price - px), dI = Math.abs(inv.price - px);
     return {
       key: trackKeyOf(c), direction: dir > 0 ? 'UP' : 'DOWN', from: px, issuedAt: lastBar.time,
@@ -766,6 +766,38 @@
     TRIPLE_COMBINATION: { pts: 6, minDev: 5, name: '三重横向整理', category: '联合调整', rules: TRIPLE_COMBINATION_RULES, labels: ['0', 'w', 'x', 'y', 'xx', 'z'] }
   };
 
+  // 容差带: 比率阈值类硬规则在阈值附近 (相对阈值 TOLERANCE.band 以内) 违规时判「接近阈值·存疑」而不否决
+  // (柳玉冬 2023-06 差 1.9% 否定了之后被证明正确的方案)。核心铁律不放宽: 浪2不破浪1起点、浪3须过浪1、
+  // 浪3不最短、浪4不入浪1、b/x 不过起点、三角形收敛等。只用于主计数，子结构识别仍按严格口径。
+  // 带宽与扣分由 scripts/wave_tolerance_check.js 回测校准
+  // 回测 (2233 条预测): 违规 ≤5% 的命中/期望 1.075 与无违规 (1.03) 相当，5~10% 降到 0.86
+  const TOLERANCE = { band: 0.05, penalty: 6 };
+  // 时间指引只作提示: 回测中符合与否的命中/期望 1.003 vs 1.009，当前浪早于 / 处在 / 超出常见窗口
+  // 1.02 / 0.99 / 1.04，均无区分度 (scripts/wave_tolerance_check.js)。按中性计分 (与未评估的指引相同)，
+  // 权重保留以免只有调整浪带时间指引而造成浪型间不对称。手稿的硬时间规则照常执行
+  const hintOnly = r => r.cat === C_G_TIME;
+  const tolRatio = (i, j, limit, sense) => g => ({ value: g.l[i] / g.l[j], limit, sense });
+  const TOL_SPECS = {
+    M2: tolRatio(1, 0, 0.2, 'min'), M6: tolRatio(4, 3, 0.7, 'min'),
+    Z1: tolRatio(1, 0, 0.2, 'min'), Z3: tolRatio(2, 1, 0.9, 'min'), Z4: tolRatio(2, 1, 5, 'max'),
+    F1: tolRatio(1, 0, 0.7, 'min'), F2: tolRatio(1, 0, 2, 'max'), F5: tolRatio(2, 0, 3, 'max'),
+    F4: g => ({ value: g.l[2] / Math.max(g.l[0], g.l[1]), limit: 2, sense: 'max' }),
+    T1: tolRatio(1, 0, 0.5, 'min'), T2: tolRatio(1, 0, 1.5, 'max'), T3: tolRatio(2, 1, 0.5, 'min'), T5: tolRatio(3, 2, 0.5, 'min'),
+    E3: tolRatio(4, 3, 0.5, 'min'),
+    W1: tolRatio(1, 0, 0.2, 'min'), W4: tolRatio(2, 0, 0.9, 'min'),
+    C1: tolRatio(1, 0, 0.7, 'min'), C2: tolRatio(1, 0, 1.5, 'max'), C5: tolRatio(3, 2, 0.7, 'min'), C6: tolRatio(3, 2, 1.5, 'max'),
+    X1: tolRatio(3, 2, 0.2, 'min'), X4: tolRatio(4, 1, 0.9, 'min')
+  };
+  Object.values(PATTERNS).forEach(def => def.rules.forEach(r => { if (r.hard && r.cat === C_PRICE && TOL_SPECS[r.id]) r.tol = TOL_SPECS[r.id]; }));
+  /** 违规幅度 (相对阈值)，不适用容差的规则返回 null */
+  function tolMargin(r, g) {
+    if (!r.tol) return null;
+    const t = r.tol(g);
+    if (!(t.limit > 0) || !isFinite(t.value)) return null;
+    return Math.max(0, t.sense === 'max' ? (t.value - t.limit) / t.limit : (t.limit - t.value) / t.limit);
+  }
+  const nearOK = (r, g, ev) => !!(ev && ev.tolBand > 0) && (m => m !== null && m <= ev.tolBand + EPS)(tolMargin(r, g));
+
   /**
    * 同级别比例硬规则（各浪型通用）：
    * 反向腿（第2/4段：浪2/浪4、b/d、x/xx）用时不得少于前一同向腿的8%，否则视为级别错配。
@@ -1234,7 +1266,7 @@
   function evaluatePattern(type, points, ev) {
     const def = PATTERNS[type];
     const g = mkGeom(points);
-    const checks = [], hardFails = [], pending = [];
+    const checks = [], hardFails = [], pending = [], nearFails = [];
     const guide = { pass: 0, fail: 0, weight: 0, weightGot: 0 };
     const lastOpen = !!points[points.length - 1].open;
     const deferred = [];
@@ -1254,7 +1286,7 @@
     for (const r of deferred) {
       account(r, !hardFails.length && ev && ev.bars ? (r.test(g, ev) || {}) : { pass: true, neutral: true, detail: '未执行子形态识别' });
     }
-    return { g, checks, hardFails, pending, guide, complete: points.length === def.pts };
+    return { g, checks, hardFails, pending, nearFails, guide, complete: points.length === def.pts };
 
     function account(r, res) {
 
@@ -1266,16 +1298,20 @@
         detail: res.detail || ''
       };
       if (openSuppressed) { check.pass = true; check.pending = true; }
+      if (r.hard && !check.pass && !check.pending && !check.neutral && nearOK(r, g, ev)) {
+        check.near = true;
+        check.margin = +tolMargin(r, g).toFixed(4);
+      }
       checks.push(check);
 
       if (r.hard) {
         if (check.pending || check.neutral) { if (check.pending) pending.push(check); }
+        else if (check.near) nearFails.push(check);
         else if (!check.pass) hardFails.push(check);
       } else {
         guide.weight += r.w;
-        if (check.neutral || check.pending) guide.weightGot += r.w * 0.5;
-        else if (check.pass) { guide.pass++; guide.weightGot += r.w; }
-        else guide.fail++;
+        if (check.neutral || check.pending || hintOnly(r)) guide.weightGot += r.w * 0.5;
+        if (check.neutral || check.pending) { /* 中性 */ } else if (check.pass) { guide.pass++; if (!hintOnly(r)) guide.weightGot += r.w; } else guide.fail++;
       }
     }
   }
@@ -1288,7 +1324,7 @@
     for (const r of def.rules) {
       if (!r.hard || r.need !== n || r.struct || r.slow || r.manual) continue;
       const res = r.test(g, ev) || {};
-      if (res.pass === false && !(lastOpen && r.pending === 'min')) return { rule: r, res, g };
+      if (res.pass === false && !(lastOpen && r.pending === 'min') && !nearOK(r, g, ev)) return { rule: r, res, g };
     }
     return null;
   }
@@ -1908,8 +1944,9 @@
       pivots: g.p.map(q => ({ idx: q.idx, time: q.time, price: q.price, type: q.type, confirmed: q.confirmed !== false })),
       waveLabels, subPivots,
       structureNotes: structNotes, diagonalRole: diagRole,
-      metrics, rules, ruleChecks: evalRes.checks.map(c => ({ id: c.id, category: CAT_NAMES[c.cat], page: c.page, text: c.text, hard: c.hard, pass: c.pass, pending: c.pending, detail: c.detail })),
+      metrics, rules, ruleChecks: evalRes.checks.map(c => ({ id: c.id, category: CAT_NAMES[c.cat], page: c.page, text: c.text, hard: c.hard, pass: c.pass, pending: c.pending, near: !!c.near, margin: c.margin, detail: c.detail })),
       pendingCount: evalRes.pending.length,
+      nearFails: (evalRes.nearFails || []).map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail, margin: c.margin })),
       guidePct: evalRes.guide.weight ? Math.round(100 * evalRes.guide.weightGot / evalRes.guide.weight) : 0,
       channel: buildChannel(h.type, g),
       monitoringPivot: levels.monitoringPivot,
@@ -2114,6 +2151,7 @@
     const guideScore = evalRes.guide.weight ? evalRes.guide.weightGot / evalRes.guide.weight : 0.5;
     let s = 45 + 50 * guideScore + 8 * Math.min(1, cand.span / sliceLen * 1.6);
     s -= 2.5 * evalRes.pending.length;
+    s -= TOLERANCE.penalty * (evalRes.nearFails || []).length;
     if (cand.status === 'COMPLETED') s += 2;
 
     // 1. 选区极值磁吸锚定加分 (消除人工选区边界误差)
@@ -2991,7 +3029,7 @@
       return result;
     }
 
-    const ev = { bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map() };
+    const ev = { bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map(), tolBand: options.tolerance != null ? options.tolerance : TOLERANCE.band };
     const blockMap = new Map();
     result.liuSignals = buildLiuSignals(slice, main.pivots, ev);
     const cands = collectCandidates(main.pivots, ev, slice.length, rangeExtrema, precedingContext, blockMap);
@@ -3463,7 +3501,8 @@
     }
     sources.sort((a, b) => a.tfSec - b.tfSec);
     const subNames = sources.filter(s => !s.isMain).map(s => s.name);
-    const mkEv = () => ({ bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map(), refineSubTimes: true, mainTfSec: tfSec, maxSubBars: 4000 });
+    const tolBand = options.tolerance != null ? options.tolerance : TOLERANCE.band;
+    const mkEv = () => ({ bars: slice, ctxBars: bars, highs, lows, sources, structCache: new Map(), refineSubTimes: true, mainTfSec: tfSec, maxSubBars: 4000, tolBand });
 
     const live = projectLive(slice, pts, fullPts, atr);
     const lp = live.pts;
@@ -3585,6 +3624,8 @@
         type, name: drawnCand.name, structureKey: sub.key, structurePage: sub.page,
         hardFails: drawnEval.hardFails.map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail })),
         pending: drawnEval.pending.map(c => ({ id: c.id, text: c.text, page: c.page })),
+        nearFails: drawnEval.nearFails.concat(liveEval && (live.appended || live.extension) ? liveEval.nearFails.filter(c => !drawnEval.nearFails.some(d => d.id === c.id)) : [])
+          .map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail, margin: c.margin })),
         guidePct: drawnCand.guidePct,
         legs: sub.legs, liveLegs: liveSub.legs,
         strongCount: strong.length, mediumCount: medium.length,
@@ -3597,7 +3638,7 @@
     }
 
     const rank = (a, b) => (a.hardFails.length - b.hardFails.length) || (a.strongCount - b.strongCount) ||
-      (a.liveHardFails.length - b.liveHardFails.length) || (a.mediumCount - b.mediumCount) || (b.guidePct - a.guidePct);
+      (a.liveHardFails.length - b.liveHardFails.length) || (a.mediumCount + a.nearFails.length - b.mediumCount - b.nearFails.length) || (b.guidePct - a.guidePct);
     // 用户可指定浪型 (例如 abc 指定为单锯齿或平台形)；未指定时在工具的各浪型中自动择优
     const forced = options.forceType && tool.types.indexOf(options.forceType) >= 0 ? options.forceType : null;
     const types = forced ? [forced] : tool.types;
@@ -3650,6 +3691,7 @@
     const doubts = [];
     primary.legs.filter(L => L.severity === 'medium').forEach(L => doubts.push(L.text));
     endpointIssues.forEach(x => doubts.push(x.text));
+    primary.nearFails.forEach(f => doubts.push(`接近阈值：${f.text}（手稿${f.page}）：${f.detail}，只差阈值的 ${(100 * f.margin).toFixed(1)}%，在容差带（${Math.round(100 * tolBand)}%）内判存疑而不否决`));
     if (preceding && preceding.warning) doubts.push(preceding.text);
     if (live.extension && !primary.liveHardFails.length) {
       doubts.push(`你标的终点 ${fmtNum(live.extension.fromPrice)} 之后价格已${pts[n - 1].type === 'high' ? '涨' : '跌'}到 ${fmtNum(live.extension.toPrice)}：末浪尚未在你标的位置结束，终点应后移`);
@@ -3772,7 +3814,7 @@
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
 
     return {
-      symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT',
+      symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT', asOf: slice[lastBar].time,
       tool: options.tool, toolName: tool.name, labels,
       forcedType: forced, toolTypes: tool.types.map(t => ({ type: t, name: PATTERNS[t].name })),
       forecast, trackRecord, reclassify,
@@ -3787,7 +3829,7 @@
       verdict, verdictLabel: VERDICTS[verdict], reasons, doubts,
       primary: {
         type: primary.type, name: primary.name, structure: primary.structureKey, structurePage: primary.structurePage,
-        hardFails: primary.hardFails, liveHardFails: primary.liveHardFails, pending: primary.pending,
+        hardFails: primary.hardFails, liveHardFails: primary.liveHardFails, nearFails: primary.nearFails, pending: primary.pending,
         guidePct: primary.guidePct, legs: primary.legs, liveLegs: primary.liveLegs,
         ruleChecks: primary.drawn.ruleChecks, alternation: primary.drawn.alternation, components: primary.drawn.components
       },
@@ -3859,6 +3901,72 @@
    * drawings: [{id, tool, timeframe, points:[{time, price}]}]
    * 返回 { nodes: {id: {parentId, leg, depth}}, issues: {id: [{severity, text}]} }
    */
+  // ---------------------------------------------------------------------------
+  // 计数生命周期: 同一组画浪前后两次评估之间的改判记录
+  //   界面按「标的 + 周期 + 所画的点」保存每次评估的快照，下次评估时传回 (drawings[i].prev)，
+  //   引擎逐根K线对照: 上次的预测是否兑现，浪型 / 阶段 / 判决是否变化，以及触发变化的价格事件
+  //   (柳玉冬的改判大多没有写明理由，见 docs 5.3)
+  // ---------------------------------------------------------------------------
+  function countSnapshot(r, verdict) {
+    if (!r || !r.primary || !isFinite(r.asOf)) return null;
+    const v = verdict || r.verdict;
+    const f = r.forecast;
+    return {
+      at: r.asOf, price: r.currentPrice, verdict: v, verdictLabel: VERDICTS[v] || r.verdictLabel,
+      type: r.primary.type, name: r.primary.name, reclassify: r.reclassify ? r.reclassify.basis : null,
+      forecast: f ? { direction: f.direction, issuedAt: f.issuedAt, deadline: f.deadline, target: f.target, invalidation: f.invalidation } : null,
+      issues: (r.reasons || []).concat(r.doubts || []).slice(0, 12)
+    };
+  }
+
+  function diffEvaluation(prev, now, bars, cur) {
+    const events = [];
+    if (!prev || !now || !(now.at > prev.at)) return { since: prev ? prev.at : null, events };
+    const seg = (bars || []).filter(b => b.time > prev.at && b.time <= now.at);
+    let hi = null, lo = null;
+    seg.forEach(b => { if (!hi || b.high > hi.price) hi = { time: b.time, price: b.high }; if (!lo || b.low < lo.price) lo = { time: b.time, price: b.low }; });
+
+    // 1. 上次预测的结局 (同一根K线两者都触及按失败)
+    const f = prev.forecast && prev.forecast.target && prev.forecast.invalidation && isFinite(prev.forecast.target.price) && isFinite(prev.forecast.invalidation.price) ? prev.forecast : null;
+    let trigger = null;
+    if (f) {
+      const up = f.direction === 'UP';
+      for (const b of seg) {
+        if (b.time > f.deadline) break;
+        if (up ? b.low <= f.invalidation.price : b.high >= f.invalidation.price) {
+          trigger = { kind: 'MISS', time: b.time, price: f.invalidation.price,
+            text: `${fmtTs(b.time)} 先${up ? '跌破' : '涨破'}失效位 ${fmtNum(f.invalidation.price)}（${f.invalidation.label || '监测点'}）：上次的预测失败` };
+          break;
+        }
+        if (up ? b.high >= f.target.price : b.low <= f.target.price) {
+          trigger = { kind: 'HIT', time: b.time, price: f.target.price,
+            text: `${fmtTs(b.time)} ${up ? '涨到' : '跌到'}目标 ${fmtNum(f.target.price)}（${f.target.label}）：上次的预测命中` };
+          break;
+        }
+      }
+      if (trigger) events.push(trigger);
+      else if (now.at >= f.deadline) events.push({ kind: 'EXPIRED', time: f.deadline, text: `到期（${fmtTs(f.deadline)}）前既未到目标 ${fmtNum(f.target.price)}，也未破失效位 ${fmtNum(f.invalidation.price)}：上次的预测过期` });
+    }
+    // 触发改判的价格事件: 预测结局 > 画完后的延伸 > 区间极值
+    const ext = cur && cur.live && cur.live.extension;
+    const cause = trigger ? trigger.text
+      : ext && ext.time > prev.at ? `${fmtTs(ext.time)} 价格越过所画终点 ${fmtNum(ext.fromPrice)}，延伸至 ${fmtNum(ext.toPrice)}`
+        : hi ? `此后 ${seg.length} 根K线最高 ${fmtNum(hi.price)}（${fmtTs(hi.time)}）、最低 ${fmtNum(lo.price)}（${fmtTs(lo.time)}）` : '';
+
+    // 2. 浪型改判 / 阶段推进
+    if (now.type !== prev.type) events.push({ kind: 'RETYPE', time: now.at, text: `改判：「${prev.name}」→「${now.name}」${cause ? '。触发：' + cause : ''}` });
+    else if (now.name !== prev.name) events.push({ kind: 'STAGE', time: now.at, text: `阶段：「${prev.name}」→「${now.name}」${cause ? '。触发：' + cause : ''}` });
+    // 3. 判决变化，附本次新出现的第一条理由
+    if (now.verdict !== prev.verdict) {
+      const added = now.issues.filter(x => !(Array.isArray(prev.issues) && prev.issues.indexOf(x) >= 0));
+      events.push({ kind: 'VERDICT', time: now.at, text: `判决：${prev.verdictLabel} → ${now.verdictLabel}${added.length ? '：' + added[0] : cause ? '。触发：' + cause : ''}` });
+    }
+    // 4. 新趋势提示出现 / 消失
+    if (now.reclassify && !prev.reclassify) events.push({ kind: 'RECLASSIFY', time: now.at, text: `新提示：${cur && cur.reclassify ? cur.reclassify.text : '更可能是新趋势'}` });
+    else if (!now.reclassify && prev.reclassify) events.push({ kind: 'RECLASSIFY_OFF', time: now.at, text: '「更可能是新趋势」的提示已不再成立' });
+    return { since: prev.at, bars: seg.length, events };
+  }
+
   function buildSketchTree(drawings) {
     const info = {}, issues = {};
     const span = d => d.points[d.points.length - 1].time - d.points[0].time;
@@ -3940,7 +4048,8 @@
     options = options || {};
     const drawings = (options.drawings || []).map((d, i) => ({
       id: String(d.id !== undefined && d.id !== null ? d.id : i + 1), tool: d.tool, timeframe: d.timeframe || '4h', type: d.type || null,
-      points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price }))
+      points: (d.points || []).filter(p => p && isFinite(p.time) && isFinite(p.price)).map(p => ({ time: +p.time, price: +p.price })),
+      prev: d.prev && isFinite(d.prev.at) ? d.prev : null
     }));
     if (!drawings.length) throw new Error('还没有画浪');
     drawings.forEach(d => {
@@ -4008,12 +4117,14 @@
 
     const out = nodes.map(nd => {
       const fv = finalOf(nd);
+      const snapshot = countSnapshot(nd.result, fv);
       return {
         id: nd.d.id, tool: nd.d.tool, toolName: USER_TOOLS[nd.d.tool].name, timeframe: nd.d.timeframe,
         parentId: nd.parentId, parentLeg: nd.leg, parentLegName: nd.legName || null, depth: nd.depth, duplicate: !!nd.duplicate,
         issues: nd.issues, verdict: fv, verdictLabel: fv === 'ERROR' ? '无法评估' : VERDICTS[fv],
         name: nd.result ? nd.result.primary.name : USER_TOOLS[nd.d.tool].name,
-        error: nd.error, result: nd.result
+        error: nd.error, result: nd.result,
+        snapshot, lifecycle: snapshot && nd.d.prev ? diffEvaluation(nd.d.prev, snapshot, barsByTf[nd.d.timeframe], nd.result) : null
       };
     });
     const verdict = worstVerdict(out.map(x => x.verdict));
@@ -4066,6 +4177,8 @@
     evaluateUserCount,
     evaluateUserSketch,
     buildSketchTree,
+    countSnapshot,
+    diffEvaluation,
     USER_TOOLS,
     findPivots,
     zigzagPivots,
