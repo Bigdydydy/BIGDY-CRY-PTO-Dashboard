@@ -187,17 +187,21 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     const b = bars['1h'].find(x => x.time === pts[1].time);
     assert.strictEqual(fixed.points[1].price, b.high, '价格取该K线的最高价');
   });
-  it('替代计数: 所画计数存疑 / 否决时给出判决更好的浪型，成立时不给', () => {
+  it('替代计数: 起点、终点与所画相同，判决不差于所画；成立时不给', () => {
     const v = [120, 100, 110, 105, 122, 116, 130, 126];
     const bars = build(v);
     const run = (tool, ks) => E.evaluateUserSketch({ '1h': bars['1h'], '15m': bars['15m'] }, 'TEST',
       { drawings: [{ id: 'A', tool, timeframe: '1h', points: ks.map(k => pt(v, k, 3600)) }] }).nodes[0];
-    const abc = run('ABC', [1, 2, 3, 4]);
+    // abc 画在一段清楚的五浪上 (0=100 → a=122 → b=116 → c=130)，中间重新数应为推动浪
+    const abc = run('ABC', [1, 4, 5, 6]);
     assert.notStrictEqual(abc.verdict, 'VALID');
     assert.ok(abc.suggestions.length > 0, '应给出替代计数');
+    assert.ok(abc.suggestions.some(sg => sg.type === 'IMPULSE' && sg.verdict === 'VALID' && sg.points.length === 6), JSON.stringify(abc.suggestions.map(x => [x.type, x.verdict])));
     const rank = { VALID: 0, DOUBT: 1, FALSIFIED_PRICE: 2, FALSIFIED_SUB: 3, INVALID: 4 };
+    const ends = q => [q[0].time, q[q.length - 1].time];
     abc.suggestions.forEach(sg => {
-      assert.ok(rank[sg.verdict] < rank[abc.verdict], `替代计数须好于所画：${sg.name} ${sg.verdict}`);
+      assert.deepStrictEqual(ends(sg.points), ends(abc.result.points), `替代计数的起点、终点须与所画相同：${sg.name}`);
+      assert.ok(sg.sameVerdict ? rank[sg.verdict] === rank[abc.verdict] : rank[sg.verdict] < rank[abc.verdict], `替代计数不得差于所画：${sg.name} ${sg.verdict}`);
       assert.ok(E.USER_TOOLS[sg.tool].types.includes(sg.type));
       assert.ok(sg.points.length >= 3);
     });
