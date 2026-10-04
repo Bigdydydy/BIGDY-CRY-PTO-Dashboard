@@ -3969,25 +3969,89 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 画浪存疑 / 否决时的替代计数
+  // 画浪存疑 / 否决时的替代计数: 起点、终点严格取所画的两个端点，只改变中间的数法与浪型
   //   1. 同样的点按其它浪型 (例如推动浪不成立，按三角形 / 楔形看)
-  //   2. 以所画起点到最新K线为选区由引擎自动数浪，取引擎的候选计数
+  //   2. 在两端点之间的K线上由粗到细取锚定拐点序列 (首尾即所画端点)，
+  //      对每种浪型找最合规的完整计数 (matchCorrectiveOn，各浪型取指引符合度最高者)
   //   每个候选都按用户画浪的同一套规则 (铁律、低周期子浪、画完后的走势检验) 重新评估，
-  //   只保留判决比所画计数好的: 成立优先，其次与所画同一起点，再按引擎相对概率
+  //   优先给判决比所画计数好的；没有时给判决相同的其它数法 (sameVerdict，供参考)。
+  //   排序: 判决 → 同样的点 → 指引符合度
   // ---------------------------------------------------------------------------
   const TOOL_OF_TYPE = {
     IMPULSE: 'IMPULSE', DIAGONAL: 'IMPULSE', ZIGZAG: 'ABC', FLAT: 'ABC', DOUBLE_ZIGZAG: 'WXY', COMBINATION: 'WXY',
     TRIPLE_ZIGZAG: 'WXYXZ', TRIPLE_COMBINATION: 'WXYXZ', TRIANGLE: 'ABCDE', EXPANDING_TRIANGLE: 'ABCDE'
   };
-  
-  /** userVerdict: 所画计数的判决，只保留判决比它好的替代计数 (存疑 → 只给成立；否决 → 成立或存疑) */
+
+  /**
+   * 两端点之间的锚定拐点序列 (首尾即所画端点)：主周期与各低周期、由粗到细各取一组，去重。
+   * 低周期拐点归到所在的主周期K线 (同一根主周期K线上的多个拐点只留极值)，主周期上数不出的五浪常在低周期里
+   */
+  function anchoredSequences(bars, sub, pA, pB) {
+    const range = Math.abs(pB.price - pA.price);
+    if (!(range > 0)) return [];
+    const mainAt = t => bars[barIdxAtOrBefore(bars, t)].time;
+    const out = [], seen = new Set();
+    const sources = [bars].concat(Object.keys(sub || {}).sort((x, y) => (TF_SEC[y] || 0) - (TF_SEC[x] || 0)).map(tf => sub[tf]));
+    for (const src of sources) {
+      const seg = (src || []).filter(x => x.time >= pA.time && x.time < pB.time + 1 + (src === bars ? 0 : TF_SEC['4h']));
+      if (seg.length < 20) continue;
+      const atr = avgTR(seg) || range / seg.length;
+      const ps = { idx: 0, time: pA.time, price: pA.price, type: pA.type, confirmed: true };
+      const pe = { idx: seg.length - 1, time: pB.time, price: pB.price, type: pB.type, confirmed: true };
+      for (const m of PROBE_MULTS.concat([0.035, 0.025])) {
+        const thr = Math.max(range * m, 0.8 * atr);
+        const inner = zigzagPivots(seg, thr)
+          .filter(q => q.idx > 0 && q.idx < seg.length - 1)
+          .map(q => Object.assign({}, q, { time: mainAt(q.time) }))
+          .filter(q => q.time > pA.time && q.time < pB.time);
+        // 同一根主周期K线上的拐点只留同类型的极值
+        const merged = [];
+        for (const q of inner) {
+          const last = merged[merged.length - 1];
+          if (last && last.time === q.time) {
+            if (last.type === q.type) { if (q.type === 'high' ? q.price > last.price : q.price < last.price) merged[merged.length - 1] = q; }
+            else merged.pop(); // 一根K线里先高后低: 主周期上看不出这一摆，去掉
+            continue;
+          }
+          merged.push(q);
+        }
+        const anchored = anchorZigzag(merged, ps, pe);
+        const swings = anchored.length - 1;
+        if (swings < 3 || swings > PROBE_MAX_SWINGS) continue;
+        const key = anchored.map(q => q.time).join(',');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(anchored);
+      }
+    }
+    return out;
+  }
+
+  /** 中间拐点移到前后两点之间同类型的真正极值 (主周期K线)，反复至不再变化；首尾不动 */
+  function refineToExtremes(bars, pts) {
+    const q = pts.map(p => { const i = barIdxAtOrBefore(bars, p.time); return { idx: i, time: bars[i].time, price: p.price, type: p.type }; });
+    for (let round = 0; round < 3; round++) {
+      let moved = false;
+      for (let i = 1; i < q.length - 1; i++) {
+        let best = null;
+        for (let k = q[i - 1].idx + 1; k < q[i + 1].idx; k++) {
+          const v = q[i].type === 'high' ? bars[k].high : bars[k].low;
+          if (!best || (q[i].type === 'high' ? v > best.price : v < best.price)) best = { idx: k, price: v };
+        }
+        if (best && best.idx !== q[i].idx) { q[i] = { idx: best.idx, time: bars[best.idx].time, price: best.price, type: q[i].type }; moved = true; }
+      }
+      if (!moved) break;
+    }
+    return q;
+  }
+
+  /** userVerdict: 所画计数的判决 (存疑 → 更好的只有成立；否决 → 成立或存疑) */
   function suggestCounts(bars, symbol, d, r, sub, maxOut, userVerdict) {
     const limit = VERDICT_RANK[userVerdict || r.verdict];
     const out = [];
     const sig = (type, pts) => type + '|' + pts.map(p => p.time).join(',');
     const seen = new Set([sig(r.primary.type, r.points)]);
-    const i0 = barIdxAtOrBefore(bars, r.points[0].time);
-    const i1 = barIdxAtOrBefore(bars, r.points[1].time);
+    const pA = r.points[0], pB = r.points[r.points.length - 1];
     const tryCount = (source, type, pts, extra) => {
       const tool = TOOL_OF_TYPE[type];
       if (!tool || pts.length < 3 || pts.length > USER_TOOLS[tool].labels.length) return;
@@ -3999,26 +4063,39 @@
         e = evaluateUserCount(bars, symbol, { tool, forceType: type, timeframe: d.timeframe, subBars: sub,
           points: pts.map(p => ({ time: p.time, price: p.price, fixed: true })) });
       } catch (err) { return; }
-      if ((e.verdict !== 'VALID' && e.verdict !== 'DOUBT') || !(VERDICT_RANK[e.verdict] < limit)) return;
+      if ((e.verdict !== 'VALID' && e.verdict !== 'DOUBT') || VERDICT_RANK[e.verdict] > limit) return;
+      // 吸附后首尾须仍是所画的两个端点
+      const q0 = e.points[0], q1 = e.points[e.points.length - 1];
+      if (q0.time !== pA.time || q1.time !== pB.time) return;
       const tr = e.trackRecord;
       out.push(Object.assign({
         source, tool, type, name: e.primary.name, verdict: e.verdict, verdictLabel: e.verdictLabel,
-        points: e.points, sameStart: Math.abs(barIdxAtOrBefore(bars, e.points[0].time) - i0) <= 2,
+        points: e.points, guidePct: e.primary.guidePct,
         doubt: e.verdict === 'DOUBT' ? (e.doubts[0] || null) : null,
         trackRecord: tr ? { hitPct: tr.hitPct, expectedPct: tr.expectedPct, resolved: tr.resolved } : null,
-        forecast: e.forecast ? e.forecast.text : null, probability: null
+        forecast: e.forecast ? e.forecast.text : null,
+        sameVerdict: VERDICT_RANK[e.verdict] === limit
       }, extra));
     };
     (r.alternatives || []).forEach(a => tryCount('SAME_POINTS', a.type, r.points));
-    let auto = null;
-    try { auto = analyzeWaves(bars, symbol, { timeframe: d.timeframe, startTime: r.points[0].time, endTime: bars[bars.length - 1].time, subBars: sub }); } catch (err) { auto = null; }
-    // 只取覆盖所画这段的计数: 起点不晚于所画第一段的终点 (之后才开始的是另一段走势)
-    if (auto) auto.candidates.filter(c => barIdxAtOrBefore(bars, c.pivots[0].time) < i1)
-      .forEach(c => tryCount('ENGINE', c.baseType, c.pivots, { probability: c.probability }));
+    // 每种浪型: 各级别锚定序列上的最佳完整计数都重新评估，保留判决最好 (同判决取指引符合度高) 的一个
+    const seqs = anchoredSequences(bars, sub, pA, pB);
+    for (const type of Object.keys(PATTERNS)) {
+      const before = out.length;
+      for (const sq of seqs) {
+        const m = matchCorrectiveOn(type, sq, false);
+        if (!m || !m.complete) continue;
+        tryCount('SAME_ENDS', type, m.pts);
+        tryCount('SAME_ENDS', type, refineToExtremes(bars, m.pts));
+      }
+      const mine = out.splice(before).sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || (b.guidePct - a.guidePct));
+      if (mine.length) out.push(mine[0]);
+    }
     out.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) ||
-      ((b.source === 'SAME_POINTS' || b.sameStart ? 1 : 0) - (a.source === 'SAME_POINTS' || a.sameStart ? 1 : 0)) ||
-      ((b.probability || 0) - (a.probability || 0)));
-    return out.slice(0, maxOut || 4);
+      ((b.source === 'SAME_POINTS' ? 1 : 0) - (a.source === 'SAME_POINTS' ? 1 : 0)) ||
+      ((b.guidePct || 0) - (a.guidePct || 0)));
+    const better = out.filter(x => !x.sameVerdict);
+    return (better.length ? better : out).slice(0, maxOut || 4);
   }
 
   function buildSketchTree(drawings) {
@@ -4199,7 +4276,7 @@
       const where = x.parentId ? `${byId[x.parentId] ? (USER_TOOLS[byId[x.parentId].d.tool] || {}).name : ''}·${x.parentLegName}的子浪` : '母浪';
       lines.push(`${'　'.repeat(x.depth)}${where}「${x.name}」（${x.timeframe}）：${x.verdictLabel}`);
       const sg = x.suggestions[0];
-      if (sg) lines.push(`${'　'.repeat(x.depth + 1)}更可能：「${sg.name}」${sg.verdictLabel}${sg.source === 'SAME_POINTS' ? '（同样的点换浪型）' : sg.probability ? `（引擎相对概率 ${sg.probability}%）` : ''}`);
+      if (sg) lines.push(`${'　'.repeat(x.depth + 1)}更可能：「${sg.name}」${sg.verdictLabel}（${sg.source === 'SAME_POINTS' ? '同样的点换浪型' : '起点、终点与所画相同'}，指引符合度 ${sg.guidePct}%）`);
     });
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
     return {

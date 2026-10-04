@@ -351,6 +351,7 @@
     return bars;
   }
 
+  const PAGE_LOADED_AT = Date.now();
   let waveWorker = null; // null=未创建, false=不可用
   let waveWorkerSeq = 0;
   const waveWorkerPending = new Map();
@@ -359,7 +360,8 @@
     if (waveWorker === false) return null;
     if (waveWorker) return waveWorker;
     try {
-      const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js')});
+      // 带页面加载时刻: Worker 的 importScripts 走浏览器缓存，部署后可能仍拿到旧引擎
+      const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js?b=' + PAGE_LOADED_AT)});
 self.onmessage = function (e) {
   var d = e.data;
   var fn = d.fn === 'evaluateUserSketch' || d.fn === 'evaluateUserCount' ? d.fn : 'analyzeWaves';
@@ -1183,16 +1185,18 @@ self.onmessage = function (e) {
           : `<div class="ue-note">${life && life.snap && life.snap.at !== life.first ? `自 ${esc(fmtT(life.first))} 以来浪型、判决都没有变化` : '首次评估。之后再评估同一画法时，会记下上次预测的结局、浪型或判决的改变，以及触发改变的价格事件'}</div>`}
       </div>`;
 
-    // 更可能的浪型: 所画计数存疑 / 否决时，引擎在同一段走势上找到的判决更好的计数
+    // 更可能的浪型: 所画计数存疑 / 否决时，引擎在所画起点、终点之间找到的其它数法
     const sugs = nd.suggestions || [];
+    const onlySame = sugs.length > 0 && sugs.every(x => x.sameVerdict);
     const sugHtml = nd.verdict !== 'VALID' && nd.verdict !== 'ERROR' ? `
       <div class="liu-signal-row">
-        <div class="liu-signal-title"><span>更可能的浪型</span><span>${sugs.length ? '按你的画浪规则重新验证过' : ''}</span></div>
+        <div class="liu-signal-title"><span>更可能的浪型</span><span>${sugs.length ? '起点、终点与你相同 · 按画浪规则重新验证' : ''}</span></div>
+        ${onlySame ? '<div class="ue-note">没有判决比你的更好的数法；以下判决与你相同，供参考</div>' : ''}
         ${sugs.length ? sugs.map((sg, k) => {
           const on = previewSug && previewSug.id === nd.id && previewSug.k === k;
           const st = VERDICT_STYLE[sg.verdict] || VERDICT_STYLE.DOUBT;
-          const meta = [sg.source === 'SAME_POINTS' ? '同样的点换浪型' : sg.sameStart ? '与你同一起点' : '起点不同',
-            sg.probability ? `引擎相对概率 ${sg.probability}%` : '',
+          const meta = [sg.source === 'SAME_POINTS' ? '同样的点换浪型' : '中间重新数',
+            sg.guidePct != null ? `指引符合度 ${sg.guidePct}%` : '',
             sg.trackRecord ? `历史上同类计数先到目标 ${sg.trackRecord.hitPct}%（随机 ${sg.trackRecord.expectedPct}%）` : ''].filter(Boolean).join(' · ');
           return `<div class="ue-sug${on ? ' active' : ''}">
             <div class="liu-signal-title"><span>${esc(sg.name)}</span><span class="liu-chip ${st.chip}">${esc(sg.verdictLabel)}</span></div>
@@ -1205,7 +1209,7 @@ self.onmessage = function (e) {
               <button class="chart-tool-btn" data-sg-adopt="${k}" data-node="${esc(nd.id)}" title="用这个计数替换你画的浪，并重新整体评估">采用</button>
             </div>
           </div>`;
-        }).join('') : '<div class="ue-note">引擎在这段走势上没有找到判决比你的计数更好的浪型</div>'}
+        }).join('') : '<div class="ue-note">在你画的起点和终点之间，没有找到判决不差于你的其它数法</div>'}
       </div>` : '';
 
     return verdictHtml + sugHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
