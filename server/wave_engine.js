@@ -3968,6 +3968,59 @@
     return { since: prev.at, bars: seg.length, events };
   }
 
+  // ---------------------------------------------------------------------------
+  // 画浪存疑 / 否决时的替代计数
+  //   1. 同样的点按其它浪型 (例如推动浪不成立，按三角形 / 楔形看)
+  //   2. 以所画起点到最新K线为选区由引擎自动数浪，取引擎的候选计数
+  //   每个候选都按用户画浪的同一套规则 (铁律、低周期子浪、画完后的走势检验) 重新评估，
+  //   只保留判决比所画计数好的: 成立优先，其次与所画同一起点，再按引擎相对概率
+  // ---------------------------------------------------------------------------
+  const TOOL_OF_TYPE = {
+    IMPULSE: 'IMPULSE', DIAGONAL: 'IMPULSE', ZIGZAG: 'ABC', FLAT: 'ABC', DOUBLE_ZIGZAG: 'WXY', COMBINATION: 'WXY',
+    TRIPLE_ZIGZAG: 'WXYXZ', TRIPLE_COMBINATION: 'WXYXZ', TRIANGLE: 'ABCDE', EXPANDING_TRIANGLE: 'ABCDE'
+  };
+  
+  /** userVerdict: 所画计数的判决，只保留判决比它好的替代计数 (存疑 → 只给成立；否决 → 成立或存疑) */
+  function suggestCounts(bars, symbol, d, r, sub, maxOut, userVerdict) {
+    const limit = VERDICT_RANK[userVerdict || r.verdict];
+    const out = [];
+    const sig = (type, pts) => type + '|' + pts.map(p => p.time).join(',');
+    const seen = new Set([sig(r.primary.type, r.points)]);
+    const i0 = barIdxAtOrBefore(bars, r.points[0].time);
+    const i1 = barIdxAtOrBefore(bars, r.points[1].time);
+    const tryCount = (source, type, pts, extra) => {
+      const tool = TOOL_OF_TYPE[type];
+      if (!tool || pts.length < 3 || pts.length > USER_TOOLS[tool].labels.length) return;
+      const key = sig(type, pts);
+      if (seen.has(key)) return;
+      seen.add(key);
+      let e;
+      try {
+        e = evaluateUserCount(bars, symbol, { tool, forceType: type, timeframe: d.timeframe, subBars: sub,
+          points: pts.map(p => ({ time: p.time, price: p.price, fixed: true })) });
+      } catch (err) { return; }
+      if ((e.verdict !== 'VALID' && e.verdict !== 'DOUBT') || !(VERDICT_RANK[e.verdict] < limit)) return;
+      const tr = e.trackRecord;
+      out.push(Object.assign({
+        source, tool, type, name: e.primary.name, verdict: e.verdict, verdictLabel: e.verdictLabel,
+        points: e.points, sameStart: Math.abs(barIdxAtOrBefore(bars, e.points[0].time) - i0) <= 2,
+        doubt: e.verdict === 'DOUBT' ? (e.doubts[0] || null) : null,
+        trackRecord: tr ? { hitPct: tr.hitPct, expectedPct: tr.expectedPct, resolved: tr.resolved } : null,
+        forecast: e.forecast ? e.forecast.text : null, probability: null
+      }, extra));
+    };
+    (r.alternatives || []).forEach(a => tryCount('SAME_POINTS', a.type, r.points));
+    let auto = null;
+    try { auto = analyzeWaves(bars, symbol, { timeframe: d.timeframe, startTime: r.points[0].time, endTime: bars[bars.length - 1].time, subBars: sub }); } catch (err) { auto = null; }
+    // 只取覆盖所画这段的计数: 起点不晚于所画第一段的终点 (之后才开始的是另一段走势)
+    if (auto) auto.candidates.filter(c => barIdxAtOrBefore(bars, c.pivots[0].time) < i1)
+      .forEach(c => tryCount('ENGINE', c.baseType, c.pivots, { probability: c.probability }));
+    out.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) ||
+      ((b.source === 'SAME_POINTS' || b.sameStart ? 1 : 0) - (a.source === 'SAME_POINTS' || a.sameStart ? 1 : 0)) ||
+      ((b.probability || 0) - (a.probability || 0)));
+    return out.slice(0, maxOut || 4);
+  }
+
   function buildSketchTree(drawings) {
     const info = {}, issues = {};
     const span = d => d.points[d.points.length - 1].time - d.points[0].time;
@@ -4063,12 +4116,15 @@
     nodes.forEach(nd => { byId[nd.d.id] = nd; });
 
     const finalOf = nd => nd.error ? 'ERROR' : worstVerdict([nd.result.verdict].concat(nd.issues.map(x => x.severity === 'strong' ? 'FALSIFIED_SUB' : x.severity === 'medium' ? 'DOUBT' : 'VALID')));
+    const subOf = d => {
+      const sub = {};
+      (SKETCH_SUB_TFS[d.timeframe] || []).forEach(tf => { if (barsByTf[tf] && barsByTf[tf].length) sub[tf] = barsByTf[tf]; });
+      return sub;
+    };
     const evalOne = (d, extra) => {
       const bars = barsByTf[d.timeframe];
       if (!bars || !bars.length) throw new Error(`缺少 ${d.timeframe} K线`);
-      const sub = {};
-      (SKETCH_SUB_TFS[d.timeframe] || []).forEach(tf => { if (barsByTf[tf] && barsByTf[tf].length) sub[tf] = barsByTf[tf]; });
-      return evaluateUserCount(bars, symbol, Object.assign({ tool: d.tool, points: d.points, timeframe: d.timeframe, subBars: sub, forceType: d.type }, extra));
+      return evaluateUserCount(bars, symbol, Object.assign({ tool: d.tool, points: d.points, timeframe: d.timeframe, subBars: subOf(d), forceType: d.type }, extra));
     };
 
     // 由内向外: 最深的子浪先评估
@@ -4116,6 +4172,13 @@
       }
     }
 
+    if (options.suggest !== false) {
+      nodes.forEach(nd => {
+        if (!nd.result || nd.duplicate || finalOf(nd) === 'VALID') return;
+        nd.suggestions = suggestCounts(barsByTf[nd.d.timeframe], symbol, nd.d, nd.result, subOf(nd.d), 4, finalOf(nd));
+      });
+    }
+
     const out = nodes.map(nd => {
       const fv = finalOf(nd);
       const snapshot = countSnapshot(nd.result, fv);
@@ -4125,7 +4188,8 @@
         issues: nd.issues, verdict: fv, verdictLabel: fv === 'ERROR' ? '无法评估' : VERDICTS[fv],
         name: nd.result ? nd.result.primary.name : USER_TOOLS[nd.d.tool].name,
         error: nd.error, result: nd.result,
-        snapshot, lifecycle: snapshot && nd.d.prev ? diffEvaluation(nd.d.prev, snapshot, barsByTf[nd.d.timeframe], nd.result) : null
+        snapshot, lifecycle: snapshot && nd.d.prev ? diffEvaluation(nd.d.prev, snapshot, barsByTf[nd.d.timeframe], nd.result) : null,
+        suggestions: nd.suggestions || []
       };
     });
     const verdict = worstVerdict(out.map(x => x.verdict));
@@ -4134,6 +4198,8 @@
     out.slice().sort((a, b) => a.depth - b.depth).forEach(x => {
       const where = x.parentId ? `${byId[x.parentId] ? (USER_TOOLS[byId[x.parentId].d.tool] || {}).name : ''}·${x.parentLegName}的子浪` : '母浪';
       lines.push(`${'　'.repeat(x.depth)}${where}「${x.name}」（${x.timeframe}）：${x.verdictLabel}`);
+      const sg = x.suggestions[0];
+      if (sg) lines.push(`${'　'.repeat(x.depth + 1)}更可能：「${sg.name}」${sg.verdictLabel}${sg.source === 'SAME_POINTS' ? '（同样的点换浪型）' : sg.probability ? `（引擎相对概率 ${sg.probability}%）` : ''}`);
     });
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
     return {
@@ -4180,6 +4246,7 @@
     buildSketchTree,
     countSnapshot,
     diffEvaluation,
+    suggestCounts,
     USER_TOOLS,
     findPivots,
     zigzagPivots,

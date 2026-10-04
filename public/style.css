@@ -5547,6 +5547,15 @@ body {
   color: var(--text-muted);
 }
 .liu-parts-table td.ue-note { border-top: none; padding-top: 0; }
+/* 更可能的浪型 (替代计数) */
+.ue-sug {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 6px;
+}
+.ue-sug.active { border-color: #10b981; }
+.ue-sug .wave-type-switch { margin-top: 4px; }
 
 /* Module 8 · 多级别画浪: 「评估全部」按钮与画板列表 */
 .wave-draw-toolbar .draw-eval-btn:not(:disabled) {
