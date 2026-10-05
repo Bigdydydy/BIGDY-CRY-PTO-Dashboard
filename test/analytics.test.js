@@ -419,160 +419,251 @@ describe('HTTP Server Lifecycle & Security Endpoints', () => {
   });
 });
 
-describe('Phase 2: Term Premium & Real Basis Dataset Engine', () => {
+describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
   const fs = require('fs');
   const path = require('path');
   const {
-    calculateConstantMaturityBasis,
-    loadHistoricalBasisSeries,
-    evaluateCarryRegime,
-    analyzeTermPremium,
-    T_BILL_RATE,
-    HURDLE_RATE
-  } = require('../server/term_premium_engine');
+    buildCurvePoint,
+    aggregateDailyFunding,
+    interpolateAtDay,
+    applyCarryMetrics,
+    calculateCarryScore,
+    scoreTier,
+    parseBinanceDeliveryExpiry,
+    SCHEMA_VERSION,
+    CQ_MIN_DAYS
+  } = require('../server/basis_fetcher');
+  const { evaluateCarryRegime, analyzeTermPremium, etfCarryMetrics } = require('../server/term_premium_engine');
+  const DAY = 86400000;
 
-  test('Verified real historical dataset exists and is clean', () => {
+  test('Historical dataset uses only real tenors and never extrapolates', () => {
     const filePath = path.join(__dirname, '..', 'data', 'term_premium_history.json');
     assert.ok(fs.existsSync(filePath), 'data/term_premium_history.json must exist');
     const series = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    assert.ok(Array.isArray(series));
-    assert.ok(series.length >= 600, `Dataset must contain >= 600 daily records, got ${series.length}`);
+    assert.ok(series.length >= 900, `Dataset must cover 2024.01 onwards (>= 900 rows), got ${series.length}`);
+    assert.equal(series[0].date, '2024-01-01');
 
-    // Check chronological order and validity of fields
-    let sum30d = 0;
     for (let i = 0; i < series.length; i++) {
       const row = series[i];
-      assert.ok(typeof row.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date), `Row ${i} date format`);
-      if (i > 0) {
-        assert.ok(row.date >= series[i - 1].date, `Row ${i} date should be in ascending order`);
+      assert.equal(row.schema, SCHEMA_VERSION, `Row ${i} schema`);
+      assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(row.date), `Row ${i} date format`);
+      if (i > 0) assert.ok(row.date > series[i - 1].date, `Row ${i} strictly ascending`);
+      for (const k of ['fundingApr', 'nqApr', 'apr90d', 'tbill', 'spreadTerm', 'excessOverTBill', 'carryScore']) {
+        assert.ok(typeof row[k] === 'number' && isFinite(row[k]), `Row ${i} ${k}`);
       }
-      assert.ok(typeof row.apr7d === 'number' && !isNaN(row.apr7d), `Row ${i} apr7d`);
-      assert.ok(typeof row.apr30d === 'number' && !isNaN(row.apr30d), `Row ${i} apr30d`);
-      assert.ok(typeof row.apr60d === 'number' && !isNaN(row.apr60d), `Row ${i} apr60d`);
-      assert.ok(typeof row.apr90d === 'number' && !isNaN(row.apr90d), `Row ${i} apr90d`);
-      assert.ok(typeof row.apr180d === 'number' && !isNaN(row.apr180d), `Row ${i} apr180d`);
-      assert.ok(typeof row.spread90d7d === 'number' && !isNaN(row.spread90d7d), `Row ${i} spread90d7d`);
-      assert.ok(typeof row.spread30d7d === 'number' && !isNaN(row.spread30d7d), `Row ${i} spread30d7d`);
-      assert.ok(typeof row.excessReturn === 'number' && !isNaN(row.excessReturn), `Row ${i} excessReturn`);
-      assert.ok(typeof row.carryScore === 'number' && !isNaN(row.carryScore), `Row ${i} carryScore`);
-      sum30d += row.apr30d;
+      // Front quarterly is dropped inside its final week, and only then
+      assert.equal(row.cqValid, row.cqDays >= CQ_MIN_DAYS, `Row ${i} cqValid`);
+      assert.equal(row.cqApr === null, !row.cqValid, `Row ${i} cqApr null iff CQ excluded`);
+      assert.equal(row.spreadShort === null, !row.cqValid, `Row ${i} spreadShort null iff CQ excluded`);
+      // 90D must lie inside the envelope of the real points that bracket it (no extrapolation)
+      const pts = [row.fundingApr, row.cqApr, row.nqApr].filter(v => v != null);
+      assert.ok(row.apr90d >= Math.min(...pts) - 0.011 && row.apr90d <= Math.max(...pts) + 0.011, `Row ${i} apr90d inside real points`);
+      assert.ok(row.carryScore >= 0 && row.carryScore <= 100, `Row ${i} carryScore in [0,100]`);
     }
 
-    // Economically sound check: avg 30D basis should be > 4.0% (verifies upstream Binance bug fix)
-    const avg30d = sum30d / series.length;
-    assert.ok(avg30d > 4.0, `Average 30D basis rate should be > 4.0%, got ${avg30d.toFixed(2)}%`);
+    // In the front quarterly's final week 90D comes from funding→NQ with NQ at ~91-98D, so it must
+    // sit next to NQ (funding weight ≤ 1 − 90/98). This is what removes the old expiry-day spikes.
+    for (const row of series.filter(r => !r.cqValid)) {
+      const fundingWeight = 1 - 90 / row.nqDays;
+      assert.ok(fundingWeight >= -0.001 && fundingWeight < 0.09, `${row.date} NQ at ${row.nqDays}D`);
+      assert.ok(Math.abs(row.apr90d - row.nqApr) <= fundingWeight * Math.abs(row.fundingApr - row.nqApr) + 0.02, `${row.date} 90D tracks NQ`);
+    }
   });
 
-  test('analyzeTermPremium returns verified real metadata and current regime', async () => {
-    const result = await analyzeTermPremium([], 77000);
-    assert.ok(result.metadata);
+  test('buildCurvePoint drops the front quarterly in its final week and interpolates 90D from real points', () => {
+    const t0 = Date.UTC(2026, 2, 26, 0, 0, 0);
+    const common = { timestamp: t0, indexPrice: 100000, fundingApr: 10, tbill: 4 };
+    // CQ 1.33 days out (excluded), NQ 92.33 days out at 5% APR
+    const nqDays = 92 + 1 / 3;
+    const nqPrice = 100000 * (1 + 0.05 * nqDays / 365);
+    const p = buildCurvePoint({ ...common, cqPrice: 100050, nqPrice, cqExpiryTs: t0 + (4 / 3) * DAY, nqExpiryTs: t0 + nqDays * DAY });
+    assert.equal(p.cqValid, false);
+    assert.equal(p.cqApr, null);
+    assert.equal(p.spreadShort, null);
+    assert.equal(p.spreadCalendar, null);
+    assert.equal(p.nqApr, 5);
+    // Linear between funding (0D, 10%) and NQ (92.33D, 5%)
+    const expected = 10 + 90 * (5 - 10) / nqDays;
+    assert.ok(Math.abs(p.apr90d - expected) < 0.01, `apr90d ${p.apr90d} vs ${expected}`);
+    assert.equal(p.hurdle, 7.5);
+
+    // Mid-quarter: CQ 60D @ 6%, NQ 151D @ 7% → 90D interpolated between the two contracts
+    const q = buildCurvePoint({
+      ...common,
+      cqPrice: 100000 * (1 + 0.06 * 60 / 365),
+      nqPrice: 100000 * (1 + 0.07 * 151 / 365),
+      cqExpiryTs: t0 + 60 * DAY,
+      nqExpiryTs: t0 + 151 * DAY
+    });
+    assert.equal(q.cqValid, true);
+    assert.equal(q.cqApr, 6);
+    assert.equal(q.spreadShort, -4);
+    assert.equal(q.spreadCalendar, 1);
+    assert.ok(Math.abs(q.apr90d - (6 + 30 / 91)) < 0.01);
+  });
+
+  test('interpolateAtDay refuses to extrapolate', () => {
+    const pts = [{ days: 0, apr: 3 }, { days: 50, apr: 5 }, { days: 140, apr: 8 }];
+    assert.equal(interpolateAtDay(pts, 25), 4);
+    assert.equal(interpolateAtDay(pts, 140), 8);
+    assert.equal(interpolateAtDay(pts, 180), null);
+  });
+
+  test('aggregateDailyFunding sums settlements in the window and annualizes', () => {
+    const now = Date.UTC(2026, 9, 5);
+    const rows = [
+      { fundingTime: now - 9 * DAY, fundingRate: '0.01' },   // outside 7D window
+      { fundingTime: now - 2 * DAY, fundingRate: '0.0001' },
+      { fundingTime: now - 16 * 3600000, fundingRate: '0.0001' },
+      { fundingTime: now - 8 * 3600000, fundingRate: '0.0001' },
+      { fundingTime: now, fundingRate: '0.0001' }
+    ];
+    assert.ok(Math.abs(aggregateDailyFunding(rows, now, 1) - 0.0003 * 365 * 100) < 1e-9);
+    assert.ok(Math.abs(aggregateDailyFunding(rows, now, 7) - 0.0004 * (365 / 7) * 100) < 1e-9);
+    assert.equal(aggregateDailyFunding([], now, 7), null);
+  });
+
+  test('parseBinanceDeliveryExpiry reads the delivery date from the symbol', () => {
+    assert.equal(parseBinanceDeliveryExpiry('BTCUSD_261225'), Date.UTC(2026, 11, 25, 8));
+    assert.equal(parseBinanceDeliveryExpiry('BTCUSD_PERP'), null);
+  });
+
+  test('calculateCarryScore: Sharpe-weighted, bounded, monotonic in carry', () => {
+    const base = { basisVolAnn: 2, spreadTerm: 0, momentum30d: 0 };
+    const low = calculateCarryScore({ ...base, excessOverTBill: -2 });
+    const mid = calculateCarryScore({ ...base, excessOverTBill: 1 });
+    const high = calculateCarryScore({ ...base, excessOverTBill: 6 });
+    assert.ok(low.carryScore < mid.carryScore && mid.carryScore < high.carryScore);
+    // Sharpe 0.5 → 37.5 pts × 0.6 + 50 × 0.25 + 50 × 0.15 = 42.5
+    assert.equal(mid.carrySharpe, 0.5);
+    assert.equal(mid.carryScore, 42.5);
+    assert.equal(high.scoreComponents.sharpe, 100);
+    assert.equal(low.scoreComponents.sharpe, 0);
+    // Vol floor prevents a quiet tape from inflating the Sharpe
+    assert.equal(calculateCarryScore({ ...base, basisVolAnn: 0.1, excessOverTBill: 1 }).carrySharpe, 1);
+    // Perp funding far above the curve (crowding) lowers the score
+    const crowded = calculateCarryScore({ ...base, excessOverTBill: 1, spreadTerm: -10 });
+    assert.ok(crowded.carryScore < mid.carryScore);
+    assert.equal(scoreTier(70).code, 'PRIME');
+    assert.equal(scoreTier(50).code, 'QUALIFIED');
+    assert.equal(scoreTier(35).code, 'MARGINAL');
+    assert.equal(scoreTier(10).code, 'AVOID');
+  });
+
+  test('applyCarryMetrics computes rolling basis vol and momentum', () => {
+    const series = Array.from({ length: 40 }, (_, i) => ({
+      apr90d: 5 + (i % 2 ? 0.5 : -0.5),
+      excessOverTBill: 1,
+      spreadTerm: 0
+    }));
+    applyCarryMetrics(series);
+    assert.equal(series[5].basisVolAnn, null, 'needs >= 10 observations');
+    // daily change ±1pp in APR → ±0.2466% of notional → annualized ≈ 4.8%
+    assert.ok(Math.abs(series[39].basisVolAnn - 1 * 90 / 365 * Math.sqrt(365) * Math.sqrt(30 / 29)) < 0.05);
+    assert.equal(series[39].momentum30d, 0);
+  });
+
+  test('evaluateCarryRegime classifies all regimes on real-tenor fields', () => {
+    const base = { fundingApr: 6, cqApr: 7, nqApr: 7.5, tbill: 4, hurdle: 7.5, spreadShort: 1, spreadTerm: 1, carryScore: 50 };
+    assert.equal(evaluateCarryRegime({ ...base, apr90d: 10, excessOverTBill: 6, excessOverHurdle: 2.5 }).regimeCode, 'NORMAL_CONTANGO');
+    assert.equal(evaluateCarryRegime({ ...base, apr90d: 6, excessOverTBill: 2, excessOverHurdle: -1.5 }).regimeCode, 'MARGINAL_CARRY');
+    assert.equal(evaluateCarryRegime({ ...base, apr90d: 3.5, excessOverTBill: -0.5, excessOverHurdle: -4 }).regimeCode, 'SUB_TBILL_DRAIN');
+    assert.equal(evaluateCarryRegime({ ...base, apr90d: 0.5, cqApr: -1, excessOverTBill: -3.5, excessOverHurdle: -7 }).regimeCode, 'CRISIS_COMPRESSION');
+    assert.equal(evaluateCarryRegime({ ...base, fundingApr: 25, apr90d: 12, spreadTerm: -13, excessOverTBill: 8, excessOverHurdle: 4.5 }).regimeCode, 'OVERCROWDED_INVERSION');
+  });
+
+  test('etfCarryMetrics nets T-Bill, sponsor fee and amortized round-trip cost', () => {
+    const m = etfCarryMetrics({ apr90d: 6, tbill: 4 });
+    // cost = 0.25 + 0.25 × 365/90 = 1.264
+    assert.equal(m.etfCostAnnualized, 1.26);
+    assert.equal(m.etfNetCarry, 0.74);
+    assert.equal(m.etfArbitrageStatus, 'COVERED');
+    assert.equal(etfCarryMetrics({ apr90d: 5, tbill: 4 }).etfArbitrageStatus, 'UNWIND_RISK');
+  });
+
+  test('analyzeTermPremium (history only) returns real-tenor payload', async () => {
+    const result = await analyzeTermPremium([], 0, { live: false });
     assert.equal(result.metadata.isRealHistorical, true);
     assert.ok(result.metadata.dataSource.includes('Binance'));
-    assert.ok(result.series.length >= 600);
-    assert.ok(result.current);
-    assert.ok(typeof result.current.apr60d === 'number');
-    assert.ok(result.regime);
+    assert.ok(result.series.length >= 900);
+    const c = result.current;
+    for (const k of ['fundingApr', 'nqApr', 'apr90d', 'tbill', 'carryScore', 'carrySharpe', 'etfNetCarry']) {
+      assert.ok(typeof c[k] === 'number', `current.${k}`);
+    }
+    assert.ok(c.scoreComponents && typeof c.scoreComponents.sharpe === 'number');
+    assert.equal(result.tBillRate, c.tbill);
+    assert.equal(result.hurdleRate, c.hurdle);
     assert.ok(result.regime.regimeCode);
-    assert.equal(result.tBillRate, T_BILL_RATE);
-    assert.equal(result.hurdleRate, HURDLE_RATE);
+  });
+});
+
+describe('Phase 2-B: ETF × Carry Linkage Statistics', () => {
+  const { simpleRegression, ols, pearson, buildWeeklyPanel, analyzeLinkage } = require('../server/etf_linkage_engine');
+
+  test('simpleRegression and ols recover known coefficients', () => {
+    const xs = Array.from({ length: 50 }, (_, i) => i - 25);
+    const ys = xs.map(x => 3 + 0.5 * x);
+    const r = simpleRegression(xs, ys);
+    assert.equal(r.beta, 0.5);
+    assert.equal(r.alpha, 3);
+    assert.equal(r.r2, 1);
+
+    const X = xs.map((x, i) => [x, (i % 7) - 3]);
+    const y = X.map(([a, b]) => 1 + 2 * a - 1.5 * b + ((a * 7919) % 3) * 0.01);
+    const fit = ols(X, y);
+    assert.ok(Math.abs(fit.coef[1] - 2) < 0.01 && Math.abs(fit.coef[2] + 1.5) < 0.01);
+    assert.equal(pearson([1, 2, 3, 4, 5], [2, 4, 6, 8, 10]).r, 1);
   });
 
-  test('evaluateCarryRegime classifies all Amberdata institutional regimes accurately', () => {
-    const contangoState = {
-      apr7d: 8.0,
-      apr30d: 9.5,
-      apr60d: 10.2,
-      apr90d: 11.0,
-      apr180d: 12.5,
-      spread90d7d: 3.0,
-      spread30d7d: 1.5,
-      spread180d30d: 3.0,
-      excessReturn: 1.5,
-      excessOverTBill: 5.0,
-      carryScore: 15.3,
-      unannualizedBasis30d: 0.78
-    };
-    const r1 = evaluateCarryRegime(contangoState, []);
-    assert.equal(r1.regimeCode, 'NORMAL_CONTANGO');
-
-    const overcrowdedState = {
-      apr7d: 15.0,
-      apr30d: 13.0,
-      apr90d: 12.0,
-      apr180d: 11.0,
-      spread90d7d: -3.0,
-      spread30d7d: -2.0,
-      spread180d30d: -2.0,
-      excessReturn: 5.0,
-      excessOverTBill: 8.5,
-      carryScore: 10.4,
-      unannualizedBasis30d: 1.07
-    };
-    const r2 = evaluateCarryRegime(overcrowdedState, []);
-    assert.equal(r2.regimeCode, 'OVERCROWDED_INVERSION');
-
-    const subTbillState = {
-      apr7d: 4.0,
-      apr30d: 4.2,
-      apr90d: 4.6,
-      spread90d7d: 0.6,
-      spread30d7d: 0.2,
-      excessReturn: -3.8,
-      excessOverTBill: -0.3,
-      carryScore: -0.8,
-      unannualizedBasis30d: 0.35
-    };
-    const r3 = evaluateCarryRegime(subTbillState, []);
-    assert.equal(r3.regimeCode, 'SUB_TBILL_DRAIN');
-
-    const marginalState = {
-      apr7d: 6.5,
-      apr30d: 7.2,
-      apr90d: 7.8,
-      spread90d7d: 1.3,
-      spread30d7d: 0.7,
-      excessReturn: -0.8,
-      excessOverTBill: 2.7,
-      carryScore: 7.9,
-      unannualizedBasis30d: 0.59
-    };
-    const r4 = evaluateCarryRegime(marginalState, []);
-    assert.equal(r4.regimeCode, 'MARGINAL_CARRY');
+  test('buildWeeklyPanel aggregates (prev Tue, Tue] and matches arbitrage flow', () => {
+    const cot = [
+      { date: '2026-09-01', lfNetShortBtc: 1000, amNetLongBtc: 0, oiBtc: 5000 },
+      { date: '2026-09-08', lfNetShortBtc: 1600, amNetLongBtc: 50, oiBtc: 5400 }
+    ];
+    const etfFlows = [
+      { date: '2026-09-01', flowBtc: 999, flowUsd: 1 },   // belongs to the previous week
+      { date: '2026-09-02', flowBtc: 500, flowUsd: 50 },
+      { date: '2026-09-08', flowBtc: 500, flowUsd: 50 }
+    ];
+    const basisSeries = [
+      { date: '2026-09-03', excessOverTBill: 1, apr90d: 5, btcPrice: 80000 },
+      { date: '2026-09-08', excessOverTBill: 3, apr90d: 7, btcPrice: 81000 }
+    ];
+    const [w] = buildWeeklyPanel({ etfFlows, cot, oiPanel: [], basisSeries });
+    assert.equal(w.etfFlowBtc, 1000);
+    assert.equal(w.etfDays, 2);
+    assert.equal(w.dLfNetShortBtc, 600);
+    assert.equal(w.arbMatchedBtc, 600);
+    assert.equal(w.directionalBtc, 400);
+    assert.equal(w.excessOverTBill, 2);
+    assert.equal(w.btcPrice, 81000);
   });
 
-  test('calculateCarryScore implements Amberdata continuous risk-adjusted formula', () => {
-    const { calculateCarryScore } = require('../server/term_premium_engine');
-    // 1. High excess return (10.0% over T-bill) & steep curve (2.0%) -> Excellent tier (> 20)
-    const s1 = calculateCarryScore(10.0, 2.0, 45.0);
-    assert.equal(s1, 30.7);
-    assert.ok(s1 > 20, 'High excess with steep curve must be in Excellent tier (>20)');
-
-    // 2. Marginal excess (5.0% over T-bill) & positive curve (2.0%) -> Marginal tier (10 ~ 20)
-    const s2 = calculateCarryScore(5.0, 2.0, 45.0);
-    assert.equal(s2, 15.3);
-    assert.ok(s2 >= 10 && s2 <= 20, 'Moderate excess must be in Marginal tier (10~20)');
-
-    // 3. Sub-hurdle excess (1.0% over T-bill) -> Avoid tier (< 10)
-    const s3 = calculateCarryScore(1.0, 2.0, 45.0);
-    assert.equal(s3, 3.1);
-    assert.ok(s3 < 10, 'Low excess must be in Avoid tier (<10)');
-
-    // 4. Negative excess (-1.0%) with inverted curve (-3.0%) -> Smooth negative score
-    const s4 = calculateCarryScore(-1.0, -3.0, 45.0);
-    assert.equal(s4, -1.2);
-    assert.ok(s4 < 0, 'Negative excess with inversion must be negative');
-
-    // 5. Neutral state: 0% excess and 0% spread -> 0.0
-    const s5 = calculateCarryScore(0.0, 0.0, 45.0);
-    assert.equal(s5, 0.0);
-  });
-
-  test('analyzeTermPremium outputs unannualized basis and ETF friction metrics', async () => {
-    const result = await analyzeTermPremium([], 77000);
-    assert.ok(result.current.unannualizedBasis30d !== undefined);
-    assert.equal(result.current.etfFrictionThreshold, 0.50);
-    assert.ok(['COVERED', 'UNWIND_RISK'].includes(result.current.etfArbitrageStatus));
-    assert.ok(typeof result.current.etfArbitrageMargin === 'number');
+  test('analyzeLinkage flags a hedged-flow regime and quantifies the hedge ratio', () => {
+    const weeks = Array.from({ length: 60 }, (_, i) => {
+      const flow = ((i * 37) % 21 - 10) * 1000;
+      const carry = i % 10 < 3 ? -1 : 3;
+      // Shorts track 60% of flows, plus noise
+      const dLf = 0.6 * flow + (((i * 53) % 7) - 3) * 100;
+      return {
+        weekEnd: `2025-${String(1 + Math.floor(i / 5)).padStart(2, '0')}-${String(1 + (i % 5) * 5).padStart(2, '0')}`,
+        etfFlowBtc: flow,
+        etfFlowUsd: flow * 80000,
+        dLfNetShortBtc: dLf,
+        excessOverTBill: carry,
+        arbMatchedBtc: flow > 0 && dLf > 0 ? Math.min(flow, dLf) : (flow < 0 && dLf < 0 ? Math.max(flow, dLf) : 0),
+        directionalBtc: 0
+      };
+    });
+    const out = analyzeLinkage(weeks);
+    assert.ok(Math.abs(out.hedgeRatio.full.beta - 0.6) < 0.02, `beta ${out.hedgeRatio.full.beta}`);
+    assert.ok(out.hedgeRatio.full.tBeta > 10);
+    assert.equal(out.hedgeRatio.rolling.length, weeks.length);
+    assert.equal(out.leadLag.length, 9);
+    assert.ok(out.unwindEpisodes.length >= 1);
+    const check = out.verdict.checks.find(c => c.key === 'hedgeRatio');
+    assert.equal(check.pass, true);
+    assert.ok(['STRONG', 'MODERATE', 'WEAK'].includes(out.verdict.level));
   });
 });
 
@@ -915,8 +1006,8 @@ describe('System Audit & Data Provenance Verification Engine', () => {
     // Specific financial & provenance integrity checks
     assert.ok(audit.modules.macro_liquidity.recordCount >= 2000, 'Macro points count');
     assert.ok(audit.modules.macro_liquidity.mstrPurchasesCount >= 100, 'MSTR official purchases count');
-    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('AMBERDATA_5_STAGE_REGIME_STATE_MACHINE'));
-    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('AMBERDATA_0.50PCT_ETF_FRICTION_THRESHOLD'));
+    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('REAL_TENOR_CURVE_FUNDING_CQ_NQ'));
+    assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('ETF_CME_HEDGE_RATIO_REGRESSION'));
     assert.ok(audit.modules.gold_btc_correlation.recordCount >= 1000, 'Gold PAXG 1000 daily points');
     assert.ok(audit.modules.ssro_oscillator.recordCount >= 2000, 'DefiLlama & BTC joined series 2000+ points');
   });

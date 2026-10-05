@@ -1,369 +1,217 @@
 /**
- * Module: Futures Basis Term Structure & Multi-Span Term Premium Radar
- * Rooted in Section 5 (Amberdata Research: The Carry Trade That Broke)
+ * Module 2: Futures Basis Term Structure & Carry Radar (schema v2)
  *
- * Implements:
- * 1. Deribit live futures basis APR calculation & constant maturity interpolation (7D, 30D, 90D, 180D)
- * 2. Multi-span term premium spreads:
- *    - 90D - 7D: Main quarterly-weekly spread (macro Contango/Backwardation)
- *    - 30D - 7D: Short-term steepness (Overcrowding Inversion detection)
- *    - 180D - 30D: Long-term institutional slope
- * 3. Excess Return over T-Bill (4.5% benchmark)
- * 4. Carry Score: (Excess Return / 30D RV) * Sign(90D - 7D)
- * 5. Dynamic Carry Regime state machine & institutional microstructure insights
+ * Term structure built only from tenors that actually trade on Binance COIN-M:
+ *   0D perp funding (7-day average) → current quarter (dropped < 7D to expiry) → next quarter, plus a 90D
+ *   constant maturity interpolated between the real points that bracket it.
+ * Spreads:
+ *   spreadShort    = CQ APR − funding APR       (short end: futures carry vs perp leverage cost)
+ *   spreadCalendar = NQ APR − CQ APR            (quarterly calendar slope)
+ *   spreadTerm     = 90D APR − funding APR      (overall term slope, always defined)
+ * Benchmarks: FRED DGS3MO 3M T-Bill (dynamic) and hurdle = T-Bill + 3.5%.
  */
 
 const fs = require('fs');
-const path = require('path');
-const { getHistoricalBasisData, calculateCarryScore } = require('./basis_fetcher');
+const {
+  getHistoricalBasisData,
+  fetchLiveBinanceCurve,
+  applyCarryMetrics,
+  calculateCarryScore,
+  scoreTier,
+  CACHE_FILE,
+  HURDLE_SPREAD
+} = require('./basis_fetcher');
 
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-const T_BILL_RATE = 4.5; // 4.5% US Treasury Bill risk-free rate
-const HURDLE_RATE = 8.0; // 8.0% Institutional Capital Opportunity Cost Benchmark
+// Spot ETF + short futures carry: annual sponsor fee and one-off round-trip costs
+// (creation/redemption 0.10% + execution slippage 0.15%), amortized over a 90D hold.
+const ETF_MGMT_FEE_ANNUAL = 0.25;
+const ETF_ROUND_TRIP_COST = 0.25;
+const ETF_HOLD_DAYS = 90;
 
-/**
- * Parses Deribit futures expiry e.g. "BTC-25SEP26" -> Date object (at 08:00 UTC)
- */
-function parseFuturesExpiry(instrumentName) {
-  const match = instrumentName.match(/^BTC-(\d{1,2})([A-Z]{3})(\d{2})$/);
-  if (!match) return null;
-  const day = parseInt(match[1], 10);
-  const mIdx = MONTHS.indexOf(match[2]);
-  if (mIdx === -1) return null;
-  const year = 2000 + parseInt(match[3], 10);
-  return new Date(Date.UTC(year, mIdx, day, 8, 0, 0));
-}
-
-/**
- * Linear interpolation helper
- */
-function interpolate(x, x0, x1, y0, y1) {
-  if (x1 === x0) return y0;
-  return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
-}
-
-/**
- * Calculates Constant Maturity Basis APRs (7D, 30D, 60D, 90D, 180D) from live futures curve
- */
-function calculateConstantMaturityBasis(futuresList, spotPrice, now = Date.now()) {
-  if (!futuresList || !futuresList.length || !spotPrice || spotPrice <= 0) {
-    return null;
+function etfCarryMetrics(row) {
+  if (row.apr90d == null || row.tbill == null) {
+    return { etfNetCarry: null, etfArbitrageStatus: 'UNKNOWN' };
   }
-
-  const contracts = [];
-  for (const item of futuresList) {
-    if (!item.instrument_name || item.instrument_name === 'BTC-PERPETUAL') continue;
-    const expDate = parseFuturesExpiry(item.instrument_name);
-    if (!expDate) continue;
-
-    const daysToExpiry = (expDate.getTime() - now) / (86400 * 1000);
-    if (daysToExpiry <= 0.1) continue; // skip expired or expiring in <2 hours
-
-    const F = Number(item.mark_price || item.last_price || 0);
-    if (F <= 0) continue;
-
-    const basisUSD = F - spotPrice;
-    const basisPct = (basisUSD / spotPrice) * 100;
-    // Annualized Basis APR = (F - S)/S * (365 / D) * 100%
-    const basisAPR = (basisUSD / spotPrice) * (365 / daysToExpiry) * 100;
-
-    contracts.push({
-      instrument: item.instrument_name,
-      expiryDate: expDate.toISOString().slice(0, 10),
-      daysToExpiry: Number(daysToExpiry.toFixed(2)),
-      markPrice: F,
-      basisUSD: Number(basisUSD.toFixed(2)),
-      basisPct: Number(basisPct.toFixed(3)),
-      basisAPR: Number(basisAPR.toFixed(2))
-    });
-  }
-
-  if (contracts.length < 2) return null;
-  contracts.sort((a, b) => a.daysToExpiry - b.daysToExpiry);
-
-  // Interpolation helper for a target constant maturity day D
-  function getAPRAtDay(targetD) {
-    if (targetD <= contracts[0].daysToExpiry) {
-      return contracts[0].basisAPR;
-    }
-    if (targetD >= contracts[contracts.length - 1].daysToExpiry) {
-      return contracts[contracts.length - 1].basisAPR;
-    }
-    for (let i = 0; i < contracts.length - 1; i++) {
-      const c0 = contracts[i];
-      const c1 = contracts[i + 1];
-      if (targetD >= c0.daysToExpiry && targetD <= c1.daysToExpiry) {
-        return Number(interpolate(targetD, c0.daysToExpiry, c1.daysToExpiry, c0.basisAPR, c1.basisAPR).toFixed(2));
-      }
-    }
-    return contracts[0].basisAPR;
-  }
-
-  const apr7d = getAPRAtDay(7);
-  const apr30d = getAPRAtDay(30);
-  const apr60d = getAPRAtDay(60);
-  const apr90d = getAPRAtDay(90);
-  const apr180d = getAPRAtDay(180);
-
+  const costAnnualized = ETF_MGMT_FEE_ANNUAL + ETF_ROUND_TRIP_COST * 365 / ETF_HOLD_DAYS;
+  const net = row.apr90d - row.tbill - costAnnualized;
   return {
-    spotPrice,
-    contracts,
-    apr7d,
-    apr30d,
-    apr60d,
-    apr90d,
-    apr180d,
-    timestamp: now
+    etfNetCarry: Number(net.toFixed(2)),
+    etfCostAnnualized: Number(costAnnualized.toFixed(2)),
+    etfArbitrageStatus: net >= 0 ? 'COVERED' : 'UNWIND_RISK'
   };
 }
 
+function readDiskSeries() {
+  if (!fs.existsSync(CACHE_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+  } catch (e) {
+    console.warn('[TermPremiumEngine] Error reading CACHE_FILE:', e.message);
+    return [];
+  }
+}
+
 /**
- * Load real historical daily series from Binance COIN-M Delivery Futures cache
- * and merge live Deribit constant maturity basis on current date
+ * Load the daily Binance history and attach the live Binance point (same exchange, same formulas).
+ * Today's 00:00 UTC snapshot is replaced by the live point so the chart always ends on "now".
  */
-async function loadHistoricalBasisSeries(liveCurrent) {
+async function loadHistoricalBasisSeries(liveOverride) {
   let baseSeries = [];
   try {
     baseSeries = await getHistoricalBasisData();
   } catch (err) {
     console.warn('[TermPremiumEngine] Fallback reading disk cache:', err.message);
+    baseSeries = readDiskSeries();
   }
-
-  if (!baseSeries || !baseSeries.length) {
-    const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
-    if (fs.existsSync(CACHE_FILE)) {
-      try {
-        baseSeries = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      } catch (e) {
-        console.warn('[TermPremiumEngine] Error reading CACHE_FILE:', e.message);
-      }
-    }
-  }
-
-  // Deep copy to prevent modifying cached data in-place
   const series = (baseSeries || []).map(item => ({ ...item }));
+  if (!series.length) return series;
 
-  // If live Deribit futures book data is present, update or append to the latest entry
-  if (liveCurrent && series.length > 0) {
-    const now = liveCurrent.timestamp ? new Date(liveCurrent.timestamp + 8 * 3600 * 1000) : new Date(Date.now() + 8 * 3600 * 1000);
-    const todayStr = now.toISOString().slice(0, 10);
-    let target = series[series.length - 1];
-
-    if (target.date !== todayStr) {
-      target = { date: todayStr };
-      series.push(target);
-    }
-
-    target.apr7d = liveCurrent.apr7d;
-    target.apr30d = liveCurrent.apr30d;
-    target.apr60d = liveCurrent.apr60d;
-    target.apr90d = liveCurrent.apr90d;
-    target.apr180d = liveCurrent.apr180d;
-    target.spread90d7d = Number((liveCurrent.apr90d - liveCurrent.apr7d).toFixed(2));
-    target.spread30d7d = Number((liveCurrent.apr30d - liveCurrent.apr7d).toFixed(2));
-    target.spread60d30d = Number((liveCurrent.apr60d - liveCurrent.apr30d).toFixed(2));
-    target.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
-    target.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
-    target.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    // Continuous Risk-Adjusted Institutional Carry Score (Amberdata Section 5)
-    target.carryScore = calculateCarryScore(target.excessOverTBill, target.spread90d7d);
-    // Unannualized 30D Basis % = APR * (30 / 365)
-    target.unannualizedBasis30d = Number((liveCurrent.apr30d * (30 / 365)).toFixed(3));
-    // ETF Arbitrage Friction Threshold = 0.50% (Amberdata: Mgmt 0.25% + Creation 0.10% + Slippage 0.15%)
-    target.etfFrictionThreshold = 0.50;
-    target.etfArbitrageMargin = Number((target.unannualizedBasis30d - 0.50).toFixed(3));
-    target.etfArbitrageStatus = target.unannualizedBasis30d >= 0.50 ? 'COVERED' : 'UNWIND_RISK';
-    if (liveCurrent.spotPrice) target.btcPrice = Math.round(liveCurrent.spotPrice);
-    if (liveCurrent.timestamp) target.timestamp = liveCurrent.timestamp;
-    target.isLiveDeribit = true;
-  }
-
-  return series;
-}
-
-// Synchronous wrapper / fallback for backward compatibility
-function generateHistoricalSeries(liveCurrent) {
-  const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
-  let baseSeries = [];
-  if (fs.existsSync(CACHE_FILE)) {
+  // undefined → fetch live; false → history only (tests / offline); object → use as given
+  let live = liveOverride;
+  if (live === undefined) {
+    live = null;
     try {
-      baseSeries = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    } catch (e) {}
+      live = await fetchLiveBinanceCurve(series[series.length - 1].tbill);
+    } catch (err) {
+      console.warn('[TermPremiumEngine] Live Binance curve unavailable:', err.message);
+    }
   }
-  const series = baseSeries.map(item => ({ ...item }));
-  if (liveCurrent && series.length > 0) {
-    const last = series[series.length - 1];
-    last.apr7d = liveCurrent.apr7d;
-    last.apr30d = liveCurrent.apr30d;
-    last.apr60d = liveCurrent.apr60d;
-    last.apr90d = liveCurrent.apr90d;
-    last.apr180d = liveCurrent.apr180d;
-    last.spread90d7d = Number((liveCurrent.apr90d - liveCurrent.apr7d).toFixed(2));
-    last.spread30d7d = Number((liveCurrent.apr30d - liveCurrent.apr7d).toFixed(2));
-    last.spread60d30d = Number((liveCurrent.apr60d - liveCurrent.apr30d).toFixed(2));
-    last.spread180d30d = Number((liveCurrent.apr180d - liveCurrent.apr30d).toFixed(2));
-    last.excessReturn = Number((liveCurrent.apr30d - HURDLE_RATE).toFixed(2));
-    last.excessOverTBill = Number((liveCurrent.apr30d - T_BILL_RATE).toFixed(2));
-    last.carryScore = calculateCarryScore(last.excessOverTBill, last.spread90d7d);
-    last.unannualizedBasis30d = Number((liveCurrent.apr30d * (30 / 365)).toFixed(3));
-    last.etfFrictionThreshold = 0.50;
-    last.etfArbitrageMargin = Number((last.unannualizedBasis30d - 0.50).toFixed(3));
-    last.etfArbitrageStatus = last.unannualizedBasis30d >= 0.50 ? 'COVERED' : 'UNWIND_RISK';
-    if (liveCurrent.spotPrice) last.btcPrice = Math.round(liveCurrent.spotPrice);
+
+  if (live) {
+    const todayStr = new Date(live.timestamp).toISOString().slice(0, 10);
+    const point = { ...live, date: todayStr };
+    if (series[series.length - 1].date === todayStr) series[series.length - 1] = point;
+    else series.push(point);
+    // Recompute rolling vol / momentum / score so the live point is scored on the same basis
+    applyCarryMetrics(series);
   }
+
+  for (const row of series) Object.assign(row, etfCarryMetrics(row));
   return series;
 }
 
 /**
- * Evaluates current Term Premium & Carry Regime state (Refined Amberdata 5-Tier Framework)
+ * Carry regime state machine on real tenors (checked in priority order)
  */
-function evaluateCarryRegime(latest, contracts) {
-  const { apr7d, apr30d, apr60d, apr90d, apr180d, spread90d7d, spread30d7d, spread180d30d, excessReturn, excessOverTBill, carryScore, unannualizedBasis30d } = latest;
+function evaluateCarryRegime(latest) {
+  const {
+    fundingApr, cqApr, nqApr, apr90d, tbill, hurdle,
+    spreadShort, spreadTerm, excessOverTBill, excessOverHurdle, carryScore
+  } = latest;
+  const fmt = v => (v == null ? '--' : `${v >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`);
+  const tb = tbill ?? 4.0;
+  const hd = hurdle ?? tb + HURDLE_SPREAD;
 
-  let regimeCode = 'NORMAL_CONTANGO';
-  let regimeName = '标准正向升水 (Healthy Contango)';
-  let regimeBadgeClass = 'badge-pos';
-  let statusSummary = '';
-  let keyPointers = [];
+  if (apr90d < 1.0 || (cqApr != null && cqApr < 0) || (nqApr != null && nqApr < 0)) {
+    return {
+      regimeCode: 'CRISIS_COMPRESSION',
+      regimeName: '基差断崖压缩 / 贴水 (Compression Cascade)',
+      regimeBadgeClass: 'badge-neg',
+      statusSummary: `90D 基差仅 ${fmt(apr90d)}，交割合约接近平水甚至贴水。套利头寸的展期收益消失，存量套利盘被迫平仓（卖现货/ETF、买回期货），对现货形成额外卖压。`,
+      keyPointers: [
+        `套利反噬：基差跌破 1% 后持有成本远超收益，期现多头集中解体。`,
+        `资金费率 ${fmt(fundingApr)}：观察永续是否同步转负，确认杠杆多头是否已出清。`,
+        `ETF 联动：此阶段 ETF 流出与 CME 杠杆基金回补空头往往同步发生（见下方联动验证）。`
+      ]
+    };
+  }
 
-  if (spread30d7d < -0.8 && apr7d > 12.0) {
-    // 1. Overcrowding Inversion (Amberdata Section 5 Case: Jan 2025 R1 euphoria)
-    regimeCode = 'OVERCROWDED_INVERSION';
-    regimeName = '多头拥挤倒挂 (Overcrowded Inversion)';
-    regimeBadgeClass = 'badge-neg';
-    statusSummary = `短端基差 (${apr7d}%) 显著超越中端 (${apr30d}%)，短端陡峭度倒挂 (${spread30d7d}%)。表明短期热钱极度拥挤追逐短端年化，过度透支远期，为后市踩踏埋下隐患。`;
-    keyPointers = [
-      `短端资金拥挤：7D 基差畸高透支中长端，反映杠杆投机资金短期高度过热。`,
-      `远端动能钝化：90D 与 180D 升水未能同步上移，期限结构呈现近陡远平的脆弱形态。`,
-      `警惕获利盘止损：短端微小回调易触发高杠杆多头集体止损，引发局部踩踏。`
-    ];
-  } else if (apr30d < 3.0 || (spread90d7d < 0 && apr30d < 5.0)) {
-    // 2. Crisis Compression / Backwardation (Amberdata Section 5 Case: Oct 2025 R5 cascade)
-    regimeCode = 'CRISIS_COMPRESSION';
-    regimeName = '基差断崖压缩 / 踩踏倒挂 (Compression Cascade)';
-    regimeBadgeClass = 'badge-neg';
-    statusSummary = `基差全曲线跌入极低贴水区间 (${apr30d}%)，中短期溢价倒挂 (${spread90d7d}%)。市场遭遇强烈流动性冲击，套利盘被迫平仓进一步加剧现货卖压。`;
-    keyPointers = [
-      `套利反噬效应：基差快速跌破成本临界点，引发对冲基金被动平仓（抛现货买期货平空）。`,
-      `流动性真空：现货卖压导致盘口滑点扩大，做市商撤单形成负反馈循环。`,
-      `避险情绪蔓延：远期缺乏升水支撑，市场进入极端防御与去杠杆通道。`
-    ];
-  } else if (apr30d < 5.0) {
-    // 3. Sub-TBill Drain (Amberdata Section 5: <5% fails T-Bills, 64% of year, capital drains)
-    regimeCode = 'SUB_TBILL_DRAIN';
-    regimeName = '跌破美债基准 / 资金外流 (Sub-TBill Drain)';
-    regimeBadgeClass = 'badge-neg';
-    statusSummary = `30D 基差 (${apr30d}%) 跌破 4.5% 美债无风险利率基准（超额美债仅 ${excessOverTBill || (apr30d - 4.5).toFixed(2)}%），套利机会成本丧失，资金回流传统无风险国债。`;
-    keyPointers = [
-      `机会成本劣势：基差收益率完全无法覆盖 4.5% 美债无风险利率，套利资金缺乏经济学合理性。`,
-      `资本逆向外流：套利头寸逐步解体，资金倾向于赎回离场回流高收益美元流动性工具。`,
-      `现货买盘疲软：缺乏期现套利多头支撑，现货价格发现完全依赖被动型长钱。`
-    ];
-  } else if (apr30d < 8.0) {
-    // 4. Marginal Carry (Amberdata Section 5: 5%~8% sub-hurdle for institutions)
-    regimeCode = 'MARGINAL_CARRY';
-    regimeName = '微利观望 / 门槛倒挂 (Sub-Hurdle / Marginal Carry)';
-    regimeBadgeClass = 'badge-warning';
-    statusSummary = `30D 基差 (${apr30d}%) 虽高于美债利率但低于 8.0% 机构资本机会成本门槛（超额机构成本 ${excessReturn}%），仅适合加密原生资金微利运转。`;
-    keyPointers = [
-      `机构资本成本劣势：基差无法覆盖 8.0% 资金机会成本（包含无风险利率 4.5% + 3.5% 风险溢价），主流大型对冲基金观望。`,
-      `期限结构扁平：30D 与 90D 利差维持在极窄区间，缺乏波动弹性与展期收益。`,
-      `等待机制转换：需静待现货强买盘或杠杆多头推动主力基差重新跨越 8.0% 临界线，打开套利空间。`
-    ];
-  } else {
-    // 5. Healthy Contango (> 8.0%, Amberdata: >8% Good/Institutional tier)
-    regimeCode = 'NORMAL_CONTANGO';
-    regimeName = '标准正向升水 (Healthy Contango)';
-    regimeBadgeClass = 'badge-pos';
-    statusSummary = `基差期限结构健康向上倾斜（90D-7D 溢价 +${spread90d7d}%），30D 基差 (${apr30d}%) 高于 8.0% 机构资本机会成本（超额收益 +${excessReturn}%），具备稳健的跨期套利空间。`;
-    keyPointers = [
-      `正向升水结构：远期稳定维持溢价，反映市场对后市持有持续乐观的温和风险偏好。`,
-      `展期套利顺畅：期现对冲仓位可获取超越 8.0% 资金成本的稳健年化收益，吸引合规长线资金持续入场。`,
-      `跨期利差健康：短端与远端利差保持合理斜率，做市商报价连续且具备充足深度缓冲。`
-    ];
+  if (fundingApr != null && fundingApr > 15 && spreadTerm != null && spreadTerm < -5) {
+    return {
+      regimeCode: 'OVERCROWDED_INVERSION',
+      regimeName: '永续杠杆拥挤 / 短端倒挂 (Perp Overcrowding)',
+      regimeBadgeClass: 'badge-neg',
+      statusSummary: `永续资金费率年化 ${fmt(fundingApr)} 显著高于 90D 交割基差 ${fmt(apr90d)}（期限斜率 ${fmt(spreadTerm)}）。杠杆多头集中在永续端支付高额资金费，交割曲线未跟随，结构脆弱。`,
+      keyPointers: [
+        `短端过热：资金费率远高于季度合约年化，说明需求来自高杠杆永续而非期限套利。`,
+        `回落风险：资金费率均值回归时常伴随多头集中止损，引发局部踩踏。`,
+        `套利视角：做空永续收资金费 + 现货多头的短期收益高于季度合约，但须承受资金费骤降风险。`
+      ]
+    };
+  }
+
+  if (excessOverTBill < 0) {
+    return {
+      regimeCode: 'SUB_TBILL_DRAIN',
+      regimeName: '跌破美债基准 / 资金外流 (Sub-TBill Drain)',
+      regimeBadgeClass: 'badge-neg',
+      statusSummary: `90D 基差 ${fmt(apr90d)} 低于 3M 美债 ${tb.toFixed(2)}%（超额 ${fmt(excessOverTBill)}），期现套利的机会成本为负，资金倾向回流国债。`,
+      keyPointers: [
+        `机会成本劣势：无风险利率即可覆盖套利收益，基差交易缺乏经济合理性。`,
+        `头寸逐步解体：关注 CME 杠杆基金净空头是否下降、ETF 是否同步流出。`,
+        `现货买盘：缺少套利多头支撑，价格发现更依赖方向性资金。`
+      ]
+    };
+  }
+
+  if (excessOverHurdle < 0) {
+    return {
+      regimeCode: 'MARGINAL_CARRY',
+      regimeName: '微利观望 / 低于机构门槛 (Marginal Carry)',
+      regimeBadgeClass: 'badge-warning',
+      statusSummary: `90D 基差 ${fmt(apr90d)} 高于 3M 美债但低于机构门槛 ${hd.toFixed(2)}%（美债 + ${HURDLE_SPREAD}%），仅低成本资金的加密原生套利可运转。`,
+      keyPointers: [
+        `机构门槛未达：超额收益 ${fmt(excessOverTBill)} 不足以补偿保证金占用与交易对手风险。`,
+        `短端利差 ${fmt(spreadShort)}：季度合约相对永续的溢价决定展期优先级。`,
+        `等待触发：需现货需求或杠杆多头推动 90D 基差重新越过门槛线。`
+      ]
+    };
   }
 
   return {
-    regimeCode,
-    regimeName,
-    regimeBadgeClass,
-    statusSummary,
-    keyPointers
+    regimeCode: 'NORMAL_CONTANGO',
+    regimeName: '标准正向升水 (Healthy Contango)',
+    regimeBadgeClass: 'badge-pos',
+    statusSummary: `90D 基差 ${fmt(apr90d)} 超过机构门槛 ${hd.toFixed(2)}%（超额美债 ${fmt(excessOverTBill)}），期限斜率 ${fmt(spreadTerm)}，套利评分 ${carryScore ?? '--'}。期现套利具备稳定吸引力。`,
+    keyPointers: [
+      `正向升水：远月稳定溢价，合规长钱的期现套利（ETF 多 + CME 空）收益覆盖资金成本。`,
+      `ETF 联动：此阶段 ETF 流入中套利对冲占比通常上升，需与方向性需求区分。`,
+      `注意拥挤：评分持续高位时关注资金费率是否抢跑，防止短端过热反转。`
+    ]
   };
 }
 
 /**
- * Main Engine API: Analyzes Term Premium and returns complete chart payload
+ * Main Engine API. `futuresList` / `spotPrice` are accepted for call-site compatibility only:
+ * the curve is now sourced from Binance so history and the live point share one exchange.
  */
-async function analyzeTermPremium(futuresList, spotPrice) {
-  const live = calculateConstantMaturityBasis(futuresList, spotPrice);
-  const historicalSeries = await loadHistoricalBasisSeries(live);
-  const latest = historicalSeries[historicalSeries.length - 1] || {
-    apr7d: 8.5,
-    apr30d: 9.0,
-    apr60d: 9.4,
-    apr90d: 9.8,
-    apr180d: 10.5,
-    spread90d7d: 1.3,
-    spread30d7d: 0.5,
-    spread60d30d: 0.4,
-    spread180d30d: 1.5,
-    excessReturn: 1.0,
-    excessOverTBill: 4.5,
-    carryScore: 13.2,
-    unannualizedBasis30d: 0.74,
-    etfFrictionThreshold: 0.50,
-    etfArbitrageMargin: 0.24,
-    etfArbitrageStatus: 'COVERED',
-    timestamp: Date.now(),
-    date: new Date().toISOString().slice(0, 10)
-  };
-  const regime = evaluateCarryRegime(latest, live?.contracts || []);
+async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
+  const historicalSeries = await loadHistoricalBasisSeries(options.live);
+  const latest = historicalSeries[historicalSeries.length - 1];
+  if (!latest) throw new Error('Term premium history unavailable');
+  const regime = evaluateCarryRegime(latest);
+  const tier = scoreTier(latest.carryScore);
 
   return {
-    spotPrice: live?.spotPrice || spotPrice,
-    tBillRate: T_BILL_RATE,
-    hurdleRate: HURDLE_RATE,
+    spotPrice: latest.btcPrice || spotPrice,
+    tBillRate: latest.tbill,
+    hurdleRate: latest.hurdle,
+    hurdleSpread: HURDLE_SPREAD,
     metadata: {
-      dataSource: 'Binance COIN-M Delivery Futures 真实交割基差 (2025.01 ~ 至今) + Deribit 实时盘口恒定到期插值',
-      timeRange: '2025-01-01 至当前最新',
-      missingHandling: '线性时间加权插值与前值顺延填充',
+      dataSource: 'Binance COIN-M BTCUSD 永续资金费率 + 当季/次季交割基差 (2024.01 ~ 至今真实日线) + Binance 实时盘口；3M 美债 FRED DGS3MO',
+      timeRange: `${historicalSeries[0].date} 至 ${latest.date}`,
+      tenorMethod: '仅用真实可交易期限点：0D 永续资金费率 (7 日均值年化) / 当季 (距交割 <7 天剔除) / 次季；90D 在相邻真实点间线性插值，不做外推',
+      scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量',
       isRealHistorical: true
     },
     current: {
-      apr7d: latest.apr7d,
-      apr30d: latest.apr30d,
-      apr60d: latest.apr60d,
-      apr90d: latest.apr90d,
-      apr180d: latest.apr180d,
-      spread90d7d: latest.spread90d7d,
-      spread30d7d: latest.spread30d7d,
-      spread60d30d: latest.spread60d30d,
-      spread180d30d: latest.spread180d30d,
-      excessReturn: latest.excessReturn,
-      excessOverTBill: latest.excessOverTBill,
-      carryScore: latest.carryScore,
-      unannualizedBasis30d: latest.unannualizedBasis30d !== undefined ? latest.unannualizedBasis30d : Number((latest.apr30d * (30 / 365)).toFixed(3)),
-      etfFrictionThreshold: 0.50,
-      etfArbitrageMargin: latest.etfArbitrageMargin !== undefined ? latest.etfArbitrageMargin : Number(((latest.apr30d * (30 / 365)) - 0.50).toFixed(3)),
-      etfArbitrageStatus: (latest.unannualizedBasis30d || (latest.apr30d * (30 / 365))) >= 0.50 ? 'COVERED' : 'UNWIND_RISK',
+      ...latest,
+      scoreTierLabel: tier.label,
       timestamp: latest.timestamp,
       date: latest.date
     },
-    contracts: live?.contracts || [],
+    contracts: latest.contracts || [],
     regime,
-    series: historicalSeries
+    series: historicalSeries.map(({ contracts, ...row }) => row)
   };
 }
 
 module.exports = {
-  calculateConstantMaturityBasis,
   loadHistoricalBasisSeries,
-  generateHistoricalSeries,
   evaluateCarryRegime,
   analyzeTermPremium,
   calculateCarryScore,
-  T_BILL_RATE,
-  HURDLE_RATE
+  etfCarryMetrics,
+  ETF_MGMT_FEE_ANNUAL,
+  ETF_ROUND_TRIP_COST
 };
-

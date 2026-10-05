@@ -82,6 +82,7 @@ function reloadAllChartsForTheme() {
     try { termPremiumChartInstance.dispose(); } catch (e) {}
     termPremiumChartInstance = null;
   }
+  if (typeof disposeEtfLinkageCharts === 'function') disposeEtfLinkageCharts();
   if (typeof ssroChartInstance !== 'undefined' && ssroChartInstance) {
     try { ssroChartInstance.dispose(); } catch (e) {}
     ssroChartInstance = null;
@@ -123,6 +124,9 @@ function reloadAllChartsForTheme() {
   }
   if (typeof renderTermPremiumChart === 'function' && typeof currentTermPremiumData !== 'undefined' && currentTermPremiumData) {
     renderTermPremiumChart();
+  }
+  if (typeof renderEtfLinkage === 'function' && typeof rawEtfLinkageData !== 'undefined' && rawEtfLinkageData) {
+    renderEtfLinkage();
   }
   if (typeof renderSsroChart === 'function' && typeof rawSsroData !== 'undefined' && rawSsroData) {
     renderSsroChart();
@@ -2812,22 +2816,43 @@ function initCdriEvents() {
 }
 
 // ============================================================================
-// Futures Basis Term Structure & Multi-Span Term Premium Radar Controller
+// Futures Basis Term Structure (real tenors) & Carry Score Controller
 // ============================================================================
 
 let currentTermPremiumData = null;
 let termPremiumChartInstance = null;
 let currentTpTimeframe = 'all'; // '30', '90', '180', '365', 'all'
 let tpVisibleSeries = {
-  spread90d7d: true,
-  spread30d7d: true,
-  spread180d30d: true,
-  apr30d: true,
+  spreadTerm: true,
+  spreadShort: true,
+  spreadCalendar: true,
+  apr90d: true,
   hurdle: true,
   tbill: true,
   carryScore: true,
+  btcPrice: true,
   allCurves: false
 };
+
+// Carry score tiers (0-100), mirrored from server/basis_fetcher.js scoreTier()
+function tpScoreColor(score) {
+  if (score == null) return '#71717a';
+  if (score >= 65) return '#10b981';
+  if (score >= 45) return '#38bdf8';
+  if (score >= 30) return '#f59e0b';
+  return '#f43f5e';
+}
+function tpScoreTierLabel(score) {
+  if (score == null) return '--';
+  if (score >= 65) return '优质';
+  if (score >= 45) return '合格';
+  if (score >= 30) return '边际';
+  return '回避';
+}
+function tpPct(v, digits = 2) {
+  if (v == null || !isFinite(v)) return '--';
+  return `${v >= 0 ? '+' : ''}${Number(v).toFixed(digits)}%`;
+}
 
 // DOM Elements
 const elTpHeaderRegimePill = document.getElementById('tp-header-regime-pill');
@@ -2837,37 +2862,33 @@ const elTpUpdateTime = document.getElementById('tp-update-time');
 const elTpDataSourceBadge = document.getElementById('tp-data-source-badge');
 const elTpHistoryPointsBadge = document.getElementById('tp-history-points-badge');
 
-const elTpVal7d = document.getElementById('tp-val-7d');
-const elTpVal30d = document.getElementById('tp-val-30d');
-const elTpVal60d = document.getElementById('tp-val-60d');
+const elTpValFunding = document.getElementById('tp-val-funding');
+const elTpValCq = document.getElementById('tp-val-cq');
+const elTpLblCq = document.getElementById('tp-lbl-cq');
+const elTpValNq = document.getElementById('tp-val-nq');
+const elTpLblNq = document.getElementById('tp-lbl-nq');
 const elTpVal90d = document.getElementById('tp-val-90d');
-const elTpVal180d = document.getElementById('tp-val-180d');
-const elTpUnann30d = document.getElementById('tp-unann-30d');
+const elTpValTbill = document.getElementById('tp-val-tbill');
+const elTpEtfNet = document.getElementById('tp-etf-net');
 const elTpEtfStatusBadge = document.getElementById('tp-etf-status-badge');
 
-const elTpSpread90d7d = document.getElementById('tp-spread-90d7d');
-const elTpSpread30d7d = document.getElementById('tp-spread-30d7d');
-const elTpSpread180d30d = document.getElementById('tp-spread-180d30d');
+const elTpSpreadTerm = document.getElementById('tp-spread-term');
+const elTpSpreadShort = document.getElementById('tp-spread-short');
+const elTpSpreadCalendar = document.getElementById('tp-spread-calendar');
 
 const elTpRegimeTag = document.getElementById('tp-regime-tag');
 const elTpScoreValue = document.getElementById('tp-score-value');
+const elTpScoreTier = document.getElementById('tp-score-tier');
 const elTpExcessVal = document.getElementById('tp-excess-val');
+const elTpSharpeVal = document.getElementById('tp-sharpe-val');
 const elTpScoreBarFill = document.getElementById('tp-score-bar-fill');
+const elTpScoreComponents = document.getElementById('tp-score-components');
 
 const elTpInsightsSummary = document.getElementById('tp-insights-summary');
 const elTpInsightsList = document.getElementById('tp-insights-list');
 
 const elTpEcharts = document.getElementById('term-premium-echarts');
 const tpTimeframeSelector = document.getElementById('tp-timeframe-selector');
-
-const btnToggleSpread90d7d = document.getElementById('btn-toggle-spread90d7d');
-const btnToggleSpread30d7d = document.getElementById('btn-toggle-spread30d7d');
-const btnToggleSpread180d30d = document.getElementById('btn-toggle-spread180d30d');
-const btnToggleApr30d = document.getElementById('btn-toggle-apr30d');
-const btnToggleHurdle = document.getElementById('btn-toggle-hurdle');
-const btnToggleTbill = document.getElementById('btn-toggle-tbill');
-const btnToggleCarryScore = document.getElementById('btn-toggle-carry-score');
-const btnToggleAllCurves = document.getElementById('btn-toggle-all-curves');
 
 /**
  * Fallback independent fetcher for Term Premium
@@ -2885,6 +2906,17 @@ async function loadTermPremiumData() {
   }
 }
 
+function tpSetSigned(el, v, { neutralColor = null, nullText = '--%' } = {}) {
+  if (!el) return;
+  if (v == null || !isFinite(v)) {
+    el.textContent = nullText;
+    el.style.color = '';
+    return;
+  }
+  el.textContent = tpPct(v);
+  el.style.color = neutralColor || (v >= 0 ? '#10b981' : '#f43f5e');
+}
+
 /**
  * Render all Term Premium metrics and chart
  */
@@ -2899,10 +2931,10 @@ function renderTermPremium(data, forceRedraw = false) {
 
   // Header pills & provenance badges
   if (elTpDataSourceBadge && data.metadata?.dataSource) {
-    elTpDataSourceBadge.title = `数据认证：${data.metadata.dataSource} | 跨度: ${data.metadata.timeRange || ''} | 缺失处理: ${data.metadata.missingHandling || ''}`;
+    elTpDataSourceBadge.title = `数据源：${data.metadata.dataSource} | 区间: ${data.metadata.timeRange || ''} | 期限: ${data.metadata.tenorMethod || ''} | 评分: ${data.metadata.scoreMethod || ''}`;
   }
-  if (elTpHistoryPointsBadge && data.series) {
-    elTpHistoryPointsBadge.textContent = `${data.series.length} 条真实历史日线 (2025.01~至今)`;
+  if (elTpHistoryPointsBadge && data.series?.length) {
+    elTpHistoryPointsBadge.textContent = `${data.series.length} 条真实日线 (${data.series[0].date.slice(0, 7)} ~ 至今)`;
   }
 
   if (elTpHeaderRegimePill && reg.regimeName) {
@@ -2911,91 +2943,80 @@ function renderTermPremium(data, forceRedraw = false) {
       elTpHeaderRegimePill.className = `tp-regime-pill ${reg.regimeBadgeClass}`;
     }
   }
-  if (elTpHeaderScorePill && c && c.carryScore !== undefined) {
-    elTpHeaderScorePill.textContent = `Carry: ${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
-    elTpHeaderScorePill.style.color = c.carryScore >= 20 ? '#10b981' : (c.carryScore >= 10 ? '#f59e0b' : '#f43f5e');
+  if (elTpHeaderScorePill && c && c.carryScore != null) {
+    elTpHeaderScorePill.textContent = `Carry: ${c.carryScore.toFixed(1)} ${tpScoreTierLabel(c.carryScore)}`;
+    elTpHeaderScorePill.style.color = tpScoreColor(c.carryScore);
   }
-  if (elTpHeaderExcessPill && c && c.excessReturn !== undefined) {
-    elTpHeaderExcessPill.textContent = `超额: ${c.excessReturn >= 0 ? '+' : ''}${c.excessReturn.toFixed(2)}%`;
+  if (elTpHeaderExcessPill && c && c.excessOverTBill != null) {
+    elTpHeaderExcessPill.textContent = `超额美债: ${tpPct(c.excessOverTBill)}`;
   }
   if (elTpUpdateTime && c) {
     elTpUpdateTime.textContent = `${formatUTC8(c.timestamp || Date.now())} (UTC+8)`;
   }
 
-  // 1. Constant Maturity Basis Matrix
   if (c) {
-    if (elTpVal7d) {
-      elTpVal7d.textContent = `${c.apr7d >= 0 ? '+' : ''}${c.apr7d.toFixed(2)}%`;
-      elTpVal7d.style.color = c.apr7d >= 0 ? '#10b981' : '#f43f5e';
-    }
-    if (elTpVal30d) {
-      elTpVal30d.textContent = `${c.apr30d >= 0 ? '+' : ''}${c.apr30d.toFixed(2)}%`;
-      elTpVal30d.style.color = '#f59e0b';
-    }
-    if (elTpVal60d) {
-      elTpVal60d.textContent = `${c.apr60d !== undefined ? (c.apr60d >= 0 ? '+' : '') + c.apr60d.toFixed(2) + '%' : '--%'}`;
-      elTpVal60d.style.color = '#38bdf8';
-    }
-    if (elTpVal90d) {
-      elTpVal90d.textContent = `${c.apr90d >= 0 ? '+' : ''}${c.apr90d.toFixed(2)}%`;
-      elTpVal90d.style.color = c.apr90d >= 0 ? '#38bdf8' : '#f43f5e';
-    }
-    if (elTpVal180d) {
-      elTpVal180d.textContent = `${c.apr180d >= 0 ? '+' : ''}${c.apr180d.toFixed(2)}%`;
-      elTpVal180d.style.color = c.apr180d >= 0 ? '#10b981' : '#f43f5e';
-    }
+    // 1. Real tenor points
+    tpSetSigned(elTpValFunding, c.fundingApr);
+    if (elTpValFunding) elTpValFunding.title = c.fundingApr24h != null ? `过去 24h 资金费率年化: ${tpPct(c.fundingApr24h)}` : '';
+    if (elTpLblCq) elTpLblCq.textContent = c.cqDays != null ? `当季 (${Math.round(c.cqDays)}D)` : '当季';
+    tpSetSigned(elTpValCq, c.cqApr, { nullText: '末周剔除' });
+    if (elTpLblNq) elTpLblNq.textContent = c.nqDays != null ? `次季 (${Math.round(c.nqDays)}D)` : '次季';
+    tpSetSigned(elTpValNq, c.nqApr);
+    tpSetSigned(elTpVal90d, c.apr90d, { neutralColor: '#f59e0b' });
+    if (elTpValTbill) elTpValTbill.textContent = c.tbill != null ? `${c.tbill.toFixed(2)}%` : '--%';
 
-    // 1-B. Amberdata 0.50% ETF Friction Audit
-    if (elTpUnann30d && c.unannualizedBasis30d !== undefined) {
-      elTpUnann30d.textContent = `${c.unannualizedBasis30d >= 0 ? '+' : ''}${c.unannualizedBasis30d.toFixed(2)}%`;
-      elTpUnann30d.style.color = c.unannualizedBasis30d >= 0.50 ? '#10b981' : (c.unannualizedBasis30d > 0 ? '#f59e0b' : '#f43f5e');
+    // ETF cash-and-carry net yield
+    if (elTpEtfNet) {
+      tpSetSigned(elTpEtfNet, c.etfNetCarry);
     }
     if (elTpEtfStatusBadge) {
-      const isCovered = c.etfArbitrageStatus === 'COVERED' || c.unannualizedBasis30d >= 0.50;
-      const margin = c.etfArbitrageMargin !== undefined ? c.etfArbitrageMargin : (c.unannualizedBasis30d ? c.unannualizedBasis30d - 0.50 : 0);
-      if (isCovered) {
-        elTpEtfStatusBadge.textContent = `摩擦覆盖 (+${margin >= 0 ? margin.toFixed(2) : '0.00'}%)`;
-        elTpEtfStatusBadge.className = 'tp-ef-badge profitable';
-      } else {
-        elTpEtfStatusBadge.textContent = `摩擦破位 (${margin.toFixed(2)}%)`;
-        elTpEtfStatusBadge.className = 'tp-ef-badge unprofitable';
-      }
+      const covered = c.etfArbitrageStatus === 'COVERED';
+      elTpEtfStatusBadge.textContent = covered ? '成本覆盖' : '成本未覆盖';
+      elTpEtfStatusBadge.className = `tp-ef-badge ${covered ? 'profitable' : 'unprofitable'}`;
+      elTpEtfStatusBadge.title = c.etfCostAnnualized != null
+        ? `90D 基差 − 3M 美债 − 年化成本 ${c.etfCostAnnualized}%（管理费 0.25%/年 + 申赎与滑点 0.25% 按 90 天摊销）`
+        : '';
     }
 
-    // 2. Multi-Span Spreads Breakdown
-    if (elTpSpread90d7d) {
-      elTpSpread90d7d.textContent = `${c.spread90d7d >= 0 ? '+' : ''}${c.spread90d7d.toFixed(2)}%`;
-      elTpSpread90d7d.className = `tp-sp-num ${c.spread90d7d >= 0 ? 'text-pos' : 'text-neg'}`;
-    }
-    if (elTpSpread30d7d) {
-      elTpSpread30d7d.textContent = `${c.spread30d7d >= 0 ? '+' : ''}${c.spread30d7d.toFixed(2)}%`;
-      elTpSpread30d7d.className = `tp-sp-num ${c.spread30d7d >= 0 ? 'text-pos' : 'text-neg'}`;
-    }
-    if (elTpSpread180d30d) {
-      elTpSpread180d30d.textContent = `${c.spread180d30d >= 0 ? '+' : ''}${c.spread180d30d.toFixed(2)}%`;
-      elTpSpread180d30d.className = `tp-sp-num ${c.spread180d30d >= 0 ? 'text-pos' : 'text-neg'}`;
-    }
+    // 2. Spreads
+    tpSetSigned(elTpSpreadTerm, c.spreadTerm);
+    tpSetSigned(elTpSpreadShort, c.spreadShort, { nullText: '当季末周' });
+    tpSetSigned(elTpSpreadCalendar, c.spreadCalendar, { nullText: '当季末周' });
 
-    // 3. Carry Score & Excess Return
+    // 3. Carry score
     if (elTpRegimeTag && reg.regimeCode) {
       elTpRegimeTag.textContent = reg.regimeCode.replace(/_/g, ' ');
     }
-    if (elTpScoreValue && c.carryScore !== undefined) {
-      elTpScoreValue.textContent = `${c.carryScore >= 0 ? '+' : ''}${c.carryScore.toFixed(1)}`;
-      // Amberdata 3-tier benchmark: <10 Avoid, 10-20 Marginal, >20 Excellent
-      if (c.carryScore >= 20) elTpScoreValue.style.color = '#10b981';
-      else if (c.carryScore >= 10) elTpScoreValue.style.color = '#f59e0b';
-      else elTpScoreValue.style.color = '#f43f5e';
+    const score = c.carryScore;
+    const scoreColor = tpScoreColor(score);
+    if (elTpScoreValue) {
+      elTpScoreValue.textContent = score != null ? score.toFixed(1) : '--';
+      elTpScoreValue.style.color = scoreColor;
     }
-    if (elTpExcessVal && c.excessReturn !== undefined) {
-      elTpExcessVal.textContent = `${c.excessReturn >= 0 ? '+' : ''}${c.excessReturn.toFixed(2)}%`;
-      elTpExcessVal.style.color = c.excessReturn >= 0 ? '#10b981' : '#f43f5e';
+    if (elTpScoreTier) {
+      elTpScoreTier.textContent = tpScoreTierLabel(score);
+      elTpScoreTier.style.color = scoreColor;
     }
-    if (elTpScoreBarFill && c.carryScore !== undefined) {
-      // Map Amberdata scale [0, 30] to [5%, 95%]
-      const pct = Math.max(5, Math.min(95, (c.carryScore / 30) * 100));
-      elTpScoreBarFill.style.width = `${pct}%`;
-      elTpScoreBarFill.style.backgroundColor = c.carryScore >= 20 ? '#10b981' : (c.carryScore >= 10 ? '#f59e0b' : '#f43f5e');
+    tpSetSigned(elTpExcessVal, c.excessOverTBill);
+    if (elTpSharpeVal) {
+      elTpSharpeVal.textContent = c.carrySharpe != null
+        ? `${c.carrySharpe.toFixed(2)} / ${c.basisVolAnn != null ? c.basisVolAnn.toFixed(2) + '%' : '--'}`
+        : '--';
+    }
+    if (elTpScoreBarFill && score != null) {
+      elTpScoreBarFill.style.width = `${Math.max(3, Math.min(100, score))}%`;
+    }
+    if (elTpScoreComponents && c.scoreComponents) {
+      ['sharpe', 'structure', 'momentum'].forEach(key => {
+        const v = c.scoreComponents[key];
+        const fill = elTpScoreComponents.querySelector(`[data-comp="${key}"]`);
+        const val = elTpScoreComponents.querySelector(`[data-comp-val="${key}"]`);
+        if (fill) {
+          fill.style.width = `${v != null ? v : 0}%`;
+          fill.style.background = tpScoreColor(v);
+        }
+        if (val) val.textContent = v != null ? v.toFixed(0) : '--';
+      });
     }
   }
 
@@ -3007,7 +3028,6 @@ function renderTermPremium(data, forceRedraw = false) {
     elTpInsightsList.innerHTML = reg.keyPointers.map(p => `<li>${escapeHtml(p)}</li>`).join('');
   }
 
-  // Render Dual-Grid Chart only when required to prevent costly re-rendering
   const shouldRedraw = forceRedraw ||
                        !termPremiumChartInstance ||
                        prevLatestTime !== data.current?.timestamp ||
@@ -3018,7 +3038,7 @@ function renderTermPremium(data, forceRedraw = false) {
 }
 
 /**
- * Render Dual-Grid ECharts: Constant Maturity Basis & Multi-Span Spreads
+ * Render Dual-Grid ECharts: 90D basis / benchmarks / score / price on top, real-tenor spreads below
  */
 function renderTermPremiumChart() {
   if (!elTpEcharts || !currentTermPremiumData || !currentTermPremiumData.series) return;
@@ -3027,201 +3047,70 @@ function renderTermPremiumChart() {
     termPremiumChartInstance = echarts.init(elTpEcharts, getEchartsTheme());
   }
 
-  let rawSeries = currentTermPremiumData.series;
+  const rawSeries = currentTermPremiumData.series;
   if (!rawSeries || !rawSeries.length) return;
 
   const colors = getChartThemeColors();
 
-  // Filter series by timeframe
   let sliced = rawSeries;
-  if (currentTpTimeframe === '30') sliced = rawSeries.slice(-30);
-  else if (currentTpTimeframe === '90') sliced = rawSeries.slice(-90);
-  else if (currentTpTimeframe === '180') sliced = rawSeries.slice(-180);
-  else if (currentTpTimeframe === '365') sliced = rawSeries.slice(-365);
+  if (currentTpTimeframe !== 'all') sliced = rawSeries.slice(-Number(currentTpTimeframe));
 
-  const dates = sliced.map(s => s.date);
-  const apr30dData = sliced.map(s => s.apr30d);
-  const hurdleData = sliced.map(() => 8.0);
-  const tbillData = sliced.map(() => 4.5);
-  const spread90d7dData = sliced.map(s => s.spread90d7d);
-  const spread30d7dData = sliced.map(s => s.spread30d7d);
-  const spread180d30dData = sliced.map(s => s.spread180d30d);
-  const carryScoreData = sliced.map(s => s.carryScore != null ? s.carryScore : 0);
-
+  const dates = sliced.map(s => (s.isLive ? `${s.date} 实时` : s.date));
+  const pick = key => sliced.map(s => (s[key] != null ? s[key] : null));
   const seriesList = [];
+  const line = (id, name, key, color, extra = {}) => ({
+    id,
+    name,
+    type: 'line',
+    xAxisIndex: id.startsWith('bot-') ? 1 : 0,
+    yAxisIndex: id.startsWith('bot-') ? 1 : 0,
+    showSymbol: false,
+    connectNulls: false,
+    data: pick(key),
+    lineStyle: { width: 1.6, color },
+    itemStyle: { color },
+    ...extra
+  });
 
-  // Top Grid Series: 30D Basis APR
-  if (tpVisibleSeries.apr30d) {
-    seriesList.push({
-      id: 'top-apr30d',
-      name: '30D 基差 APR',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      smooth: 0.2,
-      data: apr30dData,
-      lineStyle: { width: 2.2, color: '#f59e0b' },
-      itemStyle: { color: '#f59e0b' },
-      markArea: {
-        silent: true,
-        data: [
-          [
-            {
-              yAxis: -15,
-              itemStyle: { color: 'rgba(244, 63, 94, 0.04)' },
-              label: {
-                show: true,
-                position: 'insideBottomRight',
-                color: 'rgba(244, 63, 94, 0.65)',
-                fontSize: 10,
-                formatter: '机会成本劣势区 (<8.0%)'
-              }
-            },
-            { yAxis: 8.0 }
-          ],
-          [
-            {
-              yAxis: 8.0,
-              itemStyle: { color: 'rgba(16, 185, 129, 0.03)' },
-              label: {
-                show: true,
-                position: 'insideTopRight',
-                color: 'rgba(16, 185, 129, 0.65)',
-                fontSize: 10,
-                formatter: '结构性套利扩张区 (>8.0%)'
-              }
-            },
-            { yAxis: 30 }
-          ]
-        ]
-      }
-    });
+  if (tpVisibleSeries.apr90d) {
+    seriesList.push(line('top-apr90d', '90D 基差 APR', 'apr90d', '#f59e0b', { smooth: 0.2, lineStyle: { width: 2.2, color: '#f59e0b' } }));
   }
-
-  // Top Grid Series: 8.0% Institutional Hurdle Rate
   if (tpVisibleSeries.hurdle) {
-    seriesList.push({
-      id: 'top-hurdle',
-      name: '8.0% 机构资本成本',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: hurdleData,
-      lineStyle: { width: 1.8, color: '#ec4899', type: 'dashed' },
-      itemStyle: { color: '#ec4899' }
-    });
+    seriesList.push(line('top-hurdle', '机构门槛 (美债+3.5%)', 'hurdle', '#ec4899', { lineStyle: { width: 1.6, color: '#ec4899', type: 'dashed' } }));
   }
-
-  // Top Grid Series: 4.5% T-Bill Cost Line
   if (tpVisibleSeries.tbill) {
-    seriesList.push({
-      id: 'top-tbill',
-      name: '4.5% 美债机会成本',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: tbillData,
-      lineStyle: { width: 1.5, color: '#f43f5e', type: 'dotted' },
-      itemStyle: { color: '#f43f5e' }
-    });
+    seriesList.push(line('top-tbill', '3M 美债', 'tbill', '#f43f5e', { lineStyle: { width: 1.4, color: '#f43f5e', type: 'dotted' } }));
   }
-
-  // Top Grid Series: Institutional Carry Score (Right Y-Axis 2)
+  if (tpVisibleSeries.allCurves) {
+    seriesList.push(line('top-funding', '0D 资金费率 (7D均) APR', 'fundingApr', '#a1a1aa', { lineStyle: { width: 1, color: '#a1a1aa', opacity: 0.7 } }));
+    seriesList.push(line('top-cq', '当季 APR', 'cqApr', '#38bdf8', { lineStyle: { width: 1.3, color: '#38bdf8' } }));
+    seriesList.push(line('top-nq', '次季 APR', 'nqApr', '#10b981', { lineStyle: { width: 1.3, color: '#10b981' } }));
+  }
   if (tpVisibleSeries.carryScore) {
     seriesList.push({
-      id: 'top-carryScore',
-      name: '套利评分 (Carry Score)',
-      type: 'line',
-      xAxisIndex: 0,
+      ...line('top-carryScore', '套利评分 (0-100)', 'carryScore', '#818cf8', { smooth: 0.25, lineStyle: { width: 2, color: '#818cf8' } }),
       yAxisIndex: 2,
-      showSymbol: false,
-      smooth: 0.25,
-      data: carryScoreData,
-      lineStyle: { width: 2.2, color: '#818cf8' },
-      itemStyle: { color: '#818cf8' },
       markLine: {
         silent: true,
         symbol: 'none',
         data: [
-          {
-            yAxis: 20,
-            lineStyle: { color: 'rgba(16, 185, 129, 0.45)', type: 'dashed', width: 1 },
-            label: { show: true, position: 'insideEndTop', formatter: '极佳套利 (>20)', color: '#10b981', fontSize: 10 }
-          },
-          {
-            yAxis: 10,
-            lineStyle: { color: 'rgba(245, 158, 11, 0.45)', type: 'dashed', width: 1 },
-            label: { show: true, position: 'insideEndTop', formatter: '微利临界 (10)', color: '#f59e0b', fontSize: 10 }
-          }
+          { yAxis: 65, lineStyle: { color: 'rgba(16, 185, 129, 0.45)', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: '优质 65', color: '#10b981', fontSize: 10 } },
+          { yAxis: 45, lineStyle: { color: 'rgba(56, 189, 248, 0.4)', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: '合格 45', color: '#38bdf8', fontSize: 10 } },
+          { yAxis: 30, lineStyle: { color: 'rgba(245, 158, 11, 0.4)', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: '边际 30', color: '#f59e0b', fontSize: 10 } }
         ]
       }
     });
   }
-
-  // Top Grid Series: Optional Full Curve (7D, 60D, 90D, 180D)
-  if (tpVisibleSeries.allCurves) {
+  if (tpVisibleSeries.btcPrice) {
     seriesList.push({
-      id: 'top-apr7d',
-      name: '7D 超短端 APR',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: sliced.map(s => s.apr7d),
-      lineStyle: { width: 1.2, color: '#a1a1aa', type: 'dotted' },
-      itemStyle: { color: '#a1a1aa' }
-    });
-    seriesList.push({
-      id: 'top-apr60d',
-      name: '60D 中期端 APR',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: sliced.map(s => s.apr60d),
-      lineStyle: { width: 1.4, color: '#818cf8', type: 'dotted' },
-      itemStyle: { color: '#818cf8' }
-    });
-    seriesList.push({
-      id: 'top-apr90d',
-      name: '90D 季度端 APR',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: sliced.map(s => s.apr90d),
-      lineStyle: { width: 1.5, color: '#38bdf8' },
-      itemStyle: { color: '#38bdf8' }
-    });
-    seriesList.push({
-      id: 'top-apr180d',
-      name: '180D 半年端 APR',
-      type: 'line',
-      xAxisIndex: 0,
-      yAxisIndex: 0,
-      showSymbol: false,
-      data: sliced.map(s => s.apr180d),
-      lineStyle: { width: 1.5, color: '#10b981' },
-      itemStyle: { color: '#10b981' }
+      ...line('top-btcPrice', 'BTC 价格 (USD)', 'btcPrice', '#94a3b8', { z: 1, lineStyle: { width: 1.4, color: '#94a3b8', opacity: 0.85 } }),
+      yAxisIndex: 3
     });
   }
 
-  // Bottom Grid Series: 90D - 7D Main Spread
-  if (tpVisibleSeries.spread90d7d) {
-    seriesList.push({
-      id: 'bot-spread90d7d',
-      name: '90D - 7D 主跨度',
-      type: 'line',
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      showSymbol: false,
-      smooth: 0.15,
-      data: spread90d7dData,
-      lineStyle: { width: 2.0, color: '#38bdf8' },
-      itemStyle: { color: '#38bdf8' },
+  if (tpVisibleSeries.spreadTerm) {
+    seriesList.push(line('bot-spreadTerm', '90D − 资金费率 期限斜率', 'spreadTerm', '#38bdf8', {
+      lineStyle: { width: 1.8, color: '#38bdf8' },
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: 'rgba(56, 189, 248, 0.18)' },
@@ -3231,75 +3120,34 @@ function renderTermPremiumChart() {
       markLine: {
         silent: true,
         symbol: 'none',
-        data: [
-          {
-            yAxis: 0,
-            lineStyle: { color: 'rgba(255, 255, 255, 0.22)', type: 'dashed', width: 1 },
-            label: { show: true, position: 'end', formatter: '平水线 (0%)', color: '#71717a', fontSize: 10 }
-          }
-        ]
+        data: [{ yAxis: 0, lineStyle: { color: colors.gridLineStrong, type: 'dashed', width: 1 }, label: { show: true, position: 'end', formatter: '0%', color: '#71717a', fontSize: 10 } }]
       }
-    });
+    }));
+  }
+  if (tpVisibleSeries.spreadShort) {
+    seriesList.push(line('bot-spreadShort', '当季 − 资金费率 短端利差', 'spreadShort', '#a855f7'));
+  }
+  if (tpVisibleSeries.spreadCalendar) {
+    seriesList.push(line('bot-spreadCalendar', '次季 − 当季 跨期斜率', 'spreadCalendar', '#10b981'));
   }
 
-  // Bottom Grid Series: 30D - 7D Short-term Steepness
-  if (tpVisibleSeries.spread30d7d) {
-    seriesList.push({
-      id: 'bot-spread30d7d',
-      name: '30D - 7D 短端陡峭度',
-      type: 'line',
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      showSymbol: false,
-      smooth: 0.15,
-      data: spread30d7dData,
-      lineStyle: { width: 1.8, color: '#a855f7' },
-      itemStyle: { color: '#a855f7' }
-    });
-  }
+  const tooltipRow = (p, valueHtml) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
+    <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
+    ${valueHtml}
+  </div>`;
 
-  // Bottom Grid Series: 180D - 30D Long-term Slope
-  if (tpVisibleSeries.spread180d30d) {
-    seriesList.push({
-      id: 'bot-spread180d30d',
-      name: '180D - 30D 远端斜率',
-      type: 'line',
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      showSymbol: false,
-      smooth: 0.15,
-      data: spread180d30dData,
-      lineStyle: { width: 1.8, color: '#10b981' },
-      itemStyle: { color: '#10b981' }
-    });
-  }
-
+  // Fixed pixel margins (no containLabel) so both grids share the same plot width
+  const tpGridRight = 24 + (tpVisibleSeries.carryScore ? 44 : 0) + (tpVisibleSeries.btcPrice ? 52 : 0);
   const option = {
     backgroundColor: 'transparent',
     animation: false,
     grid: [
-      {
-        left: '4%',
-        right: '3%',
-        top: '6%',
-        height: '42%',
-        containLabel: true
-      },
-      {
-        left: '4%',
-        right: '3%',
-        top: '55%',
-        height: '39%',
-        containLabel: true
-      }
+      { left: 64, right: tpGridRight, top: '6%', height: '42%' },
+      { left: 64, right: tpGridRight, top: '55%', height: '39%' }
     ],
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
-      label: {
-        backgroundColor: colors.axisPointerBg,
-        fontFamily: 'JetBrains Mono',
-        fontSize: 11
-      }
+      label: { backgroundColor: colors.axisPointerBg, fontFamily: 'JetBrains Mono', fontSize: 11 }
     },
     tooltip: {
       trigger: 'axis',
@@ -3308,125 +3156,79 @@ function renderTermPremiumChart() {
       borderColor: colors.tooltipBorder,
       borderWidth: 1,
       padding: [10, 14],
-      textStyle: {
-        color: colors.tooltipText,
-        fontFamily: 'JetBrains Mono',
-        fontSize: 12
-      },
+      textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 12 },
       formatter: function (params) {
         if (!params || !params.length) return '';
-        const date = params[0].name;
-        let html = `<div style="font-weight:600;margin-bottom:6px;color:${colors.tooltipTitle};">${date}</div>`;
+        const row = sliced[params[0].dataIndex] || {};
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${colors.tooltipTitle};">${params[0].name}</div>`;
 
-        // Top grid items
-        const topItems = params.filter(p => p.seriesId && p.seriesId.startsWith('top-'));
+        const topItems = params.filter(p => p.seriesId && p.seriesId.startsWith('top-') && p.value != null);
         if (topItems.length) {
-          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:2px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">基差率与套利评分 (Basis &amp; Carry):</div>`;
+          html += `<div style="font-size:11px;color:${colors.textSecondary};border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">基差与套利评分:</div>`;
           topItems.forEach(p => {
-            const isScore = p.seriesId && p.seriesId.includes('carryScore');
-            const unit = isScore ? ' 分' : '%';
-            const valFormatted = isScore ? Number(p.value).toFixed(1) : Number(p.value).toFixed(2);
-            let tierTag = '';
-            if (isScore) {
-              const s = Number(p.value);
-              if (s >= 20) tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(16,185,129,0.2);color:#10b981;">极佳</span>';
-              else if (s >= 10) tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(245,158,11,0.2);color:#f59e0b;">微利</span>';
-              else tierTag = ' <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(244,63,94,0.2);color:#f43f5e;">回避</span>';
+            const v = Number(p.value);
+            if (p.seriesId === 'top-btcPrice') {
+              html += tooltipRow(p, `<span style="font-weight:700;color:${p.color};">$${Math.round(v).toLocaleString('en-US')}</span>`);
+            } else if (p.seriesId === 'top-carryScore') {
+              const col = tpScoreColor(v);
+              html += tooltipRow(p, `<span style="font-weight:700;color:${col};">${v.toFixed(1)} <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${col}22;">${tpScoreTierLabel(v)}</span></span>`);
+            } else {
+              html += tooltipRow(p, `<span style="font-weight:700;color:${p.color};">${v.toFixed(2)}%</span>`);
             }
-            html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
-              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
-              <span style="font-weight:700;color:${p.color};">${valFormatted}${unit}${tierTag}</span>
-            </div>`;
           });
+          if (row.cqValid === false) {
+            html += `<div style="font-size:10px;color:${colors.textMuted};margin-top:2px;">当季距交割 ${row.cqDays}D (&lt;7D)，已从曲线剔除</div>`;
+          }
         }
 
-        // Bottom grid items
-        const botItems = params.filter(p => p.seriesId && p.seriesId.startsWith('bot-'));
+        const botItems = params.filter(p => p.seriesId && p.seriesId.startsWith('bot-') && p.value != null);
         if (botItems.length) {
-          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:6px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">期限溢价利差 (Spreads):</div>`;
+          html += `<div style="font-size:11px;color:${colors.textSecondary};margin-top:6px;border-bottom:1px solid ${colors.tooltipDivider};padding-bottom:2px;">真实期限利差:</div>`;
           botItems.forEach(p => {
-            const val = Number(p.value);
-            const sign = val >= 0 ? '+' : '';
-            const col = val >= 0 ? '#38bdf8' : '#f43f5e';
-            html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0;">
-              <span style="color:${colors.textSecondary};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}:</span>
-              <span style="font-weight:700;color:${col};">${sign}${val.toFixed(2)}%</span>
-            </div>`;
+            const v = Number(p.value);
+            html += tooltipRow(p, `<span style="font-weight:700;color:${v >= 0 ? '#38bdf8' : '#f43f5e'};">${tpPct(v)}</span>`);
           });
         }
-
         return html;
       }
     },
     xAxis: [
       {
-        type: 'category',
-        gridIndex: 0,
-        data: dates,
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: colors.axisLine } },
-        axisTick: { show: false },
-        axisLabel: { show: false }
+        type: 'category', gridIndex: 0, data: dates, boundaryGap: false,
+        axisLine: { lineStyle: { color: colors.axisLine } }, axisTick: { show: false }, axisLabel: { show: false }
       },
       {
-        type: 'category',
-        gridIndex: 1,
-        data: dates,
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: colors.axisLine } },
-        axisTick: { show: false },
-        axisLabel: {
-          color: colors.tickColor,
-          fontFamily: 'JetBrains Mono',
-          fontSize: 11,
-          showMinLabel: true,
-          showMaxLabel: true
-        }
+        type: 'category', gridIndex: 1, data: dates, boundaryGap: false,
+        axisLine: { lineStyle: { color: colors.axisLine } }, axisTick: { show: false },
+        axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', fontSize: 11, showMinLabel: true, showMaxLabel: true }
       }
     ],
     yAxis: [
       {
-        type: 'value',
-        gridIndex: 0,
-        name: '基差 APR (%)',
+        type: 'value', gridIndex: 0, name: '基差 APR (%)',
         nameTextStyle: { color: colors.tickColor, fontSize: 11 },
-        axisLabel: {
-          color: colors.tickColor,
-          fontFamily: 'JetBrains Mono',
-          formatter: '{value}%'
-        },
-        splitLine: {
-          lineStyle: { color: colors.splitLine }
-        }
+        axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', formatter: '{value}%' },
+        splitLine: { lineStyle: { color: colors.gridLine } }
       },
       {
-        type: 'value',
-        gridIndex: 1,
-        name: '期限利差 (%)',
+        type: 'value', gridIndex: 1, name: '期限利差 (%)',
         nameTextStyle: { color: colors.tickColor, fontSize: 11 },
-        axisLabel: {
-          color: colors.tickColor,
-          fontFamily: 'JetBrains Mono',
-          formatter: '{value}%'
-        },
-        splitLine: {
-          lineStyle: { color: colors.splitLine }
-        }
+        axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', formatter: '{value}%' },
+        splitLine: { lineStyle: { color: colors.gridLine } }
       },
       {
-        type: 'value',
-        gridIndex: 0,
-        position: 'right',
-        name: '套利评分 Carry',
+        type: 'value', gridIndex: 0, position: 'right', min: 0, max: 100, name: '评分',
         nameTextStyle: { color: '#818cf8', fontSize: 10, fontFamily: 'JetBrains Mono' },
-        axisLabel: {
-          color: '#818cf8',
-          fontFamily: 'JetBrains Mono',
-          fontSize: 10,
-          formatter: '{value}'
-        },
+        axisLabel: { color: '#818cf8', fontFamily: 'JetBrains Mono', fontSize: 10 },
         splitLine: { show: false },
         show: tpVisibleSeries.carryScore
+      },
+      {
+        type: 'value', gridIndex: 0, position: 'right', offset: tpVisibleSeries.carryScore ? 48 : 0, scale: true, name: 'BTC (USD)',
+        nameTextStyle: { color: '#94a3b8', fontSize: 10, fontFamily: 'JetBrains Mono' },
+        axisLabel: { color: '#94a3b8', fontFamily: 'JetBrains Mono', fontSize: 10, formatter: v => `$${Math.round(v / 1000)}k` },
+        splitLine: { show: false },
+        show: tpVisibleSeries.btcPrice
       }
     ],
     series: seriesList
@@ -3442,7 +3244,6 @@ function renderTermPremiumChart() {
  * Initialize Term Premium UI event listeners
  */
 function initTermPremiumEvents() {
-  // Timeframe selector
   if (tpTimeframeSelector) {
     tpTimeframeSelector.addEventListener('click', (e) => {
       const btn = e.target.closest('.timeframe-btn');
@@ -3457,50 +3258,419 @@ function initTermPremiumEvents() {
     });
   }
 
-  // Toggle buttons helper
-  function setupToggle(btn, key) {
+  function setupToggle(id, key) {
+    const btn = document.getElementById(id);
     if (!btn) return;
     btn.addEventListener('click', () => {
       tpVisibleSeries[key] = !tpVisibleSeries[key];
-      if (tpVisibleSeries[key]) {
-        btn.classList.add('active');
-        btn.classList.remove('inactive');
-      } else {
-        btn.classList.remove('active');
-        btn.classList.add('inactive');
+      btn.classList.toggle('active', tpVisibleSeries[key]);
+      btn.classList.toggle('inactive', !tpVisibleSeries[key] && key !== 'allCurves');
+      if (key === 'allCurves') {
+        btn.querySelector('span:last-child').textContent = tpVisibleSeries.allCurves ? '收起真实期限点' : '展开真实期限点';
       }
       renderTermPremiumChart();
     });
   }
 
-  setupToggle(btnToggleSpread90d7d, 'spread90d7d');
-  setupToggle(btnToggleSpread30d7d, 'spread30d7d');
-  setupToggle(btnToggleSpread180d30d, 'spread180d30d');
-  setupToggle(btnToggleApr30d, 'apr30d');
-  setupToggle(btnToggleHurdle, 'hurdle');
-  setupToggle(btnToggleTbill, 'tbill');
-  setupToggle(btnToggleCarryScore, 'carryScore');
+  setupToggle('btn-toggle-spread-term', 'spreadTerm');
+  setupToggle('btn-toggle-spread-short', 'spreadShort');
+  setupToggle('btn-toggle-spread-calendar', 'spreadCalendar');
+  setupToggle('btn-toggle-apr90d', 'apr90d');
+  setupToggle('btn-toggle-hurdle', 'hurdle');
+  setupToggle('btn-toggle-tbill', 'tbill');
+  setupToggle('btn-toggle-carry-score', 'carryScore');
+  setupToggle('btn-toggle-btc-price', 'btcPrice');
+  setupToggle('btn-toggle-all-curves', 'allCurves');
 
-  if (btnToggleAllCurves) {
-    btnToggleAllCurves.addEventListener('click', () => {
-      tpVisibleSeries.allCurves = !tpVisibleSeries.allCurves;
-      if (tpVisibleSeries.allCurves) {
-        btnToggleAllCurves.classList.add('active');
-        btnToggleAllCurves.classList.remove('inactive');
-        btnToggleAllCurves.querySelector('span:last-child').textContent = '收起常数曲线';
-      } else {
-        btnToggleAllCurves.classList.remove('active');
-        btnToggleAllCurves.classList.remove('inactive');
-        btnToggleAllCurves.querySelector('span:last-child').textContent = '展开全期限曲线';
-      }
-      renderTermPremiumChart();
-    });
-  }
-
-  // Resize handler
   window.addEventListener('resize', () => {
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
   });
+}
+
+// ============================================================================
+// Module 2-B: ETF flows × basis-arbitrage capital linkage Controller
+// ============================================================================
+
+let rawEtfLinkageData = null;
+let elWeeklyChartInstance = null;
+let elDecompChartInstance = null;
+let elLeadLagChartInstance = null;
+let elOiChartInstance = null;
+let elFlowUnit = 'btc';
+let elOiUnit = 'usd';
+let elShowCmeOi = false;
+
+function elFmtBtc(v, signed = true) {
+  if (v == null || !isFinite(v)) return '--';
+  const sign = signed && v > 0 ? '+' : '';
+  const abs = Math.abs(v);
+  const body = abs >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0);
+  return `${sign}${body} BTC`;
+}
+function elFmtUsd(v, signed = true) {
+  if (v == null || !isFinite(v)) return '--';
+  const sign = signed && v > 0 ? '+' : (v < 0 ? '-' : '');
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(0)}M`;
+  return `${sign}$${abs.toFixed(0)}`;
+}
+function elFmtNum(v, d = 2) {
+  return v == null || !isFinite(v) ? '--' : Number(v).toFixed(d);
+}
+function elFmtShare(v) {
+  return v == null || !isFinite(v) ? '--' : `${(v * 100).toFixed(0)}%`;
+}
+
+function elInitChart(instance, id) {
+  if (instance) return instance;
+  const dom = document.getElementById(id);
+  return dom ? echarts.init(dom, getEchartsTheme()) : null;
+}
+
+async function loadEtfLinkageData(force = false) {
+  const status = document.getElementById('el-status');
+  try {
+    const resp = await fetch(`/api/etf-linkage${force ? '?force=1' : ''}`);
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    rawEtfLinkageData = json;
+    if (status) {
+      status.textContent = json.stale ? '⚠ 上游数据暂不可用，显示最近一次缓存结果' : '';
+      status.classList.toggle('error', !!json.stale);
+    }
+    renderEtfLinkage();
+  } catch (err) {
+    console.error('[ETF Linkage] Failed to load:', err);
+    if (status) {
+      status.textContent = `ETF 联动数据加载失败：${err.message}`;
+      status.classList.add('error');
+    }
+  }
+}
+
+function renderEtfLinkage() {
+  const d = rawEtfLinkageData;
+  if (!d) return;
+  const setText = (id, text, color) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (color !== undefined) el.style.color = color || '';
+  };
+
+  // Header
+  const pill = document.getElementById('el-verdict-pill');
+  if (pill && d.verdict) {
+    pill.textContent = `${d.verdict.levelLabel} ${d.verdict.passed}/${d.verdict.total}`;
+    pill.className = `el-verdict-pill ${d.verdict.level.toLowerCase()}`;
+  }
+  const lastWeek = d.weeks?.[d.weeks.length - 1];
+  setText('el-update-time', `COT 截至 ${lastWeek?.weekEnd || '--'} · 生成 ${formatUTC8(d.generatedAt, false)}`);
+
+  // KPIs
+  const full = d.hedgeRatio?.full || {};
+  const rec = d.hedgeRatio?.recent || {};
+  const betaColor = b => (b == null ? '' : b >= 0.3 ? '#10b981' : b >= 0.15 ? '#f59e0b' : '#f43f5e');
+  setText('el-kpi-beta', elFmtNum(full.beta), betaColor(full.beta));
+  setText('el-kpi-beta-sub', `t=${elFmtNum(full.tBeta, 1)} · R²=${elFmtNum(full.r2)} · n=${full.n ?? '--'}`);
+  setText('el-kpi-beta12', elFmtNum(rec.beta), betaColor(rec.beta));
+  setText('el-kpi-beta12-sub', `R²=${elFmtNum(rec.r2)} · 相关=${elFmtNum(rec.corr)}`);
+  setText('el-kpi-arbshare', elFmtShare(d.arbShare12w));
+  setText('el-kpi-arbshare-sub', `全样本 ${elFmtShare(d.arbShareAll)}`);
+  const cd = d.carryDependence || {};
+  setText('el-kpi-split', `${elFmtNum(cd.high?.beta)} / ${elFmtNum(cd.low?.beta)}`);
+  setText('el-kpi-split-sub', `${cd.high?.weeks ?? '--'} 周 / ${cd.low?.weeks ?? '--'} 周 · 交互 t=${elFmtNum(cd.interaction?.tInteraction, 1)}`);
+  const us = d.unwindSync || {};
+  setText('el-kpi-sync', elFmtShare(us.syncShareSubTbill));
+  setText('el-kpi-sync-sub', `低于美债周 vs 其他周 ${elFmtShare(us.syncShareOther)}`);
+  if (lastWeek) {
+    setText('el-kpi-lf', elFmtBtc(lastWeek.lfNetShortBtc, false));
+    setText('el-kpi-lf-sub', `周变化 ${elFmtBtc(lastWeek.dLfNetShortBtc)} · ETF ${elFmtBtc(lastWeek.etfFlowBtc)}`);
+  }
+
+  // Verdict checks
+  setText('el-verdict-count', d.verdict ? `${d.verdict.passed}/${d.verdict.total} 通过` : '--');
+  setText('el-verdict-summary', d.verdict?.summary || '--');
+  const list = document.getElementById('el-check-list');
+  if (list && d.verdict?.checks) {
+    list.innerHTML = d.verdict.checks.map(c => `<li class="${c.pass ? 'pass' : 'fail'}">
+      <span class="el-check-mark">${c.pass ? '✓' : '✗'}</span>
+      <span class="el-check-label">${escapeHtml(c.label)}</span>
+      <span class="el-check-detail">${escapeHtml(c.detail)}</span>
+    </li>`).join('');
+  }
+
+  // Episodes
+  const body = document.getElementById('el-episode-body');
+  if (body) {
+    const eps = d.unwindEpisodes || [];
+    setText('el-episode-count', `${eps.length} 段`);
+    body.innerHTML = eps.length
+      ? eps.map(ep => {
+        const tag = ep.jointUnwind
+          ? '<span class="el-tag pos">ETF 流出 + 空头回补</span>'
+          : '<span class="el-tag neutral">未同步</span>';
+        return `<tr>
+          <td>${escapeHtml(ep.start)} → ${escapeHtml(ep.end)}${ep.ongoing ? ' (进行中)' : ''}</td>
+          <td>${ep.weeks}</td>
+          <td style="color:#f43f5e;">${tpPct(ep.minCarry)}</td>
+          <td style="color:${ep.cumFlowBtc >= 0 ? '#10b981' : '#f43f5e'};">${elFmtBtc(ep.cumFlowBtc)} (${elFmtUsd(ep.cumFlowUsd)})</td>
+          <td style="color:${ep.cumDLfNetShortBtc >= 0 ? '#10b981' : '#f43f5e'};">${elFmtBtc(ep.cumDLfNetShortBtc)}</td>
+          <td>${tag}</td>
+        </tr>`;
+      }).join('')
+      : '<tr><td colspan="6">样本期内基差未低于美债</td></tr>';
+  }
+
+  // Caveats
+  const cav = document.getElementById('el-caveats');
+  if (cav && d.metadata) {
+    const src = d.metadata.sources || {};
+    cav.innerHTML = [
+      `<span><strong class="text-cyan">数据:</strong> ${escapeHtml(src.etfFlows || '')} · ${escapeHtml(src.cme || '')}</span>`,
+      `<span><strong class="text-cyan">对齐:</strong> ${escapeHtml(d.metadata.weekDefinition || '')}</span>`,
+      ...(d.metadata.caveats || []).map(t => `<span>· ${escapeHtml(t)}</span>`)
+    ].join('');
+  }
+
+  renderElWeeklyChart();
+  renderElDecompChart();
+  renderElLeadLagChart();
+  renderElOiChart();
+}
+
+function elTooltipBase(colors) {
+  return {
+    trigger: 'axis',
+    confine: true,
+    backgroundColor: colors.tooltipBg,
+    borderColor: colors.tooltipBorder,
+    borderWidth: 1,
+    padding: [8, 12],
+    textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 12 }
+  };
+}
+
+function elAxisCommon(colors) {
+  return {
+    axisLine: { lineStyle: { color: colors.axisLine } },
+    axisTick: { show: false },
+    axisLabel: { color: colors.tickColor, fontFamily: 'JetBrains Mono', fontSize: 10 },
+    splitLine: { lineStyle: { color: colors.gridLine } }
+  };
+}
+
+function renderElWeeklyChart() {
+  const d = rawEtfLinkageData;
+  if (!d?.weeks?.length) return;
+  elWeeklyChartInstance = elInitChart(elWeeklyChartInstance, 'el-weekly-echarts');
+  if (!elWeeklyChartInstance) return;
+  const colors = getChartThemeColors();
+  const weeks = d.weeks;
+  const usd = elFlowUnit === 'usd';
+  const flow = weeks.map(w => (usd ? w.etfFlowUsd : w.etfFlowBtc));
+  const dLf = weeks.map(w => (usd ? (w.btcPrice ? w.dLfNetShortBtc * w.btcPrice : null) : w.dLfNetShortBtc));
+  const fmtAxis = v => (usd ? elFmtUsd(v, false) : `${Math.round(v / 1000)}k`);
+  const rolling = d.hedgeRatio?.rolling || [];
+  const common = elAxisCommon(colors);
+
+  elWeeklyChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: [
+      { left: 64, right: 108, top: 30, height: '52%' },
+      { left: 64, right: 108, top: '72%', height: '20%' }
+    ],
+    legend: {
+      top: 0,
+      textStyle: { color: colors.textSecondary, fontSize: 11 },
+      data: ['ETF 周净流入', 'CME 杠杆基金净空头 Δ', '90D 超额美债', 'BTC 价格', '12 周滚动 β', '12 周 R²']
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const w = weeks[params[0].dataIndex];
+        const r = rolling[params[0].dataIndex] || {};
+        if (!w) return '';
+        return `<div style="font-weight:600;margin-bottom:4px;">周截至 ${w.weekEnd}（${w.etfDays} 个交易日）</div>
+          <div>ETF 净流入: <b>${elFmtBtc(w.etfFlowBtc)}</b> (${elFmtUsd(w.etfFlowUsd)})</div>
+          <div>杠杆基金净空头 Δ: <b>${elFmtBtc(w.dLfNetShortBtc)}</b>（存量 ${elFmtBtc(w.lfNetShortBtc, false)}）</div>
+          <div>资管净多头 Δ: ${elFmtBtc(w.dAmNetLongBtc)} · CME OI Δ: ${elFmtBtc(w.dCmeOiBtc)}</div>
+          <div>套利匹配: ${elFmtBtc(w.arbMatchedBtc)} · 方向性: ${elFmtBtc(w.directionalBtc)}</div>
+          <div>90D 超额美债: ${tpPct(w.excessOverTBill)} · BTC $${w.btcPrice ? w.btcPrice.toLocaleString('en-US') : '--'}</div>
+          <div style="margin-top:4px;color:${colors.textSecondary};">12 周 β ${elFmtNum(r.beta)} · R² ${elFmtNum(r.r2)}</div>`;
+      }
+    },
+    xAxis: [
+      { type: 'category', gridIndex: 0, data: weeks.map(w => w.weekEnd), ...common, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: 'category', gridIndex: 1, data: weeks.map(w => w.weekEnd), ...common, splitLine: { show: false } }
+    ],
+    yAxis: [
+      { type: 'value', gridIndex: 0, ...common, axisLabel: { ...common.axisLabel, formatter: fmtAxis }, name: usd ? 'USD' : 'BTC', nameTextStyle: { color: colors.tickColor, fontSize: 10 } },
+      { type: 'value', gridIndex: 0, position: 'right', ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, color: '#f59e0b', formatter: '{value}%' }, name: '超额', nameTextStyle: { color: '#f59e0b', fontSize: 10 } },
+      { type: 'value', gridIndex: 0, position: 'right', offset: 48, scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, color: '#94a3b8', formatter: v => `$${Math.round(v / 1000)}k` } },
+      { type: 'value', gridIndex: 1, ...common, name: 'β / R²', nameTextStyle: { color: colors.tickColor, fontSize: 10 } }
+    ],
+    series: [
+      {
+        name: 'ETF 周净流入', type: 'bar', xAxisIndex: 0, yAxisIndex: 0, barMaxWidth: 8,
+        data: flow.map(v => ({ value: v, itemStyle: { color: v >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(244,63,94,0.75)' } })),
+        itemStyle: { color: '#10b981' }
+      },
+      {
+        name: 'CME 杠杆基金净空头 Δ', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false,
+        data: dLf, lineStyle: { width: 1.8, color: '#a855f7' }, itemStyle: { color: '#a855f7' }
+      },
+      {
+        name: '90D 超额美债', type: 'line', xAxisIndex: 0, yAxisIndex: 1, showSymbol: false, connectNulls: false,
+        data: weeks.map(w => w.excessOverTBill), lineStyle: { width: 1.6, color: '#f59e0b' }, itemStyle: { color: '#f59e0b' },
+        markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0, lineStyle: { color: 'rgba(245,158,11,0.35)', type: 'dashed' }, label: { show: false } }] }
+      },
+      {
+        name: 'BTC 价格', type: 'line', xAxisIndex: 0, yAxisIndex: 2, showSymbol: false, z: 1,
+        data: weeks.map(w => w.btcPrice), lineStyle: { width: 1.2, color: '#94a3b8', opacity: 0.8 }, itemStyle: { color: '#94a3b8' }
+      },
+      {
+        name: '12 周滚动 β', type: 'line', xAxisIndex: 1, yAxisIndex: 3, showSymbol: false, connectNulls: false,
+        data: rolling.map(r => r.beta), lineStyle: { width: 1.8, color: '#818cf8' }, itemStyle: { color: '#818cf8' },
+        markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0, lineStyle: { color: colors.gridLineStrong, type: 'dashed' }, label: { show: false } }] }
+      },
+      {
+        name: '12 周 R²', type: 'line', xAxisIndex: 1, yAxisIndex: 3, showSymbol: false, connectNulls: false,
+        data: rolling.map(r => r.r2), lineStyle: { width: 1.2, color: '#38bdf8', type: 'dotted' }, itemStyle: { color: '#38bdf8' }
+      }
+    ]
+  }, true);
+}
+
+function renderElDecompChart() {
+  const d = rawEtfLinkageData;
+  if (!d?.decomposition?.length) return;
+  elDecompChartInstance = elInitChart(elDecompChartInstance, 'el-decomp-echarts');
+  if (!elDecompChartInstance) return;
+  const colors = getChartThemeColors();
+  const rows = d.decomposition;
+  const common = elAxisCommon(colors);
+  elDecompChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 60, right: 16, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: {
+      ...elTooltipBase(colors),
+      valueFormatter: v => elFmtBtc(v)
+    },
+    xAxis: { type: 'category', data: rows.map(r => r.weekEnd), ...common, splitLine: { show: false } },
+    yAxis: { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: v => `${Math.round(v / 1000)}k` }, name: 'BTC', nameTextStyle: { color: colors.tickColor, fontSize: 10 } },
+    series: [
+      { name: 'ETF 累计净流入', type: 'line', showSymbol: false, data: rows.map(r => r.cumFlowBtc), lineStyle: { width: 2.2, color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
+      { name: '套利匹配 (CME 新增空头)', type: 'line', showSymbol: false, data: rows.map(r => r.cumArbBtc), lineStyle: { width: 1.8, color: '#a855f7' }, itemStyle: { color: '#a855f7' } },
+      { name: '方向性剩余', type: 'line', showSymbol: false, data: rows.map(r => r.cumDirectionalBtc), lineStyle: { width: 1.8, color: '#10b981' }, itemStyle: { color: '#10b981' } }
+    ]
+  }, true);
+}
+
+function renderElLeadLagChart() {
+  const d = rawEtfLinkageData;
+  if (!d?.leadLag?.length) return;
+  elLeadLagChartInstance = elInitChart(elLeadLagChartInstance, 'el-leadlag-echarts');
+  if (!elLeadLagChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const rows = d.leadLag;
+  elLeadLagChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 48, right: 16, top: 34, bottom: 42 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: { ...elTooltipBase(colors), valueFormatter: v => elFmtNum(v, 3) },
+    xAxis: {
+      type: 'category',
+      data: rows.map(r => (r.lag > 0 ? `+${r.lag}` : `${r.lag}`)),
+      name: 'k (周)，正 = 基差变化领先',
+      nameLocation: 'middle',
+      nameGap: 26,
+      nameTextStyle: { color: colors.tickColor, fontSize: 10 },
+      ...common,
+      splitLine: { show: false }
+    },
+    yAxis: { type: 'value', min: -1, max: 1, ...common },
+    series: [
+      { name: '与 ETF 流入相关', type: 'bar', barMaxWidth: 14, data: rows.map(r => r.corrFlow), itemStyle: { color: '#f59e0b' } },
+      { name: '与 CME 空头增量相关', type: 'bar', barMaxWidth: 14, data: rows.map(r => r.corrShort), itemStyle: { color: '#a855f7' } }
+    ]
+  }, true);
+}
+
+function renderElOiChart() {
+  const d = rawEtfLinkageData;
+  if (!d?.oiPanel?.length) return;
+  elOiChartInstance = elInitChart(elOiChartInstance, 'el-oi-echarts');
+  if (!elOiChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const usd = elOiUnit === 'usd';
+  const rows = d.oiPanel;
+  const field = base => rows.map(r => r[`${base}${usd ? 'Usd' : 'Btc'}`] ?? null);
+  const fmtAxis = v => (usd ? `$${(v / 1e9).toFixed(0)}B` : `${Math.round(v / 1000)}k`);
+  const fmtVal = v => (usd ? elFmtUsd(v, false) : elFmtBtc(v, false));
+  const series = [
+    { name: 'Binance 期货 OI', type: 'line', showSymbol: false, data: field('binanceFutOi'), lineStyle: { width: 1.6, color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
+    { name: 'Deribit 期权 OI', type: 'line', showSymbol: false, data: field('deribitOptOi'), lineStyle: { width: 1.6, color: '#38bdf8' }, itemStyle: { color: '#38bdf8' } },
+    { name: '离岸对冲合计', type: 'line', showSymbol: false, data: field('offshoreHedgeOi'), lineStyle: { width: 2.4, color: '#a855f7' }, itemStyle: { color: '#a855f7' } }
+  ];
+  if (elShowCmeOi) {
+    series.push({ name: 'CME 期货 OI', type: 'line', showSymbol: false, data: field('cmeFutOi'), lineStyle: { width: 1.4, color: '#f97316', type: 'dashed' }, itemStyle: { color: '#f97316' } });
+  }
+  elOiChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 64, right: 16, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: { ...elTooltipBase(colors), valueFormatter: fmtVal },
+    xAxis: { type: 'category', data: rows.map(r => r.date), ...common, splitLine: { show: false } },
+    yAxis: { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: fmtAxis } },
+    series
+  }, true);
+}
+
+function disposeEtfLinkageCharts() {
+  [elWeeklyChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
+    if (ch) { try { ch.dispose(); } catch (e) {} }
+  });
+  elWeeklyChartInstance = elDecompChartInstance = elLeadLagChartInstance = elOiChartInstance = null;
+}
+
+function resizeEtfLinkageCharts() {
+  [elWeeklyChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
+    if (ch) ch.resize();
+  });
+}
+
+function initEtfLinkageEvents() {
+  const bindSegment = (id, onPick) => {
+    const seg = document.getElementById(id);
+    if (!seg) return;
+    seg.addEventListener('click', e => {
+      const btn = e.target.closest('.timeframe-btn');
+      if (!btn) return;
+      seg.querySelectorAll('.timeframe-btn').forEach(b => b.classList.toggle('active', b === btn));
+      onPick(btn.dataset.unit);
+    });
+  };
+  bindSegment('el-unit-selector', unit => { elFlowUnit = unit; renderElWeeklyChart(); });
+  bindSegment('el-oi-unit-selector', unit => { elOiUnit = unit; renderElOiChart(); });
+  const cmeBtn = document.getElementById('el-toggle-cme-oi');
+  if (cmeBtn) {
+    cmeBtn.addEventListener('click', () => {
+      elShowCmeOi = !elShowCmeOi;
+      cmeBtn.classList.toggle('active', elShowCmeOi);
+      renderElOiChart();
+    });
+  }
+  window.addEventListener('resize', resizeEtfLinkageCharts);
 }
 
 // ============================================================================
@@ -4402,6 +4572,7 @@ function switchView(viewId, updateHash = true) {
 
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
+    resizeEtfLinkageCharts();
 
     if (ssroChartInstance) {
       ssroChartInstance.resize();
@@ -5373,12 +5544,14 @@ initThemeController();
 initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
+initEtfLinkageEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
 initMcClellanEvents();
 initNavigation();
 loadMarketData(false);
+loadEtfLinkageData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 loadGoldCorrelationData(false);

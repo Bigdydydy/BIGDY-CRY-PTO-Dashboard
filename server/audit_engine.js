@@ -147,25 +147,30 @@ async function getSystemAuditData(doProbe = false) {
 
     term_premium_basis: {
       id: 'term_premium_basis',
-      name: '期现基差期限结构与期限溢价雷达 (Amberdata 模型)',
+      name: '期现基差期限结构、套利评分与 ETF × 套利资金联动',
       viewId: 'view-term-premium',
-      primarySource: 'Binance COIN-M 季度交割基差 (DAPI 2025.01~至今) + Deribit 实时盘口',
+      primarySource: 'Binance COIN-M 永续资金费率 + 当季/次季交割基差 (2024.01~至今) + FRED DGS3MO + CoinGlass ETF 流量/OI + CFTC TFF',
       targetEndpoints: [
-        'https://dapi.binance.com/dapi/v1/klines',
-        'https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=future'
+        'https://dapi.binance.com/futures/data/basis',
+        'https://dapi.binance.com/dapi/v1/fundingRate',
+        'https://dapi.binance.com/dapi/v1/premiumIndex?pair=BTCUSD',
+        'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO',
+        'https://capi.coinglass.com/api/etf/flow',
+        'https://publicreporting.cftc.gov/resource/gpe5-46if.json'
       ],
-      timeframe: '628 日历史基差日线 + 30秒实时期货盘口基差修正',
-      updateInterval: '30s 自动轮询',
+      timeframe: '2024.01 至今基差日线 + 60s 实时币安曲线；ETF/COT 周度联动',
+      updateInterval: '30s 自动轮询 (实时曲线 60s 缓存，联动数据 6h)',
       isRealtime: true,
-      recordCount: cache.termPremium?.series?.length || 628,
+      recordCount: cache.termPremium?.series?.length || 0,
       lastUpdated: cache.termPremium?.current?.timestamp
         ? new Date(cache.termPremium.current.timestamp).toISOString()
         : (cache.lastSyncCheckTime || serverTimeUTC),
       provenanceSignatures: [
-        'AMBERDATA_5_STAGE_REGIME_STATE_MACHINE',
-        'AMBERDATA_0.50PCT_ETF_FRICTION_THRESHOLD',
-        '30D_UNANNUALIZED_BASIS_AUDIT',
-        'BINANCE_COIN_M_628D_HISTORICAL_CURVE'
+        'REAL_TENOR_CURVE_FUNDING_CQ_NQ',
+        'CQ_FINAL_WEEK_EXCLUSION',
+        'CARRY_SHARPE_BASIS_MTM_VOL_SCORE',
+        'DYNAMIC_3M_TBILL_HURDLE',
+        'ETF_CME_HEDGE_RATIO_REGRESSION'
       ],
       healthStatus: (cache.termPremium || fs.existsSync(path.join(DATA_DIR, 'term_premium_history.json'))) ? 'ONLINE' : 'INITIALIZING'
     },

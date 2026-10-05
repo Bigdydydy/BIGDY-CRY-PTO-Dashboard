@@ -562,5 +562,6 @@ function readMacroCacheFile() {
 
 module.exports = {
   getMacroChartData,
-  fetchAndBuildMacroData
+  fetchAndBuildMacroData,
+  fetchFredSeries
 };
