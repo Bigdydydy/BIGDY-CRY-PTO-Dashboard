@@ -48,6 +48,13 @@
   "last_qualified": "2026-10-05",
   "symbol": "COLLECT"
  },
+ "bsc:0x51363f073b1e4920fda7aa9e9d84ba97ede1560e": {
+  "address": "0x51363f073b1e4920fda7aa9e9d84ba97ede1560e",
+  "chain": "bsc",
+  "first_qualified": "2026-10-05",
+  "last_qualified": "2026-10-05",
+  "symbol": "BOB"
+ },
  "bsc:0x531f1fd7356923e4d4da6145ce3742ddfe147777": {
   "address": "0x531f1fd7356923e4d4da6145ce3742ddfe147777",
   "chain": "bsc",
@@ -320,6 +327,13 @@
   "first_qualified": "2026-10-05",
   "last_qualified": "2026-10-05",
   "symbol": "SI"
+ },
+ "solana:F5WvFdG9sCfhv3bVYAMJNWiwpx5e3X2uvpXDtLtdsDJs": {
+  "address": "F5WvFdG9sCfhv3bVYAMJNWiwpx5e3X2uvpXDtLtdsDJs",
+  "chain": "solana",
+  "first_qualified": "2026-10-05",
+  "last_qualified": "2026-10-05",
+  "symbol": "ASH"
  },
  "solana:GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump": {
   "address": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
