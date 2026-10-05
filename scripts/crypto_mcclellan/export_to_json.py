@@ -1,178 +1,232 @@
 """
-Exporter Script: Crypto Dual-Track McClellan Oscillator to JSON
-Executes analytical pipeline and exports structured JSON to the dashboard data directory.
+Crypto McClellan Oscillator pipeline (Module 1-B).
+
+  1. Append today's Core snapshot (CoinGecko Top 300 candidates)
+  2. Run the Frontier meme discovery / gatekeeper / pricing for today
+  3. Recompute both breadth series from the stores and export
+     data/crypto_mcclellan.json for the dashboard
+
+Run: python export_to_json.py            (collect + compute)
+     python export_to_json.py --offline  (recompute from stored data only)
 """
-import sys
+
+import argparse
 import json
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import pandas as pd
-import numpy as np
 
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import config
-from src.collectors.core_collector import CoreTrackCollector
-from src.collectors.frontier_meme_collector import FrontierMemeCollector
-from src.collectors.historical_seeder import HistoricalBreadthSeeder
-from src.indicators.mcclellan_engine import McClellanEngine
-from src.indicators.dual_track_spread import DualTrackSpreadEngine
+from src import anchor, breadth, core_track, frontier_track
 
-def main():
-    print("[McClellan Export] Starting data collection and breadth oscillator computation...")
 
-    # 1. Collectors
-    core_col = CoreTrackCollector()
-    core_df = core_col.collect_and_clean()
-    core_stats = core_col.compute_breadth_stats(core_df)
+def trade_date_now() -> str:
+    now = datetime.now(timezone.utc) - timedelta(hours=config.TRADE_DATE_LAG_HOURS)
+    return now.strftime("%Y-%m-%d")
 
-    meme_col = FrontierMemeCollector()
-    meme_df = meme_col.collect_and_gatekeep()
-    meme_stats = meme_col.compute_breadth_stats(meme_df)
 
-    # 2. Historical Breadth Alignment
-    seeder = HistoricalBreadthSeeder(data_dir=ROOT_DIR / "data")
-    hist_df = seeder.generate_historical_breadth()
+def _r(x, nd=2):
+    return None if x is None else round(x, nd)
 
-    # Synchronize today's reading
-    today_dt = pd.Timestamp.now(tz="UTC").normalize().tz_localize(None)
-    hist_df.loc[today_dt, "core_adv"] = core_stats["advances"]
-    hist_df.loc[today_dt, "core_dec"] = core_stats["declines"]
-    hist_df.loc[today_dt, "core_ramo"] = core_stats["ramo"]
 
-    hist_df.loc[today_dt, "frontier_adv"] = meme_stats["advances"]
-    hist_df.loc[today_dt, "frontier_dec"] = meme_stats["declines"]
-    hist_df.loc[today_dt, "frontier_ramo"] = meme_stats["ramo"]
+def collect(trade_date: str):
+    core_rows = core_track.load_store()
+    try:
+        core_rows = core_track.upsert(core_rows, core_track.fetch_live_snapshot(trade_date))
+        core_track.save_store(core_rows)
+    except Exception as e:
+        print(f"[Core] Live snapshot failed, using stored data: {e}")
 
-    if "btc_close" in hist_df.columns:
-        hist_df["btc_close"] = hist_df["btc_close"].ffill().bfill()
+    frontier_rows = frontier_track.load_store()
+    try:
+        new_rows, registry = frontier_track.update(trade_date, frontier_rows)
+        if new_rows:
+            frontier_rows = frontier_track.upsert(frontier_rows, new_rows)
+            frontier_track.save_store(frontier_rows)
+            frontier_track.save_registry(registry)
+    except Exception as e:
+        print(f"[Frontier] Update failed, using stored data: {e}")
 
-    hist_df = hist_df.sort_index()
+    try:
+        anchor.save_volumes(anchor.fetch_volumes(trade_date))
+    except Exception as e:
+        print(f"[Anchor] DefiLlama DEX volume fetch failed, using stored data: {e}")
 
-    # 3. Compute Dual Oscillators
-    engine = McClellanEngine()
-    core_osc_df = engine.process_breadth_dataframe(hist_df, prefix="core")
-    frontier_osc_df = engine.process_breadth_dataframe(hist_df, prefix="frontier")
 
-    # 4. Compute Spread and Regimes
-    spread_engine = DualTrackSpreadEngine()
-    spread_df = spread_engine.evaluate_spread(core_osc_df, frontier_osc_df)
+def track_summary(rows, warmup: int):
+    """Oscillator / summation series plus the latest reading for one track."""
+    # Frontier rows carry a chain-equal-weighted RAMO; Core uses plain counts
+    ramo = [b.get("ramo", breadth.ratio_adjusted(b["adv"], b["dec"])) for b in rows]
+    osc, summ = breadth.mcclellan(ramo, warmup)
+    published = [o for o in osc if o is not None]
 
-    # Attach BTC Close & raw components
-    spread_df["btc_close"] = hist_df["btc_close"] if "btc_close" in hist_df.columns else 0.0
-    spread_df["core_adv"] = hist_df["core_adv"].fillna(0).astype(int)
-    spread_df["core_dec"] = hist_df["core_dec"].fillna(0).astype(int)
-    spread_df["frontier_adv"] = hist_df["frontier_adv"].fillna(0).astype(int)
-    spread_df["frontier_dec"] = hist_df["frontier_dec"].fillna(0).astype(int)
+    bands = None
+    if len(published) >= config.BAND_MIN_OBS:
+        bands = {"low": _r(breadth.quantile(published, config.BAND_LOW_PCT / 100)),
+                 "high": _r(breadth.quantile(published, config.BAND_HIGH_PCT / 100))}
 
-    # 5. Build Series List
-    series_list = []
-    for dt, row in spread_df.iterrows():
-        c_osc = float(row.get("core_oscillator", 0.0))
-        f_osc = float(row.get("frontier_oscillator", 0.0))
-        sp = float(row.get("spread", 0.0))
-        sp_ma = float(row.get("spread_30d_ma", sp)) if not np.isnan(row.get("spread_30d_ma", np.nan)) else sp
+    current = {"ready": bool(published), "breadth_days": len(rows), "warmup_days": warmup}
+    if rows:
+        last = rows[-1]
+        current.update({
+            "date": last["date"],
+            "advances": last["adv"],
+            "declines": last["dec"],
+            "unchanged": last["unch"],
+            "constituents": last["n"],
+            "ramo": _r(ramo[-1], 1),
+            "oscillator": _r(osc[-1]),
+            "summation": _r(summ[-1], 1),
+            "summation_change_10d": (_r(summ[-1] - summ[-11], 1)
+                                     if len(summ) > 10 and summ[-11] is not None else None),
+            "percentile": (_r(breadth.percentile_rank(published, osc[-1]), 0)
+                           if osc[-1] is not None else None),
+        })
+    by_date = {b["date"]: (b, ramo[i], osc[i], summ[i]) for i, b in enumerate(rows)}
+    return by_date, current, bands
 
-        series_list.append({
-            "date": dt.strftime("%Y-%m-%d"),
-            "timestamp": int(dt.timestamp() * 1000),
-            "core_oscillator": round(c_osc, 2),
-            "core_summation": round(float(row.get("core_summation", 1000.0)), 1),
-            "core_ramo": round(float(row.get("core_ramo", 0.0)), 1),
-            "core_adv": int(row.get("core_adv", 0)),
-            "core_dec": int(row.get("core_dec", 0)),
-            "frontier_oscillator": round(f_osc, 2),
-            "frontier_summation": round(float(row.get("frontier_summation", 1000.0)), 1),
-            "frontier_ramo": round(float(row.get("frontier_ramo", 0.0)), 1),
-            "frontier_adv": int(row.get("frontier_adv", 0)),
-            "frontier_dec": int(row.get("frontier_dec", 0)),
-            "spread": round(sp, 2),
-            "spread_30d_ma": round(sp_ma, 2),
-            "regime_code": str(row.get("regime_code", "CO_EXPANSION")),
-            "btc_close": round(float(row.get("btc_close", 0.0)), 2)
+
+def build_payload():
+    core_by_date, core_meta = core_track.index_store(core_track.load_store())
+    excluded = breadth.core_exclusions(core_by_date, core_meta)
+    core_rows = breadth.core_breadth(core_by_date, excluded)
+
+    frontier_store = frontier_track.load_store()
+    frontier_rows = breadth.frontier_breadth(frontier_track.index_store(frontier_store))
+
+    core_series, core_cur, core_bands = track_summary(core_rows, config.WARMUP_DAYS)
+    fr_series, fr_cur, fr_bands = track_summary(frontier_rows, config.WARMUP_DAYS)
+
+    snapshot_dates = sorted({r["date"] for r in frontier_store})
+    fr_cur["started"] = snapshot_dates[0] if snapshot_dates else None
+    if snapshot_dates:
+        latest = [r for r in frontier_store if r["date"] == snapshot_dates[-1] and r["tracked"] == "1"]
+        fr_cur["tracked_today"] = len(latest)
+        fr_cur["tracked_by_chain"] = {c: sum(1 for r in latest if r["chain"] == c) for c in config.MEME_CHAINS}
+    if frontier_rows:
+        last = frontier_rows[-1]
+        fr_cur.update({
+            "chains": last["chains"],
+            "dead": last["dead"],
+            "entries": last["entries"],
+            "exits": last["exits"],
+            "age_median": _r(last["age_median"], 1),
+            "low_sample": last["n"] < config.MEME_MIN_CONSTITUENTS,
+            "ramo_pooled": _r(last["ramo_pooled"], 1),
         })
 
-    latest_row = spread_df.iloc[-1]
-    latest_dt = spread_df.index.max()
-    current_regime_code = str(latest_row.get("regime_code", "CO_EXPANSION"))
-    regime_info = DualTrackSpreadEngine.REGIMES.get(current_regime_code, DualTrackSpreadEngine.REGIMES["CO_EXPANSION"])
+    # External anchor: correlation of the published Frontier oscillator with
+    # DEX volume momentum on the same chains
+    dex = anchor.momentum(anchor.load_volumes())
+    pairs = [(osc, dex[d]["momentum"]) for d, (_b, _r0, osc, _s) in fr_series.items()
+             if osc is not None and dex.get(d, {}).get("momentum") is not None]
+    fr_cur["anchor_corr_days"] = len(pairs)
+    fr_cur["anchor_corr"] = (_r(anchor.pearson(*zip(*pairs)))
+                             if len(pairs) >= config.ANCHOR_MIN_CORR_DAYS else None)
 
-    latest_sp = float(latest_row.get("spread", 0.0))
-    latest_f_osc = float(latest_row.get("frontier_oscillator", 0.0))
-    latest_c_osc = float(latest_row.get("core_oscillator", 0.0))
-    is_siphon_alert = bool((latest_sp >= config.SPREAD_DIVERGENCE_ALERT) or (latest_f_osc >= 20.0 and latest_c_osc <= 0.0))
+    def btc(d):
+        return (core_by_date.get(d) or {}).get("bitcoin", (None,))[0]
 
-    # Regime stats distribution
-    regime_counts = spread_df["regime_code"].value_counts().to_dict()
-    total_days = len(spread_df)
-    regime_stats = {}
-    for code, meta in DualTrackSpreadEngine.REGIMES.items():
-        cnt = int(regime_counts.get(code, 0))
-        pct = round(cnt / total_days * 100.0, 1) if total_days > 0 else 0.0
-        regime_stats[code] = {
-            "name": meta["name"],
-            "desc": meta["desc"],
-            "color": meta["color"],
-            "count": cnt,
-            "pct": pct
+    series = []
+    for d in sorted(set(core_series) | set(fr_series)):
+        dx = dex.get(d) or {}
+        point = {
+            "date": d,
+            "btc_close": _r(btc(d)),
+            "dex_volume": _r(dx["volume"] / 1e9, 3) if dx else None,           # USD bn
+            "dex_momentum": _r(dx["momentum"] * 100, 1) if dx.get("momentum") is not None else None,
         }
+        for prefix, src in (("core", core_series), ("frontier", fr_series)):
+            b, ramo, osc, summ = src.get(d, (None, None, None, None))
+            point.update({
+                f"{prefix}_adv": b["adv"] if b else None,
+                f"{prefix}_dec": b["dec"] if b else None,
+                f"{prefix}_n": b["n"] if b else None,
+                f"{prefix}_ramo": _r(ramo, 1),
+                f"{prefix}_oscillator": _r(osc),
+                f"{prefix}_summation": _r(summ, 1),
+            })
+        b = fr_series.get(d, (None,))[0]
+        if b:
+            point.update({
+                "frontier_dead": b["dead"],
+                "frontier_entries": b["entries"],
+                "frontier_exits": b["exits"],
+                "frontier_age_median": _r(b["age_median"], 1),
+                "frontier_low_sample": b["n"] < config.MEME_MIN_CONSTITUENTS,
+                "frontier_ramo_pooled": _r(b["ramo_pooled"], 1),
+            })
+        series.append(point)
 
-    payload = {
+    latest_date = series[-1]["date"] if series else None
+    return {
         "metadata": {
-            "title": "加密双轨麦克莱伦市场广度与流动性剪刀差监控系统",
-            "subtitle": "Core Top 100 Spot vs Frontier Meme Track (Solana/Base/BSC) · RAMO 比率调整算法",
-            "benchmark_date": latest_dt.strftime("%Y-%m-%d"),
-            "total_historical_days": total_days,
-            "version": "1.0.0",
+            "title": "加密麦克莱伦市场宽度振荡器",
+            "subtitle": "Core Top 100 (按当日市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
+            "version": "2.0.0",
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "benchmark_date": latest_date,
+            "total_days": len(series),
             "parameters": {
                 "ema_fast": config.EMA_FAST,
                 "ema_slow": config.EMA_SLOW,
                 "ratio_scale": config.RATIO_SCALE,
-                "alert_threshold": config.SPREAD_DIVERGENCE_ALERT,
-                "overbought": config.OSC_OVERBOUGHT,
-                "oversold": config.OSC_OVERSOLD,
-                "adv_dec_basis": "utc_close_to_close"
+                "warmup_days": config.WARMUP_DAYS,
+                "band_percentiles": [config.BAND_LOW_PCT, config.BAND_HIGH_PCT],
+                "adv_dec_basis": "utc_close_to_close_ex_ante_universe",
             },
-            "gatekeeper": config.MEME_GATEKEEPER
+            "core": {
+                "top_n": config.CORE_TOP_N,
+                "candidate_n": config.CORE_CANDIDATE_N,
+                "source": "CoinGecko",
+                "history_start": core_rows[0]["date"] if core_rows else None,
+                "excluded_count": len(excluded),
+            },
+            "frontier": {
+                "chains": list(config.MEME_CHAINS),
+                "gatekeeper": config.MEME_GATEKEEPER,
+                "retention_days": config.MEME_RETENTION_DAYS,
+                "dead_liquidity_usd": config.MEME_DEAD_LIQUIDITY_USD,
+                "min_constituents": config.MEME_MIN_CONSTITUENTS,
+                "ramo_weighting": "chain_equal_weight",
+                "chain_min_members": config.MEME_CHAIN_MIN_MEMBERS,
+                "anchor": "DefiLlama DEX volume momentum ln(MA7/MA28), chain equal-weighted",
+                "source": "GeckoTerminal (discovery) + DexScreener (pricing)",
+            },
         },
+        "bands": {"core": core_bands, "frontier": fr_bands},
         "current": {
-            "date": latest_dt.strftime("%Y-%m-%d"),
-            "regime_code": current_regime_code,
-            "regime_name": regime_info["name"],
-            "regime_desc": regime_info["desc"],
-            "regime_color": regime_info["color"],
-            "regime_badge": regime_info.get("badge", "tag-q1"),
-            "core_oscillator": round(latest_c_osc, 2),
-            "core_advances": int(core_stats.get("advances", latest_row.get("core_adv", 0))),
-            "core_declines": int(core_stats.get("declines", latest_row.get("core_dec", 0))),
-            "core_ramo": round(float(core_stats.get("ramo", latest_row.get("core_ramo", 0.0))), 1),
-            "core_summation": round(float(latest_row.get("core_summation", 1000.0)), 1),
-            "core_close_basis_count": int(core_stats.get("close_basis_count", 0)),
-            "core_rolling_basis_count": int(core_stats.get("rolling_basis_count", 0)),
-            "frontier_oscillator": round(latest_f_osc, 2),
-            "frontier_advances": int(meme_stats.get("advances", latest_row.get("frontier_adv", 0))),
-            "frontier_declines": int(meme_stats.get("declines", latest_row.get("frontier_dec", 0))),
-            "frontier_ramo": round(float(meme_stats.get("ramo", latest_row.get("frontier_ramo", 0.0))), 1),
-            "frontier_summation": round(float(latest_row.get("frontier_summation", 1000.0)), 1),
-            "frontier_close_basis_count": int(meme_stats.get("close_basis_count", 0)),
-            "frontier_rolling_basis_count": int(meme_stats.get("rolling_basis_count", 0)),
-            "spread": round(latest_sp, 2),
-            "spread_alert": is_siphon_alert,
-            "btc_close": round(float(latest_row.get("btc_close", 0.0)), 2)
+            "date": latest_date,
+            "btc_close": _r(btc(latest_date)) if latest_date else None,
+            "core": core_cur,
+            "frontier": fr_cur,
         },
-        "regime_stats": regime_stats,
-        "series": series_list
+        "series": series,
     }
 
-    # Save to data/crypto_mcclellan.json
-    target_data_file = ROOT_DIR.parent.parent / "data" / "crypto_mcclellan.json"
-    target_data_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(target_data_file, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    print(f"[McClellan Export] Successfully saved data payload to {target_data_file}")
-    print(f"                   Total series days: {len(series_list)}, Current Regime: {current_regime_code}")
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--offline", action="store_true", help="skip data collection")
+    args = parser.parse_args()
+
+    if not args.offline:
+        collect(trade_date_now())
+
+    payload = build_payload()
+    config.OUTPUT_JSON_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(config.OUTPUT_JSON_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=1)
+
+    cur = payload["current"]
+    print(f"[Export] {config.OUTPUT_JSON_FILE} | {payload['metadata']['total_days']} days | "
+          f"core osc {cur['core'].get('oscillator')} | frontier osc {cur['frontier'].get('oscillator')} "
+          f"({cur['frontier'].get('breadth_days', 0)}/{config.WARMUP_DAYS} breadth days)")
+
 
 if __name__ == "__main__":
     main()

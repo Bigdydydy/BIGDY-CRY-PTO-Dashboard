@@ -98,6 +98,10 @@ function reloadAllChartsForTheme() {
     try { goldChartInstance.dispose(); } catch (e) {}
     goldChartInstance = null;
   }
+  if (typeof mcclellanChartInstance !== 'undefined' && mcclellanChartInstance) {
+    try { mcclellanChartInstance.dispose(); } catch (e) {}
+    mcclellanChartInstance = null;
+  }
   if (typeof cdriChartInstance !== 'undefined' && cdriChartInstance) {
     try { cdriChartInstance.dispose(); } catch (e) {}
     cdriChartInstance = null;
@@ -4390,13 +4394,10 @@ function switchView(viewId, updateHash = true) {
       renderMacroChart();
     }
 
-    if (mcclellanOscillatorChartInstance) {
-      mcclellanOscillatorChartInstance.resize();
+    if (mcclellanChartInstance) {
+      mcclellanChartInstance.resize();
     } else if (rawMcClellanData && (viewId === 'view-overview' || viewId === 'view-all')) {
       renderMcClellanCharts();
-    }
-    if (mcclellanSpreadChartInstance) {
-      mcclellanSpreadChartInstance.resize();
     }
 
     if (cdriChartInstance) cdriChartInstance.resize();
@@ -4908,14 +4909,26 @@ function initGoldCorrelationEvents() {
 
 
 // ============================================================================
-// Module 1-B: Dual-Track Crypto McClellan Oscillator & Market Breadth
+// Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme)
 // ============================================================================
 
 let rawMcClellanData = null;
-let mcclellanOscillatorChartInstance = null;
-let mcclellanSpreadChartInstance = null;
+let mcclellanChartInstance = null;
 let isMcClellanLoading = false;
 let mcclellanActiveTimeframe = '1y';
+let mcclellanActiveTrack = 'core';
+
+const MC_TRACKS = {
+  core: { label: 'Core Top 100', color: '#06b6d4' },
+  frontier: { label: '链上 Meme', color: '#ec4899' }
+};
+const MC_CHAIN_LABELS = { solana: 'SOL', bsc: 'BSC', robinhood: 'HOOD' };
+
+function mcFmtSigned(v, digits = 1) {
+  if (v === null || v === undefined || !isFinite(v)) return '--';
+  const n = Number(v);
+  return `${n > 0 ? '+' : ''}${n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
 
 /**
  * Fetch Crypto McClellan data from server
@@ -4939,11 +4952,11 @@ async function loadMcClellanData(force = false) {
       if (force) {
         const rStatus = resJson.refreshStatus || rawMcClellanData.refresh_status;
         if (rStatus?.status === 'refreshed') {
-          showToast('双轨加密麦克莱伦宽度指标已由 Python 全量重新解算并更新！');
+          showToast('麦克莱伦宽度数据已重新采集并解算');
         } else if (rStatus?.status === 'pipelineUnavailable') {
-          showToast('当前环境未检测到 Python 运行时，已载入已核验的最新快照数据');
+          showToast('当前环境未检测到 Python 运行时，已载入最新快照数据');
         } else if (rStatus?.status === 'stale') {
-          showToast('Python 管线运行异常，已回退至已验证的快照数据');
+          showToast('Python 管线运行异常，已回退至快照数据');
         } else {
           showToast('已更新加密麦克莱伦市场宽度数据');
         }
@@ -4961,379 +4974,323 @@ async function loadMcClellanData(force = false) {
 }
 
 /**
- * Render KPI cards and header badges for Crypto McClellan
+ * Oscillator chip: position against the track's own 10% / 90% percentile bands
  */
-function renderMcClellanDashboard(data) {
-  if (!data) return;
+function mcOscillatorChip(el, cur, bands) {
+  if (!el) return;
+  el.className = 'mm-chip';
+  if (!cur || cur.oscillator === null || cur.oscillator === undefined) {
+    el.textContent = '--';
+    return;
+  }
+  const pct = cur.percentile !== null && cur.percentile !== undefined ? `P${cur.percentile}` : '';
+  let zone = '中性';
+  if (bands && cur.oscillator >= bands.high) { zone = '超买区'; el.classList.add('text-amber'); }
+  else if (bands && cur.oscillator <= bands.low) { zone = '超卖区'; el.classList.add('text-neg'); }
+  el.textContent = pct ? `${pct} · ${zone}` : zone;
+}
 
-  const { current, metadata } = data;
-  if (!current) return;
+function mcAdvDecText(cur) {
+  if (!cur || cur.advances === undefined) return '';
+  return `涨 ${cur.advances} / 跌 ${cur.declines} · RAMO ${mcFmtSigned(cur.ramo, 0)}`;
+}
 
-  // 1. Update time and Header Regime Pill
-  const elUpdateTime = document.getElementById('mcclellan-update-time');
-  if (elUpdateTime && current.date) {
-    elUpdateTime.textContent = `${current.date} (UTC+8)`;
-  }
-
-  const elHeaderPill = document.getElementById('mcclellan-header-regime-pill');
-  if (elHeaderPill) {
-    elHeaderPill.textContent = current.regime_name || current.regime_code || '--';
-    elHeaderPill.className = 'mcclellan-regime-pill';
-    if (current.regime_code) {
-      const cls = current.regime_code.toLowerCase().replace(/_/g, '-');
-      elHeaderPill.classList.add(`regime-${cls}`);
-    }
-  }
-
-  // 2. KPI 1: Regime
-  const elRegime = document.getElementById('kpi-mcclellan-regime');
-  const elRegimeSub = document.getElementById('kpi-mcclellan-regime-sub');
-  if (elRegime) {
-    elRegime.textContent = current.regime_name || '--';
-    if (current.regime_code === 'CO_EXPANSION') elRegime.className = 'mm-val text-pos';
-    else if (current.regime_code === 'MEME_SIPHON') elRegime.className = 'mm-val text-warn';
-    else if (current.regime_code === 'QUALITY_ACCUMULATION') elRegime.className = 'mm-val text-info';
-    else if (current.regime_code === 'DEEP_FREEZE') elRegime.className = 'mm-val text-neg';
-  }
-  if (elRegimeSub) {
-    if (current.regime_code === 'CO_EXPANSION') elRegimeSub.textContent = '增量充沛 · 核心与投机共振走强';
-    else if (current.regime_code === 'MEME_SIPHON') elRegimeSub.textContent = '存量极端博弈 · 警惕见顶流动性抽血';
-    else if (current.regime_code === 'QUALITY_ACCUMULATION') elRegimeSub.textContent = '机构稳健吸筹 · 蓝筹主导去泡沫';
-    else if (current.regime_code === 'DEEP_FREEZE') elRegimeSub.textContent = '全域流动性出清 · 熊市深度严冬筑底';
-  }
-
-  // 3. KPI 2: Core McClellan Oscillator
-  const elCore = document.getElementById('kpi-mcclellan-core');
-  const elCoreChip = document.getElementById('kpi-mcclellan-core-chip');
-  if (elCore) {
-    const coreVal = Number(current.core_oscillator);
-    const sign = coreVal > 0 ? '+' : '';
-    elCore.textContent = `${sign}${coreVal.toFixed(2)}`;
-    elCore.className = coreVal >= 0 ? 'mm-val text-cyan' : 'mm-val text-neg';
-  }
-  if (elCoreChip) {
-    const v = Number(current.core_oscillator);
-    if (v >= 50) { elCoreChip.textContent = '极度超买'; elCoreChip.className = 'mm-chip text-warn'; }
-    else if (v >= 20) { elCoreChip.textContent = '强势偏多'; elCoreChip.className = 'mm-chip text-pos'; }
-    else if (v <= -50) { elCoreChip.textContent = '极度超卖'; elCoreChip.className = 'mm-chip text-neg'; }
-    else if (v <= -20) { elCoreChip.textContent = '弱势偏空'; elCoreChip.className = 'mm-chip text-neg'; }
-    else { elCoreChip.textContent = '中性震荡'; elCoreChip.className = 'mm-chip'; }
-  }
-
-  // 4. KPI 3: Frontier Meme McClellan Oscillator
-  const elFrontier = document.getElementById('kpi-mcclellan-frontier');
-  const elFrontierChip = document.getElementById('kpi-mcclellan-frontier-chip');
-  if (elFrontier) {
-    const fVal = Number(current.frontier_oscillator);
-    const sign = fVal > 0 ? '+' : '';
-    elFrontier.textContent = `${sign}${fVal.toFixed(2)}`;
-    elFrontier.className = fVal >= 0 ? 'mm-val text-fuchsia' : 'mm-val text-neg';
-  }
-  if (elFrontierChip) {
-    const v = Number(current.frontier_oscillator);
-    if (v >= 50) { elFrontierChip.textContent = '链上高亢'; elFrontierChip.className = 'mm-chip text-fuchsia'; }
-    else if (v >= 20) { elFrontierChip.textContent = '热度上升'; elFrontierChip.className = 'mm-chip text-pos'; }
-    else if (v <= -50) { elFrontierChip.textContent = '深冻出清'; elFrontierChip.className = 'mm-chip text-neg'; }
-    else { elFrontierChip.textContent = '常态流动'; elFrontierChip.className = 'mm-chip'; }
-  }
-
-  // 5. KPI 4: Liquidity Divergence Spread
-  const elSpread = document.getElementById('kpi-mcclellan-spread');
-  const elSpreadChip = document.getElementById('kpi-mcclellan-spread-chip');
-  const elSpreadSub = document.getElementById('kpi-mcclellan-spread-sub');
-  if (elSpread) {
-    const sVal = Number(current.spread);
-    const sign = sVal > 0 ? '+' : '';
-    elSpread.textContent = `${sign}${sVal.toFixed(2)}`;
-    elSpread.className = sVal >= 40 ? 'mm-val text-warn' : (sVal >= 0 ? 'mm-val text-amber' : 'mm-val text-cyan');
-  }
-  if (elSpreadChip) {
-    const sVal = Number(current.spread);
-    if (sVal >= 40 || current.spread_alert) {
-      elSpreadChip.textContent = '抽血预警';
-      elSpreadChip.className = 'mm-chip text-warn';
-    } else if (sVal >= 20) {
-      elSpreadChip.textContent = '投机发散';
-      elSpreadChip.className = 'mm-chip text-amber';
-    } else if (sVal <= -20) {
-      elSpreadChip.textContent = '核心吸筹';
-      elSpreadChip.className = 'mm-chip text-cyan';
-    } else {
-      elSpreadChip.textContent = '利差均衡';
-      elSpreadChip.className = 'mm-chip';
-    }
-  }
-  if (elSpreadSub) {
-    const sVal = Number(current.spread);
-    if (sVal >= 40 || current.spread_alert) {
-      elSpreadSub.textContent = '⚠️ 警报: Meme利差超限，主流失血加剧';
-    } else {
-      elSpreadSub.textContent = 'Frontier - Core | 阈值 40 顶背离预警';
-    }
-  }
-
-  // 6. KPI 5: Core MSI Summation Index
-  const elMsi = document.getElementById('kpi-mcclellan-msi');
-  if (elMsi) {
-    const msiVal = Number(current.core_summation);
-    const sign = msiVal > 0 ? '+' : '';
-    elMsi.textContent = `${sign}${msiVal.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
-    elMsi.className = msiVal >= 0 ? 'mm-val text-green' : 'mm-val text-neg';
-  }
-
-  // 7. Alert Banner
-  const alertBanner = document.getElementById('mcclellan-alert-banner');
-  if (alertBanner) {
-    if (current.spread_alert || Number(current.spread) >= 40) {
-      alertBanner.classList.remove('hidden');
-    } else {
-      alertBanner.classList.add('hidden');
-    }
-  }
-
-  // 8. Render Charts
-  renderMcClellanCharts();
+function mcChangeChip(v) {
+  if (v === null || v === undefined) return ['--', 'mm-chip'];
+  return [`10日 ${mcFmtSigned(v, 0)}`, `mm-chip ${v > 0 ? 'text-pos' : (v < 0 ? 'text-neg' : '')}`];
 }
 
 /**
- * Filter series according to active timeframe and render Dual Charts
+ * Render KPI cards for Crypto McClellan
+ */
+function renderMcClellanDashboard(data) {
+  if (!data || !data.current) return;
+  const { current, bands = {}, metadata = {} } = data;
+  const core = current.core || {};
+  const fr = current.frontier || {};
+  const setText = (id, text, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (cls !== undefined) el.className = cls;
+  };
+
+  setText('mcclellan-update-time', current.date ? `${current.date} (UTC 收盘)` : '--');
+
+  // Core oscillator & summation
+  setText('kpi-mc-core-osc', mcFmtSigned(core.oscillator, 1),
+    `mm-val ${core.oscillator >= 0 ? 'text-cyan' : 'text-neg'}`);
+  mcOscillatorChip(document.getElementById('kpi-mc-core-osc-chip'), core, bands.core);
+  setText('kpi-mc-core-osc-sub', mcAdvDecText(core) || 'EMA19 − EMA39 of RAMO');
+
+  setText('kpi-mc-core-sum', mcFmtSigned(core.summation, 0),
+    `mm-val ${core.summation >= 0 ? 'text-pos' : 'text-neg'}`);
+  setText('kpi-mc-core-sum-chip', ...mcChangeChip(core.summation_change_10d));
+  setText('kpi-mc-core-sum-sub', `${core.constituents ?? '--'} 个成分 · 数据始于 ${metadata.core?.history_start || '--'}`);
+
+  // Frontier: accumulated forward only, so it may still be warming up
+  const warmup = fr.warmup_days || metadata.parameters?.warmup_days || 40;
+  if (fr.ready) {
+    setText('kpi-mc-fr-osc', mcFmtSigned(fr.oscillator, 1),
+      `mm-val ${fr.oscillator >= 0 ? 'text-fuchsia' : 'text-neg'}`);
+    mcOscillatorChip(document.getElementById('kpi-mc-fr-osc-chip'), fr, bands.frontier);
+    setText('kpi-mc-fr-sum', mcFmtSigned(fr.summation, 0),
+      `mm-val ${fr.summation >= 0 ? 'text-pos' : 'text-neg'}`);
+    setText('kpi-mc-fr-sum-chip', ...mcChangeChip(fr.summation_change_10d));
+  } else {
+    setText('kpi-mc-fr-osc', '预热中', 'mm-val text-fuchsia');
+    setText('kpi-mc-fr-osc-chip', `${fr.breadth_days || 0}/${warmup} 天`, 'mm-chip');
+    setText('kpi-mc-fr-sum', '--', 'mm-val');
+    setText('kpi-mc-fr-sum-chip', '预热', 'mm-chip');
+  }
+  const anchorText = fr.anchor_corr !== null && fr.anchor_corr !== undefined
+    ? ` · DEX 动量 r=${fr.anchor_corr.toFixed(2)}` : '';
+  setText('kpi-mc-fr-osc-sub', (mcAdvDecText(fr) + anchorText)
+    || (fr.started ? `${fr.started} 开始采集 · 次日起统计涨跌` : 'Solana · BSC · Robinhood 热门池'));
+
+  const byChain = fr.tracked_by_chain || {};
+  const chainText = Object.keys(byChain).map(c => `${MC_CHAIN_LABELS[c] || c} ${byChain[c]}`).join(' · ');
+  const deadText = fr.dead ? ` · 撤池 ${fr.dead}` : '';
+  setText('kpi-mc-fr-sum-sub', fr.tracked_today !== undefined ? `跟踪 ${fr.tracked_today} · ${chainText}${deadText}` : '--');
+
+  renderMcClellanCharts();
+}
+
+function mcFilterSeries(series) {
+  if (mcclellanActiveTimeframe === 'all' || !series.length) return series;
+  const days = { '90d': 90, '180d': 180, '1y': 365 }[mcclellanActiveTimeframe] || 365;
+  const last = new Date(`${series[series.length - 1].date}T00:00:00Z`);
+  const cutoff = new Date(last.getTime() - days * 86400000).toISOString().slice(0, 10);
+  return series.filter(d => d.date > cutoff);
+}
+
+/**
+ * Three stacked panels on a shared time axis:
+ *   BTC price  /  McClellan Oscillator  /  Summation Index
  */
 function renderMcClellanCharts() {
-  if (!rawMcClellanData || !rawMcClellanData.series) return;
+  const dom = document.getElementById('mcclellan-echarts');
+  if (!dom || !rawMcClellanData || !rawMcClellanData.series || typeof echarts === 'undefined') return;
+
+  if (!mcclellanChartInstance) {
+    mcclellanChartInstance = echarts.init(dom, getEchartsTheme());
+  }
+
   const colors = getChartThemeColors();
-  const series = rawMcClellanData.series;
+  const data = rawMcClellanData;
+  const rows = mcFilterSeries(data.series);
+  const dates = rows.map(d => d.date);
+  const track = mcclellanActiveTrack;
+  const tracks = track === 'compare' ? ['core', 'frontier'] : [track];
+  const fr = data.current?.frontier || {};
+  const posColor = '#10b981';
+  const negColor = '#f43f5e';
+  const axisLabel = { color: colors.tickColor, fontSize: 10, fontFamily: 'monospace' };
 
-  let filteredSeries = series;
-  if (mcclellanActiveTimeframe === '30d') {
-    filteredSeries = series.slice(-30);
-  } else if (mcclellanActiveTimeframe === '90d') {
-    filteredSeries = series.slice(-90);
-  } else if (mcclellanActiveTimeframe === '180d') {
-    filteredSeries = series.slice(-180);
-  } else if (mcclellanActiveTimeframe === '1y') {
-    filteredSeries = series.slice(-365);
+  // Warm-up notice for the forward-accumulated Meme track
+  const notice = document.getElementById('mcclellan-warmup-notice');
+  if (notice) {
+    const showNotice = track !== 'core' && !fr.ready;
+    notice.classList.toggle('hidden', !showNotice);
+    if (showNotice) {
+      const warmup = fr.warmup_days || 40;
+      notice.textContent = fr.started
+        ? `链上 Meme 轨从 ${fr.started} 开始逐日累积（链上热度无法回填历史），需 ${warmup} 个交易日预热后才发布振荡器，目前 ${fr.breadth_days || 0}/${warmup}。`
+        : '链上 Meme 轨尚未开始采集。';
+    }
   }
 
-  const labels = filteredSeries.map(d => d.date);
-  const coreVals = filteredSeries.map(d => d.core_oscillator);
-  const frontierVals = filteredSeries.map(d => d.frontier_oscillator);
-  const spreadVals = filteredSeries.map(d => d.spread);
-  const spreadMaVals = filteredSeries.map(d => d.spread_30d_ma);
-  const btcVals = filteredSeries.map(d => d.btc_close);
+  const zeroLine = { yAxis: 0, lineStyle: { color: colors.gridLineStrong, type: 'solid', width: 1 }, label: { show: false } };
 
-  // ----------------------------------------------------
-  // Chart 1: Dual Oscillators (Core vs Frontier vs BTC)
-  // ----------------------------------------------------
-  const canvasOsc = document.getElementById('chart-mcclellan-oscillator');
-  if (canvasOsc && window.Chart) {
-    if (mcclellanOscillatorChartInstance) {
-      mcclellanOscillatorChartInstance.destroy();
-    }
+  const series = [{
+    name: 'BTC',
+    type: 'line',
+    xAxisIndex: 0,
+    yAxisIndex: 0,
+    showSymbol: false,
+    data: rows.map(d => d.btc_close),
+    lineStyle: { width: 1.6, color: '#f7931a' },
+    itemStyle: { color: '#f7931a' }
+  }];
 
-    mcclellanOscillatorChartInstance = new Chart(canvasOsc, {
+  const showAnchor = track !== 'core';
+  if (showAnchor) {
+    series.push({
+      name: 'DEX 成交额动量',
       type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Core Top 100 Oscillator',
-            data: coreVals,
-            borderColor: '#00f2fe',
-            backgroundColor: 'rgba(0, 242, 254, 0.08)',
-            borderWidth: 1.8,
-            tension: 0.2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Frontier Meme Oscillator',
-            data: frontierVals,
-            borderColor: '#b537f2',
-            backgroundColor: 'rgba(181, 55, 242, 0.05)',
-            borderWidth: 1.8,
-            tension: 0.2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y'
-          },
-          {
-            label: 'BTC 价格 (USD)',
-            data: btcVals,
-            borderColor: 'rgba(245, 158, 11, 0.55)',
-            borderWidth: 1.2,
-            borderDash: [3, 3],
-            pointRadius: 0,
-            yAxisID: 'yBtc'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        animation: { duration: 350 },
-        scales: {
-          x: {
-            grid: { color: colors.gridLine },
-            ticks: {
-              color: colors.tickColor,
-              font: { family: 'JetBrains Mono', size: 9 },
-              maxRotation: 0,
-              maxTicksLimit: 8
-            }
-          },
-          y: {
-            position: 'left',
-            grid: {
-              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : (Math.abs(ctx.tick.value) === 50 ? (colors.isLight ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)') : colors.gridLine)
-            },
-            ticks: {
-              color: colors.tickColor,
-              font: { family: 'JetBrains Mono', size: 9 },
-              callback: v => `${v > 0 ? '+' : ''}${v}`
-            },
-            title: { display: true, text: '振荡器 (EMA19 - EMA39) * 1000', color: colors.tickColor, font: { size: 9 } }
-          },
-          yBtc: {
-            position: 'right',
-            grid: { display: false },
-            ticks: {
-              color: colors.isLight ? '#b45309' : '#d97706',
-              font: { family: 'JetBrains Mono', size: 9 },
-              callback: v => `$${Math.round(v / 1000)}k`
-            },
-            title: { display: true, text: 'BTC (USD)', color: colors.isLight ? '#b45309' : '#d97706', font: { size: 9 } }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: colors.tooltipBg,
-            borderColor: colors.tooltipBorder,
-            borderWidth: 1,
-            titleColor: colors.tooltipTitle,
-            bodyColor: colors.tooltipBody,
-            titleFont: { family: 'JetBrains Mono' },
-            bodyFont: { family: 'JetBrains Mono', size: 11 },
-            callbacks: {
-              label: item => {
-                const dsLabel = item.dataset.label || '';
-                const val = item.raw;
-                if (dsLabel.includes('BTC')) {
-                  return ` ${dsLabel}: $${Number(val).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-                }
-                const sign = val > 0 ? '+' : '';
-                return ` ${dsLabel}: ${sign}${Number(val).toFixed(2)}`;
-              }
-            }
-          }
-        }
-      }
+      xAxisIndex: 0,
+      yAxisIndex: 3,
+      showSymbol: false,
+      data: rows.map(d => d.dex_momentum),
+      lineStyle: { width: 1.3, color: '#8b5cf6', type: 'dashed' },
+      itemStyle: { color: '#8b5cf6' },
+      markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0, lineStyle: { color: 'rgba(139, 92, 246, 0.35)', type: 'dotted' }, label: { show: false } }] }
     });
   }
 
-  // ----------------------------------------------------
-  // Chart 2: Liquidity Divergence Spread & Regimes Bar
-  // ----------------------------------------------------
-  const canvasSpread = document.getElementById('chart-mcclellan-spread');
-  if (canvasSpread && window.Chart) {
-    if (mcclellanSpreadChartInstance) {
-      mcclellanSpreadChartInstance.destroy();
+  tracks.forEach((t, idx) => {
+    const meta = MC_TRACKS[t];
+    const oscData = rows.map(d => d[`${t}_oscillator`]);
+    const sumData = rows.map(d => d[`${t}_summation`]);
+
+    if (track === 'compare') {
+      series.push({
+        name: `${meta.label} 振荡器`,
+        type: 'line',
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        showSymbol: false,
+        data: oscData,
+        lineStyle: { width: 1.6, color: meta.color },
+        itemStyle: { color: meta.color },
+        markLine: idx === 0 ? { silent: true, symbol: 'none', data: [zeroLine] } : undefined
+      });
+    } else {
+      const bands = data.bands?.[t];
+      const bandLines = [zeroLine];
+      if (bands) {
+        bandLines.push(
+          { yAxis: bands.high, lineStyle: { color: 'rgba(245, 158, 11, 0.75)', type: 'dashed' }, label: { formatter: `P90 ${mcFmtSigned(bands.high, 0)}`, position: 'insideEndTop', fontSize: 10, color: '#f59e0b' } },
+          { yAxis: bands.low, lineStyle: { color: 'rgba(244, 63, 94, 0.75)', type: 'dashed' }, label: { formatter: `P10 ${mcFmtSigned(bands.low, 0)}`, position: 'insideEndBottom', fontSize: 10, color: negColor } }
+        );
+      }
+      series.push({
+        name: `${meta.label} 振荡器`,
+        type: 'bar',
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        barCategoryGap: '20%',
+        data: oscData.map(v => (v === null || v === undefined ? null : { value: v, itemStyle: { color: v >= 0 ? posColor : negColor } })),
+        itemStyle: { color: meta.color },
+        markLine: { silent: true, symbol: 'none', data: bandLines }
+      });
     }
 
-    // Dynamic bar colors based on regime code
-    const barColors = filteredSeries.map(d => {
-      if (d.regime_code === 'CO_EXPANSION') return 'rgba(16, 185, 129, 0.8)';
-      if (d.regime_code === 'MEME_SIPHON') return 'rgba(245, 158, 11, 0.8)';
-      if (d.regime_code === 'QUALITY_ACCUMULATION') return 'rgba(6, 182, 212, 0.8)';
-      return 'rgba(239, 68, 68, 0.8)';
+    series.push({
+      name: `${meta.label} 累加指数`,
+      type: 'line',
+      xAxisIndex: 2,
+      yAxisIndex: 2,
+      showSymbol: false,
+      data: sumData,
+      lineStyle: { width: 1.8, color: meta.color },
+      itemStyle: { color: meta.color },
+      areaStyle: track === 'compare' ? undefined : { color: meta.color, opacity: 0.12 },
+      markLine: idx === 0 ? { silent: true, symbol: 'none', data: [zeroLine] } : undefined
     });
+  });
 
-    mcclellanSpreadChartInstance = new Chart(canvasSpread, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            type: 'line',
-            label: '30D 移动均线',
-            data: spreadMaVals,
-            borderColor: '#60a5fa',
-            borderWidth: 1.8,
-            pointRadius: 0,
-            pointHoverRadius: 3,
-            tension: 0.2,
-            order: 1
-          },
-          {
-            type: 'bar',
-            label: '背离利差 (Frontier - Core)',
-            data: spreadVals,
-            backgroundColor: barColors,
-            borderRadius: 2,
-            order: 2
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        animation: { duration: 350 },
-        scales: {
-          x: {
-            grid: { color: colors.gridLine },
-            ticks: {
-              color: colors.tickColor,
-              font: { family: 'JetBrains Mono', size: 9 },
-              maxRotation: 0,
-              maxTicksLimit: 8
-            }
-          },
-          y: {
-            grid: {
-              color: ctx => ctx.tick.value === 0 ? colors.gridLineStrong : (ctx.tick.value === 40 ? (colors.isLight ? 'rgba(217, 119, 6, 0.5)' : 'rgba(245, 158, 11, 0.4)') : colors.gridLine)
-            },
-            ticks: {
-              color: colors.tickColor,
-              font: { family: 'JetBrains Mono', size: 9 },
-              callback: v => `${v > 0 ? '+' : ''}${v}`
-            },
-            title: { display: true, text: '背离利差 Spread (阈值: 40)', color: colors.tickColor, font: { size: 9 } }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: colors.tooltipBg,
-            borderColor: colors.tooltipBorder,
-            borderWidth: 1,
-            titleColor: colors.tooltipTitle,
-            bodyColor: colors.tooltipBody,
-            titleFont: { family: 'JetBrains Mono' },
-            bodyFont: { family: 'JetBrains Mono', size: 11 },
-            callbacks: {
-              afterBody: items => {
-                const idx = items[0].dataIndex;
-                const point = filteredSeries[idx];
-                if (!point) return '';
-                const regMap = {
-                  CO_EXPANSION: '全域共振繁荣 (Co-Expansion)',
-                  MEME_SIPHON: 'Meme 流动性抽血 (Meme Siphon)',
-                  QUALITY_ACCUMULATION: '核心价值蓄势 (Quality Accumulation)',
-                  DEEP_FREEZE: '流动性严冬深冻 (Deep Freeze)'
-                };
-                const regName = regMap[point.regime_code] || point.regime_code;
-                const alertText = point.spread >= 40 ? '\n⚠️ 达到 40 警戒线，抽血风险高' : '';
-                return `\n当前体制: ${regName}${alertText}`;
-              }
-            }
-          }
+  // Hint in the empty oscillator panel while the selected track is still warming up
+  const hasOsc = tracks.some(t => rows.some(d => d[`${t}_oscillator`] !== null && d[`${t}_oscillator`] !== undefined));
+  const graphic = hasOsc ? [] : [{
+    type: 'text',
+    left: 'center',
+    top: '50%',
+    silent: true,
+    style: { text: 'Meme 振荡器预热中', fill: colors.textMuted, fontSize: 13, fontFamily: 'monospace' }
+  }];
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    graphic,
+    legend: {
+      top: 0,
+      left: 'center',
+      itemWidth: 14,
+      itemHeight: 8,
+      textStyle: { color: colors.textSecondary, fontSize: 11 },
+      data: series.map(s => s.name)
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', lineStyle: { color: colors.crossColor } },
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.tooltipText, fontSize: 11, fontFamily: 'monospace' },
+      formatter: params => {
+        if (!params || !params.length) return '';
+        const d = rows[params[0].dataIndex];
+        if (!d) return '';
+        const line = (label, val, color) => `<div style="display:flex; justify-content:space-between; gap:14px;"><span style="color:${color || colors.tooltipText};">${label}</span><span style="font-weight:700;">${val}</span></div>`;
+        let html = `<div style="font-weight:700; margin-bottom:4px; color:${colors.tooltipTitle};">${d.date}</div>`;
+        if (d.btc_close) html += line('BTC', `$${Math.round(d.btc_close).toLocaleString('en-US')}`, '#f7931a');
+        if (showAnchor && d.dex_momentum !== null && d.dex_momentum !== undefined) {
+          html += line('DEX 成交额 / 动量', `$${d.dex_volume.toFixed(2)}B / ${mcFmtSigned(d.dex_momentum, 1)}%`, '#8b5cf6');
         }
+        tracks.forEach(t => {
+          const meta = MC_TRACKS[t];
+          if (d[`${t}_adv`] === null || d[`${t}_adv`] === undefined) return;
+          html += `<div style="margin-top:4px; border-top:1px solid ${colors.tooltipDivider}; padding-top:3px; color:${meta.color}; font-weight:700;">${meta.label}</div>`;
+          html += line('振荡器', mcFmtSigned(d[`${t}_oscillator`], 1));
+          html += line('累加指数', mcFmtSigned(d[`${t}_summation`], 0));
+          html += line('涨 / 跌 (成分)', `${d[`${t}_adv`]} / ${d[`${t}_dec`]} (${d[`${t}_n`]})`);
+          html += line(t === 'frontier' ? 'RAMO (按链等权)' : 'RAMO', mcFmtSigned(d[`${t}_ramo`], 0));
+          if (t === 'frontier' && d.frontier_ramo_pooled !== undefined) {
+            html += line('合并 RAMO (诊断)', mcFmtSigned(d.frontier_ramo_pooled, 0));
+          }
+          if (t === 'frontier' && d.frontier_dead !== undefined) {
+            // Churn diagnostics: rugs counted as declines, basket turnover and age
+            html += line('撤池 / 新进 / 移出', `${d.frontier_dead} / ${d.frontier_entries} / ${d.frontier_exits}`);
+            html += line('成分年龄中位', d.frontier_age_median === null ? '--' : `${d.frontier_age_median} 天`);
+            if (d.frontier_low_sample) html += line('⚠ 样本不足', `< ${data.metadata?.frontier?.min_constituents || 20}`, '#f59e0b');
+          }
+        });
+        return html;
       }
-    });
-  }
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    grid: [
+      { left: 60, right: showAnchor ? 52 : 20, top: '7%', height: '27%' },
+      { left: 60, right: showAnchor ? 52 : 20, top: '39%', height: '25%' },
+      { left: 60, right: showAnchor ? 52 : 20, top: '69%', height: '17%' }
+    ],
+    xAxis: [0, 1, 2].map(i => ({
+      type: 'category',
+      data: dates,
+      gridIndex: i,
+      axisLine: { lineStyle: { color: colors.axisLine } },
+      axisTick: { show: false },
+      axisLabel: i === 2 ? { ...axisLabel, formatter: v => v.slice(2) } : { show: false }
+    })),
+    yAxis: [
+      {
+        type: 'value', gridIndex: 0, scale: true, name: 'BTC', nameTextStyle: { ...axisLabel, color: '#f7931a' },
+        splitNumber: 3,
+        splitLine: { lineStyle: { color: colors.gridLine } },
+        axisLabel: { ...axisLabel, formatter: v => `$${Math.round(v / 1000)}k` }
+      },
+      {
+        type: 'value', gridIndex: 1, name: '振荡器', nameTextStyle: axisLabel,
+        splitLine: { lineStyle: { color: colors.gridLine } },
+        axisLabel: { ...axisLabel, formatter: v => mcFmtSigned(v, 0) }
+      },
+      {
+        type: 'value', gridIndex: 2, scale: true, name: '累加指数', nameTextStyle: axisLabel,
+        splitNumber: 3,
+        splitLine: { lineStyle: { color: colors.gridLine } },
+        axisLabel: { ...axisLabel, formatter: v => mcFmtSigned(v, 0) }
+      },
+      {
+        type: 'value', gridIndex: 0, position: 'right', show: showAnchor,
+        name: 'DEX 动量', nameTextStyle: { ...axisLabel, color: '#8b5cf6' },
+        splitNumber: 3,
+        splitLine: { show: false },
+        axisLabel: { ...axisLabel, color: '#8b5cf6', formatter: v => `${v}%` }
+      }
+    ],
+    dataZoom: [{
+      type: 'slider',
+      xAxisIndex: [0, 1, 2],
+      bottom: 8,
+      height: 18,
+      borderColor: colors.axisLine,
+      textStyle: { color: colors.tickColor, fontSize: 10 }
+    }],
+    series
+  };
+
+  mcclellanChartInstance.setOption(option, true);
 }
 
 /**
@@ -5345,18 +5302,24 @@ function initMcClellanEvents() {
     btnRefresh.addEventListener('click', () => loadMcClellanData(true));
   }
 
-  // Timeframe selector
-  const tfContainer = document.getElementById('mcclellan-timeframe-switch');
-  if (tfContainer) {
-    tfContainer.querySelectorAll('.switch-btn').forEach(btn => {
+  const bindSwitch = (containerId, attr, apply) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.switch-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        tfContainer.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        container.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        mcclellanActiveTimeframe = btn.dataset.range || '1y';
+        apply(btn.dataset[attr]);
         renderMcClellanCharts();
       });
     });
-  }
+  };
+  bindSwitch('mcclellan-track-switch', 'track', v => { mcclellanActiveTrack = v || 'core'; });
+  bindSwitch('mcclellan-timeframe-switch', 'range', v => { mcclellanActiveTimeframe = v || '1y'; });
+
+  window.addEventListener('resize', () => {
+    if (mcclellanChartInstance) mcclellanChartInstance.resize();
+  });
 
   // Collapsible methodology accordion
   const btnAccordion = document.getElementById('btn-mcclellan-methodology-toggle');

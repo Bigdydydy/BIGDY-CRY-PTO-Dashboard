@@ -14,3 +14,6 @@ data/liu_monitor_roles.json
 data/liu_manual_check.txt
 data/wave_track_record.json
 data/wave_tolerance_check.json
+
+# Crypto McClellan seeder download cache
+scripts/crypto_mcclellan/data/raw_cache/

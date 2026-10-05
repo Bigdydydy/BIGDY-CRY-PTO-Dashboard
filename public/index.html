@@ -449,19 +449,16 @@
       </div>
     </section>
 
-    <!-- Bento Hero Card: Dual-Track Crypto McClellan Oscillator & Breadth Regimes (Directly below Module 1) -->
+    <!-- Bento Hero Card: Crypto McClellan Oscillator (Directly below Module 1) -->
     <section class="bento-card mcclellan-hero-card" id="module-crypto-mcclellan">
       <div class="card-header">
         <div class="card-title-group">
           <span class="card-module-tag">01-B MARKET BREADTH</span>
-          <h2>双轨加密麦克莱伦市场宽度振荡器 (Crypto McClellan Oscillator)</h2>
-          <span class="card-subtitle-inline">Top 100 核心资产 vs 投机前沿 Meme · RAMO 流动性动量与四象限宏观体制</span>
+          <h2>加密麦克莱伦市场宽度振荡器 (Crypto McClellan Oscillator)</h2>
+          <span class="card-subtitle-inline">主流 Top 100 vs 链上 Meme · 比率调整 McClellan</span>
         </div>
         <div class="header-controls">
-          <div class="mcclellan-live-badge-wrap">
-            <span class="mcclellan-regime-pill" id="mcclellan-header-regime-pill">-- 宏观体制</span>
-            <span class="tz-badge" id="mcclellan-update-time">更新中... (UTC+8)</span>
-          </div>
+          <span class="tz-badge" id="mcclellan-update-time">更新中... (UTC 收盘)</span>
           <button class="chart-refresh-btn" id="btn-refresh-mcclellan" title="强制刷新麦克莱伦宽度数据">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M23 4v6h-6"></path>
@@ -473,114 +470,63 @@
       </div>
 
       <div class="card-body">
-        <!-- 5 KPI Cards Grid -->
         <div class="mcclellan-kpi-grid">
-          <!-- KPI 1: Regime -->
-          <div class="macro-metric-card" id="kpi-mcclellan-regime-card">
-            <span class="mm-label">当前宏观宽度体制 (Market Regime)</span>
+          <div class="macro-metric-card">
+            <span class="mm-label">Core Top 100 振荡器</span>
             <div class="mm-val-wrap">
-              <span class="mm-val" id="kpi-mcclellan-regime">--</span>
+              <span class="mm-val text-cyan" id="kpi-mc-core-osc">--</span>
+              <span class="mm-chip" id="kpi-mc-core-osc-chip">--</span>
             </div>
-            <span class="mm-sub" id="kpi-mcclellan-regime-sub">象限驱动特征与资金外溢判断</span>
+            <span class="mm-sub" id="kpi-mc-core-osc-sub">EMA19 − EMA39 of RAMO</span>
           </div>
 
-          <!-- KPI 2: Core McClellan -->
-          <div class="macro-metric-card" id="kpi-mcclellan-core-card">
-            <span class="mm-label">Top 100 核心麦克莱伦振荡器</span>
+          <div class="macro-metric-card">
+            <span class="mm-label">Core 累加指数 (Summation)</span>
             <div class="mm-val-wrap">
-              <span class="mm-val text-cyan" id="kpi-mcclellan-core">--</span>
-              <span class="mm-chip" id="kpi-mcclellan-core-chip">中性</span>
+              <span class="mm-val" id="kpi-mc-core-sum">--</span>
+              <span class="mm-chip" id="kpi-mc-core-sum-chip">--</span>
             </div>
-            <span class="mm-sub">EMA19 - EMA39 | &gt;+50 超买, &lt;-50 超卖</span>
+            <span class="mm-sub" id="kpi-mc-core-sum-sub">振荡器逐日累加 · 中长期宽度趋势</span>
           </div>
 
-          <!-- KPI 3: Frontier Meme McClellan -->
-          <div class="macro-metric-card" id="kpi-mcclellan-frontier-card">
-            <span class="mm-label">前沿投机 Meme 麦克莱伦振荡器</span>
+          <div class="macro-metric-card">
+            <span class="mm-label">链上 Meme 振荡器</span>
             <div class="mm-val-wrap">
-              <span class="mm-val text-fuchsia" id="kpi-mcclellan-frontier">--</span>
-              <span class="mm-chip" id="kpi-mcclellan-frontier-chip">中性</span>
+              <span class="mm-val text-fuchsia" id="kpi-mc-fr-osc">--</span>
+              <span class="mm-chip" id="kpi-mc-fr-osc-chip">--</span>
             </div>
-            <span class="mm-sub">DEX 门禁过滤链上投机流动性宽度动量</span>
+            <span class="mm-sub" id="kpi-mc-fr-osc-sub">Solana · BSC · Robinhood 热门池</span>
           </div>
 
-          <!-- KPI 4: Liquidity Divergence Spread -->
-          <div class="macro-metric-card" id="kpi-mcclellan-spread-card">
-            <span class="mm-label">流动性背离利差 (Frontier - Core)</span>
+          <div class="macro-metric-card">
+            <span class="mm-label">Meme 累加指数 · 跟踪池</span>
             <div class="mm-val-wrap">
-              <span class="mm-val text-amber" id="kpi-mcclellan-spread">--</span>
-              <span class="mm-chip" id="kpi-mcclellan-spread-chip">正常</span>
+              <span class="mm-val" id="kpi-mc-fr-sum">--</span>
+              <span class="mm-chip" id="kpi-mc-fr-sum-chip">--</span>
             </div>
-            <span class="mm-sub" id="kpi-mcclellan-spread-sub">利差 &ge; 40 触发 Meme 抽血顶背离预警</span>
-          </div>
-
-          <!-- KPI 5: Core MSI Summation -->
-          <div class="macro-metric-card" id="kpi-mcclellan-msi-card">
-            <span class="mm-label">核心麦克莱伦总和指数 (Core MSI)</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val text-green" id="kpi-mcclellan-msi">--</span>
-            </div>
-            <span class="mm-sub">长期宽度累积趋势水位 (&gt;0 宏观牛市潮汐)</span>
+            <span class="mm-sub" id="kpi-mc-fr-sum-sub">--</span>
           </div>
         </div>
 
-        <!-- Controls: Timeframe selector and Alert banner -->
         <div class="mcclellan-controls-bar">
+          <div class="view-switch" id="mcclellan-track-switch">
+            <button class="switch-btn active" data-track="core">Core Top 100</button>
+            <button class="switch-btn" data-track="frontier">链上 Meme</button>
+            <button class="switch-btn" data-track="compare">对比</button>
+          </div>
           <div class="view-switch timeframe-switch" id="mcclellan-timeframe-switch">
-            <button class="switch-btn" data-range="30d">30D</button>
             <button class="switch-btn" data-range="90d">90D</button>
             <button class="switch-btn" data-range="180d">180D</button>
             <button class="switch-btn active" data-range="1y">1Y</button>
-            <button class="switch-btn" data-range="all">ALL (2023~)</button>
-          </div>
-          <div class="mcclellan-alert-banner hidden" id="mcclellan-alert-banner">
-            <span class="alert-icon">⚠️</span>
-            <span class="alert-text">流动性警报：Meme投机利差大幅高于核心资产 (&ge;40)，主流市场正面临流动性抽血与脆弱见顶风险！</span>
+            <button class="switch-btn" data-range="all">ALL</button>
           </div>
         </div>
 
-        <!-- Dual Charts Layout (Two Column Grid on desktop, stacked on mobile) -->
-        <div class="mcclellan-charts-grid">
-          <!-- Chart 1: Dual Oscillators vs BTC -->
-          <div class="mcclellan-chart-card">
-            <div class="chart-header-sub">
-              <div class="chart-header-title">
-                <span class="chart-badge">OSCILLATORS</span>
-                <h4>双轨振荡器走势与 BTC 联动 (Dual Oscillators)</h4>
-              </div>
-              <div class="chart-legend-mini">
-                <span class="legend-indicator"><span class="dot" style="background:#00f2fe;"></span>Core Top100</span>
-                <span class="legend-indicator"><span class="dot" style="background:#b537f2;"></span>Frontier Meme</span>
-                <span class="legend-indicator"><span class="dot" style="background:#f59e0b;"></span>BTC (右轴)</span>
-              </div>
-            </div>
-            <div class="mcclellan-chart-wrapper">
-              <canvas id="chart-mcclellan-oscillator"></canvas>
-            </div>
-          </div>
-
-          <!-- Chart 2: Liquidity Divergence Spread & Regime Bars -->
-          <div class="mcclellan-chart-card">
-            <div class="chart-header-sub">
-              <div class="chart-header-title">
-                <span class="chart-badge">DIVERGENCE SPREAD</span>
-                <h4>投机利差与体制着色 (Frontier - Core &amp; Regimes)</h4>
-              </div>
-              <div class="chart-legend-mini">
-                <span class="legend-indicator"><span class="rect" style="background:#10b981;"></span>共振繁荣</span>
-                <span class="legend-indicator"><span class="rect" style="background:#f59e0b;"></span>Meme抽血</span>
-                <span class="legend-indicator"><span class="rect" style="background:#06b6d4;"></span>核心蓄势</span>
-                <span class="legend-indicator"><span class="rect" style="background:#ef4444;"></span>严冬深冻</span>
-                <span class="legend-indicator"><span class="line" style="background:#60a5fa;"></span>30D MA</span>
-              </div>
-            </div>
-            <div class="mcclellan-chart-wrapper">
-              <canvas id="chart-mcclellan-spread"></canvas>
-            </div>
-          </div>
+        <div class="mcclellan-chart-card">
+          <div class="mcclellan-notice hidden" id="mcclellan-warmup-notice"></div>
+          <div id="mcclellan-echarts" class="mcclellan-echarts"></div>
         </div>
 
-        <!-- Collapsible Methodology & Formula Accordion -->
         <div class="mcclellan-methodology-container">
           <button class="methodology-accordion-btn" id="btn-mcclellan-methodology-toggle" aria-expanded="false">
             <div class="acc-btn-title">
@@ -589,7 +535,7 @@
                 <line x1="12" y1="16" x2="12" y2="12"></line>
                 <line x1="12" y1="8" x2="12.01" y2="8"></line>
               </svg>
-              <span>指标计量设计与 4 重门禁机制 (RAMO &amp; Gatekeeper Methodology)</span>
+              <span>计算方法与成分池 (Methodology)</span>
             </div>
             <svg class="acc-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -597,45 +543,31 @@
           </button>
           <div class="methodology-accordion-content hidden" id="mcclellan-methodology-content">
             <div class="methodology-inner-grid">
-              <div class="methodology-col">
-                <h5>1. 传统麦克莱伦在加密生态的失真与修正</h5>
-                <p>传统麦克莱伦振荡器（McClellan Oscillator）基于股市等权腾落线（Advance-Decline Line, ADL）。但在加密市场，若采用等权计数，99% 的低流动性垃圾代币会制造严重的“伪宽度繁荣”。本项目提出 <strong>RAMO (Risk-Adjusted Momentum Oscillation)</strong> 算法，结合对数收益率、换手率因子与流动池惩罚系数：</p>
-                <div class="formula-box">
-                  <code>RAMO_i = sign(R_i) * ln(1 + |R_i|) * (Vol_i / Median(Vol)) * min(1, LP_i / $300,000)</code>
-                </div>
-                <p>双轨 EMA 差值放大因子标定为 1000：<code>Oscillator = (EMA_19(NetBreadth) - EMA_39(NetBreadth)) * 1000</code>。</p>
+              <div class="methodology-col full-width">
+                <h5>1. 比率调整 McClellan（两条轨道同一公式）</h5>
+                <p>每天统计成分池中收盘对收盘上涨与下跌的家数，按比率调整消除成分数量变化的影响，再取两条 EMA 之差：</p>
+                <div class="formula-box"><code>RAMO = (Adv − Dec) / (Adv + Dec) × 1000　·　Oscillator = EMA19(RAMO) − EMA39(RAMO)　·　Summation = Σ Oscillator</code></div>
+                <p>前 40 个交易日为 EMA 预热期，不发布读数。图中的虚线区间是该轨道振荡器历史读数的 10% / 90% 分位，用来替代固定的超买超卖阈值。</p>
               </div>
-
               <div class="methodology-col">
-                <h5>2. DEX 投机前沿 Meme 动态池 4 重门禁过滤</h5>
+                <h5>2. Core 轨：按当日市值的 Top 100</h5>
                 <ul class="gatekeeper-list">
-                  <li><strong>① DEX 流动性门禁 (LP &ge; $300,000)：</strong>彻底剔除无深度的薄池与恶意插针抽毯项目。</li>
-                  <li><strong>② 24h 真实成交额 (Vol &ge; $1,500,000)：</strong>过滤虚假对敲刷量与无实盘买盘代币。</li>
-                  <li><strong>③ 完全稀释估值 (FDV &ge; $10,000,000)：</strong>防止极小市值超轻微扰动污染全网宽度。</li>
-                  <li><strong>④ 7天留存滞后缓冲带 (7-Day Hysteresis)：</strong>跌破门禁后维持 7 天观察期，消除成分切换的假性抖动。</li>
+                  <li><strong>成分池：</strong>每天按<strong>前一日收盘市值</strong>重新排出 Top 100，当天的涨跌按这份事先确定的名单统计，避免"因为暴涨才入选"的偏差。</li>
+                  <li><strong>排除：</strong>稳定币、包装/跨链资产、LST/LRT、代币化黄金与国债。另外用数据自动识别：日波动中位数低于 0.15% 的视为稳定币，与 BTC/ETH/SOL/BNB 日收益差中位数低于 0.25% 的视为锚定衍生品。</li>
+                  <li><strong>数据：</strong>CoinGecko，回溯 365 天（公共接口上限），之后每天 UTC 23:30 追加收盘快照。历史候选池取当前 Top 300，跌出 Top 300 的币有轻微幸存者偏差。</li>
                 </ul>
               </div>
-
-              <div class="methodology-col full-width">
-                <h5>3. 四象限宏观体制分类与流动性背离预警</h5>
-                <div class="regime-cards-grid">
-                  <div class="regime-detail-box regime-q1">
-                    <span class="regime-tag tag-q1">Q1 全域共振繁荣 (Co-Expansion)</span>
-                    <p class="regime-desc"><strong>Core &gt; 0 且 Frontier &gt; 0：</strong>增量资金全速入场，核心蓝筹与链上投机共振走强，牛市主升浪最健康阶段。</p>
-                  </div>
-                  <div class="regime-detail-box regime-q2">
-                    <span class="regime-tag tag-q2">Q2 Meme 流动性抽血 (Meme Siphon)</span>
-                    <p class="regime-desc"><strong>Core &le; 0 且 Frontier &gt; 0：</strong>存量博弈极端化，场内流动性被投机代币吸干，主流资产熄火，当利差 &ge; 40 时为高危逃顶信号。</p>
-                  </div>
-                  <div class="regime-detail-box regime-q3">
-                    <span class="regime-tag tag-q3">Q3 核心价值蓄势 (Quality Accumulation)</span>
-                    <p class="regime-desc"><strong>Core &gt; 0 且 Frontier &le; 0：</strong>机构与理性资金吸筹 Top 100 优质资产，垃圾代币持续出清，健康慢牛初期的典型征兆。</p>
-                  </div>
-                  <div class="regime-detail-box regime-q4">
-                    <span class="regime-tag tag-q4">Q4 流动性严冬深冻 (Deep Freeze)</span>
-                    <p class="regime-desc"><strong>Core &le; 0 且 Frontier &le; 0：</strong>全市场流动性枯竭与全面出清，双轨振荡器深陷超卖区间（&lt;-50），左侧筑底孕育周期转折点。</p>
-                  </div>
-                </div>
+              <div class="methodology-col">
+                <h5>3. Meme 轨：链上热度（只向前累积）</h5>
+                <ul class="gatekeeper-list">
+                  <li><strong>发现：</strong>GeckoTerminal 上 Solana / BSC / Robinhood 链的热门池和 24h 成交额榜，排除链原生币、稳定币和代币化股票。</li>
+                  <li><strong>按链分别设门禁：</strong>流动性、24h 成交额和 FDV 都需达标（Robinhood 链的池子小一个量级，所以门槛单独设置）。</li>
+                  <li><strong>7 天留存：</strong>入选后继续跟踪 7 天，暴跌的币照样计入下跌家数。入选当天不计入，从第二天开始统计。</li>
+                  <li><strong>撤池计为下跌：</strong>跟踪中的币如果池子消失或流动性跌破 $5k，当天计为下跌后移出，不会悄悄从样本里消失。成分少于 20 个的日子标记为样本不足（悬停图表可查看撤池数、新进/移出数和成分年龄中位数）。</li>
+                  <li><strong>按链等权：</strong>Solana、BSC、Robinhood 各自计算 RAMO 后取平均（成分少于 3 个的链不参与），防止某条链上币数暴增时主导读数。合并计数的 RAMO 保留为诊断项。</li>
+                  <li><strong>外部热度锚：</strong>DefiLlama 三条链的 DEX 成交额动量 ln(7 日均值 / 28 日均值)，同样按链等权（图上紫色虚线）。它不依赖我们的选币，振荡器发布满 30 天后显示两者的相关系数，用来检验 Meme 振荡器是否跟随真实的链上热度。</li>
+                  <li><strong>报价与历史：</strong>每天用 DexScreener 批量报价。链上无法还原"过去哪些池在热榜上"，所以这条轨道不回填历史，只从首次采集日开始累积。</li>
+                </ul>
               </div>
             </div>
           </div>

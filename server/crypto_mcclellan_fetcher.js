@@ -1,5 +1,5 @@
 /**
- * Crypto Dual-Track McClellan Oscillator & Liquidity Siphon Fetcher
+ * Crypto McClellan Oscillator Fetcher (Core Top 100 vs On-chain Meme)
  * Reads, caches, and serves the pre-computed market breadth dataset for Module 1-B.
  */
 const fs = require('fs');
@@ -29,11 +29,12 @@ function validateMcClellanData(data) {
   if (!data.metadata || !data.current || !data.series || !Array.isArray(data.series)) {
     throw new Error('McClellan payload is missing metadata, current, or series');
   }
-  if (!data.regime_stats || typeof data.regime_stats !== 'object') {
-    throw new Error('McClellan payload is missing regime_stats');
+  const { core, frontier } = data.current;
+  if (!core || typeof core !== 'object' || !frontier || typeof frontier !== 'object') {
+    throw new Error('McClellan payload current state is missing core or frontier track');
   }
-  if (typeof data.current.core_oscillator !== 'number' || typeof data.current.frontier_oscillator !== 'number') {
-    throw new Error('McClellan payload current state has invalid oscillator types');
+  if (typeof core.oscillator !== 'number') {
+    throw new Error('McClellan payload core oscillator is not a number');
   }
   return true;
 }
@@ -100,7 +101,8 @@ function triggerPythonPipelineRefresh() {
     }
 
     const cmd = `"${pythonBin}" "${exportScript}"`;
-    exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 60000 }, (error, stdout, stderr) => {
+    // Collection waits out CoinGecko / GeckoTerminal rate limits, so allow a few minutes
+    exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 240000 }, (error, stdout, stderr) => {
       if (error) {
         console.warn('[McClellanFetcher] Python pipeline execution error:', error.message);
         return resolve({
@@ -140,7 +142,7 @@ async function getMcClellanData(forceRefresh = false) {
       if (result.success) {
         lastRefreshStatus = {
           status: 'refreshed',
-          message: '双轨麦克莱伦市场广度与流动性剪刀差管线已成功重新解算！',
+          message: '麦克莱伦市场宽度管线已重新采集并解算',
           timestamp: new Date().toISOString()
         };
       } else {

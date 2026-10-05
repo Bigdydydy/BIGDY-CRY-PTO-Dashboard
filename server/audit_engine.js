@@ -297,19 +297,19 @@ async function getSystemAuditData(doProbe = false) {
 
     crypto_mcclellan_breadth: {
       id: 'crypto_mcclellan_breadth',
-      name: '双轨加密麦克莱伦市场广度与流动性虹吸指标',
+      name: '加密麦克莱伦市场宽度振荡器 (Core Top 100 vs 链上 Meme)',
       viewId: 'view-overview',
-      primarySource: 'CoinGecko / Binance 500+ 原生代币池 (Core + Frontier/Meme)',
-      targetEndpoints: ['Python 计算流水线 (scripts/crypto_mcclellan/calculate_mcclellan.py)'],
-      timeframe: '小时级增量分析 + 双轨 EMA(19/39) 动量差',
-      updateInterval: '30s 监听更新',
-      isRealtime: true,
+      primarySource: 'CoinGecko Top 100 (按当日市值) + GeckoTerminal / DexScreener 链上 Meme (Solana · BSC · Robinhood)',
+      targetEndpoints: ['Python 计算流水线 (scripts/crypto_mcclellan/export_to_json.py)'],
+      timeframe: 'UTC 日收盘 · 比率调整 RAMO 的 EMA(19/39) 差值与累加指数',
+      updateInterval: '每日 UTC 23:30 (GitHub Actions)',
+      isRealtime: false,
       recordCount: mcData?.series?.length || 1000,
       lastUpdated: mcData?.metadata?.benchmark_date || null,
       maxAgeSeconds: 2 * 86400,
       provenanceSignatures: [
-        'RAMO_LIQUIDITY_PENALTY_BOUNDS',
-        'CORE_FRONTIER_DUAL_TRACK_SPREAD'
+        'RATIO_ADJUSTED_MCCLELLAN_EMA19_EMA39',
+        'POINT_IN_TIME_TOP100_EX_ANTE_UNIVERSE'
       ],
       healthStatus: (mcData?.series?.length > 0 || fs.existsSync(path.join(DATA_DIR, 'crypto_mcclellan.json'))) ? 'ONLINE' : 'INITIALIZING'
     }

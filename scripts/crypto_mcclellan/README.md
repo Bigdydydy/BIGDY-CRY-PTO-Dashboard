@@ -1,87 +1,59 @@
-﻿# 加密双轨麦克莱伦振荡器系统 (Crypto Dual-Track McClellan Oscillator Platform)
+# 加密麦克莱伦市场宽度振荡器 (Module 1-B)
 
-## 1. 为什么传统美股 McClellan 无法直接用于 Crypto？
+两条宽度轨道，同一套经典比率调整 McClellan 公式：
 
-传统美股（NYSE/NASDAQ）具有相对稳定的上市标的池与明确的收盘时间（美东 16:00），直接计算 `Advances - Declines`（上涨家数减下跌家数）即可获得有效的市场广度。但在加密市场：
-1. **极端幂律分布与垃圾币噪音**：如果全网统计几万个代币，极低流动性的链上土狗会制造巨大的虚假“上涨/下跌”。
-2. **非标资产污染**：稳定币（USDT/USDC）与流动性质押代币（stETH 等）在 0 轴附近的微幅波动会严重稀释广度信号。
-3. **上市标的数量随年份暴增**：若采用绝对数值 `(Adv - Dec)`，指标振幅会随年份扩张导致历史分位阈值失效。
-4. **流动性割裂与 Meme 轮动**：存量资金常在主流 CEX 现货与链上高频 Meme（Solana、Base、BSC、Robinhood）之间发生“抽血式”轮动。
+| 轨道 | 成分池 | 数据源 | 历史 |
+| --- | --- | --- | --- |
+| **Core** | 每天按前一日收盘市值重排的 Top 100（剔除稳定币、包装/质押衍生品、代币化 RWA） | CoinGecko | 回填 365 天，之后每日追加 |
+| **Frontier Meme** | Solana / BSC / Robinhood 链上热门池，按链分别设门禁，入选后留存 7 天 | GeckoTerminal（发现）+ DexScreener（报价） | 只向前累积（链上热度无法回填） |
 
----
+## 计算
 
-## 2. 核心架构与组成成分设计
-
-本项目构建专为加密市场结构设计的**双轨市场广度与流动性剪刀差监控系统**：
-
-### 轨道 1：机构基石轨 (Core Track)
-- **标的池**：CoinGecko Top 100/300 现货 + 币安高频 USDT 现货交易对。
-- **严格负面清单过滤**：
-  - **稳定币**：`USDT`, `USDC`, `DAI`, `FDUSD`, `USDe`, `USDS` 等；
-  - **流动性质押与再质押资产**：`stETH`, `wstETH`, `ezETH`, `weETH`, `bnsol` 等；
-  - **包装与跨链资产**：`WBTC`, `WETH` 等。
-- **产出**：反映合规资本与主流现货的健康广度水位。
-
-### 轨道 2：链上 Meme 投机前沿轨 (Frontier Meme Track)
-- **标的池**：DexScreener & GeckoTerminal 跨链热点池（覆盖 Solana、Base、BSC 等生态）。
-- **四道动态准入门槛 (Dynamic Gatekeeper)**：
-  1. **锁仓流动性 (LP)**：$\ge \$300,000$（剔除单机盘与易撤池项目）；
-  2. **24h 真实成交额**：$\ge \$1,500,000$（确保有充分换手）；
-  3. **完全稀释市值 (FDV)**：$\ge \$10,000,000$（DexScreener Hall of Fame 级别实质门槛）；
-  4. **7 天退出冷却缓冲 (Anti-Survivorship Bias Buffer)**：代币一旦入选，强制在池中追踪 **7 天**，即使随后暴跌 80% 也如实计入“下跌家数（Declines）”，彻底解决链上 Meme 唯有赢家留存的幸存者偏差！
-
----
-
-## 3. 数学与量化指标定义
-
-### 涨跌判定口径 (UTC Close-to-Close)
-传统美股以交易所收盘判定涨跌。加密市场 24/7 运行，直接取行情 API 的 `price_change_24h`
-滚动窗口会让同一段行情被相邻两个数据点重复计入、并与历史序列的 UTC 日收盘口径不一致。
-因此每个成分的日内涨跌幅优先按 **UTC 日收盘对收盘** 计算：
-
-$$\text{daily\_pct}_t = \left(\frac{\text{close}_t}{\text{close}_{t-1}} - 1\right) \times 100\%$$
-
-- `DailyCloseStore`（`data/cache/daily_closes.csv`）按 `(date, track, key)` 持久化每个成分的日收盘价；首次入库的成分当日回退到 API 24h 滚动口径（`pct_basis = rolling_24h`），次日起自动切换为 `close_to_close`。
-- 历史种子重建时会把 yfinance 核心篮子的日收盘矩阵回填进 store，使核心轨立即获得收盘基準。
-- 该 store 同时充当逐日成分快照（point-in-time universe），用于抵御幸存者偏差。
-
-### 比率调整净上涨值 (RAMO)
-$$\text{RAMO}_t = \frac{\text{Advances}_t - \text{Declines}_t}{\text{Advances}_t + \text{Declines}_t} \times 1000.0$$
-*数值严格落在 $[-1000, +1000]$ 区间内，不受成分数量动态变动影响。*
-
-### 双重指数平滑与振荡器
-$$\text{EMA}_{\text{fast}, t} = \text{EMA}_{19}(\text{RAMO}_t)$$
-$$\text{EMA}_{\text{slow}, t} = \text{EMA}_{39}(\text{RAMO}_t)$$
-$$\text{McClellan Oscillator}_t = \text{EMA}_{19, t} - \text{EMA}_{39, t}$$
-
-### 麦克莱伦累加指数 (McClellan Summation Index, MSI)
-$$\text{MSI}_t = \text{MSI}_{t-1} + \text{McClellan Oscillator}_t$$
-*用于跟踪跨越数周乃至数月的宏观牛熊广度大中枢。*
-
-### 流动性剪刀差 (Liquidity Divergence Spread)
-$$\text{Spread}_t = \text{Oscillator}_{\text{Frontier}} - \text{Oscillator}_{\text{Core}}$$
-
----
-
-## 4. 四类市场机制状态诊断
-
-| 状态类型 | 状态名称 | 判定特征 | 策略/风险含义 |
-| :--- | :--- | :--- | :--- |
-| **Q1** | **全域共振繁荣 (Co-Expansion)** | Core $> 0$, Frontier $> 0$ | 风险偏好全面打开，全市场增量流动性充沛，顺势持仓。 |
-| **Q2** | **末日轮动·流动性抽血 (Meme Siphon) ⚠️** | Frontier $\ge +20$, Core $\le 0$ 或 Spread $\ge +35$ | **极度危险见顶信号！** 散户饥渴冲入链上 Meme，主流现货流血阴跌，存量博弈衰竭。 |
-| **Q3** | **优质资产吸筹·前沿去杠杆 (Quality Flow)** | Core $> 0$, Frontier $\le -15$ | Meme 泡沫快速刺破，资金回流具备造血能力的主流币，优质资产反弹。 |
-| **Q4** | **全域冰点出清·极度超卖 (Deep Freeze)** | Core $< -25$, Frontier $< -25$ | 情绪极度绝望，全网无差别杀跌，历史上属于非对称建仓窗口。 |
-
----
-
-## 5. 一键运行与更新
-
-```bash
-# 进入工程目录
-cd crypto_mcclellan_oscillator
-
-# 一键执行日度数据采集、广度测算与看板渲染
-python run_pipeline.py
+```
+RAMO        = (Adv − Dec) / (Adv + Dec) × 1000
+Oscillator  = EMA19(RAMO) − EMA39(RAMO)
+Summation   = Σ Oscillator（从首个发布日起，基数 0）
 ```
 
-执行完成后，在浏览器中打开 `output/crypto_mcclellan_dashboard.html` 查看高密度、交互式量化仪表盘。
+- 前 40 个宽度日为 EMA 预热期，不发布读数。
+- 涨跌按 UTC 收盘对收盘计算；**成分名单事先确定**：第 t 天只统计第 t−1 天就已在池中的成分，避免"因为暴涨才入选"的偏差。
+- 超买超卖不用固定阈值，改用各轨道振荡器历史读数的 10% / 90% 分位（发布满 60 天后才绘制）。
+
+## 防失真规则
+
+**Core**
+- 静态名单：剔除稳定币、包装币、LST/LRT、代币化黄金和国债（`config.EXCLUDED_SYMBOLS` / `EXCLUDED_NAME_KEYWORDS`）。
+- 自动识别：日收益绝对值的中位数低于 0.15% 视为稳定币；与 BTC/ETH/SOL/BNB/黄金的日收益差中位数低于 0.25% 视为锚定衍生品。
+- 残余偏差：历史候选池取当前 Top 300，一年内跌出 Top 300 的币缺失。
+
+**Meme**
+- 入选当天不计入，从次日开始统计。
+- 7 天留存，崩盘的币照样计入下跌；留存到期当天仍报价一次。
+- 被跟踪的币如果池子消失或流动性跌破 $5k，计为下跌后移出。报价 API 请求失败不算撤池。
+- **按链等权**：Solana / BSC / Robinhood 各自算 RAMO 后取平均（成分少于 3 个的链不参与），`ramo_pooled` 保留合并计数作诊断。
+- **外部热度锚**：DefiLlama 三条链的 DEX 成交额动量 `ln(MA7 / MA28)`，按链等权（新上线的链满 28 天才计入，避免跳变；最近 2 天数据尚未结算，丢弃）。振荡器发布满 30 天后输出 `anchor_corr`（与锚的相关系数）。
+- 每日诊断字段：`frontier_dead`（撤池数）、`frontier_entries` / `frontier_exits`（换手）、`frontier_age_median`（成分年龄中位数）、`frontier_low_sample`（成分少于 20 个）。
+
+## 文件
+
+| 路径 | 内容 |
+| --- | --- |
+| `export_to_json.py` | 每日入口：采集 → 计算 → 输出 `data/crypto_mcclellan.json` |
+| `seed_core_history.py` | 一次性回填 Core 一年历史（公共接口限流，约 1 小时，可断点续跑） |
+| `src/breadth.py` | 纯计算：RAMO、EMA、成分池、排除规则 |
+| `src/core_track.py` / `src/frontier_track.py` | 两条轨道的采集与存储 |
+| `data/core_daily.csv` | Core 候选池每日收盘与市值（长表） |
+| `data/frontier_snapshots.csv` / `frontier_registry.json` | Meme 每日快照与入选登记 |
+| `data/dex_volume.csv` | DefiLlama 各链每日 DEX 成交额（外部锚，每次运行全量刷新） |
+| `src/anchor.py` | 外部锚：成交额动量与相关系数 |
+
+## 运行
+
+只依赖 Python 标准库。
+
+```bash
+python seed_core_history.py        # 首次部署时运行一次
+python export_to_json.py           # 每日采集并导出（GitHub Actions 每天 UTC 23:30 运行）
+python export_to_json.py --offline # 只用已存数据重算
+python test_breadth.py             # 单元测试
+```

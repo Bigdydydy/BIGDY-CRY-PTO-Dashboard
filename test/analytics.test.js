@@ -780,101 +780,64 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
 });
 
 
-describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes', () => {
-  const { getMcClellanData } = require('../server/crypto_mcclellan_fetcher');
+describe('Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme)', () => {
+  const { getMcClellanData, validateMcClellanData } = require('../server/crypto_mcclellan_fetcher');
 
-  test('RAMO mathematical bounds and liquidity penalty logic', () => {
-    // RAMO = sign(R) * ln(1 + |R|) * (Vol / Median(Vol)) * min(1, LP / 300,000)
-    const calcRamo = (ret, vol, medVol, lp) => {
-      const sign = ret > 0 ? 1 : (ret < 0 ? -1 : 0);
-      const retFactor = Math.log(1 + Math.abs(ret));
-      const turnoverFactor = medVol > 0 ? (vol / medVol) : 1;
-      const lpPenalty = Math.min(1.0, Math.max(0.0, lp / 300000));
-      return sign * retFactor * turnoverFactor * lpPenalty;
+  test('Ratio-adjusted McClellan: RAMO bounds, EMA19 - EMA39 and running summation', () => {
+    const ramo = (adv, dec) => (adv + dec > 0 ? (adv - dec) / (adv + dec) * 1000 : 0);
+    assert.equal(ramo(60, 0), 1000);
+    assert.equal(ramo(0, 60), -1000);
+    assert.equal(ramo(75, 25), 500);
+
+    const ema = (vals, span) => {
+      const k = 2 / (span + 1);
+      let prev = null;
+      return vals.map(v => (prev = prev === null ? v : k * v + (1 - k) * prev));
     };
-
-    // Test 1: Zero return yields 0 RAMO
-    assert.equal(calcRamo(0.0, 1000000, 1000000, 500000), 0);
-
-    // Test 2: Low LP (< $300k) receives penalty discount
-    const normalLpRamo = calcRamo(0.1, 1000000, 1000000, 300000);
-    const lowLpRamo = calcRamo(0.1, 1000000, 1000000, 150000);
-    assert.ok(Math.abs(lowLpRamo - normalLpRamo * 0.5) < 1e-6, 'Half LP should scale penalty linearly to 0.5');
-
-    // Test 3: Sign preservation: negative returns yield negative RAMO
-    const negRamo = calcRamo(-0.05, 2000000, 1000000, 400000);
-    assert.ok(negRamo < 0, 'Negative return must yield negative RAMO');
+    const series = [...Array(20).fill(400), ...Array(30).fill(-400)];
+    const fast = ema(series, 19);
+    const slow = ema(series, 39);
+    const osc = fast.map((f, i) => f - slow[i]);
+    assert.ok(Math.abs(osc[19]) < 1e-9, 'constant input keeps fast == slow');
+    assert.ok(osc[30] < 0, 'oscillator turns negative after breadth flips');
   });
 
-  test('McClellan Oscillator EMA difference and spread calculations', () => {
-    // Oscillator = (EMA19 - EMA39) * 1000
-    // Spread = Frontier - Core
-    const coreEma19 = 0.05;
-    const coreEma39 = 0.03;
-    const coreOsc = Math.round((coreEma19 - coreEma39) * 1000);
-    assert.equal(coreOsc, 20);
-
-    const frontierOsc = 65;
-    const spread = frontierOsc - coreOsc;
-    assert.equal(spread, 45);
-    assert.ok(spread >= 40, 'Spread >= 40 indicates meme siphon warning');
+  test('validateMcClellanData rejects payloads without both tracks', () => {
+    assert.throws(() => validateMcClellanData({ metadata: {}, current: { core: { oscillator: 1 } }, series: [] }));
+    assert.ok(validateMcClellanData({
+      metadata: {}, current: { core: { oscillator: 1.5 }, frontier: { ready: false } }, series: []
+    }));
   });
 
-  test('Four Regimes classification logic covers all 4 quadrants', () => {
-    const classifyRegime = (core, frontier) => {
-      if (core > 0 && frontier > 0) return 'CO_EXPANSION';
-      if (core <= 0 && frontier > 0) return 'MEME_SIPHON';
-      if (core > 0 && frontier <= 0) return 'QUALITY_ACCUMULATION';
-      return 'DEEP_FREEZE';
-    };
-
-    assert.equal(classifyRegime(10, 20), 'CO_EXPANSION');
-    assert.equal(classifyRegime(-5, 15), 'MEME_SIPHON');
-    assert.equal(classifyRegime(12, -8), 'QUALITY_ACCUMULATION');
-    assert.equal(classifyRegime(-15, -25), 'DEEP_FREEZE');
-  });
-
-  test('getMcClellanData loads valid data with >= 1000 records and robust schema', async () => {
+  test('getMcClellanData loads the dual-track payload with a year of Core history', async () => {
     const data = await getMcClellanData(false);
     assert.ok(data, 'data must exist');
 
-    // Metadata validation
-    assert.ok(data.metadata, 'metadata must exist');
     assert.equal(data.metadata.parameters.ema_fast, 19);
     assert.equal(data.metadata.parameters.ema_slow, 39);
     assert.equal(data.metadata.parameters.ratio_scale, 1000);
-    assert.equal(data.metadata.gatekeeper.min_liquidity_usd, 300000);
-    assert.equal(data.metadata.gatekeeper.min_volume_24h_usd, 1500000);
-    assert.equal(data.metadata.gatekeeper.min_fdv_usd, 10000000);
-    assert.equal(data.metadata.gatekeeper.retention_days, 7);
+    assert.equal(data.metadata.core.top_n, 100);
+    assert.deepEqual(data.metadata.frontier.chains, ['solana', 'bsc', 'robinhood']);
 
-    // Current state validation
-    assert.ok(data.current, 'data.current must exist');
-    assert.ok(data.current.date, 'current date must exist');
-    assert.ok(['CO_EXPANSION', 'MEME_SIPHON', 'QUALITY_ACCUMULATION', 'DEEP_FREEZE'].includes(data.current.regime_code));
-    assert.ok(typeof data.current.core_oscillator === 'number');
-    assert.ok(typeof data.current.frontier_oscillator === 'number');
-    assert.ok(typeof data.current.spread === 'number');
-    assert.ok(typeof data.current.core_summation === 'number');
-    assert.ok(typeof data.current.btc_close === 'number');
-    assert.ok(typeof data.current.spread_alert === 'boolean');
+    const { core, frontier } = data.current;
+    assert.ok(core.ready, 'Core track must be published');
+    assert.ok(typeof core.oscillator === 'number');
+    assert.ok(typeof core.summation === 'number');
+    assert.ok(core.constituents >= 80 && core.constituents <= 100, `Core constituents ${core.constituents}`);
+    assert.ok(typeof frontier.ready === 'boolean');
+    assert.ok(typeof frontier.breadth_days === 'number');
 
-    // Series validation: must have >= 1000 daily observations
-    assert.ok(Array.isArray(data.series), 'series must be an array');
-    assert.ok(data.series.length >= 1000, `series length must be >= 1000, got ${data.series.length}`);
+    assert.ok(Array.isArray(data.series));
+    assert.ok(data.series.length >= 300, `series length must be >= 300, got ${data.series.length}`);
+    const last = data.series[data.series.length - 1];
+    assert.ok(last.date);
+    assert.ok(typeof last.btc_close === 'number');
+    assert.ok(typeof last.core_oscillator === 'number');
+    assert.ok(typeof last.core_summation === 'number');
+    assert.ok(last.core_adv + last.core_dec <= last.core_n);
+    // Frontier readings stay null until the EMA warm-up completes
+    if (!frontier.ready) assert.equal(last.frontier_oscillator, null);
 
-    // Verify properties of series points
-    const sample = data.series[data.series.length - 1];
-    assert.ok(sample.date);
-    assert.ok(typeof sample.core_oscillator === 'number');
-    assert.ok(typeof sample.frontier_oscillator === 'number');
-    assert.ok(typeof sample.spread === 'number');
-    assert.ok(typeof sample.spread_30d_ma === 'number');
-    assert.ok(typeof sample.core_summation === 'number');
-    assert.ok(typeof sample.btc_close === 'number');
-    assert.ok(sample.regime_code);
-
-    // Refresh status validation
     assert.ok(data.refresh_status, 'refresh_status must exist');
     assert.ok(['refreshed', 'pipelineUnavailable', 'stale', 'cached'].includes(data.refresh_status.status));
   });
@@ -890,8 +853,8 @@ describe('Module 1-B: Dual-Track Crypto McClellan Oscillator & Breadth Regimes',
           const json = await resp.json();
           assert.equal(json.code, 0);
           assert.ok(json.data);
-          assert.ok(json.data.current);
-          assert.ok(json.data.series.length >= 1000);
+          assert.ok(json.data.current.core);
+          assert.ok(json.data.series.length >= 300);
           assert.ok(json.data.metadata.title.includes('麦克莱伦') || json.data.metadata.title.includes('McClellan'));
 
           // Verify ETag support on the endpoint
@@ -943,7 +906,8 @@ describe('System Audit & Data Provenance Verification Engine', () => {
       assert.ok(Array.isArray(mod.targetEndpoints) && mod.targetEndpoints.length > 0, `${modId} targetEndpoints`);
       assert.ok(mod.timeframe, `${modId} timeframe description`);
       assert.ok(mod.updateInterval, `${modId} updateInterval`);
-      assert.equal(mod.isRealtime, true, `${modId} isRealtime`);
+      // The breadth oscillator is computed once per UTC close, not streamed
+      assert.equal(mod.isRealtime, modId !== 'crypto_mcclellan_breadth', `${modId} isRealtime`);
       assert.ok(Array.isArray(mod.provenanceSignatures) && mod.provenanceSignatures.length > 0, `${modId} provenanceSignatures`);
       assert.ok(['ONLINE', 'INITIALIZING'].includes(mod.healthStatus), `${modId} healthStatus`);
     }
