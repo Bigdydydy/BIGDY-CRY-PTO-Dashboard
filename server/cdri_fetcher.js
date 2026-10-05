@@ -242,5 +242,6 @@ async function fetchCdriData(forceRefresh = false) {
 
 module.exports = {
   fetchCdriData,
+  callCoinglassEndpoint,
   getRiskInfo
 };

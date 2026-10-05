@@ -20,6 +20,8 @@ const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
+const { getEtfLinkageData } = require('./etf_linkage_engine');
+const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments } = require('./option_marks');
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
@@ -500,6 +502,20 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] term-premium:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/etf-linkage — ETF flows × CME positioning × basis carry linkage (Module 2-B)
+  if (pathname === '/api/etf-linkage' && req.method === 'GET') {
+    try {
+      const force = parsedUrl.query?.force === '1';
+      const basisSeries = await getHistoricalBasisData().catch(() => []);
+      const data = await getEtfLinkageData(basisSeries, force);
+      sendJsonResponse(req, res, 200, { code: 0, ...data });
+    } catch (err) {
+      console.error('[API Error] etf-linkage:', err.message);
+      sendJsonResponse(req, res, 502, { code: -1, error: err.message });
     }
     return;
   }

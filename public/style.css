@@ -5860,3 +5860,272 @@ body {
   line-height: 1.55;
   margin: 0;
 }
+
+/* ==========================================================================
+   Module 2: carry score components & Module 2-B ETF × carry linkage
+   ========================================================================== */
+.tp-score-number-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 70px;
+}
+
+.tp-score-tier {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.tp-score-components {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tp-comp-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+}
+
+.tp-comp-lbl {
+  color: var(--text-muted);
+}
+
+.tp-comp-bar {
+  height: 5px;
+  background: var(--bg-track);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.tp-comp-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 9999px;
+  background: #818cf8;
+  transition: width var(--transition-normal);
+}
+
+.tp-comp-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+.el-card {
+  margin-top: 20px;
+}
+
+.el-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.el-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.el-status:empty {
+  display: none;
+}
+
+.el-status.error {
+  color: #f43f5e;
+}
+
+.el-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.el-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.el-kpi-lbl {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.el-kpi-val {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.el-kpi-sub {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.el-verdict-pill {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: var(--bg-pill);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.el-verdict-pill.strong {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.el-verdict-pill.moderate {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.el-verdict-pill.weak {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+.el-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.el-check-list li {
+  display: grid;
+  grid-template-columns: 22px 92px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.el-check-mark {
+  font-weight: 800;
+  text-align: center;
+}
+
+.el-check-list li.pass .el-check-mark {
+  color: #10b981;
+}
+
+.el-check-list li.fail .el-check-mark {
+  color: #f43f5e;
+}
+
+.el-check-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.el-chart {
+  width: 100%;
+  height: 340px;
+}
+
+.el-chart-tall {
+  height: 520px;
+}
+
+.el-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.el-table-wrap {
+  overflow-x: auto;
+}
+
+.el-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.el-table th,
+.el-table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.el-table th:first-child,
+.el-table td:first-child {
+  text-align: left;
+}
+
+.el-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.el-table td {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.el-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.el-tag.pos {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.el-tag.neg {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+}
+
+.el-tag.neutral {
+  background: var(--bg-pill);
+  color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+  .el-two-col {
+    grid-template-columns: 1fr;
+  }
+  .el-chart-tall {
+    height: 460px;
+  }
+}
+
+@media (max-width: 640px) {
+  .el-check-list li {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .el-check-detail {
+    grid-column: 2;
+  }
+}
