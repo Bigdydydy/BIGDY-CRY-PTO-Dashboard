@@ -5943,7 +5943,7 @@ body {
 
 .el-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 10px;
 }
 
@@ -6015,7 +6015,7 @@ body {
 
 .el-check-list li {
   display: grid;
-  grid-template-columns: 22px 92px minmax(0, 1fr);
+  grid-template-columns: 40px 92px minmax(0, 1fr);
   align-items: baseline;
   gap: 6px;
   font-size: 0.72rem;
@@ -6123,9 +6123,83 @@ body {
 
 @media (max-width: 640px) {
   .el-check-list li {
-    grid-template-columns: 22px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
   }
   .el-check-detail {
     grid-column: 2;
+  }
+}
+
+/* Module 2: section intro & symbol glossary */
+.el-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-xs);
+}
+
+.el-body > .el-intro {
+  margin-bottom: 0;
+}
+
+.el-intro p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.el-intro strong {
+  color: var(--text-primary);
+}
+
+.el-glossary summary {
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  user-select: none;
+}
+
+.el-glossary dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 10px 0 2px;
+  font-size: 0.73rem;
+  line-height: 1.55;
+}
+
+.el-glossary dt {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.el-glossary dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.el-glossary code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--bg-pill);
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .el-glossary dl {
+    grid-template-columns: 1fr;
+  }
+  .el-glossary dt {
+    white-space: normal;
   }
 }

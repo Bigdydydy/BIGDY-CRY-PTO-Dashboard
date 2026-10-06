@@ -848,6 +848,29 @@
       </div>
 
       <div class="card-body">
+        <div class="el-intro">
+          <p><strong>观测目标：</strong>期现套利（买现货或 ETF + 卖季度交割合约，持有到交割锁定价差）此刻值不值得做——交割合约相对现货的年化溢价扣掉无风险利率后还剩多少、这份收益是否稳定、期限结构是否健康。基差高且稳定时套利资金流入，基差跌破美债时套利盘平仓，两者都会传导到现货与 ETF 资金流（见下方联动验证）。</p>
+          <details class="el-glossary">
+            <summary>符号说明：APR、0D / 当季 / 次季、90D、套利夏普等</summary>
+            <dl>
+              <dt>APR（年化基差）</dt>
+              <dd><code>(期货价 − 现货指数) / 现货指数 × 365 / 剩余天数</code>，即持有到交割的年化收益率。</dd>
+              <dt>0D / 当季 / 次季</dt>
+              <dd>三个真实期限点：永续合约资金费率（过去 7 日均值年化，视作 0 天期限）、最近与次近的季度交割合约。当季距交割不足 7 天时剔除，避免除以极小天数放大噪声。</dd>
+              <dt>90D</dt>
+              <dd>在相邻真实期限点之间线性插值得到的 90 天恒定期限基差，不做外推；用它跨季度比较时不受合约剩余天数影响。</dd>
+              <dt>超额美债 / 机构门槛</dt>
+              <dd>超额美债 = 90D − 3M 美债；机构门槛 = 3M 美债 + 3.5%，覆盖保证金占用、交易对手与运营成本后的最低要求。</dd>
+              <dt>期限斜率 / 短端利差 / 跨期斜率</dt>
+              <dd>90D − 资金费率、当季 − 资金费率、次季 − 当季。负的期限斜率表示永续资金费率高于远月基差：杠杆集中在永续端，容易突然回落。</dd>
+              <dt>套利夏普</dt>
+              <dd>超额美债 ÷ 基差盯市年化波动：每承担 1% 的基差价格波动能换来多少超额收益。波动用 90D 基差过去 30 天的日变化计算。</dd>
+              <dt>套利评分 0–100</dt>
+              <dd>60% 套利夏普 + 25% 期限斜率 + 15% 近 30 天基差变化；≥65 优质 / 45–65 合格 / 30–45 边际 / &lt;30 回避。</dd>
+            </dl>
+          </details>
+        </div>
+
         <div class="tp-main-layout">
           <!-- Left: Dual-Grid ECharts Panel (Approx 68%) -->
           <div class="tp-chart-panel">
@@ -1070,27 +1093,56 @@
       <div class="card-body el-body">
         <div class="el-status" id="el-status">正在拉取 CoinGlass ETF 流量、CFTC 持仓与 OI 数据…</div>
 
-        <!-- KPI tiles -->
+        <!-- What this section observes + symbol glossary -->
+        <div class="el-intro">
+          <p><strong>观测目标：</strong>美国现货 ETF 的净流入里，有多少只是期现套利的“多头腿”（买 ETF、同时在 CME 卖期货锁定基差），有多少是真正看多的方向性买盘。套利资金不承担价格风险，基差一旦收窄就会同时卖出 ETF、回补空头，所以它对价格的支撑是“借来的”。下方 ①–④ 是四项检验，⑤ 把累计流入拆成两部分，⑥ 补充离岸对冲持仓。</p>
+          <details class="el-glossary">
+            <summary>符号说明：β、R²、t、12 周滚动等</summary>
+            <dl>
+              <dt>β（对冲比例）</dt>
+              <dd>回归 <code>ΔCME 杠杆基金净空头 = α + β × ETF 周净流入</code> 的斜率：ETF 每流入 1 BTC，CME 杠杆基金平均新增 β BTC 空头。β≈1 表示流入几乎全被对冲（纯套利），β≈0 表示与套利无关。用回归而不是逐周相除，是因为流量很小的周比值会失真；回归用全部样本估计平均关系，并给出显著性。</dd>
+              <dt>α</dt>
+              <dd>截距：与 ETF 流量无关的、每周平均的空头基础变化。</dd>
+              <dt>R²</dt>
+              <dd>ETF 流量能解释空头变化的比例（0–1）。β 大但 R² 低，说明平均存在对冲关系，但逐周噪声大，单周不可靠。</dd>
+              <dt>t</dt>
+              <dd>β 除以其标准误。|t| &gt; 2 大致相当于 95% 置信度下 β 显著不为 0。</dd>
+              <dt>12 周滚动</dt>
+              <dd>每个点只用最近 12 周重新回归。12 周约等于一个季度，正好是 CME 季度合约的展期周期，套利盘多按季度建仓和展期；COT 为周频，12 个点是能估出有意义斜率的较小样本。更短（4–8 周）β 的误差过大，更长（26–52 周）会抹平阶段性的平仓潮（如 2026 年 2–7 月）。滚动 β 要和 R² 一起看：R² 低时的 β 不可信。</dd>
+              <dt>超额基差</dt>
+              <dd>90D 基差年化 − 3M 美债，即期现套利相对无风险资产的额外收益。&lt;0 时套利不划算。</dd>
+              <dt>领先滞后 k</dt>
+              <dd>本周超额基差的<em>变化</em>与第 t+k 周资金的相关系数；k&gt;0 表示基差变化在前、资金在后。用变化量而非水平，是因为基差水平自相关太强，任何滞后上相关都会偏高。</dd>
+              <dt>套利匹配 / 方向性</dt>
+              <dd>同一周 ETF 流量与空头变化同向时，取两者绝对值较小者视作被对冲的部分（套利），其余为方向性资金。</dd>
+              <dt>同步撤离</dt>
+              <dd>基差低于美债的周里，ETF 流出且杠杆基金回补空头同时发生的比例，与其他周对比。</dd>
+            </dl>
+          </details>
+        </div>
+
+        <!-- KPI tiles, in the same order as checks ①-⑤ -->
         <div class="el-kpi-grid">
-          <div class="el-kpi"><span class="el-kpi-lbl">全样本对冲比例 β</span><span class="el-kpi-val" id="el-kpi-beta">--</span><span class="el-kpi-sub" id="el-kpi-beta-sub">--</span></div>
-          <div class="el-kpi"><span class="el-kpi-lbl">近 12 周 β</span><span class="el-kpi-val" id="el-kpi-beta12">--</span><span class="el-kpi-sub" id="el-kpi-beta12-sub">--</span></div>
-          <div class="el-kpi"><span class="el-kpi-lbl">套利匹配占比 (12 周)</span><span class="el-kpi-val" id="el-kpi-arbshare">--</span><span class="el-kpi-sub" id="el-kpi-arbshare-sub">--</span></div>
-          <div class="el-kpi"><span class="el-kpi-lbl">β 高基差 / 低基差</span><span class="el-kpi-val" id="el-kpi-split">--</span><span class="el-kpi-sub" id="el-kpi-split-sub">--</span></div>
-          <div class="el-kpi"><span class="el-kpi-lbl">同步撤离比例</span><span class="el-kpi-val" id="el-kpi-sync">--</span><span class="el-kpi-sub" id="el-kpi-sync-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">① 全样本对冲比例 β</span><span class="el-kpi-val" id="el-kpi-beta">--</span><span class="el-kpi-sub" id="el-kpi-beta-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">① 近 12 周 β</span><span class="el-kpi-val" id="el-kpi-beta12">--</span><span class="el-kpi-sub" id="el-kpi-beta12-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">② β 高基差 / 低基差</span><span class="el-kpi-val" id="el-kpi-split">--</span><span class="el-kpi-sub" id="el-kpi-split-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">③ 基差变化 → 下周流入</span><span class="el-kpi-val" id="el-kpi-lead">--</span><span class="el-kpi-sub" id="el-kpi-lead-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">④ 同步撤离比例</span><span class="el-kpi-val" id="el-kpi-sync">--</span><span class="el-kpi-sub" id="el-kpi-sync-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">⑤ 套利匹配占比 (12 周)</span><span class="el-kpi-val" id="el-kpi-arbshare">--</span><span class="el-kpi-sub" id="el-kpi-arbshare-sub">--</span></div>
           <div class="el-kpi"><span class="el-kpi-lbl">CME 杠杆基金净空头</span><span class="el-kpi-val" id="el-kpi-lf">--</span><span class="el-kpi-sub" id="el-kpi-lf-sub">--</span></div>
         </div>
 
         <!-- Verdict checks -->
         <div class="tp-subcard">
           <div class="tp-subcard-title">
-            <span>校验框架结论</span>
+            <span>校验结论 (①–④)</span>
             <span class="subcard-tag" id="el-verdict-count">--</span>
           </div>
           <p class="tp-insights-summary" id="el-verdict-summary">--</p>
           <ul class="el-check-list" id="el-check-list"></ul>
         </div>
 
-        <!-- Weekly flow vs CME shorts -->
+        <!-- ① Weekly flow vs CME shorts -->
         <div class="tp-chart-panel">
           <div class="tp-chart-header">
             <div class="tp-chart-title">
@@ -1107,12 +1159,14 @@
         </div>
 
         <div class="el-two-col">
+          <!-- ② Carry dependence -->
           <div class="tp-chart-panel">
             <div class="tp-chart-header">
-              <div class="tp-chart-title"><span>⑤ 累计 ETF 流入拆分：CME 空头匹配（套利） vs 剩余（方向性）</span></div>
+              <div class="tp-chart-title"><span>② 随基差变化：按超额基差高 / 低分组的散点与 β 拟合线</span></div>
             </div>
-            <div id="el-decomp-echarts" class="el-chart"></div>
+            <div id="el-scatter-echarts" class="el-chart"></div>
           </div>
+          <!-- ③ Lead-lag -->
           <div class="tp-chart-panel">
             <div class="tp-chart-header">
               <div class="tp-chart-title"><span>③ 领先滞后：本周基差变化与第 t+k 周资金的相关系数</span></div>
@@ -1121,28 +1175,10 @@
           </div>
         </div>
 
-        <!-- Offshore hedge OI -->
-        <div class="tp-chart-panel">
-          <div class="tp-chart-header">
-            <div class="tp-chart-title"><span>离岸对冲持仓：Binance 期货 OI + Deribit 期权 OI</span></div>
-            <div class="tp-chart-actions">
-              <div class="btn-group-segmented" id="el-oi-unit-selector">
-                <button class="timeframe-btn active" data-unit="usd">USD</button>
-                <button class="timeframe-btn" data-unit="btc">BTC</button>
-              </div>
-              <button class="tp-legend-btn" id="el-toggle-cme-oi" title="叠加 CME 期货 OI 作为在岸对照">
-                <span class="legend-color-dot" style="background-color: #f97316;"></span>
-                <span>叠加 CME OI</span>
-              </button>
-            </div>
-          </div>
-          <div id="el-oi-echarts" class="el-chart"></div>
-        </div>
-
-        <!-- Unwind episodes -->
+        <!-- ④ Unwind episodes -->
         <div class="tp-subcard">
           <div class="tp-subcard-title">
-            <span>④ 平仓事件：基差低于 3M 美债的连续周</span>
+            <span>④ 同步撤离：基差低于 3M 美债的连续周</span>
             <span class="subcard-tag" id="el-episode-count">--</span>
           </div>
           <div class="el-table-wrap">
@@ -1152,6 +1188,33 @@
               </thead>
               <tbody id="el-episode-body"></tbody>
             </table>
+          </div>
+        </div>
+
+        <div class="el-two-col">
+          <!-- ⑤ Decomposition -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title"><span>⑤ 累计 ETF 流入拆分：CME 空头匹配（套利） vs 剩余（方向性）</span></div>
+            </div>
+            <div id="el-decomp-echarts" class="el-chart"></div>
+          </div>
+          <!-- ⑥ Offshore hedge OI -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title"><span>⑥ 离岸对冲持仓：Binance 期货 OI + Deribit 期权 OI</span></div>
+              <div class="tp-chart-actions">
+                <div class="btn-group-segmented" id="el-oi-unit-selector">
+                  <button class="timeframe-btn active" data-unit="usd">USD</button>
+                  <button class="timeframe-btn" data-unit="btc">BTC</button>
+                </div>
+                <button class="tp-legend-btn" id="el-toggle-cme-oi" title="叠加 CME 期货 OI 作为在岸对照">
+                  <span class="legend-color-dot" style="background-color: #f97316;"></span>
+                  <span>叠加 CME OI</span>
+                </button>
+              </div>
+            </div>
+            <div id="el-oi-echarts" class="el-chart"></div>
           </div>
         </div>
 
