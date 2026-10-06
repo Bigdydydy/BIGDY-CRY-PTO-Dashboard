@@ -12,13 +12,45 @@
         var theme = savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
         document.documentElement.setAttribute('data-theme', theme);
       } catch (e) {}
+      // Atelier: 侧栏收放状态与首访启动画面需在首帧前确定，避免布局跳动
+      try {
+        if (localStorage.getItem('atelier_rail') === 'collapsed') document.documentElement.classList.add('atl-rail-collapsed');
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!sessionStorage.getItem('atelier_intro_seen') && !reduce) document.documentElement.classList.add('atl-booting');
+      } catch (e) {}
     })();
   </script>
   <link rel="stylesheet" href="/style.css?v=20260924_k95">
+  <link rel="stylesheet" href="/atelier.css?v=20261006_2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- Atelier Stage: 油画背景（双层交叉淡入）+ ASCII 叠层 + 明暗罩 -->
+  <div class="atl-stage" id="atl-stage" aria-hidden="true">
+    <div class="atl-layer"></div>
+    <div class="atl-layer"></div>
+    <canvas class="atl-ascii" id="atl-ascii"></canvas>
+    <div class="atl-veil"></div>
+  </div>
+
+  <!-- Atelier Splash: 首访启动画面（每个会话一次） -->
+  <div class="atl-splash" id="atl-splash" role="dialog" aria-label="BIGDY 启动画面">
+    <div class="atl-splash-card">
+      <div class="atl-splash-emblem">
+        <div class="atl-rays"></div>
+        <div class="atl-mark">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+      </div>
+      <h2 class="atl-splash-title">欢迎</h2>
+      <p class="atl-splash-sub">狂妄的投入生命的张力</p>
+      <div class="atl-progress" aria-hidden="true"><span></span></div>
+      <button class="atl-btn-primary" id="atl-enter" disabled>进入 BIGDY Dashboard</button>
+    </div>
+  </div>
+
   <!-- Top Navigation Header (Sticky Glassmorphic Nav) -->
   <header class="app-header">
     <div class="header-container">
@@ -48,10 +80,20 @@
       </div>
 
       <div class="header-meta">
+        <button class="atl-search-pill" data-atl="palette" aria-label="打开命令面板 (Ctrl+K)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span class="atl-search-label">跳转 / 命令</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+
         <div class="meta-pill">
           <span class="meta-label">BTC 现货</span>
           <span class="meta-value accent" id="index-price">$--,---</span>
         </div>
+
+        <button class="atl-header-btn" data-atl="gallery" title="画廊：更换背景画作" aria-label="打开画廊">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        </button>
 
         <!-- Studio K95 Day/Night Dual-Mode Switcher Pill -->
         <div class="theme-switch-pill" id="theme-switch-pill" data-active="dark" role="radiogroup" aria-label="显示风格切换">
@@ -110,9 +152,15 @@
     <aside class="app-sidebar" id="app-sidebar">
       <div class="sidebar-header">
         <div class="sidebar-brand-badge">
+          <span class="atl-wordmark-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </span>
+          <span class="atl-wordmark">bigdy</span>
           <span class="pulse-status-dot"></span>
-          <span>BIGDY RADAR</span>
         </div>
+        <button class="atl-rail-toggle" id="atl-rail-toggle" aria-label="收起侧栏" title="收起 / 展开侧栏 ( [ )">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><line x1="9.5" y1="4" x2="9.5" y2="20"></line></svg>
+        </button>
         <button class="sidebar-close-btn" id="btn-close-sidebar" aria-label="关闭侧边栏菜单">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -255,6 +303,30 @@
         </nav>
       </div>
 
+      <div class="sidebar-menu-group atl-atelier-group">
+        <div class="sidebar-group-title">画室 Atelier</div>
+        <div class="sidebar-nav">
+          <button class="sidebar-nav-item atl-rail-action" data-atl="gallery" aria-label="画廊">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">画廊 · 更换画作</span>
+              <span class="nav-desc">3 幅 19 世纪公有领域油画</span>
+            </div>
+          </button>
+          <button class="sidebar-nav-item atl-rail-action" data-atl="contemplate" aria-label="观画模式">
+            <div class="nav-icon-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <div class="nav-label-wrap">
+              <span class="nav-title">观画模式</span>
+              <span class="nav-desc">隐去界面，只看画与题词</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <div class="sidebar-footer">
         <div class="sidebar-theme-row">
           <span class="sidebar-theme-title">主题风格</span>
@@ -293,6 +365,17 @@
 
     <!-- Main Viewport -->
     <main class="main-viewport" id="main-viewport">
+      <!-- Atelier Hero: 当前视图的序号、标题与描述 -->
+      <section class="atl-hero" id="atl-hero" aria-live="polite">
+        <div class="atl-hero-eyebrow">
+          <span id="atl-hero-index">01 / 08</span>
+          <span class="atl-hero-sep" aria-hidden="true"></span>
+          <span id="atl-hero-kicker">Macro · Liquidity · Breadth</span>
+        </div>
+        <h2 class="atl-hero-title" id="atl-hero-title">宏观与风控总览</h2>
+        <p class="atl-hero-desc" id="atl-hero-desc"></p>
+      </section>
+
       <!-- View 1: 宏观与风控总览 (Module 1 上 + Module 2 下) -->
       <div class="view-panel active" id="view-overview">
 
@@ -2464,10 +2547,15 @@
     </button>
   </nav>
 
+  <!-- Atelier: 当前背景画作铭牌（点击打开画廊） -->
+  <button class="atl-caption" id="atl-caption" type="button"></button>
+
   <script src="/chart.min.js"></script>
   <script src="/echarts.min.js"></script>
   <script src="/pnl_engine.js"></script>
+  <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
+  <script src="/atelier.js?v=20261006_2"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261003_3"></script>
+  <script src="/app.js?v=20261006_1"></script>
 </body>
 </html>

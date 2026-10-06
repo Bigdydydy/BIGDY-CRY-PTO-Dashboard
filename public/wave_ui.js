@@ -76,11 +76,11 @@
     const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     return {
       isLight,
-      background: isLight ? '#ffffff' : '#121217',
+      background: 'rgba(0, 0, 0, 0)', // 透明：由 Atelier 玻璃卡片提供底色
       textColor: isLight ? '#4b4b52' : '#a1a1aa',
       borderColor: isLight ? 'rgba(18, 18, 20, 0.12)' : 'rgba(255, 255, 255, 0.08)',
       gridColor: isLight ? 'rgba(18, 18, 20, 0.05)' : 'rgba(255, 255, 255, 0.04)',
-      crosshairColor: isLight ? '#ea580c' : '#ff5722',
+      crosshairColor: isLight ? '#8a5a14' : '#e6c27f',
       upColor: isLight ? '#059669' : '#10b981',
       downColor: isLight ? '#e11d48' : '#f43f5e',
       subwaveColor: isLight ? '#0284c7' : '#38bdf8',

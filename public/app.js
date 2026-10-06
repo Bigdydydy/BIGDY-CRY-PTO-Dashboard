@@ -168,7 +168,7 @@ function toggleTheme() {
   const nextTheme = getAppTheme() === 'light' ? 'dark' : 'light';
   setTheme(nextTheme, true);
   if (typeof showToast === 'function') {
-    showToast(`已切换至 Studio K95 ${nextTheme === 'light' ? '日间画廊模式 (Gallery)' : '夜间黑曜石模式 (Noir)'}`);
+    showToast(`已切换至 ${nextTheme === 'light' ? '日间 · 画廊光' : '夜间 · 暗室光'}`);
   }
 }
 
@@ -4624,6 +4624,9 @@ function switchView(viewId, updateHash = true) {
 
   // 7. Scroll to top smoothly
   window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // 7b. 通知 Atelier 设计层（头图、侧栏高亮、入场编排）
+  document.dispatchEvent(new CustomEvent('bigdy:viewchange', { detail: { viewId } }));
 
   // 8. Trigger chart resizes for freshly displayed views
   setTimeout(() => {
