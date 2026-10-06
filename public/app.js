@@ -3296,6 +3296,7 @@ let elWeeklyChartInstance = null;
 let elDecompChartInstance = null;
 let elLeadLagChartInstance = null;
 let elOiChartInstance = null;
+let elScatterChartInstance = null;
 let elFlowUnit = 'btc';
 let elOiUnit = 'usd';
 let elShowCmeOi = false;
@@ -3384,6 +3385,10 @@ function renderEtfLinkage() {
   const us = d.unwindSync || {};
   setText('el-kpi-sync', elFmtShare(us.syncShareSubTbill));
   setText('el-kpi-sync-sub', `低于美债周 vs 其他周 ${elFmtShare(us.syncShareOther)}`);
+  const lead1 = (d.leadLag || []).find(l => l.lag === 1);
+  const lag1 = (d.leadLag || []).find(l => l.lag === -1);
+  setText('el-kpi-lead', elFmtNum(lead1?.corrFlow));
+  setText('el-kpi-lead-sub', `反向（流入 → 基差变化）${elFmtNum(lag1?.corrFlow)}`);
   if (lastWeek) {
     setText('el-kpi-lf', elFmtBtc(lastWeek.lfNetShortBtc, false));
     setText('el-kpi-lf-sub', `周变化 ${elFmtBtc(lastWeek.dLfNetShortBtc)} · ETF ${elFmtBtc(lastWeek.etfFlowBtc)}`);
@@ -3394,8 +3399,9 @@ function renderEtfLinkage() {
   setText('el-verdict-summary', d.verdict?.summary || '--');
   const list = document.getElementById('el-check-list');
   if (list && d.verdict?.checks) {
-    list.innerHTML = d.verdict.checks.map(c => `<li class="${c.pass ? 'pass' : 'fail'}">
-      <span class="el-check-mark">${c.pass ? '✓' : '✗'}</span>
+    const marks = ['①', '②', '③', '④', '⑤'];
+    list.innerHTML = d.verdict.checks.map((c, i) => `<li class="${c.pass ? 'pass' : 'fail'}">
+      <span class="el-check-mark">${marks[i] || ''} ${c.pass ? '✓' : '✗'}</span>
       <span class="el-check-label">${escapeHtml(c.label)}</span>
       <span class="el-check-detail">${escapeHtml(c.detail)}</span>
     </li>`).join('');
@@ -3435,8 +3441,9 @@ function renderEtfLinkage() {
   }
 
   renderElWeeklyChart();
-  renderElDecompChart();
+  renderElScatterChart();
   renderElLeadLagChart();
+  renderElDecompChart();
   renderElOiChart();
 }
 
@@ -3545,6 +3552,68 @@ function renderElWeeklyChart() {
   }, true);
 }
 
+/**
+ * ② Weekly ETF flow (x) vs ΔCME leveraged-fund net short (y), split by carry above / below T-Bill.
+ * Each fitted line's slope is that group's β, so a steeper high-carry line would mean hedging
+ * intensifies when the basis trade pays.
+ */
+function renderElScatterChart() {
+  const d = rawEtfLinkageData;
+  if (!d?.weeks?.length) return;
+  elScatterChartInstance = elInitChart(elScatterChartInstance, 'el-scatter-echarts');
+  if (!elScatterChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const weeks = d.weeks.filter(w => w.excessOverTBill != null);
+  const point = w => ({ value: [w.etfFlowBtc, w.dLfNetShortBtc], week: w });
+  const high = weeks.filter(w => w.excessOverTBill > 0).map(point);
+  const low = weeks.filter(w => w.excessOverTBill <= 0).map(point);
+  const xs = weeks.map(w => w.etfFlowBtc);
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const fitLine = fit => (fit?.beta != null && fit?.alpha != null
+    ? [[xMin, fit.alpha + fit.beta * xMin], [xMax, fit.alpha + fit.beta * xMax]]
+    : []);
+  const cd = d.carryDependence || {};
+  const full = d.hedgeRatio?.full || {};
+  const kFmt = v => `${Math.round(v / 1000)}k`;
+
+  elScatterChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 56, right: 16, top: 58, bottom: 42 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: {
+      ...elTooltipBase(colors),
+      trigger: 'item',
+      formatter: p => {
+        if (!p.data?.week) return `${p.seriesName}`;
+        const w = p.data.week;
+        return `<div style="font-weight:600;">周截至 ${w.weekEnd}</div>
+          <div>ETF 净流入: ${elFmtBtc(w.etfFlowBtc)}</div>
+          <div>杠杆基金净空头 Δ: ${elFmtBtc(w.dLfNetShortBtc)}</div>
+          <div>超额基差: ${tpPct(w.excessOverTBill)}</div>`;
+      }
+    },
+    xAxis: {
+      type: 'value', name: 'ETF 周净流入 (BTC)', nameLocation: 'middle', nameGap: 26,
+      nameTextStyle: { color: colors.tickColor, fontSize: 10 },
+      ...common, axisLabel: { ...common.axisLabel, formatter: kFmt }
+    },
+    yAxis: {
+      type: 'value', name: 'Δ 净空头 (BTC)', nameTextStyle: { color: colors.tickColor, fontSize: 10 },
+      ...common, axisLabel: { ...common.axisLabel, formatter: kFmt }
+    },
+    series: [
+      { name: `超额基差 > 0（${high.length} 周）`, type: 'scatter', symbolSize: 6, data: high, itemStyle: { color: 'rgba(16,185,129,0.65)' } },
+      { name: `超额基差 ≤ 0（${low.length} 周）`, type: 'scatter', symbolSize: 6, data: low, itemStyle: { color: 'rgba(244,63,94,0.7)' } },
+      { name: `高基差 β=${elFmtNum(cd.high?.beta)}`, type: 'line', showSymbol: false, data: fitLine(cd.high), lineStyle: { width: 2, color: '#10b981' }, itemStyle: { color: '#10b981' }, tooltip: { show: false } },
+      { name: `低基差 β=${elFmtNum(cd.low?.beta)}`, type: 'line', showSymbol: false, data: fitLine(cd.low), lineStyle: { width: 2, color: '#f43f5e' }, itemStyle: { color: '#f43f5e' }, tooltip: { show: false } },
+      { name: `全样本 β=${elFmtNum(full.beta)}`, type: 'line', showSymbol: false, data: fitLine(full), lineStyle: { width: 1.4, color: colors.crossColor, type: 'dashed' }, itemStyle: { color: colors.crossColor }, tooltip: { show: false } }
+    ]
+  }, true);
+}
+
 function renderElDecompChart() {
   const d = rawEtfLinkageData;
   if (!d?.decomposition?.length) return;
@@ -3637,14 +3706,14 @@ function renderElOiChart() {
 }
 
 function disposeEtfLinkageCharts() {
-  [elWeeklyChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
+  [elWeeklyChartInstance, elScatterChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
     if (ch) { try { ch.dispose(); } catch (e) {} }
   });
-  elWeeklyChartInstance = elDecompChartInstance = elLeadLagChartInstance = elOiChartInstance = null;
+  elWeeklyChartInstance = elScatterChartInstance = elDecompChartInstance = elLeadLagChartInstance = elOiChartInstance = null;
 }
 
 function resizeEtfLinkageCharts() {
-  [elWeeklyChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
+  [elWeeklyChartInstance, elScatterChartInstance, elDecompChartInstance, elLeadLagChartInstance, elOiChartInstance].forEach(ch => {
     if (ch) ch.resize();
   });
 }
