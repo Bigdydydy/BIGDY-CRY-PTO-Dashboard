@@ -3,8 +3,8 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按当日市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "2.0.0",
-  "generated_at": "2026-10-06T03:13:03Z",
-  "benchmark_date": "2026-10-06",
+  "generated_at": "2026-10-06T14:07:25Z",
+  "benchmark_date": "2026-10-05",
   "total_days": 366,
   "parameters": {
    "ema_fast": 19,
@@ -64,13 +64,13 @@
   "frontier": null
  },
  "current": {
-  "date": "2026-10-06",
+  "date": "2026-10-05",
   "btc_close": 85539.0,
   "core": {
    "ready": true,
    "breadth_days": 366,
    "warmup_days": 40,
-   "date": "2026-10-06",
+   "date": "2026-10-05",
    "advances": 49,
    "declines": 48,
    "unchanged": 3,
@@ -85,7 +85,7 @@
    "ready": false,
    "breadth_days": 1,
    "warmup_days": 40,
-   "date": "2026-10-06",
+   "date": "2026-10-05",
    "advances": 19,
    "declines": 31,
    "unchanged": 0,
@@ -95,7 +95,7 @@
    "summation": null,
    "summation_change_10d": null,
    "percentile": null,
-   "started": "2026-10-05",
+   "started": "2026-10-04",
    "tracked_today": 64,
    "tracked_by_chain": {
     "solana": 18,
@@ -6683,10 +6683,10 @@
    "frontier_summation": null
   },
   {
-   "date": "2026-10-05",
+   "date": "2026-10-04",
    "btc_close": 85561.0,
-   "dex_volume": null,
-   "dex_momentum": null,
+   "dex_volume": 3.381,
+   "dex_momentum": -11.1,
    "core_adv": 45,
    "core_dec": 55,
    "core_n": 100,
@@ -6701,7 +6701,7 @@
    "frontier_summation": null
   },
   {
-   "date": "2026-10-06",
+   "date": "2026-10-05",
    "btc_close": 85539.0,
    "dex_volume": null,
    "dex_momentum": null,

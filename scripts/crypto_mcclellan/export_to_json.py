@@ -13,6 +13,7 @@ Run: python export_to_json.py            (collect + compute)
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -24,37 +25,57 @@ import config
 from src import anchor, breadth, core_track, frontier_track
 
 
-def trade_date_now() -> str:
-    now = datetime.now(timezone.utc) - timedelta(hours=config.TRADE_DATE_LAG_HOURS)
-    return now.strftime("%Y-%m-%d")
+def trade_date_now(now: datetime = None) -> str:
+    """UTC close a run belongs to: the date of (run time - TRADE_DATE_LAG_HOURS)."""
+    now = now or datetime.now(timezone.utc)
+    return (now - timedelta(hours=config.TRADE_DATE_LAG_HOURS)).strftime("%Y-%m-%d")
 
 
 def _r(x, nd=2):
     return None if x is None else round(x, nd)
 
 
+def _with_retry(label: str, fn, attempts: int = 2, pause_sec: float = 60.0):
+    """Run fn, retrying once after a pause; returns its result or None on failure."""
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"[{label}] attempt {i + 1}/{attempts} failed: {e}")
+            if i + 1 < attempts:
+                time.sleep(pause_sec)
+    return None
+
+
 def collect(trade_date: str):
-    core_rows = core_track.load_store()
-    try:
-        core_rows = core_track.upsert(core_rows, core_track.fetch_live_snapshot(trade_date))
-        core_track.save_store(core_rows)
-    except Exception as e:
-        print(f"[Core] Live snapshot failed, using stored data: {e}")
+    """
+    Collect all three sources for trade_date. Returns the names of the sources
+    that failed; whatever did succeed is still saved so the day is not lost.
+    """
+    print(f"[Collect] trade date {trade_date}")
+    failed = []
+
+    snapshot = _with_retry("Core", lambda: core_track.fetch_live_snapshot(trade_date))
+    if snapshot:
+        core_track.save_store(core_track.upsert(core_track.load_store(), snapshot))
+    else:
+        failed.append("core")
 
     frontier_rows = frontier_track.load_store()
-    try:
-        new_rows, registry = frontier_track.update(trade_date, frontier_rows)
-        if new_rows:
-            frontier_rows = frontier_track.upsert(frontier_rows, new_rows)
-            frontier_track.save_store(frontier_rows)
-            frontier_track.save_registry(registry)
-    except Exception as e:
-        print(f"[Frontier] Update failed, using stored data: {e}")
+    result = _with_retry("Frontier", lambda: frontier_track.update(trade_date, frontier_rows))
+    if result and result[0]:
+        new_rows, registry = result
+        frontier_track.save_store(frontier_track.upsert(frontier_rows, new_rows))
+        frontier_track.save_registry(registry)
+    else:
+        failed.append("frontier")
 
-    try:
-        anchor.save_volumes(anchor.fetch_volumes(trade_date))
-    except Exception as e:
-        print(f"[Anchor] DefiLlama DEX volume fetch failed, using stored data: {e}")
+    volumes = _with_retry("Anchor", lambda: anchor.fetch_volumes(trade_date))
+    if volumes:
+        anchor.save_volumes(volumes)
+    else:
+        failed.append("anchor")
+    return failed
 
 
 def track_summary(rows, warmup: int):
@@ -214,8 +235,7 @@ def main():
     parser.add_argument("--offline", action="store_true", help="skip data collection")
     args = parser.parse_args()
 
-    if not args.offline:
-        collect(trade_date_now())
+    failed = [] if args.offline else collect(trade_date_now())
 
     payload = build_payload()
     config.OUTPUT_JSON_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -226,6 +246,12 @@ def main():
     print(f"[Export] {config.OUTPUT_JSON_FILE} | {payload['metadata']['total_days']} days | "
           f"core osc {cur['core'].get('oscillator')} | frontier osc {cur['frontier'].get('oscillator')} "
           f"({cur['frontier'].get('breadth_days', 0)}/{config.WARMUP_DAYS} breadth days)")
+
+    # Non-zero exit marks the scheduled run red (GitHub emails the owner) after
+    # everything that was collected has been written
+    if failed:
+        print(f"[Export] collection failed for: {', '.join(failed)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

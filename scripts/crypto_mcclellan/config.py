@@ -19,9 +19,12 @@ OUTPUT_JSON_FILE = BASE_DIR.parent.parent / "data" / "crypto_mcclellan.json"
 HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MacroQuant/2.0",
                 "Accept": "application/json"}
 
-# A run before 02:00 UTC still belongs to the previous UTC day: the daily cron
-# fires at 23:30 UTC and GitHub Actions can start it late.
-TRADE_DATE_LAG_HOURS = 2
+# A snapshot is labeled with the UTC date of (run time - 12h), i.e. the close
+# it follows. The cron fires at 00:15 UTC and GitHub Actions has been starting
+# it 2-3.5h late, so any start before 12:00 UTC still lands on the same close.
+# An off-schedule daytime run labels the current day and is overwritten by the
+# next scheduled post-close run.
+TRADE_DATE_LAG_HOURS = 12
 
 # -------------------------------------------------------------
 # McClellan parameters (classic ratio-adjusted form)

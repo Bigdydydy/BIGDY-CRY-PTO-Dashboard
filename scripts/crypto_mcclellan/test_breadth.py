@@ -147,5 +147,18 @@ class TestAnchor(unittest.TestCase):
         self.assertAlmostEqual(anchor.pearson([1, 2, 3, 4], [2, 4, 6, 8]), 1.0)
 
 
+class TestTradeDate(unittest.TestCase):
+    def test_delayed_cron_runs_land_on_the_same_close(self):
+        from datetime import datetime, timezone
+        from export_to_json import trade_date_now
+        label = lambda h, m, day=6: trade_date_now(datetime(2026, 10, day, h, m, tzinfo=timezone.utc))
+        # 00:15 schedule, observed GitHub delays of 2-3.5h, and an on-time run
+        for h, m in [(0, 15), (2, 13), (2, 48), (3, 11), (11, 59)]:
+            self.assertEqual(label(h, m), "2026-10-05")
+        self.assertEqual(label(23, 30, day=5), "2026-10-05")
+        # an off-schedule afternoon run labels the current day (overwritten after the close)
+        self.assertEqual(label(14, 0), "2026-10-06")
+
+
 if __name__ == "__main__":
     unittest.main()

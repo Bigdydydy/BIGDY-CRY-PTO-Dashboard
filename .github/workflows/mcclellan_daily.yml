@@ -2,9 +2,9 @@ name: Crypto McClellan Daily Update
 
 on:
   schedule:
-    # 每天 UTC 23:30：在 UTC 日收盘前 30 分钟采集，快照最接近当日收盘。
-    # 延迟到次日 02:00 UTC 前启动的运行仍记为前一交易日 (TRADE_DATE_LAG_HOURS)
-    - cron: '30 23 * * *'
+    # 每天 UTC 00:15，在日收盘后采集。GitHub 实际启动常晚 2-3.5 小时；
+    # 12:00 UTC 前启动的运行都记为刚收盘的那一天 (TRADE_DATE_LAG_HOURS = 12)
+    - cron: '15 0 * * *'
   workflow_dispatch: # 允许在 Actions 页面手动触发补跑
 
 permissions:
@@ -33,10 +33,14 @@ jobs:
         run: python test_breadth.py
 
       - name: Run breadth pipeline (collect + compute + export JSON)
+        id: pipeline
         working-directory: scripts/crypto_mcclellan
         run: python export_to_json.py
 
+      # Commit whatever was collected even when one source failed (the pipeline
+      # step is then red and GitHub notifies the owner)
       - name: Commit and push updated dataset
+        if: ${{ !cancelled() && steps.pipeline.outcome != 'skipped' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -46,5 +50,11 @@ jobs:
             echo "No data changes; skipping commit."
           else
             git commit -m "chore(mcclellan): daily breadth data update [skip ci]"
-            git push
+            # main may have moved while the pipeline ran; rebase and retry
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase origin main && git push; then pushed=1; break; fi
+              sleep 10
+            done
+            [ "$pushed" = 1 ]
           fi
