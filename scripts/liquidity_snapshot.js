@@ -6,7 +6,11 @@
  * 写回 data/coinbase_liquidity_history.json。本地运行服务器时不要手动执行本脚本，
  * 服务器自己的快照写在 .local.json，避免与 Actions 的提交冲突。
  *
- * 用法: node scripts/liquidity_snapshot.js [--shots 3] [--gap 15]
+ * GitHub 的定时任务经常延迟或整段丢弃，所以工作流每小时排了多个时段；
+ * --skip-if-filled N：当前小时桶已有 ≥ N 个快照时直接退出、不改文件，
+ * 这样同一小时只有第一次成功的运行会产生提交。
+ *
+ * 用法: node scripts/liquidity_snapshot.js [--shots 3] [--gap 15] [--skip-if-filled 3]
  */
 
 const {
@@ -24,6 +28,7 @@ function argValue(name, fallback) {
 
 const SHOTS = argValue('--shots', 3);
 const GAP_SEC = argValue('--gap', 15);
+const SKIP_IF_FILLED = argValue('--skip-if-filled', 0);
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -39,6 +44,14 @@ async function takeSnapshot() {
 async function main() {
   let samples = history.readHistoryFile(history.COMMITTED_FILE);
   let ok = 0;
+
+  if (SKIP_IF_FILLED) {
+    const have = history.hourSampleCount(samples, Date.now());
+    if (have >= SKIP_IF_FILLED) {
+      console.log(`[liquidity] current hour already has ${have} snapshots; skipping`);
+      return;
+    }
+  }
 
   for (let i = 0; i < SHOTS; i++) {
     if (i > 0) await wait(GAP_SEC * 1000);

@@ -2,9 +2,11 @@ name: Coinbase Depth Hourly Snapshot
 
 on:
   schedule:
-    # 每小时一次 (避开整点高峰)。GitHub 高峰期可能延迟或丢弃个别运行，
-    # 档案按小时分桶，缺失的小时在图上表现为断点，不影响 7D 均值口径。
-    - cron: '23 * * * *'
+    # 每小时排 4 个时段 (避开整点高峰)。GitHub 的定时任务经常延迟或整段丢弃，
+    # 只排一个时段时档案会大段缺失；当前小时已采满后后续时段直接跳过、不产生提交
+    # (--skip-if-filled)。缺失的小时在图上表现为断点，不影响 7D 均值口径。
+    # 外部定时器 (如 cron-job.org) 也可以每小时调用 workflow_dispatch 作为兜底。
+    - cron: '7,23,38,52 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,8 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # 取 main 最新提交，而不是触发时的 SHA：同一小时前一次运行的提交必须可见，
+      # 否则 --skip-if-filled 判断失效，两次提交改同一行会在 rebase 时冲突
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -29,7 +35,7 @@ jobs:
 
       # 采样脚本只用 Node 内置模块，无需 npm install
       - name: Sample Coinbase L2 order book
-        run: node scripts/liquidity_snapshot.js --shots 3 --gap 15
+        run: node scripts/liquidity_snapshot.js --shots 3 --gap 15 --skip-if-filled 3
 
       - name: Commit and push
         run: |

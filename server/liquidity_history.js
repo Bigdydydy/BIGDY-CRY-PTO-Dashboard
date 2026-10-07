@@ -106,6 +106,15 @@ function mergeSnapshot(samples, snap, ts = Date.now()) {
 }
 
 /**
+ * ts 所在小时桶已有的快照数 (没有该桶时为 0)
+ */
+function hourSampleCount(samples, ts = Date.now()) {
+  const bucket = Math.floor(ts / HOUR_MS) * HOUR_MS;
+  const cur = samples.find(s => s.ts === bucket);
+  return cur ? (cur.n || 1) : 0;
+}
+
+/**
  * 合并两份序列：同一小时取快照数更多的那份
  */
 function mergeSampleSets(a = [], b = []) {
@@ -455,6 +464,7 @@ module.exports = {
   COMMITTED_FILE,
   snapshotFromLiquidity,
   mergeSnapshot,
+  hourSampleCount,
   mergeSampleSets,
   readHistoryFile,
   writeHistoryFile,
