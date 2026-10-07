@@ -14,6 +14,7 @@
 const fs = require('fs');
 const {
   getHistoricalBasisData,
+  getBasisFetchStatus,
   fetchLiveBinanceCurve,
   applyCarryMetrics,
   calculateCarryScore,
@@ -27,6 +28,8 @@ const {
 const ETF_MGMT_FEE_ANNUAL = 0.25;
 const ETF_ROUND_TRIP_COST = 0.25;
 const ETF_HOLD_DAYS = 90;
+
+let liveFeedError = null;
 
 function etfCarryMetrics(row) {
   if (row.apr90d == null || row.tbill == null) {
@@ -72,7 +75,9 @@ async function loadHistoricalBasisSeries(liveOverride) {
     live = null;
     try {
       live = await fetchLiveBinanceCurve(series[series.length - 1].tbill);
+      liveFeedError = null;
     } catch (err) {
+      liveFeedError = err.message;
       console.warn('[TermPremiumEngine] Live Binance curve unavailable:', err.message);
     }
   }
@@ -192,7 +197,13 @@ async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
       timeRange: `${historicalSeries[0].date} 至 ${latest.date}`,
       tenorMethod: '仅用真实可交易期限点：0D 永续资金费率 (7 日均值年化) / 当季 (距交割 <7 天剔除) / 次季；90D 在相邻真实点间线性插值，不做外推',
       scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量',
-      isRealHistorical: true
+      isRealHistorical: true,
+      // Daily-history and live-curve health, so a stalled Binance feed is visible in the UI
+      feed: {
+        ...getBasisFetchStatus(),
+        liveOk: !!latest.isLive,
+        liveError: latest.isLive ? null : liveFeedError
+      }
     },
     current: {
       ...latest,

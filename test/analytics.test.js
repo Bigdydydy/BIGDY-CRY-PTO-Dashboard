@@ -523,6 +523,18 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     assert.equal(aggregateDailyFunding([], now, 7), null);
   });
 
+  test('daily cache is refreshed as soon as a new 00:00 UTC snapshot is due', () => {
+    const { expectedLatestDate, hasLatestSnapshot } = require('../server/basis_fetcher');
+    // 10-06 08:30 UTC+8 = 00:30 UTC: the 10-06 snapshot is due
+    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 6, 0, 30)), '2026-10-06');
+    // 10-06 07:55 UTC+8 = 23:55 UTC on 10-05: still the 10-05 snapshot
+    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 5, 23, 55)), '2026-10-05');
+    const series = Array.from({ length: 101 }, () => ({ schema: SCHEMA_VERSION, date: '2026-10-05' }));
+    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 5, 18)), true);
+    // The old "< 48h old" rule kept this cache for all of 10-06; it must now be treated as stale
+    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 6, 0, 30)), false);
+  });
+
   test('parseBinanceDeliveryExpiry reads the delivery date from the symbol', () => {
     assert.equal(parseBinanceDeliveryExpiry('BTCUSD_261225'), Date.UTC(2026, 11, 25, 8));
     assert.equal(parseBinanceDeliveryExpiry('BTCUSD_PERP'), null);

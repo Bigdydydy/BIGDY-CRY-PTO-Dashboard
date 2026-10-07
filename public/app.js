@@ -2934,7 +2934,22 @@ function renderTermPremium(data, forceRedraw = false) {
     elTpDataSourceBadge.title = `数据源：${data.metadata.dataSource} | 区间: ${data.metadata.timeRange || ''} | 期限: ${data.metadata.tenorMethod || ''} | 评分: ${data.metadata.scoreMethod || ''}`;
   }
   if (elTpHistoryPointsBadge && data.series?.length) {
-    elTpHistoryPointsBadge.textContent = `${data.series.length} 条真实日线 (${data.series[0].date.slice(0, 7)} ~ 至今)`;
+    // Daily snapshots are stamped 00:00 UTC (08:00 UTC+8); flag the badge when the feed has stalled
+    const feed = data.metadata?.feed || {};
+    const stale = feed.upToDate === false || feed.liveOk === false;
+    const dailyText = feed.latestDate ? `日线截至 ${feed.latestDate}` : `${data.series.length} 条日线`;
+    const liveText = feed.liveOk === false ? ' · 实时盘口失败' : ' · 实时 ✓';
+    elTpHistoryPointsBadge.textContent = `${dailyText}${liveText}`;
+    elTpHistoryPointsBadge.style.color = stale ? '#f43f5e' : '';
+    elTpHistoryPointsBadge.style.borderColor = stale ? 'rgba(244, 63, 94, 0.35)' : '';
+    elTpHistoryPointsBadge.style.background = stale ? 'rgba(244, 63, 94, 0.1)' : '';
+    elTpHistoryPointsBadge.title = [
+      `${data.series.length} 条真实日线（${data.series[0].date} 起），每日快照为 00:00 UTC（北京时间 08:00）`,
+      feed.expectedDate ? `应有最新日线：${feed.expectedDate}` : '',
+      feed.lastSuccessAt ? `上次成功拉取：${formatUTC8(feed.lastSuccessAt)} (UTC+8)` : '',
+      feed.lastError ? `日线拉取失败：${feed.lastError}` : '',
+      feed.liveError ? `实时盘口失败：${feed.liveError}` : ''
+    ].filter(Boolean).join('\n');
   }
 
   if (elTpHeaderRegimePill && reg.regimeName) {

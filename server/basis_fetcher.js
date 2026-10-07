@@ -29,8 +29,6 @@ const DAY_MS = 86400000;
 const BINANCE_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' };
 
 let inMemoryCache = null;
-let lastCheckTime = 0;
-const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour check
 
 const round = (v, d = 2) => (v == null || !isFinite(v) ? null : Number(v.toFixed(d)));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -337,7 +335,6 @@ async function fetchAndBuildHistoricalBasis() {
   }
 
   inMemoryCache = resultSeries;
-  lastCheckTime = Date.now();
   return resultSeries;
 }
 
@@ -410,46 +407,73 @@ function isFreshSchema(parsed) {
 }
 
 /**
- * Get historical basis data, with caching and fallback
+ * Latest daily snapshot that should already exist. Binance stamps each daily basis record at
+ * 00:00 UTC (08:00 UTC+8) and publishes it a few minutes later.
+ */
+const PUBLISH_LAG_MS = 10 * 60 * 1000;
+function expectedLatestDate(now = Date.now()) {
+  return new Date(now - PUBLISH_LAG_MS).toISOString().slice(0, 10);
+}
+
+function hasLatestSnapshot(series, now = Date.now()) {
+  return isFreshSchema(series) && series[series.length - 1].date >= expectedLatestDate(now);
+}
+
+function readDiskCache() {
+  if (!fs.existsSync(CACHE_FILE)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return isFreshSchema(parsed) ? parsed : null;
+  } catch (e) {
+    console.warn('[BasisFetcher] Error reading cache file:', e.message);
+    return null;
+  }
+}
+
+// Fetch health, surfaced to the UI so a stalled feed (e.g. a geo-blocked host) is visible
+const fetchStatus = { lastAttemptAt: 0, lastSuccessAt: 0, lastError: null };
+const RETRY_INTERVAL_MS = 10 * 60 * 1000; // after a failed fetch, wait before hitting Binance again
+
+function getBasisFetchStatus(series = inMemoryCache) {
+  const latestDate = series && series.length ? series[series.length - 1].date : null;
+  const expected = expectedLatestDate();
+  return {
+    latestDate,
+    expectedDate: expected,
+    upToDate: !!latestDate && latestDate >= expected,
+    lastAttemptAt: fetchStatus.lastAttemptAt || null,
+    lastSuccessAt: fetchStatus.lastSuccessAt || null,
+    lastError: fetchStatus.lastError
+  };
+}
+
+/**
+ * Get historical basis data. The cache is reused only while it already contains the newest
+ * published daily snapshot; once a new UTC day's snapshot is due, Binance is queried again
+ * (throttled to one attempt per RETRY_INTERVAL_MS while it keeps failing).
  */
 async function getHistoricalBasisData(forceRefresh = false) {
   const now = Date.now();
 
-  if (!forceRefresh && inMemoryCache && (now - lastCheckTime < CHECK_INTERVAL_MS)) {
-    return inMemoryCache;
+  if (!forceRefresh) {
+    if (!inMemoryCache) inMemoryCache = readDiskCache();
+    if (inMemoryCache && hasLatestSnapshot(inMemoryCache, now)) return inMemoryCache;
+    if (inMemoryCache && now - fetchStatus.lastAttemptAt < RETRY_INTERVAL_MS) return inMemoryCache;
   }
 
-  if (!forceRefresh && fs.existsSync(CACHE_FILE)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      if (isFreshSchema(parsed)) {
-        const lastDate = new Date(parsed[parsed.length - 1].date).getTime();
-        // Binance publishes the 00:00 UTC snapshot once per day; < 48h old means nothing new is missing
-        if (now - lastDate < 48 * 3600 * 1000) {
-          inMemoryCache = parsed;
-          lastCheckTime = now;
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('[BasisFetcher] Error reading cache file:', e.message);
-    }
-  }
-
+  fetchStatus.lastAttemptAt = now;
   try {
-    return await fetchAndBuildHistoricalBasis();
+    const series = await fetchAndBuildHistoricalBasis();
+    fetchStatus.lastSuccessAt = Date.now();
+    fetchStatus.lastError = null;
+    return series;
   } catch (err) {
-    console.error('[BasisFetcher] Network fetch failed, falling back to disk cache:', err.message);
-    if (fs.existsSync(CACHE_FILE)) {
-      try {
-        const parsed = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-        if (isFreshSchema(parsed)) {
-          inMemoryCache = parsed;
-          return inMemoryCache;
-        }
-      } catch (e) {
-        // Fall through
-      }
+    fetchStatus.lastError = err.message;
+    console.error('[BasisFetcher] Network fetch failed, serving cached history:', err.message);
+    const fallback = inMemoryCache || readDiskCache();
+    if (fallback) {
+      inMemoryCache = fallback;
+      return fallback;
     }
     throw err;
   }
@@ -457,6 +481,9 @@ async function getHistoricalBasisData(forceRefresh = false) {
 
 module.exports = {
   getHistoricalBasisData,
+  getBasisFetchStatus,
+  expectedLatestDate,
+  hasLatestSnapshot,
   fetchAndBuildHistoricalBasis,
   fetchLiveBinanceCurve,
   buildCurvePoint,
