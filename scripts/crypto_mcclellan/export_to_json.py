@@ -260,7 +260,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="skip data collection")
     parser.add_argument("--skip-if-final", action="store_true",
-                        help="only recompute when today's trade date already has a post-close snapshot")
+                        help="exit without changes when today's trade date already has a post-close snapshot")
     args = parser.parse_args()
 
     failed = []
@@ -268,7 +268,9 @@ def main():
     if args.offline:
         pass
     elif args.skip_if_final and is_final(load_collection_log().get(trade_date), trade_date):
-        print(f"[Collect] {trade_date} already has a final post-close snapshot; recompute only")
+        # Leave every file untouched so the later cron slots produce no commit
+        print(f"[Collect] {trade_date} already has a final post-close snapshot; nothing to do")
+        return
     else:
         failed = collect(trade_date)
         record_collection(trade_date, failed)
