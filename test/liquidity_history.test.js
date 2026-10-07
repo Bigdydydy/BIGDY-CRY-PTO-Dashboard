@@ -22,6 +22,14 @@ function series(hours, fn = () => ({}), start = T0) {
 }
 
 describe('liquidity history recorder', () => {
+  test('hourSampleCount reports the snapshots already in the current hour', () => {
+    let s = h.mergeSnapshot([], snap(), T0 + 60 * 1000);
+    s = h.mergeSnapshot(s, snap(), T0 + 2 * 60 * 1000);
+    assert.strictEqual(h.hourSampleCount(s, T0 + 50 * 60 * 1000), 2);
+    assert.strictEqual(h.hourSampleCount(s, T0 + HOUR), 0);
+    assert.strictEqual(h.hourSampleCount([], T0), 0);
+  });
+
   test('snapshots in the same hour average into one bucket and track the 10bps low', () => {
     let s = h.mergeSnapshot([], snap({ d10: 30 }), T0 + 5 * 60 * 1000);
     s = h.mergeSnapshot(s, snap({ d10: 20 }), T0 + 40 * 60 * 1000);
