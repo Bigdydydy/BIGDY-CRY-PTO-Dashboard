@@ -100,7 +100,8 @@ function triggerPythonPipelineRefresh() {
       });
     }
 
-    const cmd = `"${pythonBin}" "${exportScript}"`;
+    // --skip-if-final: a manual refresh never overwrites a finalized post-close snapshot
+    const cmd = `"${pythonBin}" "${exportScript}" --skip-if-final`;
     // Collection waits out CoinGecko / GeckoTerminal rate limits, so allow a few minutes
     exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 240000 }, (error, stdout, stderr) => {
       if (error) {

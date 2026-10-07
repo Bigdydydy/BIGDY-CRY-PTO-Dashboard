@@ -2,10 +2,19 @@ name: Crypto McClellan Daily Update
 
 on:
   schedule:
-    # 每天 UTC 00:15，在日收盘后采集。GitHub 实际启动常晚 2-3.5 小时；
-    # 12:00 UTC 前启动的运行都记为刚收盘的那一天 (TRADE_DATE_LAG_HOURS = 12)
-    - cron: '15 0 * * *'
+    # 收盘后多个时段各排一次（避开整点高峰，GitHub 高峰期会延迟甚至丢弃定时任务）。
+    # 12:00 UTC 前启动的运行都记为刚收盘的那一天 (TRADE_DATE_LAG_HOURS = 12)；
+    # 第一次成功采集即定稿，之后的时段只重算、不重复采集 (--skip-if-final)
+    - cron: '37 0 * * *'
+    - cron: '37 3 * * *'
+    - cron: '37 6 * * *'
+    - cron: '37 9 * * *'
   workflow_dispatch: # 允许在 Actions 页面手动触发补跑
+    inputs:
+      force:
+        description: '即使当天已定稿也重新采集'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -35,7 +44,7 @@ jobs:
       - name: Run breadth pipeline (collect + compute + export JSON)
         id: pipeline
         working-directory: scripts/crypto_mcclellan
-        run: python export_to_json.py
+        run: python export_to_json.py ${{ inputs.force && ' ' || '--skip-if-final' }}
 
       # Commit whatever was collected even when one source failed (the pipeline
       # step is then red and GitHub notifies the owner)

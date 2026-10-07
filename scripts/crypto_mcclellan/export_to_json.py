@@ -31,6 +31,32 @@ def trade_date_now(now: datetime = None) -> str:
     return (now - timedelta(hours=config.TRADE_DATE_LAG_HOURS)).strftime("%Y-%m-%d")
 
 
+def load_collection_log():
+    if config.COLLECTION_LOG_FILE.exists():
+        return json.loads(config.COLLECTION_LOG_FILE.read_text(encoding="utf-8"))
+    return {}
+
+
+def is_final(entry, trade_date: str) -> bool:
+    """
+    A trade date is final once Core and Frontier were both collected after
+    that day's UTC close. Intraday snapshots (a daytime manual refresh) are not
+    final and get replaced by the next post-close run.
+    """
+    if not entry or entry.get("failed"):
+        return False
+    close = (datetime.fromisoformat(trade_date) + timedelta(days=1)).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(entry["collected_at"].replace("Z", "+00:00")) >= close
+
+
+def record_collection(trade_date: str, failed, now: datetime = None):
+    log = load_collection_log()
+    now = now or datetime.now(timezone.utc)
+    log[trade_date] = {"collected_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                       "failed": [f for f in failed if f in ("core", "frontier")]}
+    config.COLLECTION_LOG_FILE.write_text(json.dumps(log, indent=1, sort_keys=True), encoding="utf-8")
+
+
 def _r(x, nd=2):
     return None if x is None else round(x, nd)
 
@@ -233,9 +259,19 @@ def build_payload():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="skip data collection")
+    parser.add_argument("--skip-if-final", action="store_true",
+                        help="only recompute when today's trade date already has a post-close snapshot")
     args = parser.parse_args()
 
-    failed = [] if args.offline else collect(trade_date_now())
+    failed = []
+    trade_date = trade_date_now()
+    if args.offline:
+        pass
+    elif args.skip_if_final and is_final(load_collection_log().get(trade_date), trade_date):
+        print(f"[Collect] {trade_date} already has a final post-close snapshot; recompute only")
+    else:
+        failed = collect(trade_date)
+        record_collection(trade_date, failed)
 
     payload = build_payload()
     config.OUTPUT_JSON_FILE.parent.mkdir(parents=True, exist_ok=True)

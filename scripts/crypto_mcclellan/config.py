@@ -14,6 +14,7 @@ RAW_CACHE_DIR = DATA_DIR / "raw_cache"          # seeder download cache (git-ign
 CORE_STORE_FILE = DATA_DIR / "core_daily.csv"
 FRONTIER_STORE_FILE = DATA_DIR / "frontier_snapshots.csv"
 FRONTIER_REGISTRY_FILE = DATA_DIR / "frontier_registry.json"
+COLLECTION_LOG_FILE = DATA_DIR / "collection_log.json"  # trade date -> when it was collected
 OUTPUT_JSON_FILE = BASE_DIR.parent.parent / "data" / "crypto_mcclellan.json"
 
 HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MacroQuant/2.0",

@@ -160,5 +160,14 @@ class TestTradeDate(unittest.TestCase):
         self.assertEqual(label(14, 0), "2026-10-06")
 
 
+class TestFinalSnapshot(unittest.TestCase):
+    def test_only_post_close_complete_runs_are_final(self):
+        from export_to_json import is_final
+        self.assertTrue(is_final({"collected_at": "2026-10-07T03:21:00Z", "failed": []}, "2026-10-06"))
+        self.assertFalse(is_final({"collected_at": "2026-10-06T14:00:00Z", "failed": []}, "2026-10-06"))
+        self.assertFalse(is_final({"collected_at": "2026-10-07T03:21:00Z", "failed": ["frontier"]}, "2026-10-06"))
+        self.assertFalse(is_final(None, "2026-10-06"))
+
+
 if __name__ == "__main__":
     unittest.main()
