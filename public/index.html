@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0b0a">
   <title>BIGDY 衍生品量化智能研判雷达</title>
   <!-- Anti-FOUC: Immediately apply saved or system theme before render -->
   <script>
@@ -21,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/style.css?v=20260924_k95">
-  <link rel="stylesheet" href="/atelier.css?v=20261006_2">
+  <link rel="stylesheet" href="/atelier.css?v=20261007_3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
@@ -183,7 +184,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">01/</span>宏观与风控总览</span>
-              <span class="nav-desc">美债/MSTR + 市场宽度 + CDRI</span>
             </div>
           </button>
 
@@ -195,7 +195,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">02/</span>期现基差与溢价</span>
-              <span class="nav-desc">真实期限 · ETF 套利联动</span>
             </div>
           </button>
 
@@ -208,7 +207,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">03/</span>期权微观结构套件</span>
-              <span class="nav-desc">ATM IV / GEX / 偏度 / 微笑</span>
             </div>
           </button>
 
@@ -221,8 +219,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title"><span class="nav-index">04/</span>大宗巨鲸战略雷达</span>
-              <span class="nav-desc">冰山拆单与 BTC 确界盈亏</span>
+              <span class="nav-title"><span class="nav-index">04/</span>期权大宗雷达</span>
             </div>
           </button>
 
@@ -237,7 +234,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">05/</span>稳定币供应比率 (SSRO)</span>
-              <span class="nav-desc">宏观流动性与 BTC 购买力</span>
             </div>
           </button>
 
@@ -249,7 +245,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">06/</span>Coinbase 深度雷达</span>
-              <span class="nav-desc">阶梯深度谱系与大单滑点</span>
             </div>
           </button>
 
@@ -263,7 +258,6 @@
             </div>
             <div class="nav-label-wrap">
               <span class="nav-title"><span class="nav-index">07/</span>金/BTC 比率与相关性</span>
-              <span class="nav-desc">XAU/BTC 比价 &amp; 30D 宏观联动</span>
             </div>
           </button>
 
@@ -274,8 +268,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title"><span class="nav-index">08/</span>柳玉冬波浪研判</span>
-              <span class="nav-desc">多级别画浪 · 铁律证伪 · 监测点</span>
+              <span class="nav-title"><span class="nav-index">08/</span>波浪引擎</span>
             </div>
           </button>
         </nav>
@@ -296,8 +289,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title"><span class="nav-index">ALL/</span>全模块平铺画卷</span>
-              <span class="nav-desc">展开全部 5 大模块</span>
+              <span class="nav-title"><span class="nav-index">ALL/</span>平铺界面</span>
             </div>
           </button>
         </nav>
@@ -306,22 +298,20 @@
       <div class="sidebar-menu-group atl-atelier-group">
         <div class="sidebar-group-title">画室 Atelier</div>
         <div class="sidebar-nav">
-          <button class="sidebar-nav-item atl-rail-action" data-atl="gallery" aria-label="画廊">
+          <button class="sidebar-nav-item atl-rail-action" data-atl="gallery" aria-label="更换背景">
             <div class="nav-icon-wrap">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">画廊 · 更换画作</span>
-              <span class="nav-desc">3 幅 19 世纪公有领域油画</span>
+              <span class="nav-title">更换背景</span>
             </div>
           </button>
-          <button class="sidebar-nav-item atl-rail-action" data-atl="contemplate" aria-label="观画模式">
+          <button class="sidebar-nav-item atl-rail-action" data-atl="contemplate" aria-label="显示背景">
             <div class="nav-icon-wrap">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title">观画模式</span>
-              <span class="nav-desc">隐去界面，只看画与题词</span>
+              <span class="nav-title">显示背景</span>
             </div>
           </button>
         </div>
@@ -2125,8 +2115,7 @@
           <div class="card-header">
             <div class="card-title-group">
               <span class="card-module-tag">08 ELLIOTT WAVE THEORY &amp; LIU YUDONG RADAR</span>
-              <h2>柳玉冬波浪理论 · 多级别画浪评估 (币安合约)</h2>
-              <span class="card-subtitle-inline">在图上画母浪与子浪 • 手稿铁律 • 低周期子浪证伪 • 母子级别一致性 • 监测点 / 失效位 / 目标</span>
+              <h2>艾略特波浪评估引擎</h2>
             </div>
           </div>
 
@@ -2514,7 +2503,7 @@
         <polyline points="2 17 12 22 22 17"></polyline>
         <polyline points="2 12 12 17 22 12"></polyline>
       </svg>
-      <span>巨鲸大单</span>
+      <span>期权大宗</span>
     </button>
     <button class="mob-nav-item" data-view="view-ssro" id="mob-nav-ssro">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -2543,7 +2532,7 @@
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M2 12c3-8 5-8 8 0s5 8 8 0 5-8 8 0"></path>
       </svg>
-      <span>波浪研判</span>
+      <span>波浪引擎</span>
     </button>
   </nav>
 
@@ -2554,8 +2543,8 @@
   <script src="/echarts.min.js"></script>
   <script src="/pnl_engine.js"></script>
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
-  <script src="/atelier.js?v=20261006_2"></script>
+  <script src="/atelier.js?v=20261007_3"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261006_1"></script>
+  <script src="/app.js?v=20261007_3"></script>
 </body>
 </html>

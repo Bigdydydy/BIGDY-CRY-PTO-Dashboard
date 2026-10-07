@@ -176,6 +176,9 @@ body,
 
 .app-header { z-index: 100; }
 
+/* 侧栏（手机为抽屉）与遮罩都在 .app-layout 内：不能让它形成层叠上下文，否则会被顶栏盖住 */
+.app-layout { z-index: auto; }
+
 .app-layout,
 .app-footer {
   background: transparent;
@@ -2150,5 +2153,166 @@ html.atl-entering .atl-caption {
   .atl-nav-indicator,
   body {
     transition: none !important;
+  }
+}
+
+.atl-hero-desc:empty {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   19. 手机端观看与操作优化
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  /* 刘海屏安全区 */
+  .app-header {
+    height: calc(58px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* 顶栏：原样式在手机上整组隐藏，这里保留「更换背景」与图标化的「实时同步」 */
+  .header-meta {
+    display: flex;
+    gap: 6px;
+  }
+
+  .app-header .theme-switch-pill { display: none; }
+
+  .atl-header-btn,
+  .btn-refresh {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  #refresh-btn-text { display: none; }
+
+  /* 同步状态压成一行 */
+  .sync-container {
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .sync-left { min-width: 0; }
+
+  .sync-msg {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sync-right { display: none; }
+
+  /* 头图更紧凑，把首屏留给数据 */
+  .atl-hero { padding: 12px 2px 16px; }
+  .atl-hero-eyebrow { font-size: 0.6rem; letter-spacing: 0.12em; }
+  .atl-hero-title { margin-top: 6px; }
+
+  /* 玻璃模糊在手机 GPU 上较贵：减半 */
+  .bento-card,
+  [data-theme="light"] .bento-card {
+    backdrop-filter: blur(14px) saturate(130%);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+  }
+
+  /* 触控目标不小于 34px */
+  .timeframe-btn,
+  .switch-btn,
+  .chart-tool-btn,
+  .tp-legend-btn,
+  .wave-symbol-btn,
+  .draw-tool-btn,
+  .select-box {
+    min-height: 34px;
+  }
+
+  /* 宏观图例：原来竖排 9 行，改为可横滑的一行 */
+  .interactive-legend-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 0 10px 12px;
+  }
+
+  .legend-pills-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 12px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-mask: linear-gradient(90deg, #000 85%, transparent);
+    mask: linear-gradient(90deg, #000 85%, transparent);
+  }
+
+  .legend-pills-group::-webkit-scrollbar { display: none; }
+
+  .legend-pill {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  /* 期权模块的 3 列指标在手机上被裁切：改为可横滑卡片 */
+  .metrics-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(46%, 1fr);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .metrics-row::-webkit-scrollbar { display: none; }
+
+  .metrics-row > * {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+
+  /* 底部导航：两端渐隐提示可横滑 */
+  .mobile-bottom-nav {
+    -webkit-mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent);
+    mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent);
+    scroll-snap-type: x proximity;
+  }
+
+  .mob-nav-item {
+    scroll-snap-align: center;
+    min-width: 66px;
+  }
+
+  /* 抽屉侧栏：触屏下保留完整标签 */
+  .app-sidebar .nav-title { font-size: 0.86rem; }
+  .sidebar-nav-item { padding: 10px 9px; }
+
+  /* 画廊底部抽屉加把手 */
+  .atl-gallery-panel::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    margin-left: -19px;
+    border-radius: 4px;
+    background: var(--border-default);
+  }
+
+  .atl-gallery-head { padding-top: 26px; }
+
+  .atl-contemplate-plate .atl-art-quote .atl-q-orig { display: none; }
+}
+
+/* 触屏设备上没有悬停：关掉指针聚光，避免点按后残留高光 */
+@media (hover: none) {
+  .bento-card::before,
+  .bento-card::after {
+    display: none;
+  }
+
+  .bento-card.recomputed::after {
+    display: block;
   }
 }

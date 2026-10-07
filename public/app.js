@@ -1942,6 +1942,25 @@ function getFilteredMacroPoints() {
 /**
  * Render Macro Chart with Chart.js
  */
+// 手机窄屏：5 根 Y 轴会把绘图区挤到不足三分之一。只保留左侧 USD 与右侧利率轴，
+// 隐藏轴标题；被隐藏的轴仍参与缩放，数值可在点按提示里查看。
+const MACRO_COMPACT_QUERY = window.matchMedia('(max-width: 768px)');
+
+function applyMacroChartCompactLayout() {
+  if (!macroChartInstance) return;
+  const compact = MACRO_COMPACT_QUERY.matches;
+  const scales = macroChartInstance.options.scales;
+  ['yUSD', 'yYield', 'yVelocity', 'yMNAV', 'yLiquidity'].forEach(id => {
+    if (!scales[id]) return;
+    scales[id].title.display = !compact;
+    if (id !== 'yUSD' && id !== 'yYield') scales[id].display = !compact;
+  });
+  scales.x.ticks.maxTicksLimit = compact ? 4 : 10;
+  macroChartInstance.update('none');
+}
+
+MACRO_COMPACT_QUERY.addEventListener('change', applyMacroChartCompactLayout);
+
 function renderMacroChart() {
   const canvas = document.getElementById('macro-chart-canvas');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -2323,6 +2342,7 @@ function renderMacroChart() {
         }
       }
     });
+    applyMacroChartCompactLayout();
     window.macroChartInstance = macroChartInstance;
   } catch (err) {
     console.error('[MacroChart] Chart creation error:', err);
@@ -4572,12 +4592,12 @@ const VIEW_TITLES = {
   'view-overview': '宏观与风控总览',
   'view-term-premium': '期现基差与期限溢价',
   'view-options': '期权微观结构套件',
-  'view-block-trades': '大宗巨鲸战略雷达',
+  'view-block-trades': '期权大宗雷达',
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
-  'view-wave-radar': '柳玉冬波浪理论 · 多级别画浪评估',
-  'view-all': '全模块平铺画卷'
+  'view-wave-radar': '波浪引擎',
+  'view-all': '平铺界面'
 };
 
 let currentActiveView = 'view-overview';

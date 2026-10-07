@@ -9,6 +9,8 @@
   'use strict';
 
   const prefersReducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // 触屏设备：没有指针悬停，ASCII 叠层降帧降分辨率以省电
+  const coarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   const root = document.documentElement;
 
   const store = {
@@ -155,7 +157,7 @@
     function resize() {
       W = window.innerWidth;
       H = window.innerHeight;
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      dpr = Math.min(window.devicePixelRatio || 1, coarsePointer ? 1 : 1.5);
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
       cols = Math.ceil(W / CW);
@@ -281,7 +283,8 @@
 
     function loop(now) {
       raf = requestAnimationFrame(loop);
-      const interval = sweepStart >= 0 ? 45 : 110; // 平时约 9fps 的「数字微光」，转场时提速
+      // 平时约 9fps 的「数字微光」（触屏约 4fps），转场时提速
+      const interval = sweepStart >= 0 ? 45 : (coarsePointer ? 240 : 110);
       if (now - last < interval) return;
       last = now;
       draw(now);
@@ -794,7 +797,12 @@
   document.addEventListener('bigdy:viewchange', (e) => {
     activeViewId = (e.detail && e.detail.viewId) || 'view-overview';
     Hero.render(activeViewId);
-    requestAnimationFrame(() => Rail.moveIndicator());
+    requestAnimationFrame(() => {
+      Rail.moveIndicator();
+      // 手机底部导航可横滑：把当前模块滚到可视中间
+      const mob = document.querySelector('.mob-nav-item.active');
+      if (mob && mob.scrollIntoView) mob.scrollIntoView({ inline: 'center', block: 'nearest', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    });
     if (!root.classList.contains('atl-booting')) playEntrance(activeViewId);
   });
 
