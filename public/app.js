@@ -95,6 +95,10 @@ function reloadAllChartsForTheme() {
     try { cbSlippageChartInstance.dispose(); } catch (e) {}
     cbSlippageChartInstance = null;
   }
+  if (typeof cbHistoryChartInstance !== 'undefined' && cbHistoryChartInstance) {
+    try { cbHistoryChartInstance.dispose(); } catch (e) {}
+    cbHistoryChartInstance = null;
+  }
   if (typeof goldChartInstance !== 'undefined' && goldChartInstance) {
     try { goldChartInstance.dispose(); } catch (e) {}
     goldChartInstance = null;
@@ -134,6 +138,9 @@ function reloadAllChartsForTheme() {
   if (typeof renderCbDepthChart === 'function' && typeof rawCoinbaseData !== 'undefined' && rawCoinbaseData) {
     renderCbDepthChart(rawCoinbaseData);
     renderCbSlippageChart(rawCoinbaseData);
+  }
+  if (typeof rawCbHistory !== 'undefined' && rawCbHistory) {
+    renderCbHistoryChart(rawCbHistory);
   }
   if (typeof renderGoldChart === 'function' && typeof rawGoldData !== 'undefined' && rawGoldData) {
     renderGoldChart();
@@ -226,7 +233,6 @@ let lastDataVersion = null;
 
 // Header & Sync Elements
 const elIndexPrice = document.getElementById('index-price');
-const elDataVersionBadge = document.getElementById('data-version-badge');
 const elLastSync = document.getElementById('last-sync-time');
 const elLastChange = document.getElementById('last-change-time');
 const elSyncMsg = document.getElementById('sync-msg');
@@ -389,7 +395,7 @@ function formatTimeWindowUTC8(startInput, endInput, durationMin) {
 /**
  * Show Toast
  */
-function showToast(message, duration = 3000) {
+function showToast(message, duration = 2200) {
   elToast.textContent = message;
   elToast.classList.add('show');
   setTimeout(() => {
@@ -453,9 +459,9 @@ async function loadMarketData(triggerRefresh = false) {
     // Visual feedback for re-computation
     if (isNewData) {
       triggerRecomputedAnimation();
-      showToast(`⚡ 检测到新数据变动！所有 5 大量化模块已全量重新计算（版本 v${lastDataVersion}）`);
+      showToast('数据已更新 · 已重新计算');
     } else if (triggerRefresh) {
-      showToast(`✓ 各数据源已完成校验，当前数据已是最新状态`);
+      showToast('已是最新');
     }
   } catch (err) {
     console.error('Failed to load market data:', err);
@@ -479,7 +485,6 @@ function renderAll() {
   
   const sync = currentMarketData.syncStatus;
   if (sync) {
-    if (elDataVersionBadge) elDataVersionBadge.textContent = `v${sync.dataVersion}`;
     elSyncMsg.textContent = sync.summary || '数据已校验';
     if (sync.hasAnyUpdate) elSyncMsg.className = 'sync-msg updated';
     else elSyncMsg.className = 'sync-msg';
@@ -4567,6 +4572,291 @@ function renderCbSlippageChart(data) {
   cbSlippageChartInstance.setOption(option);
 }
 
+// ----------------------------------------------------------------------------
+// Module 6 · 流动性历史档案 (逐小时深度 & 韧性评分)
+// ----------------------------------------------------------------------------
+
+let rawCbHistory = null;
+let cbHistoryChartInstance = null;
+let cbHistoryRange = '30d';
+let cbHistoryLastFetch = 0;
+const CB_HISTORY_REFRESH_MS = 5 * 60 * 1000;
+
+const elCbHistoryEcharts = document.getElementById('cb-history-echarts');
+const elCbHistoryKpis = document.getElementById('cb-history-kpis');
+const elCbHistoryNotice = document.getElementById('cb-history-notice');
+
+const CB_TIER_COLORS = { d10: '#f59e0b', d50: '#38bdf8', d100: '#a855f7' };
+const CB_SCORE_COLOR = '#14b8a6';
+
+async function fetchCbLiquidityHistory(force = false) {
+  if (!force && rawCbHistory && Date.now() - cbHistoryLastFetch < CB_HISTORY_REFRESH_MS) return;
+  try {
+    const resp = await fetch(`/api/coinbase-liquidity-history?range=${encodeURIComponent(cbHistoryRange)}`);
+    if (!resp.ok) return;
+    const json = await resp.json();
+    if (json.code !== 0) return;
+    rawCbHistory = json;
+    cbHistoryLastFetch = Date.now();
+    renderCbHistory(json);
+  } catch (err) {
+    console.error('[Coinbase History] Fetch error:', err);
+  }
+}
+
+function fmtSignedPct(v) {
+  if (!Number.isFinite(v)) return '--';
+  return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
+}
+
+function cbSeverityColor(sev) {
+  return { critical: '#f43f5e', warning: '#f59e0b', success: '#10b981' }[sev] || 'var(--text-secondary)';
+}
+
+function renderCbHistory(data) {
+  if (!data) return;
+  const cov = data.coverage || {};
+  const ind = data.indicators;
+
+  if (elCbHistoryNotice) {
+    const days = cov.spanDays || 0;
+    const th = data.thresholds;
+    if (!cov.samples) {
+      elCbHistoryNotice.hidden = false;
+      elCbHistoryNotice.textContent = '档案刚开始记录，第一个小时样本写入后这里会出现曲线。';
+    } else if (!th) {
+      elCbHistoryNotice.hidden = false;
+      elCbHistoryNotice.textContent = `已累积 ${cov.samples} 个小时样本${days >= 1 ? `（约 ${days} 天）` : ''}。韧性阈值、7 日基线、峰值回撤与止损预警需满 7 天 Coinbase 数据后生效。`;
+    } else if (th.provisional) {
+      elCbHistoryNotice.hidden = false;
+      elCbHistoryNotice.textContent = `韧性阈值由 ${th.days} 个有效日的 Coinbase 数据算出，满 30 天前为暂定值，会随样本增加而移动。`;
+    } else {
+      elCbHistoryNotice.hidden = true;
+    }
+  }
+
+  if (elCbHistoryKpis) {
+    elCbHistoryKpis.innerHTML = ind ? buildCbHistoryKpis(ind, data.thresholds) : '';
+  }
+
+  renderCbHistoryChart(data);
+}
+
+function buildCbHistoryKpis(ind, th) {
+  const r = ind.resilience || {};
+  const zone = r.zone || {};
+  const w = ind.withdrawal || {};
+  const vs = ind.vsBaseline7d || {};
+  const slip = ind.slippage10m || {};
+  const peak = ind.peak;
+  const thText = th
+    ? `阈值 ${th.high} / ${th.low}（Coinbase ${th.days} 日四分位${th.provisional ? ' · 暂定' : ''}）`
+    : '阈值累积中（需 7 天）';
+
+  const tile = (label, value, sub, color) => `
+    <div class="cb-hk">
+      <span class="cb-hk-lbl">${label}</span>
+      <span class="cb-hk-val" style="color:${color || 'var(--text-primary)'}">${value}</span>
+      <span class="cb-hk-sub">${sub}</span>
+    </div>`;
+
+  const tiles = [
+    tile('韧性评分 · 7D',
+      Number.isFinite(r.ma7) ? r.ma7.toFixed(2) : '--',
+      zone.label ? `${escapeHtml(zone.label)} · ${thText}` : thText,
+      cbSeverityColor(zone.severity)),
+    tile('阶梯形态 · 对比 7 日基线',
+      escapeHtml(w.label || '--'),
+      `10 / 50 / 100 bps：${fmtSignedPct(vs.d10)} / ${fmtSignedPct(vs.d50)} / ${fmtSignedPct(vs.d100)}`,
+      cbSeverityColor(w.severity)),
+    tile('10 bps 深度',
+      Number.isFinite(ind.depthNow?.d10) ? `$${ind.depthNow.d10.toFixed(2)}M` : '--',
+      `48h ${fmtSignedPct(ind.change48h)}${peak ? ` · 较 ${peak.date.slice(5)} 峰值 $${peak.d10}M ${fmtSignedPct(peak.drawdownPct)}` : ''}`,
+      Number.isFinite(ind.change48h) && ind.change48h <= -30 ? '#f43f5e' : null),
+    tile('$10M 市价卖出滑点',
+      Number.isFinite(slip.nowBps) ? `${slip.nowBps.toFixed(1)} bps` : '--',
+      Number.isFinite(slip.excessPct) ? `较 30 日中位 ${slip.median30dBps} bps ${fmtSignedPct(slip.excessPct)}` : '30 日中位数累积中',
+      Number.isFinite(slip.excessPct) && slip.excessPct >= 20 ? '#f59e0b' : null)
+  ];
+
+  const flags = [];
+  if (r.inflated) {
+    flags.push(`评分虚高：7 日内评分 ${fmtSignedPct(r.chg7dPct)}，但 100 bps 深度 ${fmtSignedPct(r.depthChg7dPct)}——是成交缩量抬高了评分，不是深度修复。`);
+  }
+  if (ind.stopLoss?.caution) {
+    flags.push(`止损失灵预警：10 bps 深度处于历史第 ${ind.stopLoss.d10Pctl}% 分位，成交额处于第 ${ind.stopLoss.volPctl}% 分位。市价止损易劣后成交，宜用期权做确定性保护。`);
+  }
+  if (w.code === 'WHOLESALE_WITHDRAWAL') {
+    flags.push('三档深度同步坍塌：做市商在整条报价阶梯上撤单，而不只是拉宽价差。');
+  }
+
+  return `<div class="cb-hk-grid">${tiles.join('')}</div>` +
+    (flags.length ? `<ul class="cb-hk-flags">${flags.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : '');
+}
+
+/**
+ * 相邻样本间隔超过 2 小时处插入空点，让缺失时段在图上断开
+ */
+function cbWithGaps(series, pick) {
+  const out = [];
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i];
+    if (i > 0 && s.ts - series[i - 1].ts > 2 * 3600 * 1000) out.push([series[i - 1].ts + 3600 * 1000, null]);
+    out.push([s.ts, pick(s)]);
+  }
+  return out;
+}
+
+function renderCbHistoryChart(data) {
+  if (!elCbHistoryEcharts || !data) return;
+  if (elCbHistoryEcharts.offsetWidth === 0) return; // 视图隐藏时跳过，切回时再画
+
+  if (!cbHistoryChartInstance) {
+    cbHistoryChartInstance = echarts.init(elCbHistoryEcharts, getEchartsTheme());
+  }
+
+  const colors = getChartThemeColors();
+  const series = data.series || [];
+  const th = data.thresholds;
+  const mono = { fontFamily: 'JetBrains Mono', fontSize: 10 };
+  const gridTop = elCbHistoryEcharts.offsetWidth < 560 ? 54 : 30; // 窄屏图例换两行
+
+  const line = (name, field, color, width = 1.6) => ({
+    name,
+    type: 'line',
+    xAxisIndex: 0,
+    yAxisIndex: 0,
+    showSymbol: series.length < 3,
+    symbolSize: 5,
+    connectNulls: false,
+    data: cbWithGaps(series, s => s[field]),
+    lineStyle: { width, color },
+    itemStyle: { color }
+  });
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', label: { backgroundColor: colors.axisPointerBg } },
+      backgroundColor: colors.tooltipBg,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 11 },
+      formatter: params => {
+        if (!params || !params.length) return '';
+        const ts = params[0].value[0];
+        const row = series.find(s => s.ts === ts);
+        if (!row) return '';
+        const t = new Date(ts).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const rowHtml = (label, val, color) =>
+          `<div style="display:flex;justify-content:space-between;gap:18px;"><span style="color:${color};">${label}</span><span style="font-weight:600;">${val}</span></div>`;
+        return `<div style="font-weight:700;margin-bottom:4px;color:${colors.tooltipTitle};">${t} (UTC+8) · ${row.n} 次快照</div>` +
+          rowHtml('10 bps', `$${row.d10}M（时内低点 $${row.d10min}M）`, CB_TIER_COLORS.d10) +
+          rowHtml('50 bps', `$${row.d50}M`, CB_TIER_COLORS.d50) +
+          rowHtml('100 bps', `$${row.d100}M`, CB_TIER_COLORS.d100) +
+          rowHtml('金字塔 100/10', row.d10 ? `${(row.d100 / row.d10).toFixed(2)}x` : '--', colors.tooltipText) +
+          rowHtml('韧性评分 / 7D', `${row.score ?? '--'} / ${row.scoreMa7 ?? '--'}`, CB_SCORE_COLOR) +
+          rowHtml('中间价', `$${Math.round(row.mid).toLocaleString()}`, colors.tickColor);
+      }
+    },
+    legend: {
+      top: 0,
+      left: 0,
+      itemWidth: 14,
+      itemHeight: 2,
+      textStyle: { color: colors.tickColor, fontSize: 10 },
+      data: ['10 bps', '50 bps', '100 bps', 'BTC 中间价', '韧性评分 7D', '韧性评分 (小时)']
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    grid: [
+      { left: 56, right: 56, top: gridTop, height: '50%' },
+      { left: 56, right: 56, top: '70%', bottom: 40 }
+    ],
+    xAxis: [0, 1].map(i => ({
+      type: 'time',
+      gridIndex: i,
+      axisLine: { lineStyle: { color: colors.axisLine } },
+      axisTick: { show: false },
+      axisLabel: { show: i === 1, color: colors.tickColor, hideOverlap: true, ...mono },
+      splitLine: { show: false }
+    })),
+    yAxis: [
+      {
+        gridIndex: 0, type: 'value',
+        axisLabel: { color: colors.tickColor, ...mono, formatter: v => `$${v}M` },
+        splitLine: { lineStyle: { color: colors.gridLine } }
+      },
+      {
+        gridIndex: 0, type: 'value', scale: true, position: 'right',
+        axisLabel: { color: colors.tickColor, ...mono, formatter: v => `${Math.round(v / 1000)}k` },
+        splitLine: { show: false }
+      },
+      {
+        gridIndex: 1, type: 'value', scale: true,
+        axisLabel: { color: colors.tickColor, ...mono },
+        splitLine: { lineStyle: { color: colors.gridLine } }
+      }
+    ],
+    dataZoom: [
+      { type: 'inside', xAxisIndex: [0, 1] },
+      { type: 'slider', xAxisIndex: [0, 1], height: 14, bottom: 6, borderColor: 'transparent', textStyle: { color: colors.tickColor, fontSize: 9 } }
+    ],
+    series: [
+      line('10 bps', 'd10', CB_TIER_COLORS.d10, 2),
+      line('50 bps', 'd50', CB_TIER_COLORS.d50),
+      line('100 bps', 'd100', CB_TIER_COLORS.d100),
+      {
+        name: 'BTC 中间价', type: 'line', xAxisIndex: 0, yAxisIndex: 1,
+        showSymbol: series.length < 3, symbolSize: 4,
+        data: cbWithGaps(series, s => s.mid),
+        lineStyle: { width: 1, type: 'dashed', color: colors.tickColor, opacity: 0.55 },
+        itemStyle: { color: colors.tickColor }
+      },
+      {
+        name: '韧性评分 (小时)', type: 'line', xAxisIndex: 1, yAxisIndex: 2, showSymbol: false,
+        data: cbWithGaps(series, s => s.score),
+        lineStyle: { width: 1, color: CB_SCORE_COLOR, opacity: 0.3 },
+        itemStyle: { color: CB_SCORE_COLOR }
+      },
+      {
+        name: '韧性评分 7D', type: 'line', xAxisIndex: 1, yAxisIndex: 2,
+        showSymbol: series.length < 3, symbolSize: 5,
+        data: cbWithGaps(series, s => s.scoreMa7),
+        lineStyle: { width: 2, color: CB_SCORE_COLOR },
+        itemStyle: { color: CB_SCORE_COLOR },
+        markLine: th ? {
+          silent: true,
+          symbol: 'none',
+          label: { color: colors.tickColor, fontSize: 9, formatter: p => p.name },
+          data: [
+            { name: `充裕 ${th.high}`, yAxis: th.high, lineStyle: { color: '#10b981', type: 'dotted', width: 1 } },
+            { name: `枯竭 ${th.low}`, yAxis: th.low, lineStyle: { color: '#f43f5e', type: 'dotted', width: 1 } }
+          ]
+        } : undefined
+      }
+    ]
+  };
+
+  cbHistoryChartInstance.setOption(option, true);
+}
+
+function initCbHistoryEvents() {
+  const rangeSwitch = document.getElementById('cb-history-range');
+  if (rangeSwitch) {
+    rangeSwitch.addEventListener('click', e => {
+      const btn = e.target.closest('.switch-btn');
+      if (!btn || btn.dataset.range === cbHistoryRange) return;
+      rangeSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.toggle('active', b === btn));
+      cbHistoryRange = btn.dataset.range;
+      fetchCbLiquidityHistory(true);
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (cbHistoryChartInstance) cbHistoryChartInstance.resize();
+  });
+}
+
 /**
  * Initialize Coinbase Liquidity UI Event Listeners
  */
@@ -4577,11 +4867,15 @@ function initCoinbaseLiquidityEvents() {
   });
 
   // Auto-refresh Coinbase order book liquidity every 15 seconds when viewing
+  // (the history archive throttles itself to once per 5 minutes)
   setInterval(() => {
     if (currentActiveView === 'view-coinbase-liquidity' || currentActiveView === 'view-all') {
       fetchCoinbaseLiquidityData(false);
+      fetchCbLiquidityHistory(false);
     }
   }, 15000);
+
+  initCbHistoryEvents();
 }
 
 // ============================================================================
@@ -4697,6 +4991,12 @@ function switchView(viewId, updateHash = true) {
       cbSlippageChartInstance.resize();
     } else if (rawCoinbaseData && (viewId === 'view-coinbase-liquidity' || viewId === 'view-all')) {
       renderCbSlippageChart(rawCoinbaseData);
+    }
+
+    if (viewId === 'view-coinbase-liquidity' || viewId === 'view-all') {
+      if (cbHistoryChartInstance) cbHistoryChartInstance.resize();
+      else if (rawCbHistory) renderCbHistoryChart(rawCbHistory);
+      fetchCbLiquidityHistory(false);
     }
 
     if (goldChartInstance) {
@@ -5661,5 +5961,6 @@ loadMarketData(false);
 loadEtfLinkageData(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
+fetchCbLiquidityHistory(false);
 loadGoldCorrelationData(false);
 loadMcClellanData(false);

@@ -17,3 +17,6 @@ data/wave_tolerance_check.json
 
 # Crypto McClellan seeder download cache
 scripts/crypto_mcclellan/data/raw_cache/
+
+# 服务器本地的 Coinbase 深度快照 (权威序列由 GitHub Actions 提交到 coinbase_liquidity_history.json)
+data/coinbase_liquidity_history.local.json

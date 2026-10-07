@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "source": "Coinbase Exchange BTC-USD L2 order book",
+  "interval": "1h",
+  "units": "depth / vol24 in $M (two-sided), spread & slippage in bps, b10 = 10bps bid share %",
+  "samples": [
+    {"ts":1791345600000,"n":2,"mid":84051.98,"spr":0.001,"d10":5.75,"d50":34.192,"d100":39.553,"b10":47.6,"vol24":484.8,"s5":8.3,"s10":14.48,"d10min":5.219}
+  ]
+}

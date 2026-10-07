@@ -1049,26 +1049,33 @@ textarea:focus-visible {
   background: transparent;
 }
 
+/* 提示：左下角一枚小小的玻璃胶囊，低调地告知，不打断观看 (右下角留给画作说明) */
 .toast-notification {
-  left: 50%;
+  left: 18px;
   right: auto;
-  bottom: 28px;
-  transform: translate(-50%, 14px) scale(0.98);
+  bottom: 18px;
+  transform: translateY(6px);
   border-radius: 999px;
-  padding: 10px 20px;
-  background: var(--atl-btn-solid-bg);
-  color: var(--atl-btn-solid-ink);
-  border: none;
-  font-weight: 500;
+  padding: 5px 12px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  max-width: calc(100vw - 32px);
+  max-width: min(360px, calc(100vw - 32px));
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.6);
+  box-shadow: none;
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
 
 .toast-notification.show {
-  transform: translate(-50%, 0) scale(1);
+  opacity: 0.88;
+  transform: translateY(0);
 }
 
 .app-footer {
@@ -2055,6 +2062,13 @@ html.atl-entering .atl-caption {
 
   .main-viewport { padding-bottom: 104px; }
 
+  /* 停在底部导航栏上方 */
+  .toast-notification {
+    left: 12px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 24px);
+  }
+
   .mobile-bottom-nav {
     left: 12px;
     right: 12px;
@@ -2127,7 +2141,6 @@ html.atl-entering .atl-caption {
     max-width: none;
   }
 
-  .toast-notification { white-space: normal; border-radius: 16px; }
 }
 
 /* --------------------------------------------------------------------------

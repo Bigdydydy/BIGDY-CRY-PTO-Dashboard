@@ -1924,6 +1924,32 @@
             </div>
           </div>
         </div>
+
+        <!-- Depth & Resilience History (逐小时自建档案) -->
+        <div class="cb-history" id="cb-history">
+          <div class="cb-history-head">
+            <div class="tp-chart-title">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"></path>
+                <polyline points="7 14 11 10 14 13 20 7"></polyline>
+              </svg>
+              <span>流动性历史档案 · 10 / 50 / 100 bps 深度与韧性评分</span>
+            </div>
+            <div class="view-switch timeframe-switch" id="cb-history-range">
+              <button class="switch-btn" data-range="7d">7D</button>
+              <button class="switch-btn active" data-range="30d">30D</button>
+              <button class="switch-btn" data-range="90d">90D</button>
+              <button class="switch-btn" data-range="all">全部</button>
+            </div>
+          </div>
+          <div class="cb-history-notice" id="cb-history-notice" hidden></div>
+          <div class="cb-history-kpis" id="cb-history-kpis"></div>
+          <div id="cb-history-echarts" class="cb-history-chart"></div>
+          <div class="cb-history-foot">
+            逐小时记录 Coinbase L2 双边深度（桶内多次快照取均值）。韧性评分 = 100 bps 深度 ÷ 24h 现货成交额 × 100，取 7 日滚动均值；
+            充裕 / 枯竭阈值为 Coinbase 自身近一年日均评分的 75% / 25% 分位，不引用其他交易所数据。
+          </div>
+        </div>
       </div>
     </section>
   </div> <!-- /#view-coinbase-liquidity -->

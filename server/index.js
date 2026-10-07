@@ -17,6 +17,7 @@ const { getMacroChartData } = require('./macro_fetcher');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
+const liquidityHistory = require('./liquidity_history');
 const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
@@ -611,6 +612,22 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/coinbase-liquidity-history?range=7d|30d|90d|all
+  if (pathname === '/api/coinbase-liquidity-history' && req.method === 'GET') {
+    try {
+      const rangeParam = String(parsedUrl.query?.range || '30d');
+      const days = parseInt(rangeParam, 10);
+      const view = liquidityHistory.buildHistoryView(await liquidityHistory.getMergedHistory(), {
+        rangeDays: Number.isFinite(days) && days > 0 ? days : null
+      });
+      sendJsonResponse(req, res, 200, { code: 0, range: rangeParam, ...view });
+    } catch (err) {
+      console.error('[API Error] coinbase-liquidity-history:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
   // GET /api/gold-correlation
   if (pathname === '/api/gold-correlation' && req.method === 'GET') {
     try {
@@ -1090,6 +1107,13 @@ function startServer() {
     if (isServerIdle()) return;
     refreshMarketInBackground();
   }, MARKET_REFRESH_MS);
+
+  // Coinbase 深度每 5 分钟采样一次写入小时档案 (仅在有人访问时；可靠的逐小时序列由 GitHub Actions 记录)
+  setInterval(() => {
+    if (isServerIdle()) return;
+    getCoinbaseLiquidityData(true)
+      .catch(e => console.warn('[Server] Background Coinbase sample error:', e.message));
+  }, 300000);
 
   // 宏观数据每 5 分钟刷新 (同样仅在有人访问时)
   setInterval(async () => {

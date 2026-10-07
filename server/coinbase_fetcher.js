@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
+const liquidityHistory = require('./liquidity_history');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity.json');
 const CACHE_TTL_MS = 15000; // 15 seconds memory cache
@@ -332,6 +333,10 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），${pyramidRatio100_10 > 5.5 ? '表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。' : '做市商阶梯深度逐级递增，具备良好吸震能力。'}`
   ];
 
+  // Rolling 24h volume straight from /stats, independent of the candle history,
+  // so the depth-history recorder gets a denominator even without candles.
+  const statsVolBtc = parseFloat(tickerStats?.stats?.volume || tickerStats?.ticker?.volume || 0) || cur24hVolBtc;
+
   return {
     exchange: 'Coinbase Exchange',
     product: 'BTC-USD',
@@ -356,6 +361,10 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
       volume7dPctl: pctlVol7d,
       volume24hBtc: parseFloat(cur24hVolBtc.toFixed(1)),
       volume7dBtc: parseFloat(cur7dVolBtc.toFixed(1))
+    },
+    volume24h: {
+      btc: parseFloat(statsVolBtc.toFixed(1)),
+      usd: Math.round(statsVolBtc * midPrice)
     },
     regime: {
       code: regimeCode,
@@ -398,6 +407,7 @@ async function getCoinbaseLiquidityData(forceRefresh = false) {
 
     inMemoryCache = result;
     lastFetchTime = now;
+    liquidityHistory.recordLiveSnapshot(result, now);
 
     // Persist to local JSON cache
     try {
@@ -433,6 +443,8 @@ async function getCoinbaseLiquidityData(forceRefresh = false) {
 
 module.exports = {
   getCoinbaseLiquidityData,
+  fetchCoinbaseOrderBook,
+  fetchCoinbaseTickerAndStats,
   calcPercentile,
   walkOrderBook,
   processCoinbaseData

@@ -1,0 +1,50 @@
+name: Coinbase Depth Hourly Snapshot
+
+on:
+  schedule:
+    # 每小时一次 (避开整点高峰)。GitHub 高峰期可能延迟或丢弃个别运行，
+    # 档案按小时分桶，缺失的小时在图上表现为断点，不影响 7D 均值口径。
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: liquidity-hourly
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 采样脚本只用 Node 内置模块，无需 npm install
+      - name: Sample Coinbase L2 order book
+        run: node scripts/liquidity_snapshot.js --shots 3 --gap 15
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/coinbase_liquidity_history.json
+          if git diff --cached --quiet; then
+            echo "No changes; skipping commit."
+            exit 0
+          fi
+          # [skip render] 避免每小时触发 Render 重新部署；数据随下一次正常部署生效
+          git commit -m "chore(liquidity): hourly depth snapshot [skip ci] [skip render]"
+          pushed=0
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push; then pushed=1; break; fi
+            sleep 8
+          done
+          [ "$pushed" = 1 ]
