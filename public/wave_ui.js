@@ -8,7 +8,6 @@
 (function () {
   let waveChart = null;
   let candleSeries = null;
-  let chartMarkersPrimitive = null;
   let subSeries = null;     // 所选浪在低周期探测到的子浪 (细点线)
   let activeSeries = null;  // 正在画的浪
   const sketchSeries = new Map(); // 已画的浪 id → 折线
@@ -23,6 +22,8 @@
   let showSubwaves = false;
   let showMonitoring = true;
   let showTargets = true;
+  let showProjection = true;
+  let projSeries = null;   // 所选浪的假设推演路径 (橙色虚线，可延伸到未来)
 
   // 画浪状态
   let drawTool = null;   // 正在画的工具
@@ -100,13 +101,15 @@
   }
 
   /** 兼容 LightweightCharts v4 (series.setMarkers) 与 v5 (createSeriesMarkers) */
+  const markerPrimitives = new Map();
   function setChartMarkers(series, markers) {
     if (!series) return;
     const m = markers || [];
     if (typeof series.setMarkers === 'function') { series.setMarkers(m); return; }
     if (window.LightweightCharts && typeof window.LightweightCharts.createSeriesMarkers === 'function') {
-      if (!chartMarkersPrimitive) chartMarkersPrimitive = window.LightweightCharts.createSeriesMarkers(series, m);
-      else chartMarkersPrimitive.setMarkers(m);
+      const prim = markerPrimitives.get(series);
+      if (!prim) markerPrimitives.set(series, window.LightweightCharts.createSeriesMarkers(series, m));
+      else prim.setMarkers(m);
     }
   }
 
@@ -120,7 +123,7 @@
   function initChart() {
     const container = document.getElementById('wave-chart-container');
     if (!container || !window.LightweightCharts) return;
-    chartMarkersPrimitive = null;
+    markerPrimitives.clear();
     sketchSeries.clear();
     container.innerHTML = `
       <div class="wave-hud-legend" id="wave-hud-legend">
@@ -153,6 +156,7 @@
     subSeries = safeCreateSeries(chart, 'Line', lineOpts(colors.subwaveColor, 1, LightweightCharts.LineStyle.Dotted));
     activeSeries = safeCreateSeries(chart, 'Line', lineOpts('#a855f7', 2, LightweightCharts.LineStyle.Dashed));
     previewSeries = safeCreateSeries(chart, 'Line', lineOpts('#10b981', 2, LightweightCharts.LineStyle.LargeDashed));
+    projSeries = safeCreateSeries(chart, 'Line', lineOpts('#f59e0b', 2, LightweightCharts.LineStyle.Dashed));
 
     chart.subscribeCrosshairMove(param => {
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -710,7 +714,8 @@ self.onmessage = function (e) {
     drawHover = null;
     invalidateEval();
     const rel = relationOf(d.id);
-    setWaveStatus(`✓ 已加入「${tool.name}」（${d.timeframe.toUpperCase()}${rel ? ' · ' + rel : ' · 母浪'}）。` +
+    const partial = d.points.length < tool.labels.length ? `未画满（画到「${tool.labels[d.points.length - 1]}」），末浪按运行中，评估后可看其余各浪的假设推演。` : '';
+    setWaveStatus(`✓ 已加入「${tool.name}」（${d.timeframe.toUpperCase()}${rel ? ' · ' + rel : ' · 母浪'}）。${partial}` +
       `可继续画子浪（可切换到低周期画），画完点「评估全部」或按 Enter`);
   }
 
@@ -994,6 +999,31 @@ self.onmessage = function (e) {
     }
     if (subSeries) subSeries.setData(subData);
 
+    // 4. 所选浪的假设推演: 中值路径 (可延伸到最新K线之后)，各浪标注常见区间
+    const proj = sel && sel.result && sel.result.projection;
+    if (projSeries) {
+      const data = [], pm = [];
+      if (proj && showProjection && currentBars.length) {
+        const sec = TF_SEC[currentTf] || 14400;
+        const lastT = currentBars[currentBars.length - 1].time;
+        proj.path.forEach((p, i) => {
+          // 已有K线之内落到所在K线，之后按周期对齐
+          const t = p.time <= lastT + sec ? currentBars[barIdxAtOrBefore(p.time)].time : Math.floor(p.time / sec) * sec;
+          const prev = data[data.length - 1];
+          if (prev && t <= prev.time) { prev.value = p.price; return; }
+          data.push({ time: t, value: p.price });
+          const w = i > 0 ? proj.waves[i - 1] : null;
+          if (w && showMarkers) {
+            const up = w.zone.mid > w.start.price;
+            pm.push({ time: t, position: up ? 'aboveBar' : 'belowBar', color: '#f59e0b', shape: 'circle', size: 0.8,
+              text: `${w.label}? ${Math.round(w.zone.lo).toLocaleString()}~${Math.round(w.zone.hi).toLocaleString()}` });
+          }
+        });
+      }
+      projSeries.setData(data);
+      setChartMarkers(projSeries, pm);
+    }
+
     markers.sort((a, b) => a.time - b.time);
     setChartMarkers(candleSeries, markers);
 
@@ -1007,6 +1037,9 @@ self.onmessage = function (e) {
       }
       if (showMonitoring && inv.monitor && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || sel.timeframe})` }));
+      }
+      if (proj && showProjection && proj.invalidation) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: proj.invalidation.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: '推演失效' }));
       }
       if (showTargets && v !== 'INVALID' && v !== 'FALSIFIED_SUB') {
         (r.targets || []).slice(0, 3).forEach(t => {
@@ -1210,7 +1243,19 @@ self.onmessage = function (e) {
         }).join('') : '<div class="ue-note">在你画的起点和终点之间，没有找到判决比你的计数更好、且结构干净的其它数法</div>'}
       </div>` : '';
 
-    return verdictHtml + sugHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
+    // 假设推演: 提前结束或末浪运行中时，其余各浪的常见区间与时间窗口
+    const pj = r.projection;
+    const projHtml = pj ? `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>假设推演 · ${esc(pj.name)}</span><span>手稿常见比率 · 中值衔接</span></div>
+        <table class="liu-parts-table"><tr><td>浪</td><td>价格区间（中值）</td><td>常见结束时间</td></tr>
+          ${pj.waves.map(w => `<tr><td>${esc(w.label)}${w.running ? '（运行中）' : ''}</td><td class="num">${fmtP(w.zone.lo)} ~ ${fmtP(w.zone.hi)}（${fmtP(w.zone.mid)}）</td><td>${esc(fmtT(w.window.from).slice(5))} ~ ${esc(fmtT(w.window.to).slice(5))}</td></tr>
+            <tr><td colspan="3" class="ue-note">${esc(w.basis)}${w.inv ? `；失效 ${fmtP(w.inv.price)}：${esc(w.inv.text)}` : ''}${w.need ? `；${esc(w.need.text)}` : ''}${w.note ? `；${esc(w.note)}` : ''}</td></tr>`).join('')}
+        </table>
+        <div class="ue-note">每一浪按前一浪的中值推出，越往后越不确定；图上橙色虚线为中值路径（工具栏「假设推演」可隐藏）。这是在你的计数成立的假设下的常见走法，不是预测。</div>
+      </div>` : '';
+
+    return verdictHtml + sugHtml + projHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
   }
 
   // ---------------------------------------------------------------------------
@@ -1260,6 +1305,7 @@ self.onmessage = function (e) {
     toggle('btn-toggle-subwaves', () => showSubwaves, v => { showSubwaves = v; });
     toggle('btn-toggle-invalidation', () => showMonitoring, v => { showMonitoring = v; });
     toggle('btn-toggle-targets', () => showTargets, v => { showTargets = v; });
+    toggle('btn-toggle-projection', () => showProjection, v => { showProjection = v; });
 
     document.querySelectorAll('.draw-tool-btn').forEach(btn => {
       btn.addEventListener('click', () => {

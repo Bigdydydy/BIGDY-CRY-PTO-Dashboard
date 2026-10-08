@@ -239,6 +239,29 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(z5(r4).pass, true, `4H 上 a 浪只占 1~2 根，按根数会判 b 超过 10 倍：${z5(r4).detail}`);
   });
 
+  it('假设推演: 推动浪只画到浪3 时推演浪4 / 浪5，浪4 不进入浪1 价格区，画满且已完成时不推演', () => {
+    const v = [96, 100, 110, 105, 122, 121.5];
+    const bars = build(v);
+    const run = ks => E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', forceType: 'IMPULSE', timeframe: '1h', subBars: { '15m': bars['15m'] },
+      points: ks.map(k => pt(v, k, 3600)) });
+    const r = run([1, 2, 3, 4]);
+    assert.notStrictEqual(r.verdict, 'INVALID', r.reasons.join(' / '));
+    const pj = r.projection;
+    assert.ok(pj, '应给出推演');
+    const by = l => pj.waves.find(w => w.label === l);
+    assert.ok(by('4') && by('5'), JSON.stringify(pj.waves.map(w => w.label)));
+    assert.ok(by('4').zone.lo >= 110 - 1e-9, '浪4 不进入浪1 价格区（浪1 终点 110）');
+    assert.ok(by('4').inv && Math.abs(by('4').inv.price - r.live.points[1].price) < 1e-9, '浪4 失效位 = 浪1 终点');
+    assert.ok(by('5').zone.mid > by('4').zone.mid, '上升推动浪: 浪5 中值高于浪4 中值');
+    assert.ok(by('4').window.from > by('4').start.time && by('4').window.to >= by('4').window.from);
+    assert.strictEqual(pj.path.length, pj.waves.length + 1);
+    // 画满 0-5 且末浪已完成: 不推演
+    const v2 = [96, 100, 110, 105, 122, 116, 130, 124, 125, 123, 124];
+    const b2 = build(v2);
+    const full = E.evaluateUserCount(b2['1h'], 'TEST', { tool: 'IMPULSE', timeframe: '1h', subBars: { '15m': b2['15m'] }, points: [1, 2, 3, 4, 5, 6].map(k => pt(v2, k, 3600)) });
+    assert.strictEqual(full.projection, null);
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
