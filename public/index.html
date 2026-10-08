@@ -2283,6 +2283,7 @@
               <span class="card-module-tag">08 ELLIOTT WAVE THEORY &amp; LIU YUDONG RADAR</span>
               <h2>艾略特波浪评估引擎</h2>
             </div>
+            <button class="chart-tool-btn wave-guide-btn" id="btn-wave-guide" type="button" title="Module 8 功能与操作说明">使用说明</button>
           </div>
 
           <div class="card-body">
@@ -2369,6 +2370,123 @@
 
 </main> <!-- /#main-viewport -->
 </div> <!-- /#app-layout -->
+
+  <!-- Module 8 使用说明 -->
+  <div class="modal-backdrop" id="wave-guide-backdrop" aria-hidden="true">
+    <div class="modal-card wave-guide-card" role="dialog" aria-modal="true" aria-labelledby="wave-guide-title">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-title-top">
+            <span class="modal-tag">08 GUIDE</span>
+            <h3 id="wave-guide-title">波浪评估引擎 · 使用说明</h3>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="btn-wave-guide-close" aria-label="关闭">&times;</button>
+      </div>
+      <div class="wave-guide-tabs" role="tablist">
+        <button class="wave-guide-tab active" data-guide="start" role="tab">快速开始</button>
+        <button class="wave-guide-tab" data-guide="draw" role="tab">画浪</button>
+        <button class="wave-guide-tab" data-guide="read" role="tab">读评估</button>
+        <button class="wave-guide-tab" data-guide="alt" role="tab">更可能的浪型</button>
+        <button class="wave-guide-tab" data-guide="proj" role="tab">假设推演</button>
+        <button class="wave-guide-tab" data-guide="keys" role="tab">图表与快捷键</button>
+      </div>
+      <div class="modal-body wave-guide-body">
+
+        <section class="wave-guide-pane active" data-guide="start">
+          <ol class="wave-guide-steps">
+            <li><b>选标的与周期</b>：BTC / ETH，15m / 1H / 4H。</li>
+            <li><b>选画浪工具</b>，在图上从起点 0 开始依次点击各浪端点。点会自动吸附到该K线的最高 / 最低价。</li>
+            <li>画满自动加入画板；没画满可双击或点「结束本浪」。</li>
+            <li>点「<b>评估全部</b>」（或按 Enter）。</li>
+            <li>点右侧列表里的浪，查看判决、子浪结构、监测点与目标。</li>
+          </ol>
+          <p class="wave-guide-note">画板与评估记录保存在本机浏览器，刷新或换标的后会恢复。</p>
+        </section>
+
+        <section class="wave-guide-pane" data-guide="draw">
+          <table class="wave-guide-table">
+            <tr><th>工具</th><th>依次点击</th><th>可判定为</th></tr>
+            <tr><td>推动浪 12345</td><td>0-1-2-3-4-5</td><td>推动浪 · 引导 / 终结楔形</td></tr>
+            <tr><td>abc</td><td>0-a-b-c</td><td>单锯齿 · 平台形</td></tr>
+            <tr><td>wxy</td><td>0-w-x-y</td><td>双锯齿 · 双重横向整理</td></tr>
+            <tr><td>w-x-y-xx-z</td><td>0-w-x-y-xx-z</td><td>三锯齿 · 三重横向整理</td></tr>
+            <tr><td>三角形 abcde</td><td>0-a-b-c-d-e</td><td>收缩 · 扩张三角形</td></tr>
+          </table>
+          <ul class="wave-guide-list">
+            <li><b>母浪与子浪</b>：画在某个浪一段之内的浪，自动成为那一段的子浪，可以嵌套多层。子浪可以切到低周期去画，已画的浪在各周期都会显示。</li>
+            <li><b>指定浪型</b>：同一画法对应多种浪型（abc 可以是单锯齿或平台形），默认自动择优；在详情「判定浪型」里可以指定。</li>
+            <li><b>拖动端点</b>：鼠标移到端点上出现抓手，按住左右拖动换K线。拖过的点固定在那根K线上，不再自动吸附；评估过的会自动重评。只能拖当前周期画的浪。</li>
+            <li><b>没画满</b>：双击或「结束本浪」，末浪按运行中处理，并给出假设推演。</li>
+            <li><b>撤销 / 取消</b>：Backspace 撤销点或删除最后一个浪；Esc 或右键取消正在画的浪；列表里的 × 删除单个浪。</li>
+          </ul>
+        </section>
+
+        <section class="wave-guide-pane" data-guide="read">
+          <table class="wave-guide-table">
+            <tr><th>判决</th><th>含义</th></tr>
+            <tr><td><span class="liu-chip pos">成立</span></td><td>手稿铁律、子浪结构、画完后的走势都通过</td></tr>
+            <tr><td><span class="liu-chip warn">存疑</span></td><td>规则通过，但有指引偏离、接近阈值或结构上的疑点</td></tr>
+            <tr><td><span class="liu-chip neg">走势证伪</span></td><td>画完之后的走势打破了这个计数</td></tr>
+            <tr><td><span class="liu-chip neg">小级别证伪</span></td><td>低周期上的子浪结构与浪型不符</td></tr>
+            <tr><td><span class="liu-chip neg">否决</span></td><td>违反手稿铁律</td></tr>
+          </table>
+          <ul class="wave-guide-list">
+            <li><b>手稿铁律</b>：✗ 为违反。≈ 为接近阈值：比率类规则差阈值 5% 以内判存疑而不否决；浪2不破起点、浪3不最短、浪4不入浪1 等核心铁律不放宽。</li>
+            <li><b>时间</b>：端点精确到低周期上的极值时刻，按实际时长计算。同一组点在 4H 与 1H 上的时间判断一致。</li>
+            <li><b>子浪结构</b>：每一段在低周期上数成五浪还是三浪，是否符合该浪型的要求。</li>
+            <li><b>监测点 · 失效位 · 目标</b>：不破监测点认为当前段延续；越过失效位计数作废；目标按手稿比率给出。</li>
+            <li><b>可检验的预测</b>：期限前先到目标为命中，先破失效位为失败；附随机游走下的基准概率。</li>
+            <li><b>历史记录</b>：同类计数在 BTC / ETH 历史上先到目标的比例，与随机基准对照。</li>
+            <li><b>重新定性</b>：画成调整浪，但起点以来已在低周期走成清楚的五浪时，提示「更可能是新趋势」。</li>
+            <li><b>计数记录</b>：同一画法再次评估时，记下上次预测的结局、改判，以及触发它的价格事件。</li>
+          </ul>
+        </section>
+
+        <section class="wave-guide-pane" data-guide="alt">
+          <ul class="wave-guide-list">
+            <li>你的浪判为存疑、证伪或否决时出现。</li>
+            <li><b>起点、终点不变</b>，只改中间的数法与浪型；拐点同时从所画周期与低周期中取。</li>
+            <li>只给<b>判决比你更好</b>的：你是存疑，只给成立的；你是否决或证伪，给成立或存疑的。</li>
+            <li>结构粗糙的（中间点不是该段极值）、指引符合度低于 50% 的不给；罕见浪型须成立且符合度 ≥60%。</li>
+            <li>失败浪、穿头 b（扩散平台）、扩散楔形标为「非常规」，排在后面。最多 3 条。</li>
+            <li><b>预览</b>：图上绿色虚线。<b>采用</b>：替换你画的浪并重新评估。</li>
+          </ul>
+        </section>
+
+        <section class="wave-guide-pane" data-guide="proj">
+          <ul class="wave-guide-list">
+            <li>想验证一个还没走完的计数：<b>画到当前那一浪，双击或「结束本浪」</b>，再评估。末浪仍在运行时也会推演。</li>
+            <li>其余各浪给出价格区间（低 / 中 / 高）、常见结束时间、依据的手稿条文。</li>
+            <li>硬规则作为失效位，如浪4 不得进入浪1 价格区；区间越过失效位的部分截断。</li>
+            <li>图上橙色虚线为中值路径，可延伸到最新K线之后；「推演失效」价位线标出计数作废的位置。</li>
+            <li>每一浪由前一浪的中值推出，越往后越不确定。这是计数成立时的常见走法，不是预测。</li>
+          </ul>
+        </section>
+
+        <section class="wave-guide-pane" data-guide="keys">
+          <table class="wave-guide-table">
+            <tr><th>图表开关</th><th>作用</th></tr>
+            <tr><td>浪号标注</td><td>显示 / 隐藏浪号</td></tr>
+            <tr><td>低周期子浪</td><td>没画子浪的段，显示引擎在低周期探测到的子浪拐点</td></tr>
+            <tr><td>监测点 / 失效位</td><td>所选浪的监测点与失效位价位线</td></tr>
+            <tr><td>目标位</td><td>所选浪的目标价位线</td></tr>
+            <tr><td>假设推演</td><td>橙色推演路径与「推演失效」价位线</td></tr>
+          </table>
+          <table class="wave-guide-table">
+            <tr><th>按键</th><th>作用</th></tr>
+            <tr><td>Enter</td><td>画浪中：结束本浪；否则：评估全部</td></tr>
+            <tr><td>Backspace</td><td>撤销上一个点 / 删除最后一个浪</td></tr>
+            <tr><td>Esc / 右键</td><td>取消正在画的浪或正在拖动的端点</td></tr>
+            <tr><td>双击</td><td>画浪中提前结束本浪</td></tr>
+            <tr><td>拖动图表</td><td>平移；滚轮缩放</td></tr>
+          </table>
+          <p class="wave-guide-note">规则依据柳玉冬手稿（P1-378），每条注明页码；楔形等手稿缺失部分按通行艾略特条则补齐并标注「通用」。只讨论波浪，不构成任何交易建议。</p>
+        </section>
+
+      </div>
+    </div>
+  </div>
 
   <!-- Interactive Modal for Block Trade Analysis (Refined Glassmorphism Drawer) -->
   <div class="modal-backdrop" id="trade-modal-backdrop">
