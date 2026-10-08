@@ -1374,7 +1374,28 @@ self.onmessage = function (e) {
       });
     }
 
+    // 使用说明
+    const guide = document.getElementById('wave-guide-backdrop');
+    const setGuide = open => {
+      if (!guide) return;
+      guide.classList.toggle('open', open);
+      guide.setAttribute('aria-hidden', open ? 'false' : 'true');
+    };
+    const guideBtn = document.getElementById('btn-wave-guide');
+    if (guideBtn) guideBtn.addEventListener('click', () => setGuide(true));
+    const guideClose = document.getElementById('btn-wave-guide-close');
+    if (guideClose) guideClose.addEventListener('click', () => setGuide(false));
+    if (guide) {
+      guide.addEventListener('click', e => { if (e.target === guide) setGuide(false); });
+      guide.querySelectorAll('.wave-guide-tab').forEach(tab => tab.addEventListener('click', () => {
+        const k = tab.dataset.guide;
+        guide.querySelectorAll('.wave-guide-tab').forEach(t => t.classList.toggle('active', t === tab));
+        guide.querySelectorAll('.wave-guide-pane').forEach(p => p.classList.toggle('active', p.dataset.guide === k));
+      }));
+    }
+
     window.addEventListener('keydown', e => {
+      if (guide && guide.classList.contains('open')) { if (e.key === 'Escape') setGuide(false); return; }
       if (!waveViewVisible()) return;
       const tag = (e.target && e.target.tagName) || '';
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
