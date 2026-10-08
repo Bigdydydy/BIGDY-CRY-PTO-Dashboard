@@ -241,7 +241,11 @@
     const l = [], t = [];
     for (let i = 1; i < p.length; i++) {
       l.push(Math.abs(p[i].price - p[i - 1].price));
-      t.push(Math.max(1, p[i].idx - p[i - 1].idx));
+      // 用户画浪的端点带精确时刻 (tpos = 主周期K线序号 + 极值在该K线内的位置)：用时按实际时间折算，可为小数
+      const a = p[i - 1], b = p[i];
+      if (a.tpos !== undefined && b.tpos !== undefined) {
+        t.push(Math.max(a.tmin || 1, b.tmin || 1, Math.round(100 * (b.tpos - a.tpos)) / 100));
+      } else t.push(Math.max(1, b.idx - a.idx));
     }
     return { p, l, t, d: p.length >= 2 ? (Math.sign(p[1].price - p[0].price) || 1) : 1 };
   }
@@ -3508,6 +3512,23 @@
     const live = projectLive(slice, pts, fullPts, atr);
     const lp = live.pts;
 
+    // 精确用时: 端点时刻精化到最细且覆盖该K线的低周期上的极值时刻，浪的用时按实际时间折算成主周期根数 (可为小数)。
+    // 否则时间规则取决于在哪个周期画: 只有几小时的 a 浪在 4H 上算 1 根，对十几根的 b 浪就超过 10 倍，换到 1H 却合规
+    const fineSources = sources.filter(x => !x.isMain); // 由细到粗
+    const attachTime = list => list.forEach(p => {
+      if (p.tpos !== undefined) return;
+      for (const src of fineSources) {
+        const sb = src.bars;
+        if (!sb.length || sb[0].time > p.time || sb[sb.length - 1].time < p.time + tfSec - src.tfSec) continue;
+        const rt = refineSubTime(src, p, tfSec);
+        p.tpos = p.idx + (rt - p.time) / tfSec;
+        p.tmin = src.tfSec / tfSec;
+        return;
+      }
+    });
+    attachTime(pts);
+    attachTime(lp);
+
     // 逐段子浪探测 (以走势检验后的端点为准: 末浪若已延伸则量到新极值)；结果按端点缓存，各浪型解读共用
     const probeEv = mkEv();
     const probeCache = new Map();
@@ -3974,8 +3995,9 @@
   //   2. 在两端点之间的K线上由粗到细取锚定拐点序列 (首尾即所画端点)，
   //      对每种浪型找最合规的完整计数 (matchCorrectiveOn，各浪型取指引符合度最高者)
   //   每个候选都按用户画浪的同一套规则 (铁律、低周期子浪、画完后的走势检验) 重新评估，
-  //   优先给判决比所画计数好的；没有时给判决相同的其它数法 (sameVerdict，供参考)。
-  //   排序: 判决 → 同样的点 → 指引符合度
+  //   只给判决比所画计数好的，并从严: 指引符合度 ≥50%；存疑理由为端点不是该段极值的不给；
+  //   扩张三角形、三重锯齿 / 三重联合只在成立且指引符合度 ≥60% 时给；失败浪、扩散平台 (穿头 b)、扩散楔形标为非常规，排在常规之后。
+  //   排序: 判决 → 常规优先 → 同样的点 → 指引符合度，最多 3 个
   // ---------------------------------------------------------------------------
   const TOOL_OF_TYPE = {
     IMPULSE: 'IMPULSE', DIAGONAL: 'IMPULSE', ZIGZAG: 'ABC', FLAT: 'ABC', DOUBLE_ZIGZAG: 'WXY', COMBINATION: 'WXY',
@@ -4045,6 +4067,10 @@
     return q;
   }
 
+  const RARE_TYPES = new Set(['EXPANDING_TRIANGLE', 'TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION']);
+  const SLOPPY_DOUBT = /不是本段极值|越过你标的终点/;
+  const isUnusual = x => RARE_TYPES.has(x.type) || /失败|扩散|穿头/.test(x.name);
+
   /** userVerdict: 所画计数的判决 (存疑 → 更好的只有成立；否决 → 成立或存疑) */
   function suggestCounts(bars, symbol, d, r, sub, maxOut, userVerdict) {
     const limit = VERDICT_RANK[userVerdict || r.verdict];
@@ -4091,11 +4117,13 @@
       const mine = out.splice(before).sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || (b.guidePct - a.guidePct));
       if (mine.length) out.push(mine[0]);
     }
-    out.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) ||
+    const kept = out.filter(x => !x.sameVerdict && x.guidePct >= 50 && !(x.doubt && SLOPPY_DOUBT.test(x.doubt)) &&
+      (!RARE_TYPES.has(x.type) || (x.verdict === 'VALID' && x.guidePct >= 60)));
+    kept.forEach(x => { x.unusual = isUnusual(x); });
+    kept.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || ((a.unusual ? 1 : 0) - (b.unusual ? 1 : 0)) ||
       ((b.source === 'SAME_POINTS' ? 1 : 0) - (a.source === 'SAME_POINTS' ? 1 : 0)) ||
       ((b.guidePct || 0) - (a.guidePct || 0)));
-    const better = out.filter(x => !x.sameVerdict);
-    return (better.length ? better : out).slice(0, maxOut || 4);
+    return kept.slice(0, maxOut || 3);
   }
 
   function buildSketchTree(drawings) {
@@ -4252,7 +4280,7 @@
     if (options.suggest !== false) {
       nodes.forEach(nd => {
         if (!nd.result || nd.duplicate || finalOf(nd) === 'VALID') return;
-        nd.suggestions = suggestCounts(barsByTf[nd.d.timeframe], symbol, nd.d, nd.result, subOf(nd.d), 4, finalOf(nd));
+        nd.suggestions = suggestCounts(barsByTf[nd.d.timeframe], symbol, nd.d, nd.result, subOf(nd.d), 3, finalOf(nd));
       });
     }
 
