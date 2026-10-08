@@ -231,6 +231,26 @@ describe('Module 3: Block Trades & Iceberg Clustering', () => {
     assert.equal(cluster.totalContracts, 450);
   });
 
+  test('Iceberg clusters default to latest execution first and expose numeric start/end timestamps', () => {
+    const t0 = Date.UTC(2026, 9, 1, 0, 0, 0);
+    const slice = (id, inst, amount, ts) => ({ trade_id: id, instrument_name: inst, direction: 'buy', amount, price: 0.02, index_price: 80000, timestamp: ts });
+    const trades = [
+      // Larger, older cluster
+      slice('old-1', 'BTC-26DEC26-90000-C', 400, t0),
+      slice('old-2', 'BTC-26DEC26-90000-C', 400, t0 + 5 * 60000),
+      // Smaller, newer cluster (a day later)
+      slice('new-1', 'BTC-26DEC26-100000-C', 250, t0 + 86400000),
+      slice('new-2', 'BTC-26DEC26-100000-C', 250, t0 + 86400000 + 3 * 60000)
+    ];
+    const result = analyzeBlockTrades(trades, 30000000);
+    assert.equal(result.icebergClusters.length, 2);
+    const [first, second] = result.icebergClusters;
+    assert.equal(first.instrument, 'BTC-26DEC26-100000-C');
+    assert.equal(first.startTimestamp, t0 + 86400000);
+    assert.equal(first.endTimestamp, t0 + 86400000 + 3 * 60000);
+    assert.ok(second.clusterNotionalUSD > first.clusterNotionalUSD);
+  });
+
   test('Module 3: Pagination at 20 trades per page cleanly slices data and determines boundaries', () => {
     const PAGE_SIZE = 20;
     // Simulate 55 trades
@@ -1427,7 +1447,7 @@ describe('Module 4: 大宗交易开平仓推断与末日 0DTE 行为分类引擎
       assert.equal(b2.actionProfile.action, 'CLOSING');
 
       // Verify narrative paragraph integration
-      assert.ok(result.paragraph.includes('微观性质穿透显示'));
+      assert.ok(result.paragraph.includes('规则推断'));
       assert.ok(result.paragraph.includes('全新建仓'));
       assert.ok(result.paragraph.includes('平仓离场'));
 

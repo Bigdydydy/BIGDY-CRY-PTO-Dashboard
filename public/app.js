@@ -308,6 +308,17 @@ const elWhaleTableBody = document.getElementById('whale-table-body');
 const BLOCK_PAGE_SIZE = 20;
 let icebergCurrentPage = 1;
 let whaleCurrentPage = 1;
+let icebergSortMode = 'latest'; // 'latest' | 'notional'
+
+// Sorts in place: detail / PV buttons address clusters by index into this same array
+function sortIcebergClusters(clusters) {
+  const byNotional = (a, b) => (Number(b.clusterNotionalUSD) || 0) - (Number(a.clusterNotionalUSD) || 0);
+  const lastTs = c => Number(c.endTimestamp) || Date.parse(String(c.endTime || '').replace(' ', 'T') + '+08:00') || 0;
+  clusters.sort(icebergSortMode === 'notional'
+    ? (a, b) => byNotional(a, b) || (lastTs(b) - lastTs(a))
+    : (a, b) => (lastTs(b) - lastTs(a)) || byNotional(a, b));
+  return clusters;
+}
 
 const btnIcebergsPrev = document.getElementById('btn-icebergs-prev');
 const btnIcebergsNext = document.getElementById('btn-icebergs-next');
@@ -718,7 +729,15 @@ function renderBlockTrades(data) {
   if (!data) return;
 
   elBlockNarrativeText.textContent = data.paragraph || '';
-  elWhaleTotalVol.textContent = `$${(data.totalWhaleVolumeM || 0).toFixed(1)}M`;
+  const dedupedM = Number(data.dedupedTotalM ?? data.totalWhaleVolumeM) || 0;
+  elWhaleTotalVol.textContent = `$${dedupedM.toFixed(1)}M`;
+  const elWhaleTotalSub = document.getElementById('whale-total-sub');
+  if (elWhaleTotalSub) {
+    const overlap = Number(data.whaleInClusterCount) || 0;
+    elWhaleTotalSub.textContent = `巨鲸 $${(Number(data.totalWhaleVolumeM) || 0).toFixed(1)}M`
+      + (overlap ? `（${overlap} 笔/$${(Number(data.whaleInClusterM) || 0).toFixed(1)}M 同属冰山组）` : '')
+      + ` + 冰山另计 $${(Number(data.icebergOnlyM) || 0).toFixed(1)}M`;
+  }
   elWhaleSingleCount.textContent = `${data.whaleBlocks?.length || 0} 笔`;
   elIcebergClusterCount.textContent = `${data.icebergClusters?.length || 0} 组`;
   elFlowBiasLabel.textContent = `${data.flowBias || '--'} (${data.bullRatio || 50}% 多)`;
@@ -737,11 +756,115 @@ function renderBlockTrades(data) {
     }
   }
 
+  renderFlowHorizons(data.flowHorizons, data.oiHistory);
+
   // 1. Render Iceberg Clusters with pagination (20 per page)
-  renderIcebergsList(data.icebergClusters || []);
+  renderIcebergsList(sortIcebergClusters(data.icebergClusters || []));
 
   // 2. Render Single Whale Blocks with pagination (20 per page)
   renderWhaleSinglesList(data.whaleBlocks || []);
+}
+
+function formatSignedUsdM(v) {
+  const abs = Math.abs(v) / 1e6;
+  return `${v >= 0 ? '+' : '−'}$${abs.toFixed(abs >= 100 ? 0 : 1)}M`;
+}
+
+function setTextIfPresent(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+/**
+ * 期限资金流向 (近 4 周)：按剩余期限分桶的周度净 Delta、净 Vega、净权利金与 OI 开仓占比
+ */
+function renderFlowHorizons(fh, oiHistory) {
+  const elPanel = document.getElementById('horizon-flow');
+  const elBody = document.getElementById('horizon-flow-body');
+  if (!elPanel || !elBody) return;
+  if (!fh || !Array.isArray(fh.horizons)) {
+    elPanel.style.display = 'none';
+    return;
+  }
+  elPanel.style.display = '';
+
+  const WEEK_MS = 7 * 86400000;
+  const shortDate = ts => formatUTC8(ts, false).slice(5, 10);
+  const elHeads = document.getElementById('horizon-week-heads');
+  if (elHeads && Array.isArray(fh.weekEnds)) {
+    const n = fh.weekEnds.length;
+    elHeads.innerHTML = fh.weekEnds.map((end, i) => {
+      const label = i === n - 1 ? '近 7 天' : `W-${n - 1 - i}`;
+      const range = `${shortDate(end - WEEK_MS)}~${shortDate(end)}`;
+      return `<th title="${range} (UTC+8)">${label}<span class="horizon-week-range">${range}</span></th>`;
+    }).join('');
+  }
+
+  const oiDays = Number(oiHistory?.days) || 0;
+  const oiText = fh.oiAvailable && oiDays >= 2
+    ? `OI 快照 ${oiDays} 天（最新 ${formatUTC8(oiHistory.latestTs, false)}）`
+    : `OI 快照积累中（已 ${oiDays} 天）：满 2 天后开始给出开仓占比`;
+  setTextIfPresent('horizon-flow-meta', `按剩余期限分桶 · 主动成交方向计正负 · 只含未交割合约 · ${oiText}`);
+
+  const maxAbs = Math.max(1, ...fh.horizons.flatMap(h => h.weeks.map(w => Math.abs(w.netDeltaUSD))));
+  const toneCell = v => {
+    if (!v) return '';
+    const a = (0.08 + 0.32 * Math.min(1, Math.abs(v) / maxAbs)).toFixed(2);
+    return v > 0 ? `background: rgba(34, 197, 94, ${a});` : `background: rgba(239, 68, 68, ${a});`;
+  };
+  const toneText = v => (v > 0 ? 'text-pos' : v < 0 ? 'text-neg' : '');
+
+  elBody.innerHTML = fh.horizons.map(h => {
+    const head = `<td><strong>${escapeHtml(h.label)}</strong><span class="horizon-range">${escapeHtml(h.range)}</span></td>`;
+    if (!h.count) {
+      return `<tr class="horizon-empty">${head}<td colspan="10">近 4 周无大宗成交</td></tr>`;
+    }
+    const expiries = (h.topExpiries || [])
+      .map(e => `${escapeHtml(e.expiry)} <span class="horizon-share">${Number(e.sharePct) || 0}%</span>`)
+      .join('<br>');
+    const weeks = h.weeks.map(w => {
+      const tip = `${Number(w.count) || 0} 笔 · 总名义 $${(w.grossNotionalUSD / 1e6).toFixed(0)}M · 净权利金 ${formatSignedUsdM(w.netPremiumUSD)}`;
+      return `<td class="horizon-week-cell" style="${toneCell(w.netDeltaUSD)}" title="${tip}">${w.count ? formatSignedUsdM(w.netDeltaUSD) : '--'}</td>`;
+    }).join('');
+    const vegaK = h.netVegaUSD / 1e3;
+    const coverage = `OI 判定覆盖 ${Math.round((h.oiCoverage || 0) * 100)}% 名义额`;
+    const oiCell = h.oiOpenShare == null
+      ? `<td class="horizon-muted" title="${coverage}">--</td>`
+      : `<td title="${coverage}">${Math.round(h.oiOpenShare * 100)}%</td>`;
+    return `
+      <tr>
+        ${head}
+        <td>${expiries || '--'}</td>
+        <td>$${(h.grossNotionalUSD / 1e6).toFixed(0)}M<span class="horizon-range">${Number(h.count) || 0} 笔</span></td>
+        ${weeks}
+        <td class="${toneText(h.netDeltaUSD)}"><strong>${formatSignedUsdM(h.netDeltaUSD)}</strong></td>
+        <td class="${toneText(h.netVegaUSD)}">${vegaK >= 0 ? '+' : '−'}$${Math.abs(vegaK).toFixed(Math.abs(vegaK) < 10 ? 1 : 0)}K</td>
+        <td>${formatSignedUsdM(h.netPremiumUSD)}</td>
+        ${oiCell}
+      </tr>
+    `;
+  }).join('');
+}
+
+/**
+ * OI-verified opening / closing tag (estimated from Deribit daily open interest change vs 24h volume).
+ * The rule-based actionTag next to it stays as the trade-feature inference.
+ */
+function oiBadgeHtml(p) {
+  if (!p) return '';
+  const howTitle = '按该合约当日 Deribit 未平仓量 (OI) 变化与 24h 成交量估算：开仓占比 = (成交量 + OI 变化) / (2 × 成交量)';
+  if (p.status === 'pending') {
+    return '<span class="intent-badge-pill badge-neutral" title="成交在最新一次 Deribit OI 快照之后，次日 08:15 UTC 快照后判定">⏳ OI 待确认</span>';
+  }
+  if (p.openShare == null) return '';
+  const pct = Math.round(p.openShare * 100);
+  const styles = {
+    opening: ['badge-bull', `OI 验证 · 开仓 ${pct}%`],
+    closing: ['badge-bear', `OI 验证 · 平仓 ${100 - pct}%`],
+    mixed: ['badge-neutral', `OI 验证 · 开平混合 (开仓 ${pct}%)`]
+  };
+  const st = styles[p.status];
+  return st ? `<span class="intent-badge-pill ${st[0]}" title="${howTitle}">${st[1]}</span>` : '';
 }
 
 /**
@@ -788,6 +911,7 @@ function renderIcebergsList(clusters) {
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
               ${c.actionTag ? `<span class="intent-badge-pill ${escapeHtml(c.actionBadgeClass || 'badge-neutral')}">${escapeHtml(c.actionTag)}</span>` : ''}
+              ${oiBadgeHtml(c.oiProfile)}
               ${c.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(c.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE: ${escapeHtml(c.timingTag)}</span>` : ''}
               <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
             </div>
@@ -865,6 +989,7 @@ function renderWhaleSinglesList(blocks) {
         <td>
           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
             ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
+            ${oiBadgeHtml(b.oiProfile)}
             ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE ${escapeHtml(b.timingTag)}</span>` : ''}
           </div>
           <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
@@ -891,6 +1016,7 @@ function renderWhaleSinglesList(blocks) {
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;">
             ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
+            ${oiBadgeHtml(b.oiProfile)}
             ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE</span>` : ''}
             <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
           </div>
@@ -1679,6 +1805,18 @@ if (timeRangeSelect) {
     loadMarketData(false);
   });
 }
+
+// Module 3: Iceberg sort switch (latest execution / cumulative notional)
+document.querySelectorAll('#iceberg-sort-switch .switch-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.sort === 'notional' ? 'notional' : 'latest';
+    if (mode === icebergSortMode) return;
+    icebergSortMode = mode;
+    document.querySelectorAll('#iceberg-sort-switch .switch-btn').forEach(b => b.classList.toggle('active', b === btn));
+    icebergCurrentPage = 1;
+    renderIcebergsList(sortIcebergClusters(currentMarketData?.blockTrades?.icebergClusters || []));
+  });
+});
 
 // Module 3: Block Trades Pagination Button Listeners
 if (btnIcebergsPrev) {

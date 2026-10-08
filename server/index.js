@@ -10,6 +10,7 @@ const {
   analyzeAtmIv,
   analyzeDynamicGex,
   analyzeBlockTrades,
+  analyzeFlowHorizons,
   analyzeIvSmile,
   analyze25DeltaSkew
 } = require('./analytics_engine');
@@ -23,7 +24,8 @@ const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { getEtfLinkageData } = require('./etf_linkage_engine');
 const { getHistoricalBasisData } = require('./basis_fetcher');
-const { getOptionMarks, pickInstruments } = require('./option_marks');
+const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
+const optionOiHistory = require('./option_oi_history');
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
@@ -432,7 +434,20 @@ async function handleApiRequest(req, res, parsedUrl) {
       // Always re-run analysis dynamically on current data (enhanced with real-time atmData)
       const atmAnalysis = analyzeAtmIv(data.ivHistory, data.dvolStats, data.atmData);
       const gexAnalysis = analyzeDynamicGex(data.gex, new Date());
-      const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice);
+      // Deribit OI 日快照：验证大宗成交是开仓还是平仓；当天缺快照时后台补采，不阻塞本次请求
+      let oiSnapshots = [];
+      try {
+        oiSnapshots = await optionOiHistory.getMergedHistory();
+        optionOiHistory.maybeRecordLiveSnapshot(oiSnapshots, () => fetchBookSummaryRows('BTC'));
+      } catch (err) {
+        console.warn('[API] option OI history unavailable:', err.message);
+      }
+      const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots);
+      blockAnalysis.flowHorizons = analyzeFlowHorizons(data.blockTrades, Date.now(), oiSnapshots);
+      blockAnalysis.oiHistory = {
+        days: oiSnapshots.length,
+        latestTs: oiSnapshots.length ? oiSnapshots[oiSnapshots.length - 1].ts : null
+      };
       blockAnalysis.timeRange = timeRangeParam;
       blockAnalysis.activeTradesCount = activeTrades.length;
       blockAnalysis.tradeStoreStats = data.tradeStoreStats || null;

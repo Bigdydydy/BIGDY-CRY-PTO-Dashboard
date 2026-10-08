@@ -1575,8 +1575,9 @@
 
         <div class="flow-summary-bar">
           <div class="flow-stat">
-            <span class="stat-label">巨鲸交易总量</span>
+            <span class="stat-label" title="单笔巨鲸与冰山拆单组合按 Block ID 去重后的合计名义价值">大宗总名义 (去重)</span>
             <span class="stat-val" id="whale-total-vol">$--M</span>
+            <span class="stat-sub" id="whale-total-sub">--</span>
           </div>
           <div class="flow-stat">
             <span class="stat-label">单笔巨鲸笔数</span>
@@ -1587,8 +1588,38 @@
             <span class="stat-val text-warning" id="iceberg-cluster-count">-- 组</span>
           </div>
           <div class="flow-stat">
-            <span class="stat-label">主流资金倾向</span>
+            <span class="stat-label" title="按去重后全集：买 Call + 卖 Put 名义额占比">主流资金倾向</span>
             <span class="stat-val text-accent" id="flow-bias-label">--</span>
+          </div>
+        </div>
+
+        <!-- 期限资金流向：近 4 周按剩余期限分桶 (方法 2) + OI 开仓占比 (方法 1) -->
+        <div class="horizon-flow" id="horizon-flow">
+          <div class="horizon-flow-head">
+            <span class="horizon-flow-title">期限资金流向 · 近 4 周</span>
+            <span class="horizon-flow-meta" id="horizon-flow-meta">--</span>
+          </div>
+          <div class="horizon-table-scroll">
+            <table class="horizon-flow-table">
+              <thead>
+                <tr>
+                  <th rowspan="2">期限</th>
+                  <th rowspan="2">主力到期日</th>
+                  <th rowspan="2">4 周总名义</th>
+                  <th colspan="4" class="horizon-week-group" title="主动买入 Call / 卖出 Put 为正 Delta；按成交时指数价与 IV 的 Black-Scholes 估算">净 Delta · 周度</th>
+                  <th rowspan="2">4 周净 Delta</th>
+                  <th rowspan="2" title="IV 每变动 1 个点的美元价值变化；正 = 主动方净买入波动率">净 Vega</th>
+                  <th rowspan="2" title="正 = 主动方净支付权利金（买期权为主），负 = 净收取（卖期权为主）">净权利金</th>
+                  <th rowspan="2" title="按 Deribit 每日未平仓量变化估算的开仓名义占比；判定覆盖不足一半名义额时不显示">OI 开仓占比</th>
+                </tr>
+                <tr id="horizon-week-heads">
+                  <th>W-3</th><th>W-2</th><th>W-1</th><th>近 7 天</th>
+                </tr>
+              </thead>
+              <tbody id="horizon-flow-body">
+                <tr><td colspan="11" class="text-center">加载期限资金流向中...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -1614,7 +1645,13 @@
         </div>
 
         <div class="tab-content" id="content-icebergs">
-          <div class="table-hint">💡 点击任意拆单行展开 Black-Scholes 希腊字母（Delta/Gamma/Vega/Theta）与看方向/看震荡深度穿透</div>
+          <div class="iceberg-toolbar">
+            <div class="table-hint">💡 点击任意拆单行展开 Black-Scholes 希腊字母（Delta/Gamma/Vega/Theta）与看方向/看震荡深度穿透</div>
+            <div class="view-switch iceberg-sort-switch" id="iceberg-sort-switch" role="group" aria-label="冰山拆单排序">
+              <button class="switch-btn active" data-sort="latest" title="按该组最后一笔成交时间，新的在前">最新时间</button>
+              <button class="switch-btn" data-sort="notional" title="按该组累计名义价值，大的在前">累计名义价值</button>
+            </div>
+          </div>
           <div class="cluster-cards" id="cluster-cards-container">
             <div class="loading-placeholder">扫描时间窗口拆单行为中...</div>
           </div>
@@ -2571,6 +2608,6 @@
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
   <script src="/atelier.js?v=20261007_3"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261007_3"></script>
+  <script src="/app.js?v=20261008_2"></script>
 </body>
 </html>

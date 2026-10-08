@@ -43,12 +43,21 @@ function pickInstruments(snapshot, instruments) {
   return { ...snapshot, marks };
 }
 
-async function fetchSnapshot(currency) {
+/**
+ * Raw Deribit option book summary rows (also used by the daily open-interest snapshot).
+ */
+async function fetchBookSummaryRows(currency = 'BTC') {
   const url = `https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${encodeURIComponent(currency)}&kind=option`;
   const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 8000 });
   if (!resp.ok) throw new Error(`Deribit book summary HTTP ${resp.status}`);
   const json = await resp.json();
-  return { currency, timestamp: Date.now(), ...compactBookSummary(json.result) };
+  if (!Array.isArray(json.result)) throw new Error('Deribit book summary: malformed result');
+  return json.result;
+}
+
+async function fetchSnapshot(currency) {
+  const rows = await fetchBookSummaryRows(currency);
+  return { currency, timestamp: Date.now(), ...compactBookSummary(rows) };
 }
 
 /**
@@ -89,6 +98,7 @@ function clearOptionMarksCache() {
 
 module.exports = {
   getOptionMarks,
+  fetchBookSummaryRows,
   compactBookSummary,
   pickInstruments,
   clearOptionMarksCache

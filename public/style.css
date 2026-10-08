@@ -1016,6 +1016,107 @@ body {
   color: var(--text-primary);
 }
 
+.stat-sub {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+/* 期限资金流向 (近 4 周) */
+.horizon-flow {
+  margin-top: 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.horizon-flow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.horizon-flow-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.horizon-flow-meta {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.horizon-table-scroll {
+  overflow-x: auto;
+}
+
+.horizon-flow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.horizon-flow-table th,
+.horizon-flow-table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.horizon-flow-table tbody td:first-child,
+.horizon-flow-table tbody td:nth-child(2),
+.horizon-flow-table thead tr:first-child th:first-child,
+.horizon-flow-table thead tr:first-child th:nth-child(2) {
+  text-align: left;
+}
+
+.horizon-flow-table thead th {
+  font-family: inherit;
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.horizon-flow-table th.horizon-week-group {
+  text-align: center;
+  border-bottom-style: dashed;
+}
+
+.horizon-flow-table td {
+  color: var(--text-primary);
+}
+
+.horizon-flow-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.horizon-range,
+.horizon-week-range {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.horizon-share {
+  color: var(--text-muted);
+}
+
+.horizon-flow-table td.horizon-muted,
+.horizon-flow-table tr.horizon-empty td {
+  color: var(--text-muted);
+}
+
 /* 30-Day Persistent Store Meta Banner */
 .store-meta-banner {
   background: rgba(99, 102, 241, 0.04);
@@ -1099,6 +1200,24 @@ body {
   font-size: 0.72rem;
   color: var(--text-muted);
   margin-bottom: 10px;
+}
+
+.iceberg-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.iceberg-toolbar .table-hint {
+  margin-bottom: 0;
+  flex: 1 1 280px;
+}
+
+.iceberg-sort-switch {
+  flex-shrink: 0;
 }
 
 /* Iceberg Cluster Cards */

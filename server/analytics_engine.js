@@ -3,6 +3,8 @@
  * Enhanced with Black-Scholes Greeks, Trade Intent Classification, IV Smile & 25D Skew
  */
 
+const { profileFromItems } = require('./option_oi_history');
+
 const MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const QUARTER_MONTHS = ["MAR", "JUN", "SEP", "DEC"];
 
@@ -1565,7 +1567,117 @@ function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming 
  * Module 3: Whale Block Trades & Iceberg Split Order Clustering
  * Enhanced with Black-Scholes Greeks calculation & Detailed Intent Diagnostics
  */
-function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all', spotPrice = 77250) {
+// OI-based opening / closing estimate for a set of legs (null when no OI history is available)
+function oiProfileOf(oiSnapshots, legs) {
+  if (!oiSnapshots || !oiSnapshots.length) return null;
+  return profileFromItems(oiSnapshots, legs.map(l => ({
+    instrument: l.instrument,
+    ts: l.timestamp,
+    amount: l.amount,
+    expiryMs: l.expiryMs
+  })));
+}
+
+const FLOW_HORIZONS = [
+  { key: 'm1', label: '本月', range: '≤ 1 个月', maxDays: 31 },
+  { key: 'm3', label: '约 3 个月', range: '1–3 个月', maxDays: 100 },
+  { key: 'm6', label: '约 6 个月', range: '3–6 个月', maxDays: 200 },
+  { key: 'far', label: '更远', range: '> 6 个月', maxDays: Infinity }
+];
+const FLOW_WEEKS = 4;
+
+/**
+ * 期限资金流向：近 4 周大宗成交按「剩余期限」分桶，按主动成交方向计正负。
+ * 只统计截至 nowMs 仍未交割的合约 (已交割的不再是持仓)，期限按 nowMs 时的剩余天数划分。
+ * Delta / Vega 用成交时的指数价与 IV 按 Black-Scholes 估算；净权利金为正表示主动方净支付。
+ * @returns {{nowMs: number, weekEnds: number[], horizons: Array, oiAvailable: boolean}}
+ */
+function analyzeFlowHorizons(rawTrades, nowMs = Date.now(), oiSnapshots = null) {
+  const WEEK_MS = 7 * 86400000;
+  const startMs = nowMs - FLOW_WEEKS * WEEK_MS;
+  const oiAvailable = !!(oiSnapshots && oiSnapshots.length);
+  const emptyWeek = () => ({ netDeltaUSD: 0, grossNotionalUSD: 0, netPremiumUSD: 0, count: 0 });
+  const horizons = FLOW_HORIZONS.map(h => ({
+    key: h.key,
+    label: h.label,
+    range: h.range,
+    count: 0,
+    grossNotionalUSD: 0,
+    netDeltaUSD: 0,
+    netVegaUSD: 0,
+    netPremiumUSD: 0,
+    weeks: Array.from({ length: FLOW_WEEKS }, emptyWeek),
+    expiries: {},
+    oiKnownNotional: 0,
+    oiOpenNotional: 0
+  }));
+
+  for (const t of rawTrades || []) {
+    if (!(t.timestamp >= startMs && t.timestamp <= nowMs)) continue;
+    const inst = parseInstrument(t.instrument_name || '');
+    const expDate = inst && parseDeribitExpiry(inst.expiryStr);
+    if (!expDate || expDate.getTime() <= nowMs) continue;
+    const S = Number(t.index_price) || 0;
+    const amt = Number(t.amount) || 0;
+    if (!(S > 0) || !(amt > 0)) continue;
+
+    const daysLeft = (expDate.getTime() - nowMs) / 86400000;
+    const h = horizons[FLOW_HORIZONS.findIndex(x => daysLeft <= x.maxDays)];
+    const T = Math.max(0.001, (expDate.getTime() - t.timestamp) / (365.25 * 86400000));
+    const g = calcGreeks(S, inst.strike, T, t.iv || 35.0, inst.isCall);
+    const sign = t.direction === 'buy' ? 1 : -1;
+    const notional = amt * S;
+    const deltaUSD = sign * g.delta * amt * S;
+    const premiumUSD = sign * (Number(t.price) || 0) * amt * S;
+
+    h.count++;
+    h.grossNotionalUSD += notional;
+    h.netDeltaUSD += deltaUSD;
+    h.netVegaUSD += sign * g.vega * amt;
+    h.netPremiumUSD += premiumUSD;
+    h.expiries[inst.expiryStr] = (h.expiries[inst.expiryStr] || 0) + notional;
+
+    const w = Math.min(FLOW_WEEKS - 1, Math.floor((t.timestamp - startMs) / WEEK_MS));
+    const wk = h.weeks[w];
+    wk.count++;
+    wk.netDeltaUSD += deltaUSD;
+    wk.grossNotionalUSD += notional;
+    wk.netPremiumUSD += premiumUSD;
+
+    if (oiAvailable) {
+      const c = profileFromItems(oiSnapshots, [{ instrument: t.instrument_name, ts: t.timestamp, amount: amt, expiryMs: expDate.getTime() }]);
+      if (c.openShare !== undefined) {
+        h.oiKnownNotional += notional;
+        h.oiOpenNotional += c.openShare * notional;
+      }
+    }
+  }
+
+  return {
+    nowMs,
+    weekEnds: Array.from({ length: FLOW_WEEKS }, (_, i) => startMs + (i + 1) * WEEK_MS),
+    oiAvailable,
+    horizons: horizons.map(h => {
+      const { expiries, oiKnownNotional, oiOpenNotional, ...rest } = h;
+      return {
+        ...rest,
+        topExpiries: Object.entries(expiries)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(([expiry, usd]) => ({ expiry, sharePct: Math.round((usd / (h.grossNotionalUSD || 1)) * 100) })),
+        // OI 判定覆盖不到一半名义额时不给开仓占比，避免小样本误导
+        oiOpenShare: oiKnownNotional >= 0.5 * h.grossNotionalUSD && oiKnownNotional > 0 ? oiOpenNotional / oiKnownNotional : null,
+        oiCoverage: h.grossNotionalUSD > 0 ? oiKnownNotional / h.grossNotionalUSD : 0
+      };
+    })
+  };
+}
+
+/**
+ * @param {Array} oiSnapshots - optional Deribit OI daily snapshots (server/option_oi_history.js) used to
+ *   estimate whether each block / iceberg opened or closed positions
+ */
+function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all', spotPrice = 77250, oiSnapshots = null) {
   if (!rawTrades || !rawTrades.length) {
     return {
       status: 'insufficient_data',
@@ -1647,6 +1759,8 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         iv: leg.iv,
         strike,
         isCall,
+        timestamp: leg.timestamp,
+        expiryMs: inst ? expDate.getTime() : null,
         indexPrice: leg.index_price,
         notionalUSD: notional,
         notionalM: notional / 1e6,
@@ -1696,6 +1810,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       const actionProfile = evaluateTradeAction(blockCandidate, S, timingProfile);
 
       const dateUtc8 = formatUTC8(timestamp);
+      const oiProfile = oiProfileOf(oiSnapshots, processedLegs);
       whaleBlocks.push({
         blockId: bid,
         timestamp,
@@ -1720,6 +1835,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         timingBadgeClass: timingProfile.badgeClass,
         hoursToExpiry: timingProfile.hoursToExpiry,
         is0DTE: timingProfile.is0DTE,
+        oiProfile,
         ...intent
       });
     }
@@ -1870,6 +1986,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       const timingProfile = evaluate0DTEBehavior(clusterCandidate, S);
       const actionProfile = evaluateTradeAction(clusterCandidate, S, timingProfile);
 
+      const oiProfile = oiProfileOf(oiSnapshots, group.flatMap(b => b.legs));
       icebergClusters.push({
         instrument: displayInstrument,
         instrumentRaw: base.structureSignature,
@@ -1885,6 +2002,8 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         endTime: endTimeUTC8,
         startTimeUTC8,
         endTimeUTC8,
+        startTimestamp: group[0].timestamp,
+        endTimestamp: group[group.length - 1].timestamp,
         netDeltaBTC: clusterDeltaBTC,
         netDeltaUSD: clusterDeltaUSD,
         netDeltaUSDM: clusterDeltaUSD / 1e6,
@@ -1902,21 +2021,35 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         timingBadgeClass: timingProfile.badgeClass,
         hoursToExpiry: timingProfile.hoursToExpiry,
         is0DTE: timingProfile.is0DTE,
+        oiProfile,
         ...intent
       });
     }
   }
-  icebergClusters.sort((a, b) => b.clusterNotionalUSD - a.clusterNotionalUSD);
+  // Latest execution first (the UI can re-sort by cumulative notional)
+  icebergClusters.sort((a, b) => (b.endTimestamp - a.endTimestamp) || (b.clusterNotionalUSD - a.clusterNotionalUSD));
 
   // 3. Statistical synthesis
-  let totalWhaleVolume = 0;
+  // 单笔巨鲸与冰山组会重叠 (一笔 ≥ 门槛的大单也可能是某组拆单的一片)，
+  // 总名义与多空倾向按两者的并集 (blockId 去重) 统计，各自的口径另行给出
+  const totalWhaleVolume = whaleBlocks.reduce((acc, b) => acc + b.notionalUSD, 0);
+  const whaleIdSet = new Set(whaleBlocks.map(b => b.blockId));
+  const clusteredIdSet = new Set();
+  for (const c of icebergClusters) (c.blockIds || []).forEach(id => clusteredIdSet.add(id));
+  const dedupedUnits = blockUnits.filter(u => whaleIdSet.has(u.blockId) || clusteredIdSet.has(u.blockId));
+  const dedupedTotal = dedupedUnits.reduce((acc, u) => acc + u.totalNotional, 0);
+  const overlapUnits = dedupedUnits.filter(u => whaleIdSet.has(u.blockId) && clusteredIdSet.has(u.blockId));
+  const whaleInClusterUSD = overlapUnits.reduce((acc, u) => acc + u.totalNotional, 0);
+  const icebergOnlyUSD = dedupedUnits
+    .filter(u => !whaleIdSet.has(u.blockId))
+    .reduce((acc, u) => acc + u.totalNotional, 0);
+
   let callBuyNotional = 0;
   let callSellNotional = 0;
   let putBuyNotional = 0;
   let putSellNotional = 0;
 
-  for (const b of whaleBlocks) {
-    totalWhaleVolume += b.notionalUSD;
+  for (const b of dedupedUnits) {
     for (const l of b.legs) {
       const notional = l.notionalM * 1e6;
       const isCall = l.instrument.includes('-C');
@@ -1970,8 +2103,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     const m = /-(\d{1,2}[A-Z]{3}\d{2})-/.exec(fallbackName || '');
     return m ? m[1] : null;
   };
-  const clusteredIds = new Set();
-  for (const c of icebergClusters) (c.blockIds || []).forEach(id => clusteredIds.add(id));
+  const clusteredIds = clusteredIdSet;
   const concItems = [];
   for (const c of icebergClusters) {
     concItems.push({ usd: c.clusterNotionalUSD || 0, name: c.strategyNameZh || '未识别构型', expiry: dominantExpiry(c.legs, c.instrument) });
@@ -2002,12 +2134,30 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   }
 
   const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : '过去 30 天历史沉淀'));
-  const paragraph = `在【${rangeLabel}】窗口内，大宗交易雷达共监测到 ${whaleBlocks.length} 笔名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸大单，累计名义金额达 $${(totalWhaleVolume / 1e6).toFixed(1)}M；同时智能冰山算法成功捕获到 ${icebergClusters.length} 组机构级时间切片拆单与组合价差冰山聚合（捕获针对同一合约或多腿策略组合的滚动分批执行）。整体大宗资金流向呈现【${flowBias}】特征（多头倾向占比约 ${bullRatio}%）。微观性质穿透显示：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。${concentrationText}`;
+  const M = v => (v / 1e6).toFixed(1);
+  const overlapText = overlapUnits.length
+    ? `，其中 ${overlapUnits.length} 笔（$${M(whaleInClusterUSD)}M）同属冰山组`
+    : '';
+  const oiCounts = { opening: 0, closing: 0, mixed: 0, pending: 0 };
+  for (const x of [...icebergClusters, ...whaleBlocks.filter(b => !clusteredIdSet.has(b.blockId))]) {
+    if (x.oiProfile && oiCounts[x.oiProfile.status] !== undefined) oiCounts[x.oiProfile.status]++;
+  }
+  const oiJudged = oiCounts.opening + oiCounts.closing + oiCounts.mixed;
+  const oiText = oiJudged
+    ? `按 Deribit 未平仓量变化验证（冰山组与独立大单）：开仓 ${oiCounts.opening} 组，平仓 ${oiCounts.closing} 组，开平混合 ${oiCounts.mixed} 组${oiCounts.pending ? `，另 ${oiCounts.pending} 组待次日快照确认` : ''}。`
+    : '';
+  const paragraph = `在【${rangeLabel}】窗口内，单笔巨鲸大单与冰山拆单组合去重后的大宗资金总名义为 $${M(dedupedTotal)}M：名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸 ${whaleBlocks.length} 笔、合计 $${M(totalWhaleVolume)}M${overlapText}；智能冰山算法捕获 ${icebergClusters.length} 组机构级时间切片拆单与组合价差聚合，另含 $${M(icebergOnlyUSD)}M 单笔未达门槛的拆单切片。整体大宗资金流向呈现【${flowBias}】特征（按去重后全集，多头倾向占比约 ${bullRatio}%）。${oiText}单笔巨鲸按成交特征的规则推断：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。${concentrationText}`;
 
   return {
     whaleBlocks,
     icebergClusters,
     totalWhaleVolumeM: totalWhaleVolume / 1e6,
+    dedupedTotalM: dedupedTotal / 1e6,
+    dedupedBlockCount: dedupedUnits.length,
+    whaleInClusterCount: overlapUnits.length,
+    whaleInClusterM: whaleInClusterUSD / 1e6,
+    icebergOnlyM: icebergOnlyUSD / 1e6,
+    oiVerified: oiJudged > 0 ? oiCounts : null,
     bullRatio,
     flowBias,
     paragraph
@@ -2211,6 +2361,7 @@ module.exports = {
   analyzeAtmIv,
   analyzeDynamicGex,
   analyzeBlockTrades,
+  analyzeFlowHorizons,
   analyzeIvSmile,
   analyze25DeltaSkew,
   calcGreeks,
