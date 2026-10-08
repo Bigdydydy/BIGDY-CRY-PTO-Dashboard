@@ -208,6 +208,37 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     const imp = run('IMPULSE', [1, 2, 3, 4, 5, 6]);
     if (imp.verdict === 'VALID') assert.deepStrictEqual(imp.suggestions, []);
   });
+  it('精确用时: 同一组点在 4H 与 1H 上的时间规则判断一致 (不受所画周期粒度影响)', () => {
+    // a 浪 6 小时、b 浪 55 小时、c 浪 80 小时 (15m 粒度生成)
+    const legs = [[100, 96, 24], [96, 99.5, 220], [99.5, 92, 320], [92, 93, 40]];
+    const m15 = [];
+    let t = T0;
+    for (const [a, b, n] of legs) {
+      for (let k = 0; k < n; k++) {
+        const o = a + (b - a) * k / n, c = a + (b - a) * (k + 1) / n;
+        m15.push({ time: t, open: o, close: c, high: Math.max(o, c) + 0.01, low: Math.min(o, c) - 0.01 });
+        t += 900;
+      }
+    }
+    const agg = k => {
+      const out = [];
+      for (let i = 0; i < m15.length; i += k) {
+        const g = m15.slice(i, i + k);
+        out.push({ time: g[0].time, open: g[0].open, close: g[g.length - 1].close, high: Math.max(...g.map(x => x.high)), low: Math.min(...g.map(x => x.low)) });
+      }
+      return out;
+    };
+    const h1 = agg(4), h4 = agg(16);
+    const at = (bars, i15) => bars.filter(b => b.time <= m15[i15].time).pop().time;
+    const ends = [0, 23, 243, 563];
+    const run = (tf, bars, sub) => E.evaluateUserCount(bars, 'TEST', { tool: 'ABC', forceType: 'ZIGZAG', timeframe: tf, subBars: sub,
+      points: ends.map((i, k) => ({ time: at(bars, i), price: [100, 96, 99.5, 92][k] })) });
+    const z5 = r => r.primary.ruleChecks.find(c => c.id === 'Z5');
+    const r4 = run('4h', h4, { '1h': h1, '15m': m15 }), r1 = run('1h', h1, { '15m': m15 });
+    assert.strictEqual(z5(r1).pass, true, z5(r1).detail);
+    assert.strictEqual(z5(r4).pass, true, `4H 上 a 浪只占 1~2 根，按根数会判 b 超过 10 倍：${z5(r4).detail}`);
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
