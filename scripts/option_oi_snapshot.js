@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Deribit BTC 期权未平仓量日快照 (由 .github/workflows/option_oi_daily.yml 在 UTC 08:00 交割后调用)
+ * Deribit BTC 期权未平仓量日快照 (由 .github/workflows/block_insight_daily.yml 在 UTC 08:00 交割后调用)
  *
  * 把每个期权合约的 open_interest / 24h volume 并入 data/option_oi_history_BTC.json，
  * 供大宗成交的开平仓判定使用 (见 server/option_oi_history.js)。

@@ -715,6 +715,7 @@
     'view-term-premium': 'Basis · Term Structure · Carry',
     'view-options': 'Volatility · Gamma · Skew',
     'view-block-trades': 'Block Flow · Icebergs',
+    'view-block-insight': 'Block Flow · Positioning · Smart Money',
     'view-ssro': 'Stablecoin Supply Ratio',
     'view-coinbase-liquidity': 'Order Book · Depth · Slippage',
     'view-gold-correlation': 'Gold × Bitcoin',
@@ -734,14 +735,20 @@
       const t = document.querySelector(`.sidebar-nav-item[data-view="${viewId}"] .nav-title`);
       return t ? t.textContent.replace(/^\s*\S+\//, '').trim() : '';
     }
+    // 4B 等从属视图不在侧栏中：序号沿用所属模块并加后缀，说明写在这里
+    const SUB_VIEWS = {
+      'view-block-insight': { parent: 'view-block-trades', suffix: 'B', desc: '期限资金流向 · OI 开平仓验证 · 行权价热力图 · 聪明钱命中率' }
+    };
     function viewDesc(viewId) {
+      if (SUB_VIEWS[viewId]) return SUB_VIEWS[viewId].desc;
       const d = document.querySelector(`.sidebar-nav-item[data-view="${viewId}"] .nav-desc`);
       return d ? d.textContent.trim() : '';
     }
     function render(viewId) {
       if (!elTitle) return;
-      const idx = VIEW_ORDER.indexOf(viewId);
-      if (elIndex) elIndex.textContent = idx >= 0 ? `${String(idx + 1).padStart(2, '0')} / ${String(VIEW_ORDER.length).padStart(2, '0')}` : 'ALL';
+      const sub = SUB_VIEWS[viewId];
+      const idx = VIEW_ORDER.indexOf(sub ? sub.parent : viewId);
+      if (elIndex) elIndex.textContent = idx >= 0 ? `${String(idx + 1).padStart(2, '0')}${sub ? sub.suffix : ''} / ${String(VIEW_ORDER.length).padStart(2, '0')}` : 'ALL';
       if (elKicker) elKicker.textContent = VIEW_KICKERS[viewId] || '';
       const title = viewTitle(viewId);
       elTitle.setAttribute('aria-label', title);

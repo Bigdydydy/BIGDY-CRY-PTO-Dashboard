@@ -23,3 +23,6 @@ data/coinbase_liquidity_history.local.json
 
 # 服务器本地补采的 Deribit 期权 OI 快照 (权威序列由 GitHub Actions 提交到 option_oi_history_BTC.json)
 data/option_oi_history_BTC.local.json
+
+# 服务器本地补采的 4B 聪明钱登记册 (权威序列由 GitHub Actions 提交到 smart_money_BTC.json)
+data/smart_money_BTC.local.json

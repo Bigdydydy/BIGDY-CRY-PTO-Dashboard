@@ -1578,101 +1578,6 @@ function oiProfileOf(oiSnapshots, legs) {
   })));
 }
 
-const FLOW_HORIZONS = [
-  { key: 'm1', label: '本月', range: '≤ 1 个月', maxDays: 31 },
-  { key: 'm3', label: '约 3 个月', range: '1–3 个月', maxDays: 100 },
-  { key: 'm6', label: '约 6 个月', range: '3–6 个月', maxDays: 200 },
-  { key: 'far', label: '更远', range: '> 6 个月', maxDays: Infinity }
-];
-const FLOW_WEEKS = 4;
-
-/**
- * 期限资金流向：近 4 周大宗成交按「剩余期限」分桶，按主动成交方向计正负。
- * 只统计截至 nowMs 仍未交割的合约 (已交割的不再是持仓)，期限按 nowMs 时的剩余天数划分。
- * Delta / Vega 用成交时的指数价与 IV 按 Black-Scholes 估算；净权利金为正表示主动方净支付。
- * @returns {{nowMs: number, weekEnds: number[], horizons: Array, oiAvailable: boolean}}
- */
-function analyzeFlowHorizons(rawTrades, nowMs = Date.now(), oiSnapshots = null) {
-  const WEEK_MS = 7 * 86400000;
-  const startMs = nowMs - FLOW_WEEKS * WEEK_MS;
-  const oiAvailable = !!(oiSnapshots && oiSnapshots.length);
-  const emptyWeek = () => ({ netDeltaUSD: 0, grossNotionalUSD: 0, netPremiumUSD: 0, count: 0 });
-  const horizons = FLOW_HORIZONS.map(h => ({
-    key: h.key,
-    label: h.label,
-    range: h.range,
-    count: 0,
-    grossNotionalUSD: 0,
-    netDeltaUSD: 0,
-    netVegaUSD: 0,
-    netPremiumUSD: 0,
-    weeks: Array.from({ length: FLOW_WEEKS }, emptyWeek),
-    expiries: {},
-    oiKnownNotional: 0,
-    oiOpenNotional: 0
-  }));
-
-  for (const t of rawTrades || []) {
-    if (!(t.timestamp >= startMs && t.timestamp <= nowMs)) continue;
-    const inst = parseInstrument(t.instrument_name || '');
-    const expDate = inst && parseDeribitExpiry(inst.expiryStr);
-    if (!expDate || expDate.getTime() <= nowMs) continue;
-    const S = Number(t.index_price) || 0;
-    const amt = Number(t.amount) || 0;
-    if (!(S > 0) || !(amt > 0)) continue;
-
-    const daysLeft = (expDate.getTime() - nowMs) / 86400000;
-    const h = horizons[FLOW_HORIZONS.findIndex(x => daysLeft <= x.maxDays)];
-    const T = Math.max(0.001, (expDate.getTime() - t.timestamp) / (365.25 * 86400000));
-    const g = calcGreeks(S, inst.strike, T, t.iv || 35.0, inst.isCall);
-    const sign = t.direction === 'buy' ? 1 : -1;
-    const notional = amt * S;
-    const deltaUSD = sign * g.delta * amt * S;
-    const premiumUSD = sign * (Number(t.price) || 0) * amt * S;
-
-    h.count++;
-    h.grossNotionalUSD += notional;
-    h.netDeltaUSD += deltaUSD;
-    h.netVegaUSD += sign * g.vega * amt;
-    h.netPremiumUSD += premiumUSD;
-    h.expiries[inst.expiryStr] = (h.expiries[inst.expiryStr] || 0) + notional;
-
-    const w = Math.min(FLOW_WEEKS - 1, Math.floor((t.timestamp - startMs) / WEEK_MS));
-    const wk = h.weeks[w];
-    wk.count++;
-    wk.netDeltaUSD += deltaUSD;
-    wk.grossNotionalUSD += notional;
-    wk.netPremiumUSD += premiumUSD;
-
-    if (oiAvailable) {
-      const c = profileFromItems(oiSnapshots, [{ instrument: t.instrument_name, ts: t.timestamp, amount: amt, expiryMs: expDate.getTime() }]);
-      if (c.openShare !== undefined) {
-        h.oiKnownNotional += notional;
-        h.oiOpenNotional += c.openShare * notional;
-      }
-    }
-  }
-
-  return {
-    nowMs,
-    weekEnds: Array.from({ length: FLOW_WEEKS }, (_, i) => startMs + (i + 1) * WEEK_MS),
-    oiAvailable,
-    horizons: horizons.map(h => {
-      const { expiries, oiKnownNotional, oiOpenNotional, ...rest } = h;
-      return {
-        ...rest,
-        topExpiries: Object.entries(expiries)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 2)
-          .map(([expiry, usd]) => ({ expiry, sharePct: Math.round((usd / (h.grossNotionalUSD || 1)) * 100) })),
-        // OI 判定覆盖不到一半名义额时不给开仓占比，避免小样本误导
-        oiOpenShare: oiKnownNotional >= 0.5 * h.grossNotionalUSD && oiKnownNotional > 0 ? oiOpenNotional / oiKnownNotional : null,
-        oiCoverage: h.grossNotionalUSD > 0 ? oiKnownNotional / h.grossNotionalUSD : 0
-      };
-    })
-  };
-}
-
 /**
  * @param {Array} oiSnapshots - optional Deribit OI daily snapshots (server/option_oi_history.js) used to
  *   estimate whether each block / iceberg opened or closed positions
@@ -2361,7 +2266,6 @@ module.exports = {
   analyzeAtmIv,
   analyzeDynamicGex,
   analyzeBlockTrades,
-  analyzeFlowHorizons,
   analyzeIvSmile,
   analyze25DeltaSkew,
   calcGreeks,

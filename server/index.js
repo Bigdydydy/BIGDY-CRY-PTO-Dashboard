@@ -10,7 +10,6 @@ const {
   analyzeAtmIv,
   analyzeDynamicGex,
   analyzeBlockTrades,
-  analyzeFlowHorizons,
   analyzeIvSmile,
   analyze25DeltaSkew
 } = require('./analytics_engine');
@@ -26,6 +25,7 @@ const { getEtfLinkageData } = require('./etf_linkage_engine');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
 const optionOiHistory = require('./option_oi_history');
+const blockInsight = require('./block_insight');
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
@@ -443,7 +443,6 @@ async function handleApiRequest(req, res, parsedUrl) {
         console.warn('[API] option OI history unavailable:', err.message);
       }
       const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots);
-      blockAnalysis.flowHorizons = analyzeFlowHorizons(data.blockTrades, Date.now(), oiSnapshots);
       blockAnalysis.oiHistory = {
         days: oiSnapshots.length,
         latestTs: oiSnapshots.length ? oiSnapshots[oiSnapshots.length - 1].ts : null
@@ -502,6 +501,35 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] option-marks:', err.message);
       sendJsonResponse(req, res, 502, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/block-insight?expiry=30OCT26
+  // Module 4B：期限资金流向 (日聚合)、行权价热力图与目标区间、聪明钱命中率
+  if (pathname === '/api/block-insight' && req.method === 'GET') {
+    try {
+      if (!getCachedData().lastSyncCheckTime) await refreshAllMarketData('BTC');
+      const data = getCachedData();
+      const expiryParam = String(parsedUrl.query?.expiry || '').toUpperCase();
+      let oiSnapshots = [];
+      try {
+        oiSnapshots = await optionOiHistory.getMergedHistory();
+      } catch (err) {
+        console.warn('[API] option OI history unavailable:', err.message);
+      }
+      const insight = await blockInsight.getServerInsight({
+        trades: data.blockTrades,
+        nowMs: Date.now(),
+        spot: data.gex?.index_price || null,
+        expiry: /^\d{1,2}[A-Z]{3}\d{2}$/.test(expiryParam) ? expiryParam : null,
+        oiSnapshots,
+        fetchRows: () => fetchBookSummaryRows('BTC')
+      });
+      sendJsonResponse(req, res, 200, { code: 0, ...insight });
+    } catch (err) {
+      console.error('[API Error] block-insight:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
     }
     return;
   }

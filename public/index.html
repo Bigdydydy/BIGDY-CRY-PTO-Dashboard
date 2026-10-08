@@ -1593,35 +1593,15 @@
           </div>
         </div>
 
-        <!-- 期限资金流向：近 4 周按剩余期限分桶 (方法 2) + OI 开仓占比 (方法 1) -->
-        <div class="horizon-flow" id="horizon-flow">
-          <div class="horizon-flow-head">
-            <span class="horizon-flow-title">期限资金流向 · 近 4 周</span>
-            <span class="horizon-flow-meta" id="horizon-flow-meta">--</span>
-          </div>
-          <div class="horizon-table-scroll">
-            <table class="horizon-flow-table">
-              <thead>
-                <tr>
-                  <th rowspan="2">期限</th>
-                  <th rowspan="2">主力到期日</th>
-                  <th rowspan="2">4 周总名义</th>
-                  <th colspan="4" class="horizon-week-group" title="主动买入 Call / 卖出 Put 为正 Delta；按成交时指数价与 IV 的 Black-Scholes 估算">净 Delta · 周度</th>
-                  <th rowspan="2">4 周净 Delta</th>
-                  <th rowspan="2" title="IV 每变动 1 个点的美元价值变化；正 = 主动方净买入波动率">净 Vega</th>
-                  <th rowspan="2" title="正 = 主动方净支付权利金（买期权为主），负 = 净收取（卖期权为主）">净权利金</th>
-                  <th rowspan="2" title="按 Deribit 每日未平仓量变化估算的开仓名义占比；判定覆盖不足一半名义额时不显示">OI 开仓占比</th>
-                </tr>
-                <tr id="horizon-week-heads">
-                  <th>W-3</th><th>W-2</th><th>W-1</th><th>近 7 天</th>
-                </tr>
-              </thead>
-              <tbody id="horizon-flow-body">
-                <tr><td colspan="11" class="text-center">加载期限资金流向中...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <!-- Module 4B 入口：资金深度研判 -->
+        <button type="button" class="insight-entry" id="btn-enter-block-insight" aria-label="进入 4B 大宗资金深度研判">
+          <span class="insight-entry-tag">04 · B</span>
+          <span class="insight-entry-main">
+            <span class="insight-entry-title">大宗资金深度研判</span>
+            <span class="insight-entry-desc">期限资金流向 (4 / 12 / 26 周) · OI 开平仓验证 · 行权价热力图与目标区间 · 聪明钱命中率</span>
+          </span>
+          <span class="insight-entry-go">进入 4B →</span>
+        </button>
 
         <div class="store-meta-banner" id="store-meta-banner">
           <div class="store-meta-left">
@@ -1709,6 +1689,129 @@
       </div>
     </section>
   </div> <!-- /#view-block-trades -->
+
+  <!-- View 4B: 大宗资金深度研判 (从 Module 4 进入，不在侧栏单独列出) -->
+  <div class="view-panel" id="view-block-insight">
+    <div class="insight-backbar">
+      <button type="button" class="insight-back-btn" id="btn-back-block-trades">← 返回 04 期权大宗</button>
+      <span class="insight-coverage" id="insight-coverage">加载中...</span>
+    </div>
+
+    <!-- A. 期限资金流向 (方法 1 · 2 · 4) -->
+    <section class="bento-card" id="module-insight-flow">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">04B · FLOW BY HORIZON</span>
+          <h2>期限资金流向与 OI 开平仓验证</h2>
+        </div>
+        <div class="view-switch" id="insight-weeks-switch" role="group" aria-label="统计窗口">
+          <button class="switch-btn active" data-weeks="4">4 周</button>
+          <button class="switch-btn" data-weeks="12">12 周</button>
+          <button class="switch-btn" data-weeks="26">26 周</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="insight-note" id="insight-flow-note">--</p>
+        <div class="horizon-table-scroll">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th>期限</th>
+                <th>主力到期日</th>
+                <th>总名义</th>
+                <th class="horizon-spark-head" title="主动买入 Call / 卖出 Put 为正 Delta；按成交时指数价与 IV 的 Black-Scholes 估算。悬停查看每周数值">净 Delta · 周度 <span id="insight-spark-range"></span></th>
+                <th>窗口净 Delta</th>
+                <th title="IV 每变动 1 个点的美元价值变化；正 = 主动方净买入波动率">净 Vega</th>
+                <th title="正 = 主动方净支付权利金（买期权为主），负 = 净收取（卖期权为主）">净权利金</th>
+                <th title="按 Deribit 每日未平仓量变化估算的开仓名义占比；判定覆盖不足一半名义额时不显示">OI 开仓占比</th>
+              </tr>
+            </thead>
+            <tbody id="insight-flow-body">
+              <tr><td colspan="8" class="text-center">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- B. 行权价热力图 (方法 3) -->
+    <section class="bento-card" id="module-insight-strikes">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">04B · STRIKE MAP</span>
+          <h2>行权价热力图 · 目标区间与价位墙</h2>
+        </div>
+        <div class="view-switch" id="insight-type-switch" role="group" aria-label="期权类型">
+          <button class="switch-btn active" data-type="C">Call</button>
+          <button class="switch-btn" data-type="P">Put</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="insight-expiry-chips" id="insight-expiry-chips"></div>
+        <p class="insight-note">颜色 = 当日主动方净成交张数（买入为正 / 卖出为负）；下方柱状为累计净成交，折线为 Deribit 当前未平仓量。</p>
+        <div id="insight-heatmap" class="insight-chart insight-heatmap"></div>
+        <div id="insight-cumulative" class="insight-chart insight-cumulative"></div>
+        <div class="insight-strike-lists">
+          <div class="insight-list-card">
+            <div class="insight-list-title">目标区间 <span class="insight-list-hint">大额结构合并后的到期盈利区间与最佳价位</span></div>
+            <div id="insight-zones" class="insight-list"></div>
+          </div>
+          <div class="insight-list-card">
+            <div class="insight-list-title">价位墙 <span class="insight-list-hint">主动成交最集中的行权价 / 现价上下最大未平仓量</span></div>
+            <div id="insight-walls" class="insight-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- C. 聪明钱命中率 (方法 5) -->
+    <section class="bento-card" id="module-insight-smart">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">04B · SMART MONEY</span>
+          <h2>聪明钱命中率与信号加权</h2>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="insight-note">≥ $30M 的冰山组 / 独立大单登记入册，每天按 Deribit 标记价估一次主动方盈亏（BTC 计），到期后按交割价结算；按 Delta / Vega 画像分组统计命中率，权重 = (胜 + 1) / (样本 + 2)。</p>
+        <div class="insight-kpis" id="insight-smart-kpis"></div>
+        <div class="horizon-table-scroll">
+          <table class="horizon-flow-table insight-family-table">
+            <thead>
+              <tr>
+                <th>画像</th>
+                <th>已结算</th>
+                <th>到期命中率</th>
+                <th>平均结算盈亏</th>
+                <th title="成交后 7~10 天的盯市结果">7 天命中率</th>
+                <th>未结算</th>
+                <th title="(胜 + 1) / (样本 + 2)；结算样本 ≥ 5 用到期结果，否则 7 天结果 ≥ 5 时用 7 天结果，都不足时为 50%">信号权重</th>
+              </tr>
+            </thead>
+            <tbody id="insight-family-body"></tbody>
+          </table>
+        </div>
+        <div class="insight-subtitle">最近登记的大额结构</div>
+        <div class="horizon-table-scroll">
+          <table class="horizon-flow-table insight-recent-table">
+            <thead>
+              <tr>
+                <th>成交时间 (UTC+8)</th>
+                <th>结构</th>
+                <th>主力到期日</th>
+                <th>名义价值</th>
+                <th>画像</th>
+                <th>主动方盈亏 (₿)</th>
+                <th>状态</th>
+                <th>同类权重</th>
+              </tr>
+            </thead>
+            <tbody id="insight-recent-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div> <!-- /#view-block-insight -->
 
   <!-- View 5: 稳定币供应比率震荡指标 (SSRO) 与 BTC 宏观购买力 -->
   <div class="view-panel" id="view-ssro">
@@ -2606,8 +2709,8 @@
   <script src="/echarts.min.js"></script>
   <script src="/pnl_engine.js"></script>
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
-  <script src="/atelier.js?v=20261007_3"></script>
+  <script src="/atelier.js?v=20261008_1"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261008_2"></script>
+  <script src="/app.js?v=20261008_3"></script>
 </body>
 </html>

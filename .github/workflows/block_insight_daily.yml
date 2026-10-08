@@ -1,9 +1,9 @@
-name: Deribit Option OI Daily Snapshot
+name: Module 4B Daily (Option OI · Block Flow · Smart Money)
 
 on:
   schedule:
-    # Deribit 期权 08:00 UTC 交割，交割后采样当天的 OI 基线。GitHub 的定时任务经常延迟或整段丢弃，
-    # 所以排了多个时段；当天已采过时后续时段直接跳过、不产生提交 (--skip-if-done)。
+    # Deribit 期权 08:00 UTC 交割，交割后采样当天的 OI 基线并给大额结构盯市。GitHub 的定时任务经常延迟或整段丢弃，
+    # 所以排了多个时段；OI 当天已采过时直接跳过 (--skip-if-done)，4B 日更各步骤幂等，重复运行只补缺失部分。
     - cron: '17,41 8 * * *'
     - cron: '13 9,11,14 * * *'
   workflow_dispatch:
@@ -12,15 +12,15 @@ permissions:
   contents: write
 
 concurrency:
-  group: option-oi-daily
+  group: block-insight-daily
   cancel-in-progress: false
 
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      # 取 main 最新提交，确保同一天前一次运行的提交可见，--skip-if-done 才能生效
+      # 取 main 最新提交，确保同一天前一次运行的提交可见
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -35,17 +35,20 @@ jobs:
       - name: Snapshot Deribit option open interest
         run: node scripts/option_oi_snapshot.js --skip-if-done
 
+      - name: Block flow daily aggregates and smart-money marks
+        run: node scripts/block_insight_daily.js
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/option_oi_history_BTC.json
+          git add data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json
           if git diff --cached --quiet; then
             echo "No changes; skipping commit."
             exit 0
           fi
           # [skip render] 避免触发 Render 重新部署；线上从 GitHub raw 读取最新档案
-          git commit -m "chore(options-oi): daily open interest snapshot [skip ci] [skip render]"
+          git commit -m "chore(4b): daily option OI, block flow aggregates and smart-money marks [skip ci] [skip render]"
           pushed=0
           for i in 1 2 3; do
             if git pull --rebase origin main && git push; then pushed=1; break; fi

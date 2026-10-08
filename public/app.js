@@ -115,6 +115,12 @@ function reloadAllChartsForTheme() {
     try { pnlChartInstance.dispose(); } catch (e) {}
     pnlChartInstance = null;
   }
+  if (typeof insightHeatmapChart !== 'undefined') {
+    [insightHeatmapChart, insightCumChart].forEach(ch => { if (ch) { try { ch.dispose(); } catch (e) {} } });
+    insightHeatmapChart = null;
+    insightCumChart = null;
+    if (blockInsightData) renderInsightStrikes();
+  }
   if (typeof pnlViewState !== 'undefined' && pnlViewState && document.getElementById('pnl-modal-backdrop')?.classList.contains('open')) {
     renderPnLView({ resetChart: true });
   }
@@ -756,8 +762,6 @@ function renderBlockTrades(data) {
     }
   }
 
-  renderFlowHorizons(data.flowHorizons, data.oiHistory);
-
   // 1. Render Iceberg Clusters with pagination (20 per page)
   renderIcebergsList(sortIcebergClusters(data.icebergClusters || []));
 
@@ -773,77 +777,6 @@ function formatSignedUsdM(v) {
 function setTextIfPresent(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
-}
-
-/**
- * 期限资金流向 (近 4 周)：按剩余期限分桶的周度净 Delta、净 Vega、净权利金与 OI 开仓占比
- */
-function renderFlowHorizons(fh, oiHistory) {
-  const elPanel = document.getElementById('horizon-flow');
-  const elBody = document.getElementById('horizon-flow-body');
-  if (!elPanel || !elBody) return;
-  if (!fh || !Array.isArray(fh.horizons)) {
-    elPanel.style.display = 'none';
-    return;
-  }
-  elPanel.style.display = '';
-
-  const WEEK_MS = 7 * 86400000;
-  const shortDate = ts => formatUTC8(ts, false).slice(5, 10);
-  const elHeads = document.getElementById('horizon-week-heads');
-  if (elHeads && Array.isArray(fh.weekEnds)) {
-    const n = fh.weekEnds.length;
-    elHeads.innerHTML = fh.weekEnds.map((end, i) => {
-      const label = i === n - 1 ? '近 7 天' : `W-${n - 1 - i}`;
-      const range = `${shortDate(end - WEEK_MS)}~${shortDate(end)}`;
-      return `<th title="${range} (UTC+8)">${label}<span class="horizon-week-range">${range}</span></th>`;
-    }).join('');
-  }
-
-  const oiDays = Number(oiHistory?.days) || 0;
-  const oiText = fh.oiAvailable && oiDays >= 2
-    ? `OI 快照 ${oiDays} 天（最新 ${formatUTC8(oiHistory.latestTs, false)}）`
-    : `OI 快照积累中（已 ${oiDays} 天）：满 2 天后开始给出开仓占比`;
-  setTextIfPresent('horizon-flow-meta', `按剩余期限分桶 · 主动成交方向计正负 · 只含未交割合约 · ${oiText}`);
-
-  const maxAbs = Math.max(1, ...fh.horizons.flatMap(h => h.weeks.map(w => Math.abs(w.netDeltaUSD))));
-  const toneCell = v => {
-    if (!v) return '';
-    const a = (0.08 + 0.32 * Math.min(1, Math.abs(v) / maxAbs)).toFixed(2);
-    return v > 0 ? `background: rgba(34, 197, 94, ${a});` : `background: rgba(239, 68, 68, ${a});`;
-  };
-  const toneText = v => (v > 0 ? 'text-pos' : v < 0 ? 'text-neg' : '');
-
-  elBody.innerHTML = fh.horizons.map(h => {
-    const head = `<td><strong>${escapeHtml(h.label)}</strong><span class="horizon-range">${escapeHtml(h.range)}</span></td>`;
-    if (!h.count) {
-      return `<tr class="horizon-empty">${head}<td colspan="10">近 4 周无大宗成交</td></tr>`;
-    }
-    const expiries = (h.topExpiries || [])
-      .map(e => `${escapeHtml(e.expiry)} <span class="horizon-share">${Number(e.sharePct) || 0}%</span>`)
-      .join('<br>');
-    const weeks = h.weeks.map(w => {
-      const tip = `${Number(w.count) || 0} 笔 · 总名义 $${(w.grossNotionalUSD / 1e6).toFixed(0)}M · 净权利金 ${formatSignedUsdM(w.netPremiumUSD)}`;
-      return `<td class="horizon-week-cell" style="${toneCell(w.netDeltaUSD)}" title="${tip}">${w.count ? formatSignedUsdM(w.netDeltaUSD) : '--'}</td>`;
-    }).join('');
-    const vegaK = h.netVegaUSD / 1e3;
-    const coverage = `OI 判定覆盖 ${Math.round((h.oiCoverage || 0) * 100)}% 名义额`;
-    const oiCell = h.oiOpenShare == null
-      ? `<td class="horizon-muted" title="${coverage}">--</td>`
-      : `<td title="${coverage}">${Math.round(h.oiOpenShare * 100)}%</td>`;
-    return `
-      <tr>
-        ${head}
-        <td>${expiries || '--'}</td>
-        <td>$${(h.grossNotionalUSD / 1e6).toFixed(0)}M<span class="horizon-range">${Number(h.count) || 0} 笔</span></td>
-        ${weeks}
-        <td class="${toneText(h.netDeltaUSD)}"><strong>${formatSignedUsdM(h.netDeltaUSD)}</strong></td>
-        <td class="${toneText(h.netVegaUSD)}">${vegaK >= 0 ? '+' : '−'}$${Math.abs(vegaK).toFixed(Math.abs(vegaK) < 10 ? 1 : 0)}K</td>
-        <td>${formatSignedUsdM(h.netPremiumUSD)}</td>
-        ${oiCell}
-      </tr>
-    `;
-  }).join('');
 }
 
 /**
@@ -1786,6 +1719,417 @@ function renderPnLChart(s, view, resetChart) {
     pnlChartInstance.setOption(option, { replaceMerge: ['series'] });
   }
 }
+
+// ==========================================
+// Module 4B: 大宗资金深度研判 (从 Module 4 进入)
+// ==========================================
+let blockInsightData = null;
+let blockInsightLoadedAt = 0;
+let blockInsightRequest = null;
+let insightWeeks = 4;
+let insightType = 'C';
+let insightHeatmapChart = null;
+let insightCumChart = null;
+const BLOCK_INSIGHT_TTL_MS = 5 * 60 * 1000;
+
+const fmtK = v => {
+  const a = Math.abs(v);
+  return a >= 1000 ? `${(v / 1000).toFixed(a >= 10000 ? 0 : 1)}k` : `${Math.round(v)}`;
+};
+const fmtStrike = k => (k >= 1000 ? `${k / 1000}k` : `${k}`);
+const fmtUsdCompact = v => {
+  const a = Math.abs(v);
+  if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `$${(v / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M`;
+  return `$${Math.round(v).toLocaleString()}`;
+};
+
+async function loadBlockInsight(expiry = null) {
+  const url = expiry ? `/api/block-insight?expiry=${encodeURIComponent(expiry)}` : '/api/block-insight';
+  const req = fetch(url).then(r => r.json());
+  blockInsightRequest = req;
+  try {
+    const json = await req;
+    if (blockInsightRequest !== req) return; // 更新的请求已发出
+    if (json.code !== 0) throw new Error(json.error || '加载失败');
+    blockInsightData = json;
+    blockInsightLoadedAt = Date.now();
+    renderBlockInsight();
+  } catch (err) {
+    if (blockInsightRequest === req) setTextIfPresent('insight-coverage', `4B 数据加载失败：${err.message}`);
+  }
+}
+
+function ensureBlockInsightLoaded() {
+  if (!blockInsightData || Date.now() - blockInsightLoadedAt > BLOCK_INSIGHT_TTL_MS) {
+    loadBlockInsight(blockInsightData?.strikeMap?.expiry || null);
+  } else {
+    if (insightHeatmapChart) insightHeatmapChart.resize();
+    if (insightCumChart) insightCumChart.resize();
+  }
+}
+
+function renderBlockInsight() {
+  const d = blockInsightData;
+  if (!d) return;
+  const c = d.coverage || {};
+  const parts = [];
+  parts.push(c.dailyDays ? `日聚合 ${c.dailyFrom} ~ ${c.dailyTo}（${c.dailyDays} 个 OI 日）` : '日聚合积累中');
+  parts.push(c.oiDays ? `OI 快照 ${c.oiDays} 天` : 'OI 快照积累中');
+  parts.push(`大额结构 ${d.smartMoney?.tracked || 0} 个`);
+  if (d.spot) parts.push(`现价 $${Math.round(d.spot).toLocaleString()}`);
+  setTextIfPresent('insight-coverage', parts.join(' · '));
+  renderInsightFlows();
+  renderInsightStrikes();
+  renderInsightSmart();
+}
+
+// ---- A. 期限资金流向 ----
+function renderInsightFlows() {
+  const elBody = document.getElementById('insight-flow-body');
+  const fh = blockInsightData?.flows?.[insightWeeks];
+  if (!elBody || !fh) return;
+  const WEEK_MS = 7 * 86400000;
+  const shortDate = ts => formatUTC8(ts, false).slice(5, 10);
+  const firstStart = fh.weekEnds[0] - WEEK_MS;
+  setTextIfPresent('insight-spark-range', `(${shortDate(firstStart)} ~ ${shortDate(fh.weekEnds[fh.weekEnds.length - 1])})`);
+
+  const notes = ['按剩余期限分桶，只含未交割合约，主动成交方向计正负。'];
+  if (fh.coverageStartMs && fh.coverageStartMs > firstStart) {
+    notes.push(`日聚合从 ${formatUTC8(fh.coverageStartMs, false).slice(0, 10)} 开始，更早的周显示为虚线空格（无数据，不是零流量）。`);
+  }
+  const oiDays = Number(blockInsightData.coverage?.oiDays) || 0;
+  notes.push(oiDays >= 2 ? `OI 开仓占比基于 ${oiDays} 天的 Deribit 未平仓量快照。` : `OI 快照已 ${oiDays} 天，满 2 天后开始给出开仓占比。`);
+  setTextIfPresent('insight-flow-note', notes.join(' '));
+
+  const maxAbs = Math.max(1, ...fh.horizons.flatMap(h => h.weeks.map(w => Math.abs(w.netDeltaUSD))));
+  const toneText = v => (v > 0 ? 'text-pos' : v < 0 ? 'text-neg' : '');
+
+  elBody.innerHTML = fh.horizons.map(h => {
+    const head = `<td><strong>${escapeHtml(h.label)}</strong><span class="horizon-range">${escapeHtml(h.range)}</span></td>`;
+    const bars = h.weeks.map((w, i) => {
+      const end = fh.weekEnds[i];
+      const range = `${shortDate(end - WEEK_MS)}~${shortDate(end)}`;
+      if (fh.coverageStartMs && end <= fh.coverageStartMs) {
+        return `<span class="flow-spark-bar nodata" title="${range}：无日聚合数据"></span>`;
+      }
+      const pct = Math.round(Math.min(1, Math.abs(w.netDeltaUSD) / maxAbs) * 100);
+      const cls = w.netDeltaUSD > 0 ? 'pos' : (w.netDeltaUSD < 0 ? 'neg' : '');
+      const tip = `${range} · 净 Delta ${formatSignedUsdM(w.netDeltaUSD)} · ${Number(w.count) || 0} 笔 · 总名义 ${fmtUsdCompact(w.grossNotionalUSD)} · 净权利金 ${formatSignedUsdM(w.netPremiumUSD)}`;
+      return `<span class="flow-spark-bar ${cls}" style="--h:${pct}%" title="${tip}"></span>`;
+    }).join('');
+    if (!h.count) {
+      return `<tr class="horizon-empty">${head}<td>--</td><td>--</td><td><div class="flow-spark" style="--n:${h.weeks.length}">${bars}</div></td><td colspan="4">窗口内无大宗成交</td></tr>`;
+    }
+    const expiries = (h.topExpiries || []).map(e => `${escapeHtml(e.expiry)} <span class="horizon-share">${Number(e.sharePct) || 0}%</span>`).join('<br>');
+    const vegaK = h.netVegaUSD / 1e3;
+    const coverage = `OI 判定覆盖 ${Math.round((h.oiCoverage || 0) * 100)}% 名义额`;
+    const oiCell = h.oiOpenShare == null
+      ? `<td class="horizon-muted" title="${coverage}">--</td>`
+      : `<td title="${coverage}">${Math.round(h.oiOpenShare * 100)}%</td>`;
+    return `
+      <tr>
+        ${head}
+        <td>${expiries || '--'}</td>
+        <td>${fmtUsdCompact(h.grossNotionalUSD)}<span class="horizon-range">${Number(h.count) || 0} 笔</span></td>
+        <td><div class="flow-spark" style="--n:${h.weeks.length}">${bars}</div></td>
+        <td class="${toneText(h.netDeltaUSD)}"><strong>${formatSignedUsdM(h.netDeltaUSD)}</strong></td>
+        <td class="${toneText(h.netVegaUSD)}">${vegaK >= 0 ? '+' : '−'}$${Math.abs(vegaK).toFixed(Math.abs(vegaK) < 10 ? 1 : 0)}K</td>
+        <td>${formatSignedUsdM(h.netPremiumUSD)}</td>
+        ${oiCell}
+      </tr>
+    `;
+  }).join('');
+}
+
+// ---- B. 行权价热力图 ----
+function renderInsightStrikes() {
+  const d = blockInsightData;
+  const sm = d?.strikeMap;
+  const elChips = document.getElementById('insight-expiry-chips');
+  if (elChips) {
+    elChips.innerHTML = (d?.expiries || []).map(e => `
+      <button type="button" class="insight-chip ${sm && e.expiry === sm.expiry ? 'active' : ''}" data-expiry="${escapeHtml(e.expiry)}">
+        ${escapeHtml(e.expiry)}<span>${fmtUsdCompact(e.grossUSD)}</span>
+      </button>`).join('') || '<span class="insight-note">暂无未交割到期日的大宗成交</span>';
+  }
+  if (!sm) return;
+  renderInsightHeatmap(sm, d.spot);
+  renderInsightCumulative(sm, d.spot);
+  renderInsightZones(sm, d.spot);
+  renderInsightWalls(sm, d.spot);
+}
+
+function renderInsightHeatmap(sm, spot) {
+  const el = document.getElementById('insight-heatmap');
+  if (!el || !window.echarts) return;
+  const themeColors = getChartThemeColors();
+  const cells = sm.cells.filter(c => c.type === insightType);
+  const xIdx = new Map(sm.strikes.map((k, i) => [k, i]));
+  const yIdx = new Map(sm.days.map((k, i) => [k, i]));
+  const data = cells.map(c => [xIdx.get(c.strike), yIdx.get(c.day), c.net, c.gross]);
+  // 色阶上限取 |净成交| 的 95 分位：少数巨量格子饱和显示，避免把其余格子都压成中性色
+  const absSorted = cells.map(c => Math.abs(c.net)).sort((a, b) => a - b);
+  const cap = Math.max(1, absSorted[Math.floor((absSorted.length - 1) * 0.95)] || 0);
+  el.style.height = `${Math.max(240, sm.days.length * 16 + 90)}px`;
+  if (!insightHeatmapChart) insightHeatmapChart = echarts.init(el, getEchartsTheme());
+  insightHeatmapChart.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { top: 10, left: 56, right: 18, bottom: 64 },
+    tooltip: {
+      backgroundColor: themeColors.tooltipBg,
+      borderColor: themeColors.tooltipBorder,
+      textStyle: { color: themeColors.tooltipText, fontSize: 12 },
+      formatter: p => {
+        const [x, y, net, gross] = p.data;
+        return `${sm.days[y]} · ${fmtStrike(sm.strikes[x])} ${insightType === 'C' ? 'Call' : 'Put'}<br>主动净成交 <strong>${net > 0 ? '+' : ''}${Number(net).toLocaleString()}</strong> 张 · 总成交 ${Number(gross).toLocaleString()} 张`;
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: sm.strikes.map(fmtStrike),
+      axisLabel: { color: themeColors.textSecondary, fontSize: 10, rotate: sm.strikes.length > 24 ? 45 : 0 },
+      axisLine: { lineStyle: { color: themeColors.axisLine } },
+      splitArea: { show: false }
+    },
+    yAxis: {
+      type: 'category',
+      data: sm.days.map(k => k.slice(5)),
+      axisLabel: { color: themeColors.textSecondary, fontSize: 10 },
+      axisLine: { lineStyle: { color: themeColors.axisLine } }
+    },
+    visualMap: {
+      min: -cap,
+      max: cap,
+      dimension: 2, // 默认映射最后一维 (总成交，恒为正)，这里要按净成交着色
+      calculable: false,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 4,
+      itemHeight: 140,
+      itemWidth: 10,
+      text: ['净买入', '净卖出'],
+      textStyle: { color: themeColors.textSecondary, fontSize: 10 },
+      inRange: { color: ['#ef4444', themeColors.isLight ? '#f4f4f5' : '#27272a', '#22c55e'] }
+    },
+    series: [{ type: 'heatmap', data, itemStyle: { borderColor: themeColors.isLight ? '#ffffff' : '#18181b', borderWidth: 1 } }]
+  }, true);
+}
+
+function renderInsightCumulative(sm, spot) {
+  const el = document.getElementById('insight-cumulative');
+  if (!el || !window.echarts) return;
+  const themeColors = getChartThemeColors();
+  const isCall = insightType === 'C';
+  const nets = sm.cumulative.map(c => (isCall ? c.callNet : c.putNet));
+  const ois = sm.cumulative.map(c => (isCall ? c.callOI : c.putOI));
+  const labels = sm.strikes.map(fmtStrike);
+  let spotLabel = null;
+  if (spot && sm.strikes.length) {
+    const nearest = sm.strikes.reduce((a, k) => (Math.abs(k - spot) < Math.abs(a - spot) ? k : a), sm.strikes[0]);
+    spotLabel = fmtStrike(nearest);
+  }
+  if (!insightCumChart) insightCumChart = echarts.init(el, getEchartsTheme());
+  insightCumChart.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    legend: { top: 0, left: 'center', textStyle: { color: themeColors.textSecondary, fontSize: 11 } },
+    grid: { top: 44, left: 56, right: 56, bottom: 40 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: themeColors.tooltipBg,
+      borderColor: themeColors.tooltipBorder,
+      textStyle: { color: themeColors.tooltipText, fontSize: 12 }
+    },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisLabel: { color: themeColors.textSecondary, fontSize: 10, rotate: labels.length > 24 ? 45 : 0 },
+      axisLine: { lineStyle: { color: themeColors.axisLine } }
+    },
+    yAxis: [
+      { type: 'value', name: '累计净成交', nameTextStyle: { color: themeColors.textSecondary, fontSize: 10 }, axisLabel: { color: themeColors.textSecondary, fontSize: 10, formatter: fmtK }, splitLine: { lineStyle: { color: themeColors.gridLine, type: 'dashed' } } },
+      { type: 'value', name: '未平仓量', nameTextStyle: { color: themeColors.textSecondary, fontSize: 10 }, axisLabel: { color: themeColors.textSecondary, fontSize: 10, formatter: fmtK }, splitLine: { show: false } }
+    ],
+    series: [
+      {
+        name: `累计主动净成交 (${isCall ? 'Call' : 'Put'})`,
+        type: 'bar',
+        color: '#22c55e',
+        data: nets.map(v => ({ value: v, itemStyle: { color: v >= 0 ? '#22c55e' : '#ef4444' } })),
+        barMaxWidth: 18,
+        markLine: spotLabel ? {
+          symbol: ['none', 'none'],
+          silent: true,
+          data: [{ xAxis: spotLabel, lineStyle: { color: '#38bdf8', type: 'dotted', width: 2 }, label: { formatter: `现价 ≈ $${Math.round(spot).toLocaleString()}`, color: '#38bdf8', fontSize: 10 } }]
+        } : undefined
+      },
+      {
+        name: 'Deribit 当前未平仓量',
+        type: 'line',
+        yAxisIndex: 1,
+        data: ois,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 1.5, color: '#a78bfa' },
+        itemStyle: { color: '#a78bfa' }
+      }
+    ]
+  }, true);
+}
+
+function describeZonePeak(z) {
+  if (z.peakPrice == null) {
+    return z.peakOpenEnded === 'up' ? '币价越高越好' : (z.peakOpenEnded === 'down' ? '币价越低越好' : '--');
+  }
+  const p = `$${Number(z.peakPrice).toLocaleString()}`;
+  return z.peakOpenEnded === 'up' ? `≥ ${p}` : (z.peakOpenEnded === 'down' ? `≤ ${p}` : p);
+}
+
+function renderInsightZones(sm, spot) {
+  const el = document.getElementById('insight-zones');
+  if (!el) return;
+  if (!sm.targetZones.length) {
+    el.innerHTML = '<div class="insight-note">该到期日暂无 ≥ $30M 的同到期日大额结构。</div>';
+    return;
+  }
+  el.innerHTML = sm.targetZones.map(z => {
+    const ranges = (z.profitRanges || []).map(r => {
+      if (r.lo == null && r.hi == null) return '全区间';
+      if (r.lo == null) return `≤ $${Number(r.hi).toLocaleString()}`;
+      if (r.hi == null) return `≥ $${Number(r.lo).toLocaleString()}`;
+      return `$${Number(r.lo).toLocaleString()} ~ $${Number(r.hi).toLocaleString()}`;
+    }).join('，') || '无盈利区间';
+    const dist = z.peakPrice && spot ? ` <span class="horizon-share">(较现价 ${z.peakPrice >= spot ? '+' : ''}${(((z.peakPrice - spot) / spot) * 100).toFixed(1)}%)</span>` : '';
+    const legs = z.legs.map(l => {
+      const parts = l.instrument.split('-');
+      return `<span class="${l.direction === 'buy' ? 'text-pos' : 'text-neg'}">${l.direction === 'buy' ? '+' : '−'}${fmtK(l.amount)} ${fmtStrike(Number(parts[2]))}${parts[3]}</span>`;
+    }).join(' ');
+    const when = z.firstTs === z.lastTs ? formatUTC8(z.firstTs, false).slice(5) : `${formatUTC8(z.firstTs, false).slice(5, 10)} ~ ${formatUTC8(z.lastTs, false).slice(5, 10)}`;
+    return `
+      <div class="insight-zone">
+        <div class="insight-zone-head">
+          <strong>${escapeHtml(z.strategyNameZh)}</strong>
+          <span class="insight-zone-usd">${fmtUsdCompact(z.notionalUSD)} · ${z.count} 组</span>
+        </div>
+        <div class="insight-zone-row">最佳价位 <strong>${describeZonePeak(z)}</strong>${dist}</div>
+        <div class="insight-zone-row">到期盈利区间 ${ranges}</div>
+        <div class="insight-zone-row insight-zone-legs">${legs} <span class="horizon-share">· ${escapeHtml(z.familyLabel || '')} · ${when}</span></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderInsightWalls(sm, spot) {
+  const el = document.getElementById('insight-walls');
+  if (!el) return;
+  const rows = [];
+  for (const w of sm.flowWalls) {
+    const side = w.net >= 0 ? '主动净买入' : '主动净卖出';
+    rows.push(`<div class="insight-wall"><span class="insight-wall-k">${fmtStrike(w.strike)} ${w.type === 'C' ? 'Call' : 'Put'}</span><span class="${w.net >= 0 ? 'text-pos' : 'text-neg'}">${side} ${Math.abs(w.net).toLocaleString()} 张</span><span class="horizon-share">OI ${Number(w.oi || 0).toLocaleString()}</span></div>`);
+  }
+  for (const w of sm.oiWalls) {
+    const where = w.type === 'C' ? '现价上方 Call 未平仓' : '现价下方 Put 未平仓';
+    rows.push(`<div class="insight-wall"><span class="insight-wall-k">${fmtStrike(w.strike)} ${w.type === 'C' ? 'Call' : 'Put'}</span><span>${where}</span><span class="horizon-share">${Number(w.oi).toLocaleString()} 张</span></div>`);
+  }
+  el.innerHTML = rows.join('') || '<div class="insight-note">暂无</div>';
+}
+
+// ---- C. 聪明钱命中率 ----
+function renderInsightSmart() {
+  const sm = blockInsightData?.smartMoney;
+  if (!sm) return;
+  const pct = v => (v == null ? '--' : `${Math.round(v * 100)}%`);
+  const bias = (v, pos, neg) => {
+    if (v == null) return { text: '--', cls: '', sub: '暂无未结算结构' };
+    const cls = v > 0.05 ? 'text-pos' : (v < -0.05 ? 'text-neg' : '');
+    const word = v > 0.05 ? pos : (v < -0.05 ? neg : '中性');
+    return { text: `${v > 0 ? '+' : ''}${v.toFixed(2)}`, cls, sub: word };
+  };
+  const dir = bias(sm.directionalBias, '偏多', '偏空');
+  const vol = bias(sm.volBias, '偏买波动率', '偏卖波动率');
+  const elKpis = document.getElementById('insight-smart-kpis');
+  if (elKpis) {
+    elKpis.innerHTML = `
+      <div class="insight-kpi"><span class="stat-label">已登记结构</span><span class="stat-val">${sm.tracked}</span><span class="stat-sub">已结算 ${sm.settled} · 未结算 ${sm.open}</span></div>
+      <div class="insight-kpi"><span class="stat-label">到期总命中率</span><span class="stat-val">${pct(sm.overallHitRate)}</span><span class="stat-sub">主动方结算盈亏 &gt; 0 的比例</span></div>
+      <div class="insight-kpi"><span class="stat-label" title="近 30 天未结算的方向性结构：Σ 方向 × 名义额 × (2 × 权重 − 1) / Σ 名义额">胜率加权方向倾向</span><span class="stat-val ${dir.cls}">${dir.text}</span><span class="stat-sub">${dir.sub}</span></div>
+      <div class="insight-kpi"><span class="stat-label" title="近 30 天未结算的波动率结构，买入波动率为正">胜率加权波动率倾向</span><span class="stat-val ${vol.cls}">${vol.text}</span><span class="stat-sub">${vol.sub}</span></div>
+    `;
+  }
+  const elFam = document.getElementById('insight-family-body');
+  if (elFam) {
+    elFam.innerHTML = sm.families.map(f => {
+      const basis = f.weightBasis === 'final' ? '按到期结果' : (f.weightBasis === '7d' ? '按 7 天结果' : '样本不足');
+      const avg = f.avgPnlBtc == null ? '--' : `<span class="${f.avgPnlBtc >= 0 ? 'text-pos' : 'text-neg'}">${f.avgPnlBtc >= 0 ? '+' : ''}${f.avgPnlBtc.toFixed(2)} ₿</span>`;
+      return `
+        <tr>
+          <td><strong>${escapeHtml(f.label)}</strong></td>
+          <td>${f.finals}</td>
+          <td>${pct(f.hitRate)}</td>
+          <td>${avg}</td>
+          <td>${pct(f.hitRate7d)}<span class="horizon-range">n=${f.n7}</span></td>
+          <td>${f.open}</td>
+          <td><strong>${Math.round(f.weight * 100)}%</strong><span class="horizon-range">${basis}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+  const elRecent = document.getElementById('insight-recent-body');
+  if (elRecent) {
+    elRecent.innerHTML = sm.recent.map(r => {
+      const legs = (r.legs || []).map(l => {
+        const parts = l.instrument.split('-');
+        return `${l.direction === 'buy' ? '+' : '−'}${fmtStrike(Number(parts[2]))}${parts[3]}`;
+      }).join(' ');
+      const pnl = r.pnlBtc == null ? '<span class="horizon-muted">--</span>' : `<span class="${r.pnlBtc >= 0 ? 'text-pos' : 'text-neg'}">${r.pnlBtc >= 0 ? '+' : ''}${r.pnlBtc.toFixed(2)}</span>`;
+      const status = r.settled ? '已结算' : (r.markedAt ? `盯市 ${formatUTC8(r.markedAt, false).slice(5, 10)}` : '待盯市');
+      return `
+        <tr>
+          <td>${formatUTC8(r.ts, false)}</td>
+          <td>${escapeHtml(r.strategyNameZh)}<span class="horizon-range">${escapeHtml(legs)}</span></td>
+          <td>${escapeHtml(r.expiry || '--')}</td>
+          <td>${fmtUsdCompact(r.notionalUSD)}</td>
+          <td>${escapeHtml(r.familyLabel || '')}</td>
+          <td>${pnl}</td>
+          <td>${status}</td>
+          <td>${Math.round((r.familyWeight ?? 0.5) * 100)}%</td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="8" class="text-center">暂无登记</td></tr>';
+  }
+}
+
+(function wireBlockInsight() {
+  const btnEnter = document.getElementById('btn-enter-block-insight');
+  const btnBack = document.getElementById('btn-back-block-trades');
+  if (btnEnter) btnEnter.addEventListener('click', () => switchView('view-block-insight'));
+  if (btnBack) btnBack.addEventListener('click', () => switchView('view-block-trades'));
+  document.querySelectorAll('#insight-weeks-switch .switch-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      insightWeeks = Number(btn.dataset.weeks) || 4;
+      document.querySelectorAll('#insight-weeks-switch .switch-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderInsightFlows();
+    });
+  });
+  document.querySelectorAll('#insight-type-switch .switch-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      insightType = btn.dataset.type === 'P' ? 'P' : 'C';
+      document.querySelectorAll('#insight-type-switch .switch-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderInsightStrikes();
+    });
+  });
+  const elChips = document.getElementById('insight-expiry-chips');
+  if (elChips) {
+    elChips.addEventListener('click', e => {
+      const chip = e.target.closest('.insight-chip');
+      if (!chip || chip.classList.contains('active')) return;
+      elChips.querySelectorAll('.insight-chip').forEach(c => c.classList.toggle('active', c === chip));
+      loadBlockInsight(chip.dataset.expiry);
+    });
+  }
+})();
 
 // Event Listeners
 btnRefresh.addEventListener('click', () => {
@@ -5025,6 +5369,7 @@ const VIEW_TITLES = {
   'view-term-premium': '期现基差与期限溢价',
   'view-options': '期权微观结构套件',
   'view-block-trades': '期权大宗雷达',
+  'view-block-insight': '期权大宗 · 4B 资金深度研判',
   'view-ssro': '稳定币比率震荡指标 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
@@ -5062,14 +5407,15 @@ function switchView(viewId, updateHash = true) {
     });
   }
 
-  // 2. Update sidebar navigation items
+  // 2. Update sidebar navigation items (4B 从属于 Module 4，侧栏仍高亮 04)
+  const navViewId = viewId === 'view-block-insight' ? 'view-block-trades' : viewId;
   sidebarNavItems.forEach(item => {
-    item.classList.toggle('active', item.dataset.view === viewId);
+    item.classList.toggle('active', item.dataset.view === navViewId);
   });
 
   // 3. Update mobile bottom navigation items
   mobNavItems.forEach(item => {
-    item.classList.toggle('active', item.dataset.view === viewId);
+    item.classList.toggle('active', item.dataset.view === navViewId);
   });
 
   // 4. Update header view title
@@ -5141,6 +5487,10 @@ function switchView(viewId, updateHash = true) {
       goldChartInstance.resize();
     } else if (rawGoldData && (viewId === 'view-gold-correlation' || viewId === 'view-all')) {
       renderGoldChart();
+    }
+
+    if (viewId === 'view-block-insight' || viewId === 'view-all') {
+      ensureBlockInsightLoaded();
     }
 
     if (viewId === 'view-wave-radar' || viewId === 'view-all') {

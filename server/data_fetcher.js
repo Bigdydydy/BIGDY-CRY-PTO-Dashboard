@@ -348,5 +348,6 @@ function getCachedData() {
 
 module.exports = {
   refreshAllMarketData,
-  getCachedData
+  getCachedData,
+  fetchBlockTrades
 };

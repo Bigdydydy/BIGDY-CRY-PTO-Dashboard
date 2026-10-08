@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const oi = require('../server/option_oi_history.js');
-const { analyzeBlockTrades, analyzeFlowHorizons } = require('../server/analytics_engine.js');
+const { analyzeBlockTrades } = require('../server/analytics_engine.js');
 
 const H = 3600 * 1000;
 const D = 24 * H;
@@ -103,29 +103,4 @@ test('analyzeBlockTrades attaches OI opening / closing profiles when snapshots a
   const r = analyzeBlockTrades(trades, 30e6, 'all', 80000, snaps);
   assert.equal(r.whaleBlocks[0].oiProfile.status, 'opening');
   assert.equal(analyzeBlockTrades(trades, 30e6).whaleBlocks[0].oiProfile, null);
-});
-
-test('analyzeFlowHorizons buckets live expiries by days left and splits 4 weekly windows', () => {
-  const now = Date.UTC(2026, 9, 8, 4, 0);
-  const tr = (inst, direction, amount, daysAgo) => ({ instrument_name: inst, direction, amount, price: 0.02, iv: 45, index_price: 80000, timestamp: now - daysAgo * D });
-  const res = analyzeFlowHorizons([
-    tr('BTC-30OCT26-95000-C', 'buy', 100, 1),    // ~22 days left -> m1, last week
-    tr('BTC-30OCT26-95000-C', 'sell', 40, 25),   // m1, W-3 (28-21 days ago)
-    tr('BTC-25DEC26-85000-C', 'sell', 50, 2),    // ~78 days -> m3
-    tr('BTC-26MAR27-90000-P', 'buy', 10, 3),     // ~169 days -> m6
-    tr('BTC-25SEP26-80000-C', 'buy', 999, 5),    // expired -> ignored
-    tr('BTC-30OCT26-95000-C', 'buy', 999, 40)    // older than 4 weeks -> ignored
-  ], now);
-  const [m1, m3, m6, far] = res.horizons;
-  assert.equal(m1.count, 2);
-  assert.ok(m1.weeks[3].netDeltaUSD > 0 && m1.weeks[0].netDeltaUSD < 0);
-  assert.equal(m1.weeks[1].count + m1.weeks[2].count, 0);
-  assert.ok(Math.abs(m1.netPremiumUSD - 0.02 * 60 * 80000) < 1e-6); // paid 100, received 40
-  assert.deepEqual(m1.topExpiries.map(e => e.expiry), ['30OCT26']);
-  assert.ok(m3.netDeltaUSD < 0 && m3.netVegaUSD < 0);
-  assert.ok(m6.netDeltaUSD < 0); // long put
-  assert.equal(far.count, 0);
-  assert.equal(res.oiAvailable, false);
-  assert.equal(m1.oiOpenShare, null);
-  assert.equal(res.weekEnds[3], now);
 });

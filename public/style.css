@@ -6423,3 +6423,326 @@ body {
     white-space: normal;
   }
 }
+/* ==========================================================================
+   Module 4B · 大宗资金深度研判 (从 Module 4 进入)
+   ========================================================================== */
+
+.insight-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--accent-primary-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.insight-entry:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-surface-hover);
+  transform: translateY(-1px);
+}
+
+.insight-entry-tag {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: var(--accent-primary-bg);
+  border: 1px solid var(--accent-primary-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+}
+
+.insight-entry-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.insight-entry-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.insight-entry-desc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.insight-entry-go {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  white-space: nowrap;
+}
+
+.insight-backbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 14px;
+}
+
+.insight-back-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.insight-back-btn:hover {
+  border-color: var(--border-hover);
+}
+
+.insight-coverage {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+#view-block-insight .bento-card + .bento-card {
+  margin-top: 16px;
+}
+
+.insight-note {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.insight-subtitle {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 16px 0 6px;
+}
+
+/* 周度净 Delta 迷你柱：中线以上为正、以下为负，虚线空格 = 无数据 */
+.flow-spark {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(5px, 1fr));
+  gap: 2px;
+  height: 36px;
+  min-width: calc(var(--n) * 8px);
+  background: linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--border-default) calc(50% - 0.5px), var(--border-default) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+.flow-spark-bar {
+  position: relative;
+  height: 100%;
+}
+
+.flow-spark-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 1px;
+}
+
+.flow-spark-bar.pos::after {
+  bottom: 50%;
+  height: max(1px, calc(var(--h) / 2));
+  background: #22c55e;
+}
+
+.flow-spark-bar.neg::after {
+  top: 50%;
+  height: max(1px, calc(var(--h) / 2));
+  background: #ef4444;
+}
+
+.flow-spark-bar.nodata::after {
+  top: 30%;
+  bottom: 30%;
+  border: 1px dashed var(--border-default);
+}
+
+.horizon-spark-head {
+  min-width: 140px;
+}
+
+.horizon-flow-table td .flow-spark {
+  margin-left: auto;
+}
+
+/* 行权价热力图 */
+.insight-expiry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.insight-chip {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-pill);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.insight-chip span {
+  margin-left: 6px;
+  color: var(--text-muted);
+}
+
+.insight-chip.active {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary-border);
+  background: var(--accent-primary-bg);
+}
+
+.insight-chart {
+  width: 100%;
+}
+
+.insight-heatmap {
+  height: 320px;
+}
+
+.insight-cumulative {
+  height: 260px;
+  margin-top: 8px;
+}
+
+.insight-strike-lists {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .insight-strike-lists {
+    grid-template-columns: 1fr;
+  }
+}
+
+.insight-list-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+.insight-list-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.insight-list-hint {
+  font-size: 0.64rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.insight-zone {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-subtle);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.insight-zone:last-child {
+  border-bottom: none;
+}
+
+.insight-zone-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+
+.insight-zone-usd {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.insight-zone-row {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+.insight-zone-row strong {
+  color: var(--text-primary);
+}
+
+.insight-zone-legs span + span {
+  margin-left: 2px;
+}
+
+.insight-wall {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+.insight-wall:last-child {
+  border-bottom: none;
+}
+
+.insight-wall-k {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 聪明钱 */
+.insight-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 840px) {
+  .insight-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.insight-kpi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
