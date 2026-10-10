@@ -969,11 +969,11 @@
         </div>
         <div class="header-controls">
           <div class="tp-header-badges">
-            <span class="tp-source-badge" id="tp-data-source-badge" title="真实期限点：Binance COIN-M 永续资金费率 + 当季/次季交割合约 (2024.01~至今日线 + 实时盘口)；90D 仅在真实点之间插值">
+            <span class="tp-source-badge" id="tp-data-source-badge" title="真实期限点：Deribit 永续资金费率 + 当季/次季季度合约 (2024.01~至今，每日 08:00 UTC 快照 + 实时盘口)；90D 仅在真实点之间插值">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:4px;">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              Binance 真实期限点
+              Deribit 真实期限点
             </span>
             <span class="tp-regime-pill" id="tp-header-regime-pill">-- 升水结构</span>
             <span class="tp-score-pill" id="tp-header-score-pill">Carry: --</span>
@@ -1058,7 +1058,7 @@
                 <span class="legend-color-dot" style="background-color: #818cf8;"></span>
                 <span>套利评分 (0-100)</span>
               </button>
-              <button class="tp-legend-btn active" data-series="btcPrice" id="btn-toggle-btc-price" title="BTC 美元价格（币安 COIN-M 指数价，每日 00:00 UTC 快照；最新点为实时）">
+              <button class="tp-legend-btn active" data-series="btcPrice" id="btn-toggle-btc-price" title="BTC 美元价格（Deribit BTC 指数，每日 08:00 UTC 快照；最新点为实时）">
                 <span class="legend-color-dot" style="background-color: #94a3b8;"></span>
                 <span>BTC 价格 (USD)</span>
               </button>
@@ -1076,7 +1076,7 @@
             <!-- Real Basis Audit & Provenance Footnote -->
             <div class="tp-data-audit-strip">
               <div class="tp-audit-left">
-                <span><strong class="text-cyan">数据源:</strong> Binance COIN-M 永续资金费率 + 当季/次季交割基差 (2024.01 ~ 至今日线 + 实时盘口)</span>
+                <span><strong class="text-cyan">数据源:</strong> Deribit 永续资金费率 + 当季/次季季度合约 (2024.01 ~ 至今，每日 08:00 UTC + 实时盘口)</span>
                 <span><strong class="text-cyan">期限:</strong> 0D 资金费率 (7 日均) / 当季 (距交割 &lt;7 天剔除) / 次季 / 90D 插值，不外推</span>
                 <span><strong class="text-cyan">基准:</strong> FRED 3M 美债 + 3.5% 机构门槛</span>
               </div>

@@ -1,7 +1,7 @@
 /**
  * Module 2: Futures Basis Term Structure & Carry Radar (schema v2)
  *
- * Term structure built only from tenors that actually trade on Binance COIN-M:
+ * Term structure built only from tenors that actually trade on Deribit (BTC inverse futures):
  *   0D perp funding (7-day average) → current quarter (dropped < 7D to expiry) → next quarter, plus a 90D
  *   constant maturity interpolated between the real points that bracket it.
  * Spreads:
@@ -15,7 +15,7 @@ const fs = require('fs');
 const {
   getHistoricalBasisData,
   getBasisFetchStatus,
-  fetchLiveBinanceCurve,
+  fetchLiveCurve,
   applyCarryMetrics,
   calculateCarryScore,
   scoreTier,
@@ -55,8 +55,8 @@ function readDiskSeries() {
 }
 
 /**
- * Load the daily Binance history and attach the live Binance point (same exchange, same formulas).
- * Today's 00:00 UTC snapshot is replaced by the live point so the chart always ends on "now".
+ * Load the daily Deribit history and attach the live Deribit point (same exchange, same formulas).
+ * Today's 08:00 UTC snapshot is replaced by the live point so the chart always ends on "now".
  */
 async function loadHistoricalBasisSeries(liveOverride) {
   let baseSeries = [];
@@ -74,11 +74,11 @@ async function loadHistoricalBasisSeries(liveOverride) {
   if (live === undefined) {
     live = null;
     try {
-      live = await fetchLiveBinanceCurve(series[series.length - 1].tbill);
+      live = await fetchLiveCurve(series[series.length - 1].tbill);
       liveFeedError = null;
     } catch (err) {
       liveFeedError = err.message;
-      console.warn('[TermPremiumEngine] Live Binance curve unavailable:', err.message);
+      console.warn('[TermPremiumEngine] Live Deribit curve unavailable:', err.message);
     }
   }
 
@@ -178,7 +178,7 @@ function evaluateCarryRegime(latest) {
 
 /**
  * Main Engine API. `futuresList` / `spotPrice` are accepted for call-site compatibility only:
- * the curve is now sourced from Binance so history and the live point share one exchange.
+ * the curve is sourced from Deribit so history and the live point share one exchange.
  */
 async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
   const historicalSeries = await loadHistoricalBasisSeries(options.live);
@@ -193,12 +193,12 @@ async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
     hurdleRate: latest.hurdle,
     hurdleSpread: HURDLE_SPREAD,
     metadata: {
-      dataSource: 'Binance COIN-M BTCUSD 永续资金费率 + 当季/次季交割基差 (2024.01 ~ 至今真实日线) + Binance 实时盘口；3M 美债 FRED DGS3MO',
+      dataSource: 'Deribit BTC 永续资金费率 + 当季/次季季度合约 (2024.01 ~ 至今，每日 08:00 UTC 快照) + Deribit 实时盘口；3M 美债 FRED DGS3MO',
       timeRange: `${historicalSeries[0].date} 至 ${latest.date}`,
       tenorMethod: '仅用真实可交易期限点：0D 永续资金费率 (7 日均值年化) / 当季 (距交割 <7 天剔除) / 次季；90D 在相邻真实点间线性插值，不做外推',
       scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量',
       isRealHistorical: true,
-      // Daily-history and live-curve health, so a stalled Binance feed is visible in the UI
+      // Daily-history and live-curve health, so a stalled exchange feed is visible in the UI
       feed: {
         ...getBasisFetchStatus(),
         liveOk: !!latest.isLive,

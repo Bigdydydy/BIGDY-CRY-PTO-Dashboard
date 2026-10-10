@@ -1,12 +1,18 @@
 /**
- * Real Historical Basis & Term Structure Fetcher (schema v2)
- * Source: Binance COIN-M BTCUSD (/futures/data/basis + /dapi/v1/fundingRate) + FRED DGS3MO
+ * Real Historical Basis & Term Structure Fetcher (schema v4, Deribit)
+ * Source: Deribit BTC inverse futures + BTC-PERPETUAL funding + FRED DGS3MO
+ *
+ * Deribit is used because it is reachable from the deployed server: Binance answers the Render
+ * host with HTTP 418 (shared egress IPs are banned), which froze this module online.
+ *
+ * Daily snapshots are taken at 08:00 UTC (16:00 UTC+8): Deribit's daily candles, index fixing
+ * and quarterly expiries all fall on that hour.
  *
  * Only tenors that actually trade are used:
- *   0D   = BTCUSD_PERP funding, trailing 7-day average annualized (raw 24h kept as fundingApr24h;
- *          24h funding is ~8x noisier day-to-day than the 90D basis and would swamp every spread)
- *   CQ   = current-quarter delivery contract (dropped when < 7 days to expiry)
- *   NQ   = next-quarter delivery contract
+ *   0D   = BTC-PERPETUAL realized funding (sum of hourly interest_1h), trailing 7-day average
+ *          annualized (raw 24h kept as fundingApr24h; 24h funding is far noisier than the basis)
+ *   CQ   = current-quarter future (dropped when < 7 days to expiry)
+ *   NQ   = next-quarter future
  *   90D  = linear interpolation between the real points that bracket 90 days
  * No extrapolation outside the observed points.
  */
@@ -17,8 +23,11 @@ const { fetchWithTimeout } = require('./http_client');
 const { fetchFredSeries } = require('./macro_fetcher');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
-const SCHEMA_VERSION = 3;
-const HISTORY_START_TS = Date.UTC(2024, 0, 1); // Spot ETF launch era (ETFs listed 2024-01-11)
+const SCHEMA_VERSION = 4;
+const HISTORY_START_TS = Date.UTC(2024, 0, 1, 8); // Spot ETF launch era (ETFs listed 2024-01-11)
+const SNAPSHOT_HOUR_UTC = 8;
+const DERIBIT_API = 'https://www.deribit.com/api/v2/public';
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const CQ_MIN_DAYS = 7;            // Front quarterly is dropped inside its final week
 const HURDLE_SPREAD = 3.5;        // Institutional hurdle = 3M T-Bill + 3.5%
 const DEFAULT_TBILL = 4.0;        // Only used if FRED is unreachable and no prior value exists
@@ -26,7 +35,8 @@ const VOL_WINDOW = 30;            // Rolling window (days) for basis mark-to-mar
 const VOL_FLOOR = 1.0;            // Annualized MTM vol floor (%), avoids blow-ups in quiet periods
 const FUNDING_WINDOW_DAYS = 7;    // 0D tenor = realized perp funding over the trailing week
 const DAY_MS = 86400000;
-const BINANCE_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' };
+const HOUR_MS = 3600000;
+const FUNDING_CHUNK_MS = 30 * DAY_MS; // Deribit returns at most ~744 hourly funding rows per call
 
 let inMemoryCache = null;
 
@@ -61,12 +71,28 @@ function getQuarterExpiries(date) {
 }
 
 /**
- * Parse a Binance delivery symbol (e.g. BTCUSD_261225) into its 08:00 UTC expiry timestamp
+ * Deribit future name for an 08:00 UTC expiry, e.g. 2026-12-25 → BTC-25DEC26
  */
-function parseBinanceDeliveryExpiry(symbol) {
-  const m = /_(\d{2})(\d{2})(\d{2})$/.exec(symbol || '');
-  if (!m) return null;
-  return Date.UTC(2000 + Number(m[1]), Number(m[2]) - 1, Number(m[3]), 8, 0, 0);
+function deribitFutureName(expiryTs) {
+  const d = new Date(expiryTs);
+  return `BTC-${d.getUTCDate()}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(2)}`;
+}
+
+/**
+ * Parse a Deribit future name (e.g. BTC-25DEC26) into its 08:00 UTC expiry timestamp
+ */
+function parseDeribitFutureExpiry(name) {
+  const m = /^BTC-(\d{1,2})([A-Z]{3})(\d{2})$/.exec(name || '');
+  if (!m || MONTHS.indexOf(m[2]) < 0) return null;
+  return Date.UTC(2000 + Number(m[3]), MONTHS.indexOf(m[2]), Number(m[1]), 8, 0, 0);
+}
+
+/**
+ * 08:00 UTC snapshot timestamp of the UTC date containing ts
+ */
+function snapshotTsOf(ts) {
+  const d = new Date(ts);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), SNAPSHOT_HOUR_UTC);
 }
 
 /**
@@ -218,50 +244,55 @@ function applyCarryMetrics(series) {
   return series;
 }
 
-/**
- * Fetch all historical basis data from Binance DAPI for a given contract type
- */
-async function fetchBinanceBasisSeries(contractType, startTs = HISTORY_START_TS) {
-  const allRecords = [];
-  let cur = startTs;
-  const now = Date.now();
-
-  while (cur < now) {
-    const url = `https://dapi.binance.com/futures/data/basis?pair=BTCUSD&contractType=${contractType}&period=1d&startTime=${cur}&limit=500`;
-    const res = await fetchWithTimeout(url, { headers: BINANCE_HEADERS });
-    if (!res.ok) {
-      throw new Error(`Binance basis HTTP ${res.status} for ${contractType}`);
-    }
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) break;
-
-    allRecords.push(...data);
-    const lastTime = data[data.length - 1].timestamp;
-    if (lastTime <= cur || data.length < 500) break;
-    cur = lastTime + DAY_MS;
-  }
-
-  return allRecords;
+async function deribitGet(method, params) {
+  const url = `${DERIBIT_API}/${method}?${new URLSearchParams(params)}`;
+  const res = await fetchWithTimeout(url, { timeout: 20000, retries: 2 });
+  if (!res.ok) throw new Error(`Deribit ${method} HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(`Deribit ${method}: ${json.error.message || json.error.code}`);
+  return json.result;
 }
 
 /**
- * Fetch BTCUSD_PERP funding settlements from startTs to now
+ * BTC-PERPETUAL hourly funding rows from startTs to endTs, as
+ * { fundingTime, fundingRate (realized interest_1h), indexPrice }.
+ * Requested in 30-day chunks, a few chunks at a time.
  */
-async function fetchBinanceFundingHistory(startTs) {
+async function fetchDeribitFundingHistory(startTs, endTs = Date.now()) {
+  const chunks = [];
+  for (let s = startTs; s < endTs; s += FUNDING_CHUNK_MS) chunks.push([s, Math.min(endTs, s + FUNDING_CHUNK_MS)]);
   const rows = [];
-  let cur = startTs;
-  for (let guard = 0; guard < 50 && cur < Date.now(); guard++) {
-    const url = `https://dapi.binance.com/dapi/v1/fundingRate?symbol=BTCUSD_PERP&startTime=${cur}&limit=1000`;
-    const res = await fetchWithTimeout(url, { headers: BINANCE_HEADERS });
-    if (!res.ok) throw new Error(`Binance funding HTTP ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) break;
-    rows.push(...data);
-    const last = Number(data[data.length - 1].fundingTime);
-    if (data.length < 1000 || last <= cur) break;
-    cur = last + 1;
+  for (let i = 0; i < chunks.length; i += 4) {
+    const batch = await Promise.all(chunks.slice(i, i + 4).map(([s, e]) => deribitGet('get_funding_rate_history', {
+      instrument_name: 'BTC-PERPETUAL',
+      start_timestamp: s,
+      end_timestamp: e
+    })));
+    for (const part of batch) rows.push(...part);
   }
-  return rows;
+  const byTime = new Map();
+  for (const r of rows) {
+    byTime.set(r.timestamp, { fundingTime: r.timestamp, fundingRate: r.interest_1h, indexPrice: r.index_price });
+  }
+  return [...byTime.values()].sort((a, b) => a.fundingTime - b.fundingTime);
+}
+
+/**
+ * Daily (08:00 UTC) closes of one future: Map(snapshotTs → price at that snapshot).
+ * Deribit's 1D candle with tick T spans T → T + 1 day, so its close is the price at T + 1 day.
+ */
+async function fetchDeribitDailyCloses(instrument, startTs, endTs) {
+  const res = await deribitGet('get_tradingview_chart_data', {
+    instrument_name: instrument,
+    start_timestamp: startTs - DAY_MS,
+    end_timestamp: endTs,
+    resolution: '1D'
+  });
+  const closes = new Map();
+  (res.ticks || []).forEach((t, i) => {
+    if (res.close[i] > 0) closes.set(t + DAY_MS, Number(res.close[i]));
+  });
+  return closes;
 }
 
 /**
@@ -289,40 +320,64 @@ async function fetchTbillLookup() {
  * Build consolidated historical term structure from real CQ / NQ / funding / T-Bill data
  */
 async function fetchAndBuildHistoricalBasis() {
-  console.log('[BasisFetcher] Ingesting Binance COIN-M basis + funding and FRED 3M T-Bill...');
-  const [cqList, nqList, fundingRows, tbillLookup] = await Promise.all([
-    fetchBinanceBasisSeries('CURRENT_QUARTER'),
-    fetchBinanceBasisSeries('NEXT_QUARTER'),
-    fetchBinanceFundingHistory(HISTORY_START_TS - (FUNDING_WINDOW_DAYS + 1) * DAY_MS),
-    fetchTbillLookup()
+  console.log('[BasisFetcher] Ingesting Deribit futures + perpetual funding and FRED 3M T-Bill...');
+  const lastSnapshot = latestSnapshotTs();
+  const snapshots = [];
+  for (let ts = HISTORY_START_TS; ts <= lastSnapshot; ts += DAY_MS) snapshots.push(ts);
+
+  // Every quarterly that served as CQ or NQ on some snapshot, with the window it was needed for
+  const contracts = new Map();
+  for (const ts of snapshots) {
+    for (const exp of getQuarterExpiries(new Date(ts))) {
+      const name = deribitFutureName(exp.getTime());
+      const c = contracts.get(name) || { name, from: ts, to: ts };
+      c.to = ts;
+      contracts.set(name, c);
+    }
+  }
+
+  const [fundingRows, tbillLookup, closesList] = await Promise.all([
+    fetchDeribitFundingHistory(HISTORY_START_TS - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, lastSnapshot + HOUR_MS),
+    fetchTbillLookup(),
+    Promise.all([...contracts.values()].map(c => fetchDeribitDailyCloses(c.name, c.from, c.to)
+      .then(closes => [c.name, closes])))
   ]);
+  const closesByName = new Map(closesList);
+  const indexAt = new Map(fundingRows.map(r => [r.fundingTime, r.indexPrice]));
 
-  const nqMap = new Map(nqList.map(item => [item.timestamp, item]));
   const resultSeries = [];
-  let lastTbill = tbillLookup.latest ?? DEFAULT_TBILL;
-  const firstTbill = cqList.length ? tbillLookup.at(new Date(cqList[0].timestamp).toISOString().slice(0, 10)) : null;
-  if (firstTbill != null) lastTbill = firstTbill;
+  let lastTbill = tbillLookup.at(new Date(HISTORY_START_TS).toISOString().slice(0, 10)) ?? tbillLookup.latest ?? DEFAULT_TBILL;
+  let skipped = 0;
 
-  for (const cq of cqList) {
-    const ts = cq.timestamp;
+  for (const ts of snapshots) {
     const dateStr = new Date(ts).toISOString().slice(0, 10);
-    const nq = nqMap.get(ts);
     const [q1Expiry, q2Expiry] = getQuarterExpiries(new Date(ts));
+    const indexPrice = indexAt.get(ts);
+    const cqPrice = closesByName.get(deribitFutureName(q1Expiry.getTime()))?.get(ts) ?? null;
+    const nqPrice = closesByName.get(deribitFutureName(q2Expiry.getTime()))?.get(ts) ?? null;
     const tb = tbillLookup.at(dateStr);
     if (tb != null) lastTbill = tb;
+    // A day without the index or the next-quarter close cannot be anchored; skip it rather than guess
+    if (!(indexPrice > 0) || !(nqPrice > 0)) {
+      skipped++;
+      continue;
+    }
 
     resultSeries.push(buildCurvePoint({
       timestamp: ts,
-      indexPrice: Number(cq.indexPrice),
-      // Full-precision price ratio instead of Binance's 4-decimal basisRate
-      cqPrice: Number(cq.futuresPrice),
-      nqPrice: nq ? Number(nq.futuresPrice) : null,
+      indexPrice,
+      cqPrice,
+      nqPrice,
       cqExpiryTs: q1Expiry.getTime(),
       nqExpiryTs: q2Expiry.getTime(),
       fundingApr: aggregateDailyFunding(fundingRows, ts, FUNDING_WINDOW_DAYS),
       fundingApr24h: aggregateDailyFunding(fundingRows, ts, 1),
       tbill: lastTbill
     }));
+  }
+  if (skipped) console.warn(`[BasisFetcher] Skipped ${skipped} snapshot(s) missing index or next-quarter price`);
+  if (!resultSeries.length || resultSeries[resultSeries.length - 1].timestamp !== lastSnapshot) {
+    throw new Error(`Deribit history incomplete: latest snapshot ${new Date(lastSnapshot).toISOString()} missing`);
   }
 
   applyCarryMetrics(resultSeries);
@@ -339,54 +394,53 @@ async function fetchAndBuildHistoricalBasis() {
 }
 
 /**
- * Live Binance snapshot: perp / CQ / NQ mark vs index plus trailing-24h funding.
+ * Live Deribit snapshot: CQ / NQ mark vs the BTC index plus trailing perpetual funding.
  * Same exchange and same formulas as the history, so the latest point does not splice sources.
  */
 let liveCache = null;
 let liveCacheTime = 0;
 const LIVE_TTL_MS = 60 * 1000;
 
-async function fetchLiveBinanceCurve(tbill) {
+async function fetchLiveCurve(tbill) {
   const now = Date.now();
   if (liveCache && now - liveCacheTime < LIVE_TTL_MS) {
     return { ...liveCache, tbill: round(tbill), ...rebaseOnTbill(liveCache, tbill) };
   }
-  const [premRes, fundRes] = await Promise.all([
-    fetchWithTimeout('https://dapi.binance.com/dapi/v1/premiumIndex?pair=BTCUSD', { headers: BINANCE_HEADERS }),
-    fetchWithTimeout(`https://dapi.binance.com/dapi/v1/fundingRate?symbol=BTCUSD_PERP&startTime=${now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS}&limit=100`, { headers: BINANCE_HEADERS })
+  const [book, funding] = await Promise.all([
+    deribitGet('get_book_summary_by_currency', { currency: 'BTC', kind: 'future' }),
+    fetchDeribitFundingHistory(now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, now)
   ]);
-  if (!premRes.ok) throw new Error(`Binance premiumIndex HTTP ${premRes.status}`);
-  if (!fundRes.ok) throw new Error(`Binance funding HTTP ${fundRes.status}`);
-  const prem = await premRes.json();
-  const funding = await fundRes.json();
 
-  const deliveries = prem
-    .filter(p => /^BTCUSD_\d{6}$/.test(p.symbol))
-    .map(p => ({ symbol: p.symbol, expiry: parseBinanceDeliveryExpiry(p.symbol), mark: Number(p.markPrice), index: Number(p.indexPrice) }))
-    .filter(p => p.expiry && p.expiry > now)
-    .sort((a, b) => a.expiry - b.expiry);
-  const perp = prem.find(p => p.symbol === 'BTCUSD_PERP');
-  if (deliveries.length < 2 || !perp) throw new Error('Binance live curve incomplete');
+  const [q1Expiry, q2Expiry] = getQuarterExpiries(new Date(now));
+  const byName = new Map(book.map(b => [b.instrument_name, b]));
+  const cq = byName.get(deribitFutureName(q1Expiry.getTime()));
+  const nq = byName.get(deribitFutureName(q2Expiry.getTime()));
+  const perp = byName.get('BTC-PERPETUAL');
+  const indexPrice = Number(perp?.estimated_delivery_price || cq?.estimated_delivery_price);
+  if (!cq || !nq || !(indexPrice > 0)) throw new Error('Deribit live curve incomplete');
 
   const point = buildCurvePoint({
     timestamp: now,
-    indexPrice: Number(perp.indexPrice),
-    cqPrice: deliveries[0].mark,
-    nqPrice: deliveries[1].mark,
-    cqExpiryTs: deliveries[0].expiry,
-    nqExpiryTs: deliveries[1].expiry,
+    indexPrice,
+    cqPrice: Number(cq.mark_price),
+    nqPrice: Number(nq.mark_price),
+    cqExpiryTs: q1Expiry.getTime(),
+    nqExpiryTs: q2Expiry.getTime(),
     fundingApr: aggregateDailyFunding(funding, now, FUNDING_WINDOW_DAYS),
     fundingApr24h: aggregateDailyFunding(funding, now, 1),
     tbill
   });
-  point.predictedFundingApr = round(Number(perp.lastFundingRate) * 3 * 365 * 100);
-  point.contracts = deliveries.slice(0, 2).map(d => ({
-    instrument: d.symbol,
-    expiryDate: new Date(d.expiry).toISOString().slice(0, 10),
-    daysToExpiry: round((d.expiry - now) / DAY_MS, 2),
-    markPrice: d.mark,
-    basisAPR: round((d.mark - d.index) / d.index * 365 / ((d.expiry - now) / DAY_MS) * 100)
-  }));
+  if (perp?.funding_8h != null) point.predictedFundingApr = round(Number(perp.funding_8h) * 3 * 365 * 100);
+  point.contracts = [[cq, q1Expiry], [nq, q2Expiry]].map(([b, exp]) => {
+    const days = (exp.getTime() - now) / DAY_MS;
+    return {
+      instrument: b.instrument_name,
+      expiryDate: exp.toISOString().slice(0, 10),
+      daysToExpiry: round(days, 2),
+      markPrice: Number(b.mark_price),
+      basisAPR: round((b.mark_price - indexPrice) / indexPrice * 365 / days * 100)
+    };
+  });
   point.isLive = true;
   liveCache = point;
   liveCacheTime = now;
@@ -407,12 +461,16 @@ function isFreshSchema(parsed) {
 }
 
 /**
- * Latest daily snapshot that should already exist. Binance stamps each daily basis record at
- * 00:00 UTC (08:00 UTC+8) and publishes it a few minutes later.
+ * Latest daily snapshot that should already exist: 08:00 UTC (16:00 UTC+8) each day, available
+ * once Deribit's daily candle and that hour's funding row have printed.
  */
-const PUBLISH_LAG_MS = 10 * 60 * 1000;
+const PUBLISH_LAG_MS = 15 * 60 * 1000;
+function latestSnapshotTs(now = Date.now()) {
+  return snapshotTsOf(now - SNAPSHOT_HOUR_UTC * HOUR_MS - PUBLISH_LAG_MS);
+}
+
 function expectedLatestDate(now = Date.now()) {
-  return new Date(now - PUBLISH_LAG_MS).toISOString().slice(0, 10);
+  return new Date(latestSnapshotTs(now)).toISOString().slice(0, 10);
 }
 
 function hasLatestSnapshot(series, now = Date.now()) {
@@ -432,7 +490,7 @@ function readDiskCache() {
 
 // Fetch health, surfaced to the UI so a stalled feed (e.g. a geo-blocked host) is visible
 const fetchStatus = { lastAttemptAt: 0, lastSuccessAt: 0, lastError: null };
-const RETRY_INTERVAL_MS = 10 * 60 * 1000; // after a failed fetch, wait before hitting Binance again
+const RETRY_INTERVAL_MS = 10 * 60 * 1000; // after a failed fetch, wait before hitting Deribit again
 
 function getBasisFetchStatus(series = inMemoryCache) {
   const latestDate = series && series.length ? series[series.length - 1].date : null;
@@ -449,7 +507,7 @@ function getBasisFetchStatus(series = inMemoryCache) {
 
 /**
  * Get historical basis data. The cache is reused only while it already contains the newest
- * published daily snapshot; once a new UTC day's snapshot is due, Binance is queried again
+ * published daily snapshot; once a new 08:00 UTC snapshot is due, Deribit is queried again
  * (throttled to one attempt per RETRY_INTERVAL_MS while it keeps failing).
  */
 async function getHistoricalBasisData(forceRefresh = false) {
@@ -485,14 +543,16 @@ module.exports = {
   expectedLatestDate,
   hasLatestSnapshot,
   fetchAndBuildHistoricalBasis,
-  fetchLiveBinanceCurve,
+  fetchLiveCurve,
   buildCurvePoint,
   aggregateDailyFunding,
   interpolateAtDay,
   applyCarryMetrics,
   calculateCarryScore,
   scoreTier,
-  parseBinanceDeliveryExpiry,
+  deribitFutureName,
+  parseDeribitFutureExpiry,
+  latestSnapshotTs,
   getQuarterExpiries,
   CACHE_FILE,
   SCHEMA_VERSION,
