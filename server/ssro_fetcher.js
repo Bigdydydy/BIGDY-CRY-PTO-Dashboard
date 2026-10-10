@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
+const { fetchWithTimeout } = require('./http_client');
+const { fetchSpotDailyCloses } = require('./spot_daily');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'ssro_chart.json');
 let inMemoryCache = null;
@@ -109,32 +110,18 @@ async function fetchDefiLlamaStablecoins() {
 }
 
 /**
- * Fetch daily BTC close price history from Binance
+ * Fetch daily BTC close price history (Binance, falling back to OKX / Coinbase when the host
+ * is blocked — see spot_daily.js). Records which venue served the data.
  */
-async function fetchBinanceBtcDaily(startDateStr = '2021-01-01') {
+let btcDailyVenue = null;
+async function fetchBtcDaily(startDateStr = '2021-01-01') {
   try {
-    let start = new Date(startDateStr).getTime();
-    const now = Date.now();
-    const allKlines = [];
-    while (start < now) {
-      const pathAndQuery = `/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${start}&limit=1000`;
-      const res = await fetchBinanceSpot(pathAndQuery, { timeout: 12000, retries: 1 });
-      if (!res.ok) throw new Error(`HTTP ${res.status} from Binance ${pathAndQuery}`);
-      const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) break;
-      allKlines.push(...data);
-      const lastTime = data[data.length - 1][0];
-      if (lastTime <= start) break;
-      start = lastTime + 86400000;
-    }
-    const map = new Map();
-    for (const k of allKlines) {
-      const d = new Date(k[0]).toISOString().slice(0, 10);
-      map.set(d, parseFloat(k[4])); // Daily close
-    }
-    return map;
+    const { venue, series, errors } = await fetchSpotDailyCloses(['BTC'], new Date(startDateStr).getTime());
+    if (errors.length) console.warn(`[SSRO] BTC daily from ${venue} after: ${errors.join(' | ')}`);
+    btcDailyVenue = venue;
+    return new Map(series.BTC.map(r => [r.date, r.close]));
   } catch (err) {
-    console.error('[SSRO] Binance BTC price fetch error:', err.message);
+    console.error('[SSRO] BTC daily price fetch error:', err.message);
     return new Map();
   }
 }
@@ -204,7 +191,7 @@ async function fetchAndBuildSsroData() {
   const [tvQuote, stableHistoryMap, btcDailyMap] = await Promise.all([
     fetchTradingViewQuote(),
     fetchDefiLlamaStablecoins(),
-    fetchBinanceBtcDaily('2021-01-01')
+    fetchBtcDaily('2021-01-01')
   ]);
 
   console.log(`[SSRO] Ingestion stats: TV STABLE.C=$${tvQuote.stableCap ? (tvQuote.stableCap / 1e9).toFixed(2) + 'B' : 'N/A'}, DefiLlama=${stableHistoryMap.size} days, BTC=${btcDailyMap.size} days`);
@@ -218,6 +205,9 @@ async function fetchAndBuildSsroData() {
     if (fs.existsSync(CACHE_FILE)) {
       console.warn('[SSRO] Live fetch returned empty, using disk cache');
       const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      // Hold the stale copy for one TTL instead of re-fetching on every request
+      inMemoryCache = cached;
+      lastFetchTime = Date.now();
       return cached;
     }
     throw new Error('Failed to retrieve history for SSRO calculation');
@@ -326,7 +316,7 @@ async function fetchAndBuildSsroData() {
   const payload = {
     code: 0,
     updatedAt: new Date().toISOString(),
-    source: 'TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance',
+    source: `TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & ${btcDailyVenue || 'Binance'}`,
     pinescript: `method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed`,
     latest: {
       date: latestPoint.date,

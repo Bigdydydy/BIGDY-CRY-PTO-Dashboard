@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-10-07T03:36:28.717Z",
+  "updatedAt": "2026-10-10T14:53:17.667Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
-    "date": "2026-10-07",
-    "btcPrice": 84076,
-    "stableCap": 312610325510,
-    "stableCapBillions": "312.61",
-    "ssr": 5.4,
-    "ssro200": 1.647,
-    "ssro50": 0.8,
+    "date": "2026-10-10",
+    "btcPrice": 82983.86,
+    "stableCap": 310727109642,
+    "stableCapBillions": "310.73",
+    "ssr": 5.362,
+    "ssro200": 1.522,
+    "ssro50": 0.588,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.003337212172281261,
-      "priceUsd": 312610325510
+      "change24h": 0.0011347210781125746,
+      "priceUsd": 310727109642
     },
     "quantEvaluation": {
-      "zScore": 1.647,
+      "zScore": 1.522,
       "zone": "moderately_overbought",
       "label": "偏热警戒 (买力消耗)",
       "colorClass": "text-amber",
@@ -25,9 +25,9 @@
     }
   },
   "summary": {
-    "totalDays": 2106,
+    "totalDays": 2109,
     "startDate": "2021-01-01",
-    "endDate": "2026-10-07",
+    "endDate": "2026-10-10",
     "minSsro200": -3.193,
     "maxSsro200": 4.111
   },
@@ -29504,17 +29504,59 @@
     },
     {
       "date": "2026-10-07",
-      "btcPrice": 84076,
-      "stableCap": 312610325510,
-      "ssr": 5.4,
-      "ssro200": 1.647,
+      "btcPrice": 83321.81,
+      "stableCap": 312806553537,
+      "ssr": 5.348,
+      "ssro200": 1.541,
       "sma200": 4.609,
       "stdev200": 0.48,
-      "upper2_200": 5.569,
-      "lower2_200": 3.649,
-      "ssro50": 0.8,
-      "sma50": 5.219,
+      "upper2_200": 5.568,
+      "lower2_200": 3.65,
+      "ssro50": 0.576,
+      "sma50": 5.218,
       "stdev50": 0.225
+    },
+    {
+      "date": "2026-10-08",
+      "btcPrice": 81754.45,
+      "stableCap": 312243322681,
+      "ssr": 5.257,
+      "ssro200": 1.337,
+      "sma200": 4.613,
+      "stdev200": 0.481,
+      "upper2_200": 5.576,
+      "lower2_200": 3.651,
+      "ssro50": 0.12,
+      "sma50": 5.232,
+      "stdev50": 0.204
+    },
+    {
+      "date": "2026-10-09",
+      "btcPrice": 82635.55,
+      "stableCap": 311611497263,
+      "ssr": 5.324,
+      "ssro200": 1.461,
+      "sma200": 4.617,
+      "stdev200": 0.484,
+      "upper2_200": 5.585,
+      "lower2_200": 3.65,
+      "ssro50": 0.418,
+      "sma50": 5.243,
+      "stdev50": 0.195
+    },
+    {
+      "date": "2026-10-10",
+      "btcPrice": 82983.86,
+      "stableCap": 310727109642,
+      "ssr": 5.362,
+      "ssro200": 1.522,
+      "sma200": 4.622,
+      "stdev200": 0.487,
+      "upper2_200": 5.595,
+      "lower2_200": 3.648,
+      "ssro50": 0.588,
+      "sma50": 5.247,
+      "stdev50": 0.195
     }
   ]
 }

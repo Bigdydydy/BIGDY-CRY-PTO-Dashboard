@@ -859,6 +859,29 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
     assert.equal(r4.badgeClass, 'badge-neg');
   });
 
+  test('fetchSpotDailyCloses falls through blocked venues and keeps both legs on one venue', async () => {
+    const { fetchSpotDailyCloses } = require('../server/spot_daily');
+    const day = Date.UTC(2026, 9, 1);
+    const blocked = { name: 'Blocked', quote: 'USDT', daily: async () => { throw new Error('HTTP 418'); } };
+    // Serves BTC but not PAXG: must be skipped so the ratio never mixes venues
+    const partial = { name: 'Partial', quote: 'USDT', daily: async s => (s === 'BTC' ? [{ openTime: day, close: 80000 }] : []) };
+    const good = {
+      name: 'Good',
+      quote: 'USD',
+      daily: async s => [
+        { openTime: day + 86400000, close: s === 'BTC' ? 81000 : 4100 },
+        { openTime: day, close: s === 'BTC' ? 80000 : 4000 }
+      ]
+    };
+    const out = await fetchSpotDailyCloses(['PAXG', 'BTC'], day, [blocked, partial, good]);
+    assert.equal(out.venue, 'Good');
+    assert.equal(out.quote, 'USD');
+    assert.deepEqual(out.series.BTC.map(r => [r.date, r.close]), [['2026-10-01', 80000], ['2026-10-02', 81000]]);
+    assert.equal(out.errors.length, 2);
+    assert.match(out.errors[0], /Blocked: HTTP 418/);
+    await assert.rejects(fetchSpotDailyCloses(['BTC'], day, [blocked]), /All spot venues failed/);
+  });
+
   test('Verified real Gold & BTC historical dataset exists and is clean', () => {
     const filePath = path.join(__dirname, '..', 'data', 'gold_correlation.json');
     assert.ok(fs.existsSync(filePath), 'data/gold_correlation.json must exist');
@@ -866,7 +889,8 @@ describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {
 
     assert.ok(data.metadata);
     assert.equal(data.metadata.isRealHistorical, true);
-    assert.ok(data.metadata.dataSource.includes('Binance'));
+    // Venue depends on reachability (Binance → OKX → Coinbase), the instrument does not
+    assert.ok(data.metadata.dataSource.includes('PAXG'));
     assert.ok(data.current);
     assert.ok(data.current.btcGoldRatio > 0);
     assert.ok(data.current.goldBtcRatio > 0);
