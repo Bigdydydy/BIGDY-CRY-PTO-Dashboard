@@ -129,6 +129,9 @@ function reloadAllChartsForTheme() {
   if (typeof renderMacroChart === 'function' && typeof rawMacroData !== 'undefined' && rawMacroData) {
     renderMacroChart();
   }
+  if (typeof renderPreferredsCharts === 'function' && typeof rawPrefData !== 'undefined' && rawPrefData) {
+    renderPreferredsCharts();
+  }
   if (typeof renderCdriChart === 'function' && typeof rawCdriData !== 'undefined' && rawCdriData) {
     renderCdriChart();
   }
@@ -454,6 +457,7 @@ async function loadMarketData(triggerRefresh = false) {
     const [mResp] = await Promise.all([
       fetch(`/api/market-data?threshold=${threshold}&timeRange=${timeRange}`),
       loadMacroData(triggerRefresh).catch(e => console.error('[App] Macro fetch error:', e.message)),
+      loadPreferredsData(triggerRefresh).catch(e => console.error('[App] Preferreds fetch error:', e.message)),
       loadCdriData(triggerRefresh).catch(e => console.error('[App] CDRI fetch error:', e.message)),
       fetchSsroData(triggerRefresh).catch(e => console.error('[App] SSRO fetch error:', e.message))
     ]);
@@ -2878,6 +2882,162 @@ function renderMacroChart() {
       }
     });
   }
+}
+
+// ============================================================================
+// MSTR 融资压力：STRC 平价锚定 + STRD−STRF 分层利差
+// ============================================================================
+
+let rawPrefData = null;
+let prefStrcChart = null;
+let prefSpreadChart = null;
+
+async function loadPreferredsData(forceRefresh = false) {
+  try {
+    const resp = await fetch(forceRefresh ? '/api/mstr-preferreds?refresh=true' : '/api/mstr-preferreds');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.error || 'Failed to load preferreds data');
+    rawPrefData = json;
+    renderPreferredsSummary(json.summary, json.monthly);
+    renderPreferredsCharts();
+  } catch (err) {
+    console.error('[Preferreds] Error loading data:', err);
+    const asof = document.getElementById('pref-asof');
+    if (asof) asof.textContent = '数据源暂不可用';
+  }
+}
+
+function renderPreferredsSummary(s, monthly) {
+  if (!s) return;
+  const setText = (id, text, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (cls !== undefined) el.className = cls;
+  };
+  const signed = (v, digits = 2) => `${v >= 0 ? '+' : ''}${v.toFixed(digits)}`;
+
+  setText('pref-asof', `截至 ${s.asOf} · Yahoo / FRED`);
+
+  setText('pref-strc-val', `$${s.strcClose.toFixed(2)}`, `mm-val ${s.strcClose < 99 ? 'text-rose' : ''}`);
+  setText('pref-strc-chip', `${signed(s.strcDeviationPct)}%`,
+    `mm-chip ${s.strcClose < 99 ? 'chip-negative' : s.strcClose < 99.5 ? 'chip-warning' : 'chip-positive'}`);
+
+  setText('pref-vwap-val', `$${s.strcVwap20.toFixed(2)}`);
+  setText('pref-vwap-sub', s.strcClose >= s.strcVwap20 ? '收盘高于 VWAP，向平价修复' : '收盘低于 VWAP，抛压未退');
+
+  setText('pref-streak-val', `${s.belowParStreak} 天`, `mm-val ${s.belowParStreak >= 5 ? 'text-rose' : ''}`);
+  setText('pref-streak-sub', `历史最长 ${s.maxBelowParStreak} 天 (止于 ${s.maxBelowParStreakEnd})`);
+
+  const pct60 = Math.round(s.belowParDays60 / s.window60 * 100);
+  setText('pref-below60-val', `${pct60}%`, `mm-val ${pct60 >= 50 ? 'text-rose' : ''}`);
+  setText('pref-below60-sub', `${s.belowParDays60} / ${s.window60} 个交易日`);
+
+  if (s.juniorSpreadPct !== null) {
+    const zone = { normal: ['正常', 'chip-positive'], watch: ['留意', 'chip-warning'], stress: ['压力', 'chip-negative'] }[s.juniorSpreadZone];
+    setText('pref-spread-val', `${s.juniorSpreadPct.toFixed(2)}%`);
+    setText('pref-spread-chip', zone[0], `mm-chip ${zone[1]}`);
+  }
+  if (s.juniorSpreadChange20dBp !== null) {
+    setText('pref-spread-chg-val', `${s.juniorSpreadChange20dBp >= 0 ? '+' : ''}${s.juniorSpreadChange20dBp} bp`,
+      `mm-val ${s.juniorSpreadChange20dBp > 0 ? 'text-rose' : 'text-green'}`);
+    setText('pref-spread-pct-sub', `高于过去 1 年 ${s.juniorSpreadPercentile1y}% 的交易日`);
+  }
+
+  // 指标二依赖手动维护的 STRC 月度股息率
+  const m = s.strcLatestRatedMonth;
+  if (!s.strcRateConfigured || !m) {
+    setText('pref-tbill-val', '待配置');
+    setText('pref-tbill-sub', '在 data/mstr_preferreds.json 填写月度股息率');
+    setText('pref-gap-val', '待配置');
+    setText('pref-gap-chip', '--', 'mm-chip');
+    setText('pref-gap-sub', '需 STRC 月度股息率');
+    return;
+  }
+  setText('pref-tbill-val', m.spreadOverTbillPct !== null ? `${m.spreadOverTbillPct.toFixed(2)}%` : '--');
+  setText('pref-tbill-sub', `${m.month} 股息率 ${m.ratePct.toFixed(2)}%，T-bill ${m.tbill1mPct?.toFixed(2) ?? '--'}%`);
+  setText('pref-gap-val', `${s.hikeFailedMonths} / ${s.hikeMonths}`);
+  setText('pref-gap-chip', m.hikeFailed ? '本月触发' : '本月未触发', `mm-chip ${m.hikeFailed ? 'chip-negative' : 'chip-positive'}`);
+  setText('pref-gap-sub', `隐含利率缺口 ${m.impliedGapBp} bp (回到 $100 还需加息)`);
+}
+
+function renderPreferredsCharts() {
+  if (!rawPrefData || typeof Chart === 'undefined') return;
+  const strcCanvas = document.getElementById('pref-strc-canvas');
+  const spreadCanvas = document.getElementById('pref-spread-canvas');
+  if (!strcCanvas || !spreadCanvas) return;
+
+  const points = rawPrefData.points;
+  const t = rawPrefData.summary.spreadThresholdsPct;
+  const labels = points.map(p => p.date);
+  const colors = getChartThemeColors();
+  const flat = (v) => points.map(() => v);
+  const refLine = (label, v, color) => ({
+    label, data: flat(v), borderColor: color, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, isRef: true
+  });
+  const baseOptions = (title, yTick, tooltipLabel) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        display: true,
+        labels: { color: colors.textSecondary, boxWidth: 12, font: { family: 'Inter', size: 10 } }
+      },
+      title: { display: true, text: title, color: colors.textPrimary, font: { family: 'Inter', size: 11, weight: '600' } },
+      tooltip: {
+        backgroundColor: colors.tooltipBg,
+        borderColor: colors.tooltipBorder,
+        borderWidth: 1,
+        titleColor: colors.tooltipTitle,
+        bodyColor: colors.tooltipBody,
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        filter: (item) => !item.dataset.isRef && item.parsed.y !== null,
+        callbacks: { label: tooltipLabel }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: colors.tickColor, maxTicksLimit: 8, maxRotation: 0, font: { family: 'JetBrains Mono', size: 10 } } },
+      y: { grid: { color: colors.gridLine }, ticks: { color: colors.tickColor, callback: yTick, font: { family: 'JetBrains Mono', size: 10 } } }
+    }
+  });
+
+  if (prefStrcChart) prefStrcChart.destroy();
+  prefStrcChart = new Chart(strcCanvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'STRC 收盘', data: points.map(p => p.strcClose), borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+        { label: '20D VWAP', data: points.map(p => p.strcVwap20), borderColor: '#a1a1aa', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0 },
+        refLine('$99 警戒', 99, '#f43f5e')
+      ]
+    },
+    options: baseOptions('STRC 平价偏离', v => `$${v}`, (c) => {
+      const p = points[c.dataIndex];
+      const streak = c.datasetIndex === 0 && p.belowParStreak > 0 ? ` · 连续 ${p.belowParStreak} 天 <$99` : '';
+      return ` ${c.dataset.label}: $${c.parsed.y.toFixed(2)}${streak}`;
+    })
+  });
+
+  if (prefSpreadChart) prefSpreadChart.destroy();
+  prefSpreadChart = new Chart(spreadCanvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'STRD − STRF 利差', data: points.map(p => p.juniorSpread), borderColor: '#8b5cf6', borderWidth: 2, pointRadius: 0, tension: 0.1, spanGaps: true },
+        refLine(`留意 ${t.watch}%`, t.watch, '#f59e0b'),
+        refLine(`压力 ${t.stress}%`, t.stress, '#f43f5e')
+      ]
+    },
+    options: baseOptions('优先股分层利差 (领先 STRC 约 1–2 周)', v => `${v}%`, (c) => {
+      const p = points[c.dataIndex];
+      return ` 利差 ${c.parsed.y.toFixed(2)}% · STRD $${p.strdClose ?? '--'} / STRF $${p.strfClose ?? '--'} · STRC $${p.strcClose}`;
+    })
+  });
 }
 
 /**

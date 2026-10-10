@@ -1,0 +1,6 @@
+{
+  "_note": "MSTR 优先股参数。strcMonthlyRatePct 按 'YYYY-MM': 年化股息率(%) 手动维护，来源为 Strategy 每月公告的 STRC 股息率；留空时「上调后仍未回平价」指标不计算。",
+  "fixedCouponPct": { "STRF": 10, "STRD": 10 },
+  "spreadThresholdsPct": { "watch": 3.5, "stress": 4.5 },
+  "strcMonthlyRatePct": {}
+}

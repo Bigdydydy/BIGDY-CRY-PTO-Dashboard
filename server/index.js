@@ -14,6 +14,7 @@ const {
   analyze25DeltaSkew
 } = require('./analytics_engine');
 const { getMacroChartData } = require('./macro_fetcher');
+const { getPreferredsData } = require('./mstr_preferreds');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
@@ -567,6 +568,19 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/mstr-preferreds — STRC 平价锚定与优先股分层利差
+  if (pathname === '/api/mstr-preferreds' && req.method === 'GET') {
+    try {
+      const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+      const data = await getPreferredsData(forceParam);
+      sendJsonResponse(req, res, 200, { code: 0, ...data });
+    } catch (err) {
+      console.error('[API Error] mstr-preferreds:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
   // GET /api/macro-chart
   if (pathname === '/api/macro-chart' && req.method === 'GET') {
     try {
@@ -753,6 +767,7 @@ async function handleApiRequest(req, res, parsedUrl) {
           const [syncResult] = await Promise.all([
             refreshAllMarketData('BTC'),
             getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
+            getPreferredsData(true).catch(e => console.error('[Preferreds] Sync refresh error:', e.message)),
             fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
             getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
             getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),

@@ -2334,6 +2334,59 @@ body {
   }
 }
 
+/* MSTR 融资压力：优先股锚定 */
+.pref-section {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pref-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pref-section-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pref-section-asof {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.mm-chip.chip-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.pref-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pref-chart-wrapper {
+  position: relative;
+  height: 260px;
+}
+
+@media (max-width: 1180px) {
+  .pref-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pref-chart-wrapper {
+    height: 230px;
+  }
+}
+
 /* ==========================================================================
    CoinGlass CDRI (Crypto Derivatives Risk Index) Module
    ========================================================================== */

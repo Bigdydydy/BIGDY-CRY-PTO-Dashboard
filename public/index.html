@@ -21,7 +21,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20260924_k95">
+  <link rel="stylesheet" href="/style.css?v=20261010_1">
   <link rel="stylesheet" href="/atelier.css?v=20261007_3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg">
@@ -518,6 +518,69 @@
         <!-- Chart Canvas Container -->
         <div class="macro-chart-canvas-wrapper">
           <canvas id="macro-chart-canvas"></canvas>
+        </div>
+
+        <!-- MSTR 融资压力：STRC 平价锚定 + 优先股分层利差 -->
+        <div class="pref-section" id="mstr-pref-section">
+          <div class="pref-section-head">
+            <span class="pref-section-title">MSTR 融资压力 · 优先股锚定</span>
+            <span class="pref-section-asof" id="pref-asof">--</span>
+          </div>
+          <div class="macro-metrics-row">
+            <div class="macro-metric-card">
+              <span class="mm-label">STRC 收盘 / 偏离平价</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="pref-strc-val">$--</span>
+                <span class="mm-chip" id="pref-strc-chip">--</span>
+              </div>
+              <span class="mm-sub">面值 $100，按月调息维持平价</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">STRC 20D VWAP</span>
+              <div class="mm-val-wrap"><span class="mm-val" id="pref-vwap-val">$--</span></div>
+              <span class="mm-sub" id="pref-vwap-sub">典型价 × 成交量加权</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">连续收于 $99 以下</span>
+              <div class="mm-val-wrap"><span class="mm-val" id="pref-streak-val">-- 天</span></div>
+              <span class="mm-sub" id="pref-streak-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">近 60 日低于 $99 占比</span>
+              <div class="mm-val-wrap"><span class="mm-val" id="pref-below60-val">--%</span></div>
+              <span class="mm-sub" id="pref-below60-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">STRD − STRF 收益率利差</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="pref-spread-val">--%</span>
+                <span class="mm-chip" id="pref-spread-chip">--</span>
+              </div>
+              <span class="mm-sub">次级 + 非累积股息的风险溢价 (5D 中位数)</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">利差 20D 变化 / 1 年分位</span>
+              <div class="mm-val-wrap"><span class="mm-val" id="pref-spread-chg-val">-- bp</span></div>
+              <span class="mm-sub" id="pref-spread-pct-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">STRC 当期收益率 − 1M T-bill</span>
+              <div class="mm-val-wrap"><span class="mm-val" id="pref-tbill-val">--</span></div>
+              <span class="mm-sub" id="pref-tbill-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">上调后仍未回平价</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="pref-gap-val">--</span>
+                <span class="mm-chip" id="pref-gap-chip">--</span>
+              </div>
+              <span class="mm-sub" id="pref-gap-sub">--</span>
+            </div>
+          </div>
+          <div class="pref-charts">
+            <div class="pref-chart-wrapper"><canvas id="pref-strc-canvas"></canvas></div>
+            <div class="pref-chart-wrapper"><canvas id="pref-spread-canvas"></canvas></div>
+          </div>
         </div>
       </div>
     </section>
@@ -2830,6 +2893,6 @@
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
   <script src="/atelier.js?v=20261008_1"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261010_1"></script>
+  <script src="/app.js?v=20261010_2"></script>
 </body>
 </html>
