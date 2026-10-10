@@ -171,7 +171,7 @@
   "address": "0x66661c7229901f568f16bd1551b3ba826f83ce49",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-07",
+  "last_qualified": "2026-10-10",
   "symbol": "DEBIT"
  },
  "bsc:0x6a998b45cc97046c40784b456941b045f02e7777": {
@@ -453,6 +453,13 @@
   "first_qualified": "2026-10-06",
   "last_qualified": "2026-10-07",
   "symbol": "SS"
+ },
+ "robinhood:0x28f4d51a1627ddfd52ce5c14775f22b55156d7bc": {
+  "address": "0x28f4d51a1627ddfd52ce5c14775f22b55156d7bc",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-10",
+  "last_qualified": "2026-10-10",
+  "symbol": "HBLINU"
  },
  "robinhood:0x2e8c31162b855a2ffa90f6f8634643ad6f111e18": {
   "address": "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
@@ -822,7 +829,7 @@
   "address": "0xeb24a2663af4ee979dcbfe39cb95b5f12d369c4b",
   "chain": "robinhood",
   "first_qualified": "2026-10-05",
-  "last_qualified": "2026-10-06",
+  "last_qualified": "2026-10-10",
   "symbol": "CEREBRO"
  },
  "robinhood:0xeb72730086812cbe418f6036578e8a72248c2244": {
@@ -993,6 +1000,13 @@
   "last_qualified": "2026-10-04",
   "symbol": "HUMAN"
  },
+ "solana:8nnaeWCw8mUypcGAgbmSuzAT85uWx4UN12adDrMhXrGF": {
+  "address": "8nnaeWCw8mUypcGAgbmSuzAT85uWx4UN12adDrMhXrGF",
+  "chain": "solana",
+  "first_qualified": "2026-10-10",
+  "last_qualified": "2026-10-10",
+  "symbol": "HOTBOT"
+ },
  "solana:98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump": {
   "address": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
   "chain": "solana",
@@ -1034,6 +1048,13 @@
   "first_qualified": "2026-10-04",
   "last_qualified": "2026-10-10",
   "symbol": "CATE"
+ },
+ "solana:ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg": {
+  "address": "ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg",
+  "chain": "solana",
+  "first_qualified": "2026-10-10",
+  "last_qualified": "2026-10-10",
+  "symbol": "CYBERLEEK"
  },
  "solana:BQAeeSowpwEx8Km8GcporcbuLKq4a7EQceH3F2qZpump": {
   "address": "BQAeeSowpwEx8Km8GcporcbuLKq4a7EQceH3F2qZpump",
@@ -1104,6 +1125,13 @@
   "first_qualified": "2026-10-05",
   "last_qualified": "2026-10-09",
   "symbol": "HIGGS"
+ },
+ "solana:E92fvVYzA4AumJnp1ZsdVN3mfnNdDFSs3rP9gsUVxmC7": {
+  "address": "E92fvVYzA4AumJnp1ZsdVN3mfnNdDFSs3rP9gsUVxmC7",
+  "chain": "solana",
+  "first_qualified": "2026-10-10",
+  "last_qualified": "2026-10-10",
+  "symbol": "PULT"
  },
  "solana:EEpng77ZPn9FbgbT4xsRjwuxNCcMBYq3HTwEscyTpump": {
   "address": "EEpng77ZPn9FbgbT4xsRjwuxNCcMBYq3HTwEscyTpump",
