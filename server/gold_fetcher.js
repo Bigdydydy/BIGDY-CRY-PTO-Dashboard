@@ -1,8 +1,21 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchBinanceSpot } = require('./http_client');
+const { fetchSpotDailyCloses } = require('./spot_daily');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'gold_correlation.json');
+const HISTORY_DAYS = 1000;
+const DAY_MS = 86400000;
+const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
+
+function readCachedSeries() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return null;
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return Array.isArray(cached?.series) ? cached : null;
+  } catch (e) {
+    return null;
+  }
+}
 const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Approx $18.5T for ~212,500 tonnes of global above-ground gold
 const BTC_CIRCULATING_SUPPLY = 19.8e6;     // Approx 19.8M circulating BTC in 2026
 
@@ -130,43 +143,47 @@ function classifyCorrelationRegime(r, btcGoldRatio, btcMarketCapShare) {
 }
 
 /**
- * Fetch historical klines from Binance and calculate gold/BTC ratio and rolling correlation
+ * Fetch ~1000 daily PAXG and BTC closes (same venue for both legs) and calculate
+ * the gold/BTC ratio and rolling correlation
  */
 async function fetchGoldCorrelationFromSource() {
-  const [paxgResp, btcResp] = await Promise.all([
-    fetchBinanceSpot('/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000'),
-    fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000')
-  ]);
+  const startMs = Date.now() - HISTORY_DAYS * DAY_MS;
+  const { venue, quote, series: spot, errors, partial, coverageStart } = await fetchSpotDailyCloses(['PAXG', 'BTC'], startMs);
+  if (errors.length) console.warn(`[GoldFetcher] Using ${venue} after: ${errors.join(' | ')}`);
 
-  if (!paxgResp.ok) throw new Error(`Binance PAXG HTTP ${paxgResp.status}`);
-  if (!btcResp.ok) throw new Error(`Binance BTC HTTP ${btcResp.status}`);
+  const paxgMap = new Map(spot.PAXG.map(r => [r.date, r]));
 
-  const paxgKlines = await paxgResp.json();
-  const btcKlines = await btcResp.json();
-
-  // Create date lookup map for PAXG
-  const paxgMap = new Map();
-  for (const k of paxgKlines) {
-    const d = new Date(k[0]).toISOString().slice(0, 10);
-    paxgMap.set(d, {
-      openTime: k[0],
-      close: parseFloat(k[4])
-    });
-  }
-
-  // Intersect with BTC klines by calendar date
+  // Intersect with BTC closes by calendar date
   const alignedDates = [];
   const btcPrices = [];
   const goldPrices = [];
   const timestamps = [];
 
-  for (const k of btcKlines) {
-    const d = new Date(k[0]).toISOString().slice(0, 10);
-    if (paxgMap.has(d)) {
-      alignedDates.push(d);
-      timestamps.push(k[0]);
-      btcPrices.push(parseFloat(k[4]));
-      goldPrices.push(paxgMap.get(d).close);
+  // The fallback venue lists PAXG for less than the full window: keep the cached days before its
+  // first bar (both legs from the cached venue), so each day's ratio still uses a single venue
+  let dataSource = `${venue} PAXG/${quote} (1:1 实物黄金锚定) + BTC/${quote} 现货 24/7 连续日线`;
+  let historySource = dataSource; // single-venue label of the oldest days, carried across splices
+  if (partial) {
+    const cached = readCachedSeries();
+    const older = cached ? cached.series.filter(r => r.date < coverageStart && r.date >= isoDate(startMs)) : [];
+    for (const r of older) {
+      alignedDates.push(r.date);
+      timestamps.push(r.timestamp);
+      btcPrices.push(r.btcPrice);
+      goldPrices.push(r.goldPrice);
+    }
+    if (older.length) {
+      historySource = cached.metadata?.historySource || cached.metadata?.dataSource || '缓存历史';
+      dataSource = `${historySource}（至 ${older[older.length - 1].date}）+ ${venue} PAXG/${quote} + BTC/${quote}（自 ${coverageStart} 起）`;
+    }
+  }
+
+  for (const k of spot.BTC) {
+    if (paxgMap.has(k.date) && (!partial || k.date >= coverageStart)) {
+      alignedDates.push(k.date);
+      timestamps.push(k.openTime);
+      btcPrices.push(k.close);
+      goldPrices.push(paxgMap.get(k.date).close);
     }
   }
 
@@ -208,7 +225,10 @@ async function fetchGoldCorrelationFromSource() {
 
   return {
     metadata: {
-      dataSource: 'Binance PAXG/USDT (1:1 实物黄金锚定) + BTC/USDT 官方现货 24/7 连续日线',
+      dataSource,
+      historySource,
+      venue,
+      venueFallbackErrors: errors,
       targetReference: 'Newhedge.io (Bitcoin vs. Gold Correlation & Ratio)',
       externalUrl: 'https://newhedge.io/bitcoin/gold-correlation',
       timeRange: `${series[0].date} 至 ${latest.date}`,

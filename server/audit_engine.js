@@ -263,7 +263,7 @@ async function getSystemAuditData(doProbe = false) {
       id: 'gold_btc_correlation',
       name: '黄金与比特币比率及滚动相关性引擎',
       viewId: 'view-gold-correlation',
-      primarySource: 'Binance 现货官方接口 (PAXG/USDT + BTC/USDT)',
+      primarySource: 'PAXG + BTC 现货日线：Binance 优先，被拒 (418/451) 时改用 OKX / Coinbase',
       targetEndpoints: ['https://api.binance.com/api/v3/klines'],
       timeframe: '1,000 天完整日线 + 30秒实时现货相关性联动',
       updateInterval: '30s 自动轮询',
@@ -282,7 +282,7 @@ async function getSystemAuditData(doProbe = false) {
       id: 'ssro_oscillator',
       name: '稳定币比率震荡指标 (SSRO)',
       viewId: 'view-ssro',
-      primarySource: 'DefiLlama 全网稳定币总市值 + Binance BTC 现货',
+      primarySource: 'DefiLlama 全网稳定币总市值 + BTC 现货日线 (Binance 优先，备用 OKX / Coinbase)',
       targetEndpoints: [
         'https://stablecoins.llama.fi/stablecoincharts/all',
         'https://api.binance.com/api/v3/klines?symbol=BTCUSDT'
