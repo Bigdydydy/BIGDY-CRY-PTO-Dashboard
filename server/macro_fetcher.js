@@ -6,7 +6,29 @@ const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'macro_chart.json');
 const BT_STRATEGY_FILE = path.join(__dirname, '..', 'data', 'bitcointreasuries_strategy.json');
+const MSTR_CAPITAL_FILE = path.join(__dirname, '..', 'data', 'mstr_capital_structure.json');
 let inMemoryCache = null;
+
+// 区块补贴：2024-04-20 第四次减半后 3.125 BTC × 144 块 ≈ 450 BTC/天
+function dailyIssuanceBtc(dateStr) {
+  return dateStr >= '2024-04-20' ? 450 : 900;
+}
+
+/**
+ * 读取 MSTR 固定债权（可转债 + 优先股面值 − 现金，单位 USD）。
+ * mNAV 外推时，这部分 EV 不随股价变动；未填写则退化为纯股权口径。
+ */
+function loadMstrCapitalStructure() {
+  try {
+    if (fs.existsSync(MSTR_CAPITAL_FILE)) {
+      const cfg = JSON.parse(fs.readFileSync(MSTR_CAPITAL_FILE, 'utf8'));
+      if (typeof cfg.netFixedClaimsUSD === 'number') return cfg;
+    }
+  } catch (err) {
+    console.error('[MacroFetcher] Error reading MSTR capital structure:', err.message);
+  }
+  return null;
+}
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
@@ -315,16 +337,18 @@ async function fetchAndBuildMacroData() {
         const estCostBasis = (lastOfficial.costBasisUSD || 63800000000) + (e.delta > 0 ? e.delta * btcPx : 0);
         cost = Number((estCostBasis / e.balance).toFixed(2));
       }
-      return { timestamp: e.timestamp, cost: cost || 75437, holdings: e.balance };
+      return { timestamp: e.timestamp, cost: cost || 75437, holdings: e.balance, source: 'bitcointreasuries' };
     });
 
   const mergedMstrEvents = [
-    ...btPurchases.map(p => ({ timestamp: p.timestamp, cost: p.avgCostUSD, holdings: p.balance })),
+    ...btPurchases.map(p => ({ timestamp: p.timestamp, cost: p.avgCostUSD, holdings: p.balance, source: 'sec' })),
     ...postSnapshotBtEvents,
     ...effectiveMstrList
       .filter(m => m.timestamp > lastOfficialPurchaseTs && !postSnapshotBtEvents.some(b => Math.abs(b.timestamp - m.timestamp) < 86400000))
-      .map(m => ({ timestamp: m.timestamp, cost: m.microStrategyCost, holdings: m.totalBitcoin }))
+      .map(m => ({ timestamp: m.timestamp, cost: m.microStrategyCost, holdings: m.totalBitcoin, source: 'coinglass' }))
   ].sort((a, b) => a.timestamp - b.timestamp);
+  let lastMstrCostSource = null;
+  let lastMstrCostDate = null;
   console.log('[MacroFetcher] MSTR events: ' + btPurchases.length + ' official purchases + ' + postSnapshotBtEvents.length + ' live BT news + ' + (mergedMstrEvents.length - btPurchases.length - postSnapshotBtEvents.length) + ' live Coinglass records');
 
   // mNAV anchor: last snapshot dailyData point, used to estimate mNAV beyond snapshot coverage
@@ -341,10 +365,26 @@ async function fetchAndBuildMacroData() {
       if (stockDates[k] <= anchorDaily.date) { anchorPx = mstrStockMap.get(stockDates[k]); break; }
     }
     if (anchorDaily.mnav && anchorDaily.holdings && anchorBtc && anchorPx) {
-      mnavAnchor = { mnav: anchorDaily.mnav, nav: anchorDaily.holdings * anchorBtc, px: anchorPx };
-      console.log('[MacroFetcher] mNAV anchor @ ' + anchorDaily.date + ': mnav=' + anchorDaily.mnav + ' mstrPx=' + anchorPx.toFixed(2) + ' btc=' + anchorBtc);
+      // EV = 股权市值 + 固定债权。只有股权部分随股价变动，股数由锚点反推
+      const capital = loadMstrCapitalStructure();
+      const fixedClaims = capital ? capital.netFixedClaimsUSD : 0;
+      const ev = anchorDaily.mnav * anchorDaily.holdings * anchorBtc;
+      const equity = ev - fixedClaims;
+      if (equity > 0) {
+        mnavAnchor = {
+          date: anchorDaily.date,
+          holdings: anchorDaily.holdings,
+          fixedClaims,
+          shares: equity / anchorPx,
+          basis: capital ? 'ev' : 'equity'
+        };
+        console.log('[MacroFetcher] mNAV anchor @ ' + anchorDaily.date + ': mnav=' + anchorDaily.mnav + ' mstrPx=' + anchorPx.toFixed(2) + ' btc=' + anchorBtc + ' fixedClaims=' + fixedClaims + ' basis=' + mnavAnchor.basis);
+      }
     }
   }
+  // 锚点之后新增的 BTC 假设由 ATM 增发按当日股价融资，累计新增股数
+  let dilutionShares = 0;
+  let prevEstHoldings = mnavAnchor ? mnavAnchor.holdings : null;
 
   // Initialize Fed Liquidity with last known values before allDates[0]
   let lastWalcl = null;
@@ -361,9 +401,13 @@ async function fetchAndBuildMacroData() {
     const timeMs = new Date(date).getTime();
 
     // Advance merged MSTR events (official purchases + post-snapshot live Coinglass records)
-    while (mstrEventIdx < mergedMstrEvents.length && mergedMstrEvents[mstrEventIdx].timestamp <= timeMs + 86400000) {
-      lastMstrCost = mergedMstrEvents[mstrEventIdx].cost;
-      curHoldings = mergedMstrEvents[mstrEventIdx].holdings;
+    // 事件只在其自身日期当天及之后生效，避免提前一天引入未公告信息
+    while (mstrEventIdx < mergedMstrEvents.length && mergedMstrEvents[mstrEventIdx].timestamp <= timeMs) {
+      const ev = mergedMstrEvents[mstrEventIdx];
+      lastMstrCost = ev.cost;
+      curHoldings = ev.holdings;
+      lastMstrCostSource = ev.source;
+      lastMstrCostDate = new Date(ev.timestamp).toISOString().slice(0, 10);
       mstrEventIdx++;
     }
 
@@ -379,23 +423,24 @@ async function fetchAndBuildMacroData() {
     if (btDailyMap.has(date)) {
       const d = btDailyMap.get(date);
       curHoldings = d.holdings;
-      curVelocity = d.velocity30d;
       curMnav = d.mnav;
-    } else {
-      // Calculate 30-day rolling buy velocity (derivative: BTC / day)
-      const windowDays = Math.min(i, 30);
-      const prevHoldings = i >= 30 ? points[i - 30].mstrHoldings : (points[0] ? points[0].mstrHoldings : 21454);
-      const holdingsDiff = curHoldings - prevHoldings;
-      curVelocity = windowDays > 0 ? Number((Math.max(0, holdingsDiff) / windowDays).toFixed(1)) : 0;
-
-      // Estimate mNAV beyond snapshot coverage via market-cap/NAV ratio scaling
+    } else if (mnavAnchor && date > mnavAnchor.date) {
+      // 快照之后：EV = (锚点股数 + 增发股数) × 股价 + 固定债权
       const btcToday = btcMap.get(date);
-      if (mnavAnchor && lastMstrPx && curHoldings > 0 && btcToday > 0) {
-        const navNow = curHoldings * btcToday;
-        curMnav = Number((mnavAnchor.mnav * (mnavAnchor.nav / navNow) * (lastMstrPx / mnavAnchor.px)).toFixed(3));
+      if (lastMstrPx && curHoldings > 0 && btcToday > 0) {
+        const added = curHoldings - prevEstHoldings;
+        if (added > 0) dilutionShares += (added * btcToday) / lastMstrPx;
+        prevEstHoldings = curHoldings;
+        const evNow = (mnavAnchor.shares + dilutionShares) * lastMstrPx + mnavAnchor.fixedClaims;
+        curMnav = Number((evNow / (curHoldings * btcToday)).toFixed(3));
         mnavEstimated = true;
       }
     }
+
+    // 30 日平均净增持速率 (BTC/天)，保留符号：负值即净减持
+    const windowDays = Math.min(i, 30);
+    const prevHoldings = i >= 30 ? points[i - 30].mstrHoldings : (points[0] ? points[0].mstrHoldings : curHoldings);
+    curVelocity = windowDays > 0 ? Number(((curHoldings - prevHoldings) / windowDays).toFixed(1)) : 0;
 
     if (fred1y.has(date)) last1y = fred1y.get(date);
     if (fred10y.has(date)) last10y = fred10y.get(date);
@@ -450,8 +495,10 @@ async function fetchAndBuildMacroData() {
 
   // Find peak 30-day velocity
   let peakVel = 0;
+  let troughVel = 0;
   for (const p of points) {
     if (p.mstrBuyVelocity30d > peakVel) peakVel = p.mstrBuyVelocity30d;
+    if (p.mstrBuyVelocity30d < troughVel) troughVel = p.mstrBuyVelocity30d;
   }
   if (btData && btData.metadata && btData.metadata.peakVelocity30d > peakVel) {
     peakVel = btData.metadata.peakVelocity30d;
@@ -467,8 +514,15 @@ async function fetchAndBuildMacroData() {
     currentMstrHoldings: latest ? latest.mstrHoldings : (btData?.metadata?.latestHoldings || 845050),
     currentMstrVelocity30d: latest ? latest.mstrBuyVelocity30d : (btData?.metadata?.latestVelocity30d || 153.4),
     peakVelocity30d: peakVel,
+    troughVelocity30d: troughVel,
+    dailyIssuanceBtc: latest ? dailyIssuanceBtc(latest.date) : 450,
+    velocityToIssuance: latest ? Number((latest.mstrBuyVelocity30d / dailyIssuanceBtc(latest.date)).toFixed(2)) : null,
+    mstrCostSource: lastMstrCostSource,
+    mstrCostAsOf: lastMstrCostDate,
     currentMnav: latest ? latest.mnav : (btData?.metadata?.latestMnav || 1.055),
     mnavEstimated: latest ? !!latest.mnavEstimated : false,
+    mnavAnchorDate: mnavAnchor ? mnavAnchor.date : null,
+    mnavBasis: mnavAnchor ? mnavAnchor.basis : null,
     minMnav: btData?.metadata?.minMnav || 0.929,
     maxMnav: btData?.metadata?.maxMnav || 8.006,
     mstrPurchasesCount: btPurchases.length || effectiveMstrList.length,

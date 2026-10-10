@@ -402,7 +402,7 @@
               <span class="mm-val text-purple" id="macro-mstr-val">$--,---</span>
               <span class="mm-chip" id="macro-mstr-mult">--x</span>
             </div>
-            <span class="mm-sub" id="macro-mstr-sub">bitcointreasuries / SEC 公告核准数据</span>
+            <span class="mm-sub" id="macro-mstr-sub">数据来源加载中</span>
           </div>
 
           <div class="macro-metric-card" id="card-metric-1y">
@@ -431,12 +431,12 @@
           </div>
 
           <div class="macro-metric-card" id="card-metric-velocity">
-            <span class="mm-label">MSTR 加仓速度 (30D 导数)</span>
+            <span class="mm-label">MSTR 30D 平均净增持</span>
             <div class="mm-val-wrap">
               <span class="mm-val text-fuchsia" id="macro-velocity-val">-- BTC/d</span>
-              <span class="mm-chip" id="macro-velocity-chip">峰值 5,714</span>
+              <span class="mm-chip" id="macro-velocity-chip">--× 日产量</span>
             </div>
-            <span class="mm-sub" id="macro-velocity-sub">近30天日均吸筹速率 (bitcointreasuries.net)</span>
+            <span class="mm-sub" id="macro-velocity-sub">(持仓_t − 持仓_t−30) ÷ 30，负值为净减持</span>
           </div>
 
           <div class="macro-metric-card" id="card-metric-mnav">
@@ -492,9 +492,9 @@
               <span class="legend-name">(US 10Y - US 1Y) 利差</span>
               <span class="legend-axis-tag tag-right">右轴 %</span>
             </button>
-            <button class="legend-pill active" data-dataset="5" id="legend-btn-velocity" title="点击隐藏/显示 MSTR 购买速度 (30D 导数)">
+            <button class="legend-pill active" data-dataset="5" id="legend-btn-velocity" title="点击隐藏/显示 MSTR 30D 平均净增持">
               <span class="legend-color-dot" style="background-color: #ec4899;"></span>
-              <span class="legend-name">MSTR 购买速度 (30D 导数)</span>
+              <span class="legend-name">MSTR 30D 平均净增持</span>
               <span class="legend-axis-tag tag-velocity">右轴2 BTC/d</span>
             </button>
             <button class="legend-pill active" data-dataset="6" id="legend-btn-mnav" title="点击隐藏/显示 MSTR mNAV (EV 倍数)">
@@ -2830,6 +2830,6 @@
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
   <script src="/atelier.js?v=20261008_1"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261008_3"></script>
+  <script src="/app.js?v=20261010_1"></script>
 </body>
 </html>

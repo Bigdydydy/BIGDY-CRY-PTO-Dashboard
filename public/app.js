@@ -2250,6 +2250,7 @@ let currentMacroTimeframe = '1y';
 const elMacroBtcVal = document.getElementById('macro-btc-val');
 const elMacroMstrVal = document.getElementById('macro-mstr-val');
 const elMacroMstrMult = document.getElementById('macro-mstr-mult');
+const elMacroMstrSub = document.getElementById('macro-mstr-sub');
 const elMacro1yVal = document.getElementById('macro-1y-val');
 const elMacro10yVal = document.getElementById('macro-10y-val');
 const elMacroSpreadVal = document.getElementById('macro-spread-val');
@@ -2307,6 +2308,15 @@ function renderMacroSummary(summary) {
     elMacroMstrMult.className = `mm-chip ${isGain ? 'chip-positive' : 'chip-negative'}`;
   }
 
+  if (elMacroMstrSub && summary.mstrCostSource) {
+    const sourceName = {
+      sec: 'SEC 8-K 公告',
+      bitcointreasuries: 'bitcointreasuries 实时披露',
+      coinglass: 'Coinglass 估算（未经 SEC 核准）'
+    }[summary.mstrCostSource] || summary.mstrCostSource;
+    elMacroMstrSub.textContent = `${sourceName} · 截至 ${summary.mstrCostAsOf}`;
+  }
+
   if (elMacro1yVal && summary.current1y !== null) {
     elMacro1yVal.textContent = `${summary.current1y.toFixed(2)}%`;
   }
@@ -2339,29 +2349,40 @@ function renderMacroSummary(summary) {
     }
   }
 
+  const vel = summary.currentMstrVelocity30d || 0;
+  const issuance = summary.dailyIssuanceBtc || 450;
+  const issuanceRatio = summary.velocityToIssuance ?? vel / issuance;
+
   if (elMacroVelocityVal) {
-    const vel = summary.currentMstrVelocity30d || 0;
-    elMacroVelocityVal.textContent = vel > 0 ? `+${vel.toLocaleString()} BTC/d` : `0.0 BTC/d`;
+    const sign = vel > 0 ? '+' : '';
+    elMacroVelocityVal.textContent = `${sign}${vel.toLocaleString()} BTC/d`;
+    elMacroVelocityVal.className = `mm-val ${vel < 0 ? 'text-rose' : 'text-fuchsia'}`;
   }
 
-  if (elMacroVelocityChip && summary.peakVelocity30d) {
-    elMacroVelocityChip.textContent = `峰值 ${Math.round(summary.peakVelocity30d).toLocaleString()} BTC/d`;
+  // 以矿工日产量为参照：>1× 即吸收量超过全网新增供给
+  if (elMacroVelocityChip) {
+    elMacroVelocityChip.textContent = `${issuanceRatio.toFixed(2)}× 日产量`;
+    elMacroVelocityChip.className = `mm-chip ${vel < 0 ? 'chip-negative' : issuanceRatio >= 1 ? 'chip-positive' : ''}`;
   }
 
   if (elMacroVelocitySub) {
-    const vel = summary.currentMstrVelocity30d || 0;
-    if (vel >= 1000) {
-      elMacroVelocitySub.textContent = `强力吸筹中 (对现货市场形成明显供给冲击)`;
+    const range = `峰值 +${Math.round(summary.peakVelocity30d || 0).toLocaleString()} / 谷值 ${Math.round(summary.troughVelocity30d || 0).toLocaleString()} BTC/d`;
+    let state;
+    if (vel < 0) {
+      state = `净减持 (近30天日均 ${vel.toLocaleString()} BTC)`;
+    } else if (issuanceRatio >= 1) {
+      state = `吸收量超过矿工日产量 ${issuance} BTC (供给冲击)`;
     } else if (vel > 0) {
-      elMacroVelocitySub.textContent = `稳步加仓中 (近30天日均 +${vel.toLocaleString()} BTC)`;
+      state = `净增持，约占日产量 ${(issuanceRatio * 100).toFixed(0)}%`;
     } else {
-      elMacroVelocitySub.textContent = `近30天暂未披露新增购入 (蓄势观望)`;
+      state = `近30天持仓无变化`;
     }
+    elMacroVelocitySub.textContent = `${state} · ${range}`;
   }
 
   // Render MSTR mNAV
   if (elMacroMnavVal && summary.currentMnav !== null && summary.currentMnav !== undefined) {
-    elMacroMnavVal.textContent = `${summary.currentMnav.toFixed(2)}×`;
+    elMacroMnavVal.textContent = `${summary.currentMnav.toFixed(2)}×${summary.mnavEstimated ? ' 估' : ''}`;
   }
 
   if (elMacroMnavChip && summary.currentMnav !== null && summary.currentMnav !== undefined) {
@@ -2380,7 +2401,12 @@ function renderMacroSummary(summary) {
   }
 
   if (elMacroMnavSub && summary.minMnav !== null && summary.maxMnav !== null) {
-    elMacroMnavSub.textContent = `历史全域: ${summary.minMnav.toFixed(2)}× ~ ${summary.maxMnav.toFixed(2)}× (EV mNAV)`;
+    let sub = `历史全域: ${summary.minMnav.toFixed(2)}× ~ ${summary.maxMnav.toFixed(2)}× (EV mNAV)`;
+    if (summary.mnavEstimated && summary.mnavAnchorDate) {
+      const basis = summary.mnavBasis === 'ev' ? '含固定债权' : '纯股权口径';
+      sub = `${summary.mnavAnchorDate} 后为股价外推估算 (${basis}，含增发稀释) · ${sub}`;
+    }
+    elMacroMnavSub.textContent = sub;
   }
 
   // 8. FED Net Liquidity (WALCL - TGA - RRP)
@@ -2461,7 +2487,7 @@ function renderMacroChart() {
   const us1yYields = points.map(p => p.us1y);
   const us10yYields = points.map(p => p.us10y);
   const spreads = points.map(p => p.yieldSpread);
-  const velocities = points.map(p => p.mstrBuyVelocity30d || 0);
+  const velocities = points.map(p => p.mstrBuyVelocity30d ?? 0);
   const mnavs = points.map(p => (p.mnav !== null && p.mnav !== undefined) ? p.mnav : null);
   const netLiqs = points.map(p => (p.fedNetLiquidity !== null && p.fedNetLiquidity !== undefined) ? p.fedNetLiquidity : null);
   const netLiqSmas = points.map(p => (p.fedNetLiqSma20 !== null && p.fedNetLiqSma20 !== undefined) ? p.fedNetLiqSma20 : null);
@@ -2578,7 +2604,7 @@ function renderMacroChart() {
       hidden: !visibilityStates[4]
     },
     {
-      label: 'MSTR 购买速度 (30D 导数, BTC/天)',
+      label: 'MSTR 30D 平均净增持 (BTC/天)',
       data: velocities,
       borderColor: '#ec4899',
       backgroundColor: velGradient,
@@ -2685,11 +2711,14 @@ function renderMacroChart() {
                 if (context.dataset.yAxisID === 'yUSD') {
                   return ` ${label}: $${Number(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
                 } else if (context.dataset.yAxisID === 'yVelocity') {
-                  return ` ${label}: +${Number(val).toLocaleString()} BTC/d`;
+                  const issuance = context.label >= '2024-04-20' ? 450 : 900;
+                  const sign = val > 0 ? '+' : '';
+                  return ` ${label}: ${sign}${Number(val).toLocaleString()} BTC/d (${(val / issuance).toFixed(2)}× 日产量)`;
                 } else if (context.dataset.yAxisID === 'yMNAV') {
                   const premiumPct = ((val - 1) * 100).toFixed(1);
                   const status = val >= 1 ? `溢价 +${premiumPct}%` : `折价 ${premiumPct}%`;
-                  return ` ${label}: ${val.toFixed(2)}× (${status})`;
+                  const est = points[context.dataIndex]?.mnavEstimated ? ' · 估算' : '';
+                  return ` ${label}: ${val.toFixed(2)}× (${status}${est})`;
                 } else if (context.dataset.yAxisID === 'yLiquidity') {
                   return ` ${label}: $${val.toFixed(3)}T ($${Math.round(val * 1000).toLocaleString()}B)`;
                 } else {
@@ -2774,11 +2803,10 @@ function renderMacroChart() {
             },
             title: {
               display: true,
-              text: 'MSTR 速度 (BTC/天)',
+              text: 'MSTR 净增持 (BTC/天)',
               color: colors.isLight ? '#db2777' : '#f472b6',
               font: { family: 'Inter', size: 10, weight: '500' }
-            },
-            suggestedMin: 0
+            }
           },
           yMNAV: {
             type: 'linear',

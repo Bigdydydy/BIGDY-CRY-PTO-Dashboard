@@ -1,0 +1,6 @@
+{
+  "_note": "MSTR mNAV 外推用。netFixedClaimsUSD = 可转债面值 + 优先股清算优先额 - 现金及等价物（USD），取锚点日（bitcointreasuries 快照末日）附近的最新 10-Q/8-K 数据。为 null 时 mNAV 外推退化为纯股权口径。",
+  "asOf": null,
+  "source": null,
+  "netFixedClaimsUSD": null
+}

@@ -734,7 +734,7 @@
     {
       "date": "2020-09-13",
       "btcPrice": 10332.83,
-      "mstrCost": 11111.11,
+      "mstrCost": 11652.84,
       "mstrHoldings": 21454,
       "mstrBuyVelocity30d": 0,
       "mnav": 7.743,
@@ -2128,7 +2128,7 @@
     {
       "date": "2020-12-04",
       "btcPrice": 18650.52,
-      "mstrCost": 11635.31,
+      "mstrCost": 11111.11,
       "mstrHoldings": 38250,
       "mstrBuyVelocity30d": 0,
       "mnav": 4.916,
@@ -2400,7 +2400,7 @@
     {
       "date": "2020-12-20",
       "btcPrice": 23455.52,
-      "mstrCost": 15964.24,
+      "mstrCost": 11635.31,
       "mstrHoldings": 40824,
       "mstrBuyVelocity30d": 85.8,
       "mnav": 3.393,
@@ -2944,7 +2944,7 @@
     {
       "date": "2021-01-21",
       "btcPrice": 30850.13,
-      "mstrCost": 16034.7,
+      "mstrCost": 15964.24,
       "mstrHoldings": 70470,
       "mstrBuyVelocity30d": 0,
       "mnav": 2.482,
@@ -3131,7 +3131,7 @@
     {
       "date": "2021-02-01",
       "btcPrice": 33526.37,
-      "mstrCost": 16108.84,
+      "mstrCost": 16034.7,
       "mstrHoldings": 70784,
       "mstrBuyVelocity30d": 10.5,
       "mnav": 2.734,
@@ -3505,7 +3505,7 @@
     {
       "date": "2021-02-23",
       "btcPrice": 48891,
-      "mstrCost": 23980.74,
+      "mstrCost": 16108.84,
       "mstrHoldings": 71079,
       "mstrBuyVelocity30d": 9.8,
       "mnav": 2.024,
@@ -3590,7 +3590,7 @@
     {
       "date": "2021-02-28",
       "btcPrice": 45135.66,
-      "mstrCost": 24059.26,
+      "mstrCost": 23980.74,
       "mstrHoldings": 90531,
       "mstrBuyVelocity30d": 658.2,
       "mnav": 1.856,
@@ -3658,7 +3658,7 @@
     {
       "date": "2021-03-04",
       "btcPrice": 48374.09,
-      "mstrCost": 24114.91,
+      "mstrCost": 24059.26,
       "mstrHoldings": 90859,
       "mstrBuyVelocity30d": 659.3,
       "mnav": 1.501,
@@ -3777,7 +3777,7 @@
     {
       "date": "2021-03-11",
       "btcPrice": 57773.16,
-      "mstrCost": 24209.97,
+      "mstrCost": 24114.91,
       "mstrHoldings": 91064,
       "mstrBuyVelocity30d": 666.2,
       "mnav": 1.541,
@@ -4185,7 +4185,7 @@
     {
       "date": "2021-04-04",
       "btcPrice": 58202.01,
-      "mstrCost": 24306.88,
+      "mstrCost": 24209.97,
       "mstrHoldings": 91326,
       "mstrBuyVelocity30d": 8.7,
       "mnav": 1.345,
@@ -4831,7 +4831,7 @@
     {
       "date": "2021-05-12",
       "btcPrice": 49631.32,
-      "mstrCost": 24398.48,
+      "mstrCost": 24306.88,
       "mstrHoldings": 91579,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.236,
@@ -4916,7 +4916,7 @@
     {
       "date": "2021-05-17",
       "btcPrice": 43538.04,
-      "mstrCost": 24446.4,
+      "mstrCost": 24398.48,
       "mstrHoldings": 91850,
       "mstrBuyVelocity30d": 9,
       "mnav": 1.274,
@@ -5494,7 +5494,7 @@
     {
       "date": "2021-06-20",
       "btcPrice": 35600.16,
-      "mstrCost": 26074.38,
+      "mstrCost": 24446.4,
       "mstrHoldings": 92079,
       "mstrBuyVelocity30d": 0,
       "mnav": 2.016,
@@ -6565,7 +6565,7 @@
     {
       "date": "2021-08-22",
       "btcPrice": 49239.22,
-      "mstrCost": 26763.68,
+      "mstrCost": 26074.38,
       "mstrHoldings": 105084,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.405,
@@ -6905,7 +6905,7 @@
     {
       "date": "2021-09-11",
       "btcPrice": 45173.69,
-      "mstrCost": 27708.46,
+      "mstrCost": 26763.68,
       "mstrHoldings": 108991,
       "mstrBuyVelocity30d": 130.2,
       "mnav": 1.281,
@@ -8231,7 +8231,7 @@
     {
       "date": "2021-11-28",
       "btcPrice": 57274.88,
-      "mstrCost": 29529.18,
+      "mstrCost": 27708.46,
       "mstrHoldings": 114041,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.035,
@@ -8401,7 +8401,7 @@
     {
       "date": "2021-12-08",
       "btcPrice": 50471.19,
-      "mstrCost": 29856.22,
+      "mstrCost": 29529.18,
       "mstrHoldings": 121043,
       "mstrBuyVelocity30d": 233.4,
       "mnav": 1.064,
@@ -8758,7 +8758,7 @@
     {
       "date": "2021-12-29",
       "btcPrice": 46464.66,
-      "mstrCost": 30154.11,
+      "mstrCost": 29856.22,
       "mstrHoldings": 122477,
       "mstrBuyVelocity30d": 47.8,
       "mnav": 1.008,
@@ -9302,7 +9302,7 @@
     {
       "date": "2022-01-30",
       "btcPrice": 37881.76,
-      "mstrCost": 30194.88,
+      "mstrCost": 30154.11,
       "mstrHoldings": 124391,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.271,
@@ -10373,7 +10373,7 @@
     {
       "date": "2022-04-03",
       "btcPrice": 46407.35,
-      "mstrCost": 30695.41,
+      "mstrCost": 30194.88,
       "mstrHoldings": 125051,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.328,
@@ -11835,7 +11835,7 @@
     {
       "date": "2022-06-28",
       "btcPrice": 20281.29,
-      "mstrCost": 30658.68,
+      "mstrCost": 30695.41,
       "mstrHoldings": 129218,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.631,
@@ -13246,7 +13246,7 @@
     {
       "date": "2022-09-19",
       "btcPrice": 19537.02,
-      "mstrCost": 30633.66,
+      "mstrCost": 30658.68,
       "mstrHoldings": 129699,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.773,
@@ -14912,7 +14912,7 @@
     {
       "date": "2022-12-26",
       "btcPrice": 16919.39,
-      "mstrCost": 30392.85,
+      "mstrCost": 30633.66,
       "mstrHoldings": 130000,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.82,
@@ -16374,7 +16374,7 @@
     {
       "date": "2023-03-22",
       "btcPrice": 27250.97,
-      "mstrCost": 29793.82,
+      "mstrCost": 30392.85,
       "mstrHoldings": 132500,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.452,
@@ -16612,7 +16612,7 @@
     {
       "date": "2023-04-05",
       "btcPrice": 28170.01,
-      "mstrCost": 29785.71,
+      "mstrCost": 29793.82,
       "mstrHoldings": 138955,
       "mstrBuyVelocity30d": 215.2,
       "mnav": 1.473,
@@ -18023,7 +18023,7 @@
     {
       "date": "2023-06-27",
       "btcPrice": 30692.44,
-      "mstrCost": 29671.84,
+      "mstrCost": 29785.71,
       "mstrHoldings": 140000,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.433,
@@ -18584,7 +18584,7 @@
     {
       "date": "2023-07-30",
       "btcPrice": 29281.09,
-      "mstrCost": 29646.6,
+      "mstrCost": 29671.84,
       "mstrHoldings": 152333,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.665,
@@ -19519,7 +19519,7 @@
     {
       "date": "2023-09-23",
       "btcPrice": 26575.96,
-      "mstrCost": 29582,
+      "mstrCost": 29646.6,
       "mstrHoldings": 152800,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.51,
@@ -20148,7 +20148,7 @@
     {
       "date": "2023-10-30",
       "btcPrice": 34474.73,
-      "mstrCost": 29586,
+      "mstrCost": 29582,
       "mstrHoldings": 158245,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.33,
@@ -20641,7 +20641,7 @@
     {
       "date": "2023-11-28",
       "btcPrice": 37818.87,
-      "mstrCost": 30252.68,
+      "mstrCost": 29586,
       "mstrHoldings": 158400,
       "mstrBuyVelocity30d": 5.2,
       "mnav": 1.376,
@@ -21100,7 +21100,7 @@
     {
       "date": "2023-12-25",
       "btcPrice": 43576.13,
-      "mstrCost": 31165.74,
+      "mstrCost": 30252.68,
       "mstrHoldings": 174530,
       "mstrBuyVelocity30d": 537.7,
       "mnav": 1.256,
@@ -21814,7 +21814,7 @@
     {
       "date": "2024-02-05",
       "btcPrice": 42708.7,
-      "mstrCost": 31210.53,
+      "mstrCost": 31165.74,
       "mstrHoldings": 189150,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.297,
@@ -22154,7 +22154,7 @@
     {
       "date": "2024-02-25",
       "btcPrice": 51728.85,
-      "mstrCost": 31544,
+      "mstrCost": 31210.53,
       "mstrHoldings": 190000,
       "mstrBuyVelocity30d": 28.3,
       "mnav": 1.403,
@@ -22375,7 +22375,7 @@
     {
       "date": "2024-03-09",
       "btcPrice": 68313.27,
-      "mstrCost": 33707.32,
+      "mstrCost": 31544,
       "mstrHoldings": 193000,
       "mstrBuyVelocity30d": 100,
       "mnav": 1.985,
@@ -22528,7 +22528,7 @@
     {
       "date": "2024-03-18",
       "btcPrice": 67609.99,
-      "mstrCost": 35160.52,
+      "mstrCost": 33707.32,
       "mstrHoldings": 205000,
       "mstrBuyVelocity30d": 500,
       "mnav": 1.987,
@@ -22732,7 +22732,7 @@
     {
       "date": "2024-03-30",
       "btcPrice": 69582.18,
-      "mstrCost": 35164.6,
+      "mstrCost": 35160.52,
       "mstrHoldings": 214246,
       "mstrBuyVelocity30d": 708.2,
       "mnav": 2.074,
@@ -23225,7 +23225,7 @@
     {
       "date": "2024-04-28",
       "btcPrice": 63118.62,
-      "mstrCost": 35180,
+      "mstrCost": 35164.6,
       "mstrHoldings": 214278,
       "mstrBuyVelocity30d": 1.1,
       "mnav": 1.762,
@@ -24109,7 +24109,7 @@
     {
       "date": "2024-06-19",
       "btcPrice": 64974.37,
-      "mstrCost": 36804.5,
+      "mstrCost": 35180,
       "mstrHoldings": 214400,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.938,
@@ -24823,7 +24823,7 @@
     {
       "date": "2024-07-31",
       "btcPrice": 64628,
-      "mstrCost": 36644.59,
+      "mstrCost": 36804.5,
       "mstrHoldings": 226331,
       "mstrBuyVelocity30d": 0,
       "mnav": 2.118,
@@ -25554,7 +25554,7 @@
     {
       "date": "2024-09-12",
       "btcPrice": 58132.32,
-      "mstrCost": 38602.94,
+      "mstrCost": 36644.59,
       "mstrHoldings": 226500,
       "mstrBuyVelocity30d": 0,
       "mnav": 1.959,
@@ -25673,7 +25673,7 @@
     {
       "date": "2024-09-19",
       "btcPrice": 62947.99,
-      "mstrCost": 39266,
+      "mstrCost": 38602.94,
       "mstrHoldings": 244800,
       "mstrBuyVelocity30d": 610,
       "mnav": 1.825,
@@ -26557,7 +26557,7 @@
     {
       "date": "2024-11-10",
       "btcPrice": 80370.01,
-      "mstrCost": 42692.23,
+      "mstrCost": 39266,
       "mstrHoldings": 252220,
       "mstrBuyVelocity30d": 0,
       "mnav": 2.419,
@@ -26659,7 +26659,7 @@
     {
       "date": "2024-11-16",
       "btcPrice": 90586.92,
-      "mstrCost": 49873.7,
+      "mstrCost": 42692.23,
       "mstrHoldings": 279420,
       "mstrBuyVelocity30d": 906.7,
       "mnav": 2.405,
@@ -26778,7 +26778,7 @@
     {
       "date": "2024-11-23",
       "btcPrice": 97672.4,
-      "mstrCost": 56761.08,
+      "mstrCost": 49873.7,
       "mstrHoldings": 331200,
       "mstrBuyVelocity30d": 2632.7,
       "mnav": 2.304,
@@ -26914,7 +26914,7 @@
     {
       "date": "2024-12-01",
       "btcPrice": 97185.18,
-      "mstrCost": 58262.97,
+      "mstrCost": 56761.08,
       "mstrHoldings": 386700,
       "mstrBuyVelocity30d": 4482.7,
       "mnav": 1.83,
@@ -27016,7 +27016,7 @@
     {
       "date": "2024-12-07",
       "btcPrice": 99831.99,
-      "mstrCost": 60324.12,
+      "mstrCost": 58262.97,
       "mstrHoldings": 402100,
       "mstrBuyVelocity30d": 4996,
       "mnav": 1.744,
@@ -27135,7 +27135,7 @@
     {
       "date": "2024-12-14",
       "btcPrice": 101420,
-      "mstrCost": 61724.92,
+      "mstrCost": 60324.12,
       "mstrHoldings": 423650,
       "mstrBuyVelocity30d": 4807.7,
       "mnav": 1.685,
@@ -27271,7 +27271,7 @@
     {
       "date": "2024-12-22",
       "btcPrice": 95186.27,
-      "mstrCost": 62350.59,
+      "mstrCost": 61724.92,
       "mstrHoldings": 439000,
       "mstrBuyVelocity30d": 3593.3,
       "mnav": 1.554,
@@ -27390,7 +27390,7 @@
     {
       "date": "2024-12-29",
       "btcPrice": 93738.2,
-      "mstrCost": 62500,
+      "mstrCost": 62350.59,
       "mstrHoldings": 444262,
       "mstrBuyVelocity30d": 1918.7,
       "mnav": 1.422,
@@ -27509,7 +27509,7 @@
     {
       "date": "2025-01-05",
       "btcPrice": 98363.61,
-      "mstrCost": 62506.98,
+      "mstrCost": 62500,
       "mstrHoldings": 446400,
       "mstrBuyVelocity30d": 1476.7,
       "mnav": 2.066,
@@ -27628,7 +27628,7 @@
     {
       "date": "2025-01-12",
       "btcPrice": 94545.06,
-      "mstrCost": 62691,
+      "mstrCost": 62506.98,
       "mstrHoldings": 447470,
       "mstrBuyVelocity30d": 794,
       "mnav": 2.076,
@@ -27764,7 +27764,7 @@
     {
       "date": "2025-01-20",
       "btcPrice": 102260.01,
-      "mstrCost": 63610,
+      "mstrCost": 62691,
       "mstrHoldings": 450000,
       "mstrBuyVelocity30d": 366.7,
       "mnav": 2.277,
@@ -27866,7 +27866,7 @@
     {
       "date": "2025-01-26",
       "btcPrice": 102620,
-      "mstrCost": 64580.25,
+      "mstrCost": 63610,
       "mstrHoldings": 461000,
       "mstrBuyVelocity30d": 557.9,
       "mnav": 1.991,
@@ -28104,7 +28104,7 @@
     {
       "date": "2025-02-09",
       "btcPrice": 96462.75,
-      "mstrCost": 65101.22,
+      "mstrCost": 64580.25,
       "mstrHoldings": 471107,
       "mstrBuyVelocity30d": 787.9,
       "mnav": 1.93,
@@ -28342,7 +28342,7 @@
     {
       "date": "2025-02-23",
       "btcPrice": 96258,
-      "mstrCost": 66423.2,
+      "mstrCost": 65101.22,
       "mstrHoldings": 478740,
       "mstrBuyVelocity30d": 591.3,
       "mnav": 1.755,
@@ -28699,7 +28699,7 @@
     {
       "date": "2025-03-16",
       "btcPrice": 82574.53,
-      "mstrCost": 66406.07,
+      "mstrCost": 66423.2,
       "mstrHoldings": 499096,
       "mstrBuyVelocity30d": 678.5,
       "mnav": 1.949,
@@ -28818,7 +28818,7 @@
     {
       "date": "2025-03-23",
       "btcPrice": 86082.5,
-      "mstrCost": 66653.17,
+      "mstrCost": 66406.07,
       "mstrHoldings": 499226,
       "mstrBuyVelocity30d": 682.9,
       "mnav": 1.906,
@@ -28937,7 +28937,7 @@
     {
       "date": "2025-03-30",
       "btcPrice": 82389.99,
-      "mstrCost": 67458,
+      "mstrCost": 66653.17,
       "mstrHoldings": 506137,
       "mstrBuyVelocity30d": 234.7,
       "mnav": 1.879,
@@ -29158,7 +29158,7 @@
     {
       "date": "2025-04-12",
       "btcPrice": 85276.9,
-      "mstrCost": 67019.26,
+      "mstrCost": 67458,
       "mstrHoldings": 528185,
       "mstrBuyVelocity30d": 969.6,
       "mnav": 1.988,
@@ -29277,7 +29277,7 @@
     {
       "date": "2025-04-19",
       "btcPrice": 85077.01,
-      "mstrCost": 67762.91,
+      "mstrCost": 67019.26,
       "mstrHoldings": 531644,
       "mstrBuyVelocity30d": 1080.6,
       "mnav": 2.081,
@@ -29396,7 +29396,7 @@
     {
       "date": "2025-04-26",
       "btcPrice": 94628,
-      "mstrCost": 68448.48,
+      "mstrCost": 67762.91,
       "mstrHoldings": 538200,
       "mstrBuyVelocity30d": 1068.8,
       "mnav": 2.117,
@@ -29481,7 +29481,7 @@
     {
       "date": "2025-05-01",
       "btcPrice": 96489.91,
-      "mstrCost": 68550,
+      "mstrCost": 68448.48,
       "mstrHoldings": 553555,
       "mstrBuyVelocity30d": 845.7,
       "mnav": 2.083,
@@ -29634,7 +29634,7 @@
     {
       "date": "2025-05-10",
       "btcPrice": 104809.53,
-      "mstrCost": 69287,
+      "mstrCost": 68550,
       "mstrHoldings": 555450,
       "mstrBuyVelocity30d": 908.8,
       "mnav": 2.069,
@@ -29770,7 +29770,7 @@
     {
       "date": "2025-05-18",
       "btcPrice": 106454.26,
-      "mstrCost": 69726,
+      "mstrCost": 69287,
       "mstrHoldings": 568840,
       "mstrBuyVelocity30d": 1239.9,
       "mnav": 1.917,
@@ -29872,7 +29872,7 @@
     {
       "date": "2025-05-24",
       "btcPrice": 107761.91,
-      "mstrCost": 69979,
+      "mstrCost": 69726,
       "mstrHoldings": 576230,
       "mstrBuyVelocity30d": 1267.7,
       "mnav": 1.74,
@@ -29991,7 +29991,7 @@
     {
       "date": "2025-05-31",
       "btcPrice": 104591.88,
-      "mstrCost": 70023,
+      "mstrCost": 69979,
       "mstrHoldings": 580250,
       "mstrBuyVelocity30d": 889.8,
       "mnav": 1.778,
@@ -30110,7 +30110,7 @@
     {
       "date": "2025-06-07",
       "btcPrice": 105552.15,
-      "mstrCost": 70086,
+      "mstrCost": 70023,
       "mstrHoldings": 580955,
       "mstrBuyVelocity30d": 850.2,
       "mnav": 1.783,
@@ -30246,7 +30246,7 @@
     {
       "date": "2025-06-15",
       "btcPrice": 105594.01,
-      "mstrCost": 70663.74,
+      "mstrCost": 70086,
       "mstrHoldings": 582000,
       "mstrBuyVelocity30d": 438.7,
       "mnav": 1.816,
@@ -30348,7 +30348,7 @@
     {
       "date": "2025-06-21",
       "btcPrice": 102120.01,
-      "mstrCost": 70681,
+      "mstrCost": 70663.74,
       "mstrHoldings": 592100,
       "mstrBuyVelocity30d": 529,
       "mnav": 1.787,
@@ -30484,7 +30484,7 @@
     {
       "date": "2025-06-29",
       "btcPrice": 108356.93,
-      "mstrCost": 70982.14,
+      "mstrCost": 70681,
       "mstrHoldings": 592345,
       "mstrBuyVelocity30d": 403.2,
       "mnav": 1.743,
@@ -30722,7 +30722,7 @@
     {
       "date": "2025-07-13",
       "btcPrice": 119086.64,
-      "mstrCost": 71269.06,
+      "mstrCost": 70982.14,
       "mstrHoldings": 597325,
       "mstrBuyVelocity30d": 510.8,
       "mnav": 1.878,
@@ -30841,7 +30841,7 @@
     {
       "date": "2025-07-20",
       "btcPrice": 117265.12,
-      "mstrCost": 71756,
+      "mstrCost": 71269.06,
       "mstrHoldings": 601550,
       "mstrBuyVelocity30d": 315,
       "mnav": 1.848,
@@ -30977,7 +30977,7 @@
     {
       "date": "2025-07-28",
       "btcPrice": 118062.32,
-      "mstrCost": 73277,
+      "mstrCost": 71756,
       "mstrHoldings": 607770,
       "mstrBuyVelocity30d": 514.2,
       "mnav": 1.741,
@@ -31198,7 +31198,7 @@
     {
       "date": "2025-08-10",
       "btcPrice": 119294.01,
-      "mstrCost": 73288,
+      "mstrCost": 73277,
       "mstrHoldings": 628791,
       "mstrBuyVelocity30d": 1048.9,
       "mnav": 1.633,
@@ -31317,7 +31317,7 @@
     {
       "date": "2025-08-17",
       "btcPrice": 117405.01,
-      "mstrCost": 73319.6,
+      "mstrCost": 73288,
       "mstrHoldings": 628946,
       "mstrBuyVelocity30d": 913.2,
       "mnav": 1.597,
@@ -31436,7 +31436,7 @@
     {
       "date": "2025-08-24",
       "btcPrice": 113493.59,
-      "mstrCost": 73526.73,
+      "mstrCost": 73319.6,
       "mstrHoldings": 629376,
       "mstrBuyVelocity30d": 720.2,
       "mnav": 1.625,
@@ -31572,7 +31572,7 @@
     {
       "date": "2025-09-01",
       "btcPrice": 109237.42,
-      "mstrCost": 73765,
+      "mstrCost": 73526.73,
       "mstrHoldings": 632457,
       "mstrBuyVelocity30d": 122.2,
       "mnav": 1.582,
@@ -31674,7 +31674,7 @@
     {
       "date": "2025-09-07",
       "btcPrice": 111137.34,
-      "mstrCost": 73879.64,
+      "mstrCost": 73765,
       "mstrHoldings": 636505,
       "mstrBuyVelocity30d": 257.1,
       "mnav": 1.551,
@@ -31793,7 +31793,7 @@
     {
       "date": "2025-09-14",
       "btcPrice": 115268.01,
-      "mstrCost": 73914.1,
+      "mstrCost": 73879.64,
       "mstrHoldings": 638460,
       "mstrBuyVelocity30d": 317.1,
       "mnav": 1.473,
@@ -31912,7 +31912,7 @@
     {
       "date": "2025-09-21",
       "btcPrice": 115232.29,
-      "mstrCost": 73971.79,
+      "mstrCost": 73914.1,
       "mstrHoldings": 638985,
       "mstrBuyVelocity30d": 320.3,
       "mnav": 1.524,
@@ -32031,7 +32031,7 @@
     {
       "date": "2025-09-28",
       "btcPrice": 112163.95,
-      "mstrCost": 73980.79,
+      "mstrCost": 73971.79,
       "mstrHoldings": 639835,
       "mstrBuyVelocity30d": 245.9,
       "mnav": 1.422,
@@ -32269,7 +32269,7 @@
     {
       "date": "2025-10-12",
       "btcPrice": 114958.8,
-      "mstrCost": 74002.34,
+      "mstrCost": 73980.79,
       "mstrHoldings": 640031,
       "mstrBuyVelocity30d": 52.4,
       "mnav": 1.37,
@@ -32388,7 +32388,7 @@
     {
       "date": "2025-10-19",
       "btcPrice": 108642.78,
-      "mstrCost": 74014.16,
+      "mstrCost": 74002.34,
       "mstrHoldings": 640250,
       "mstrBuyVelocity30d": 42.2,
       "mnav": 1.389,
@@ -32507,7 +32507,7 @@
     {
       "date": "2025-10-26",
       "btcPrice": 114559.4,
-      "mstrCost": 74031.54,
+      "mstrCost": 74014.16,
       "mstrHoldings": 640418,
       "mstrBuyVelocity30d": 19.4,
       "mnav": 1.334,
@@ -32626,7 +32626,7 @@
     {
       "date": "2025-11-02",
       "btcPrice": 110540.68,
-      "mstrCost": 74063.68,
+      "mstrCost": 74031.54,
       "mstrHoldings": 640808,
       "mstrBuyVelocity30d": 25.9,
       "mnav": 1.302,
@@ -32745,7 +32745,7 @@
     {
       "date": "2025-11-09",
       "btcPrice": 104722.96,
-      "mstrCost": 74085.39,
+      "mstrCost": 74063.68,
       "mstrHoldings": 641205,
       "mstrBuyVelocity30d": 39.1,
       "mnav": 1.256,
@@ -32864,7 +32864,7 @@
     {
       "date": "2025-11-16",
       "btcPrice": 94261.44,
-      "mstrCost": 74430.27,
+      "mstrCost": 74085.39,
       "mstrHoldings": 641692,
       "mstrBuyVelocity30d": 48.1,
       "mnav": 1.194,
@@ -33102,7 +33102,7 @@
     {
       "date": "2025-11-30",
       "btcPrice": 90360,
-      "mstrCost": 74430.77,
+      "mstrCost": 74430.27,
       "mstrHoldings": 649870,
       "mstrBuyVelocity30d": 302.1,
       "mnav": 1.119,
@@ -33221,7 +33221,7 @@
     {
       "date": "2025-12-07",
       "btcPrice": 90395.31,
-      "mstrCost": 74702.1,
+      "mstrCost": 74430.77,
       "mstrHoldings": 650000,
       "mstrBuyVelocity30d": 293.2,
       "mnav": 1.127,
@@ -33340,7 +33340,7 @@
     {
       "date": "2025-12-14",
       "btcPrice": 88172.17,
-      "mstrCost": 74977.51,
+      "mstrCost": 74702.1,
       "mstrHoldings": 660624,
       "mstrBuyVelocity30d": 631.1,
       "mnav": 1.124,
@@ -33578,7 +33578,7 @@
     {
       "date": "2025-12-28",
       "btcPrice": 87952.71,
-      "mstrCost": 75004.05,
+      "mstrCost": 74977.51,
       "mstrHoldings": 671268,
       "mstrBuyVelocity30d": 713.3,
       "mnav": 1.024,
@@ -33697,7 +33697,7 @@
     {
       "date": "2026-01-04",
       "btcPrice": 91529.73,
-      "mstrCost": 75024.15,
+      "mstrCost": 75004.05,
       "mstrHoldings": 672497,
       "mstrBuyVelocity30d": 749.9,
       "mnav": 0.974,
@@ -33816,7 +33816,7 @@
     {
       "date": "2026-01-11",
       "btcPrice": 91013.65,
-      "mstrCost": 75355.32,
+      "mstrCost": 75024.15,
       "mstrHoldings": 673783,
       "mstrBuyVelocity30d": 438.6,
       "mnav": 0.98,
@@ -33952,7 +33952,7 @@
     {
       "date": "2026-01-19",
       "btcPrice": 92631,
-      "mstrCost": 75974.16,
+      "mstrCost": 75355.32,
       "mstrHoldings": 687410,
       "mstrBuyVelocity30d": 538.1,
       "mnav": 1.017,
@@ -34054,7 +34054,7 @@
     {
       "date": "2026-01-25",
       "btcPrice": 86670.36,
-      "mstrCost": 76040.45,
+      "mstrCost": 75974.16,
       "mstrHoldings": 709715,
       "mstrBuyVelocity30d": 1281.6,
       "mnav": 1.004,
@@ -34173,7 +34173,7 @@
     {
       "date": "2026-02-01",
       "btcPrice": 76968.21,
-      "mstrCost": 76047.44,
+      "mstrCost": 76040.45,
       "mstrHoldings": 712647,
       "mstrBuyVelocity30d": 1338.3,
       "mnav": 1.055,
@@ -34292,7 +34292,7 @@
     {
       "date": "2026-02-08",
       "btcPrice": 70330.38,
-      "mstrCost": 76051.85,
+      "mstrCost": 76047.44,
       "mstrHoldings": 713502,
       "mstrBuyVelocity30d": 1324,
       "mnav": 1.225,
@@ -34428,7 +34428,7 @@
     {
       "date": "2026-02-16",
       "btcPrice": 68892.43,
-      "mstrCost": 76025.16,
+      "mstrCost": 76051.85,
       "mstrHoldings": 714644,
       "mstrBuyVelocity30d": 907.8,
       "mnav": 1.241,
@@ -34530,7 +34530,7 @@
     {
       "date": "2026-02-22",
       "btcPrice": 67643.4,
-      "mstrCost": 76018.29,
+      "mstrCost": 76025.16,
       "mstrHoldings": 717131,
       "mstrBuyVelocity30d": 247.2,
       "mnav": 1.24,
@@ -34649,7 +34649,7 @@
     {
       "date": "2026-03-01",
       "btcPrice": 65776.47,
-      "mstrCost": 75991.66,
+      "mstrCost": 76018.29,
       "mstrHoldings": 717722,
       "mstrBuyVelocity30d": 169.2,
       "mnav": 1.263,
@@ -34768,7 +34768,7 @@
     {
       "date": "2026-03-08",
       "btcPrice": 65971.2,
-      "mstrCost": 75859.82,
+      "mstrCost": 75991.66,
       "mstrHoldings": 720737,
       "mstrBuyVelocity30d": 241.2,
       "mnav": 1.282,
@@ -34887,7 +34887,7 @@
     {
       "date": "2026-03-15",
       "btcPrice": 72815.24,
-      "mstrCost": 75696.26,
+      "mstrCost": 75859.82,
       "mstrHoldings": 738731,
       "mstrBuyVelocity30d": 802.9,
       "mnav": 1.171,
@@ -35006,7 +35006,7 @@
     {
       "date": "2026-03-22",
       "btcPrice": 67859,
-      "mstrCost": 75698.83,
+      "mstrCost": 75696.26,
       "mstrHoldings": 761068,
       "mstrBuyVelocity30d": 1464.6,
       "mnav": 1.194,
@@ -35244,7 +35244,7 @@
     {
       "date": "2026-04-05",
       "btcPrice": 69034.18,
-      "mstrCost": 75648.33,
+      "mstrCost": 75698.83,
       "mstrHoldings": 762099,
       "mstrBuyVelocity30d": 1378.7,
       "mnav": 1.072,
@@ -35363,7 +35363,7 @@
     {
       "date": "2026-04-12",
       "btcPrice": 70740.98,
-      "mstrCost": 75579.75,
+      "mstrCost": 75648.33,
       "mstrHoldings": 766970,
       "mstrBuyVelocity30d": 941.3,
       "mnav": 1.093,
@@ -35482,7 +35482,7 @@
     {
       "date": "2026-04-19",
       "btcPrice": 73801.79,
-      "mstrCost": 75528.09,
+      "mstrCost": 75579.75,
       "mstrHoldings": 780897,
       "mstrBuyVelocity30d": 661,
       "mnav": 1.247,
@@ -35601,7 +35601,7 @@
     {
       "date": "2026-04-26",
       "btcPrice": 78657.55,
-      "mstrCost": 75531.51,
+      "mstrCost": 75528.09,
       "mstrHoldings": 815061,
       "mstrBuyVelocity30d": 1765.4,
       "mnav": 1.145,
@@ -35839,7 +35839,7 @@
     {
       "date": "2026-05-10",
       "btcPrice": 82210.07,
-      "mstrCost": 75543.22,
+      "mstrCost": 75531.51,
       "mstrHoldings": 818334,
       "mstrBuyVelocity30d": 1712.1,
       "mnav": 1.269,
@@ -35958,7 +35958,7 @@
     {
       "date": "2026-05-17",
       "btcPrice": 77457.67,
-      "mstrCost": 75698.85,
+      "mstrCost": 75543.22,
       "mstrHoldings": 818869,
       "mstrBuyVelocity30d": 1265.7,
       "mnav": 1.291,
@@ -36196,7 +36196,7 @@
     {
       "date": "2026-05-31",
       "btcPrice": 73674.39,
-      "mstrCost": 75701.73,
+      "mstrCost": 75698.85,
       "mstrHoldings": 843738,
       "mstrBuyVelocity30d": 846.8,
       "mnav": 1.214,
@@ -36315,7 +36315,7 @@
     {
       "date": "2026-06-07",
       "btcPrice": 63332.01,
-      "mstrCost": 75681.21,
+      "mstrCost": 75701.73,
       "mstrHoldings": 843706,
       "mstrBuyVelocity30d": 845.7,
       "mnav": 1.157,
@@ -36434,7 +36434,7 @@
     {
       "date": "2026-06-14",
       "btcPrice": 65746.45,
-      "mstrCost": 75657.56,
+      "mstrCost": 75681.21,
       "mstrHoldings": 845256,
       "mstrBuyVelocity30d": 879.6,
       "mnav": 1.176,
@@ -36553,7 +36553,7 @@
     {
       "date": "2026-06-21",
       "btcPrice": 63311.99,
-      "mstrCost": 75646.45,
+      "mstrCost": 75657.56,
       "mstrHoldings": 846842,
       "mstrBuyVelocity30d": 103.5,
       "mnav": 1.143,
@@ -36791,7 +36791,7 @@
     {
       "date": "2026-07-05",
       "btcPrice": 63650,
-      "mstrCost": 75482.21,
+      "mstrCost": 75646.45,
       "mstrHoldings": 847363,
       "mstrBuyVelocity30d": 121.9,
       "mnav": 1.059,
@@ -36844,7 +36844,7 @@
       "btcPrice": 62290,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.039,
       "mnavEstimated": false,
       "us1y": 4.06,
@@ -36861,7 +36861,7 @@
       "btcPrice": 63230,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.024,
       "mnavEstimated": false,
       "us1y": 4.02,
@@ -36878,7 +36878,7 @@
       "btcPrice": 64161.72,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.014,
       "mnavEstimated": false,
       "us1y": 4.06,
@@ -36895,7 +36895,7 @@
       "btcPrice": 63819,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.019,
       "mnavEstimated": false,
       "us1y": 4.06,
@@ -36912,7 +36912,7 @@
       "btcPrice": 63780,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.02,
       "mnavEstimated": false,
       "us1y": 4.06,
@@ -36929,7 +36929,7 @@
       "btcPrice": 62334.52,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.027,
       "mnavEstimated": false,
       "us1y": 4.12,
@@ -36946,7 +36946,7 @@
       "btcPrice": 65043.98,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -49.4,
       "mnav": 1.019,
       "mnavEstimated": false,
       "us1y": 4.02,
@@ -36963,7 +36963,7 @@
       "btcPrice": 64756.28,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.023,
       "mnavEstimated": false,
       "us1y": 3.97,
@@ -36980,7 +36980,7 @@
       "btcPrice": 63830.2,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.015,
       "mnavEstimated": false,
       "us1y": 3.99,
@@ -36997,7 +36997,7 @@
       "btcPrice": 63931.67,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.019,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37014,7 +37014,7 @@
       "btcPrice": 64834.22,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.005,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37031,7 +37031,7 @@
       "btcPrice": 64722.54,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.006,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37048,7 +37048,7 @@
       "btcPrice": 65255.51,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.017,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37065,7 +37065,7 @@
       "btcPrice": 66556.16,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -102.2,
       "mnav": 1.024,
       "mnavEstimated": false,
       "us1y": 4.08,
@@ -37082,7 +37082,7 @@
       "btcPrice": 66114.49,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.018,
       "mnavEstimated": false,
       "us1y": 4.11,
@@ -37099,7 +37099,7 @@
       "btcPrice": 65098.97,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 0.993,
       "mnavEstimated": false,
       "us1y": 4.15,
@@ -37116,7 +37116,7 @@
       "btcPrice": 64139.99,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 0.995,
       "mnavEstimated": false,
       "us1y": 4.14,
@@ -37133,7 +37133,7 @@
       "btcPrice": 64375,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 0.992,
       "mnavEstimated": false,
       "us1y": 4.14,
@@ -37150,7 +37150,7 @@
       "btcPrice": 65399.99,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 0.974,
       "mnavEstimated": false,
       "us1y": 4.14,
@@ -37167,7 +37167,7 @@
       "btcPrice": 63755.86,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.049,
       "mnavEstimated": false,
       "us1y": 4.14,
@@ -37184,7 +37184,7 @@
       "btcPrice": 63915,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.029,
       "mnavEstimated": false,
       "us1y": 4.09,
@@ -37201,7 +37201,7 @@
       "btcPrice": 63984.28,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.008,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37218,7 +37218,7 @@
       "btcPrice": 64780.02,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.026,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37235,7 +37235,7 @@
       "btcPrice": 62887.88,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.025,
       "mnavEstimated": false,
       "us1y": 4.08,
@@ -37252,7 +37252,7 @@
       "btcPrice": 62823.64,
       "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.026,
       "mnavEstimated": false,
       "us1y": 4.08,
@@ -37267,9 +37267,9 @@
     {
       "date": "2026-08-02",
       "btcPrice": 63570,
-      "mstrCost": 75415.19,
+      "mstrCost": 75482.21,
       "mstrHoldings": 843775,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -119.6,
       "mnav": 1.014,
       "mnavEstimated": false,
       "us1y": 4.08,
@@ -37286,7 +37286,7 @@
       "btcPrice": 63520,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -174.2,
       "mnav": 1.028,
       "mnavEstimated": false,
       "us1y": 4.07,
@@ -37303,7 +37303,7 @@
       "btcPrice": 64106.56,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -174.2,
       "mnav": 1.038,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37320,7 +37320,7 @@
       "btcPrice": 64665.23,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -54.6,
       "mnav": 1.034,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37337,7 +37337,7 @@
       "btcPrice": 64323.61,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -54.6,
       "mnav": 1.029,
       "mnavEstimated": false,
       "us1y": 4.06,
@@ -37354,7 +37354,7 @@
       "btcPrice": 64923.19,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -54.6,
       "mnav": 1.041,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37371,7 +37371,7 @@
       "btcPrice": 64962.6,
       "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -54.6,
       "mnav": 1.041,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37386,9 +37386,9 @@
     {
       "date": "2026-08-09",
       "btcPrice": 64901.59,
-      "mstrCost": 75388.45,
+      "mstrCost": 75415.19,
       "mstrHoldings": 842138,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -54.6,
       "mnav": 1.042,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37405,7 +37405,7 @@
       "btcPrice": 63970.01,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.04,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37422,7 +37422,7 @@
       "btcPrice": 63600,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.037,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37439,7 +37439,7 @@
       "btcPrice": 63479.99,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.03,
       "mnavEstimated": false,
       "us1y": 4,
@@ -37456,7 +37456,7 @@
       "btcPrice": 63490.86,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.046,
       "mnavEstimated": false,
       "us1y": 3.97,
@@ -37473,7 +37473,7 @@
       "btcPrice": 63043.56,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.024,
       "mnavEstimated": false,
       "us1y": 3.98,
@@ -37490,7 +37490,7 @@
       "btcPrice": 63086.01,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.024,
       "mnavEstimated": false,
       "us1y": 3.98,
@@ -37507,7 +37507,7 @@
       "btcPrice": 62900,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.027,
       "mnavEstimated": false,
       "us1y": 3.98,
@@ -37524,7 +37524,7 @@
       "btcPrice": 64532.1,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.033,
       "mnavEstimated": false,
       "us1y": 4,
@@ -37541,7 +37541,7 @@
       "btcPrice": 64725.42,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.994,
       "mnavEstimated": false,
       "us1y": 3.99,
@@ -37558,7 +37558,7 @@
       "btcPrice": 69334.79,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.005,
       "mnavEstimated": false,
       "us1y": 4,
@@ -37575,7 +37575,7 @@
       "btcPrice": 73025.15,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.005,
       "mnavEstimated": false,
       "us1y": 3.99,
@@ -37592,7 +37592,7 @@
       "btcPrice": 78338.03,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.977,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37609,7 +37609,7 @@
       "btcPrice": 77074.93,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.993,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37626,7 +37626,7 @@
       "btcPrice": 77734,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.984,
       "mnavEstimated": false,
       "us1y": 4.03,
@@ -37643,7 +37643,7 @@
       "btcPrice": 78992.75,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.988,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37660,7 +37660,7 @@
       "btcPrice": 78539.14,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.018,
       "mnavEstimated": false,
       "us1y": 4.01,
@@ -37677,7 +37677,7 @@
       "btcPrice": 79023.75,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 0.991,
       "mnavEstimated": false,
       "us1y": 4.02,
@@ -37694,7 +37694,7 @@
       "btcPrice": 80249.58,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.056,
       "mnavEstimated": false,
       "us1y": 4.04,
@@ -37711,7 +37711,7 @@
       "btcPrice": 77845.87,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.03,
       "mnavEstimated": false,
       "us1y": 4.15,
@@ -37728,7 +37728,7 @@
       "btcPrice": 78230,
       "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.025,
       "mnavEstimated": false,
       "us1y": 4.15,
@@ -37743,9 +37743,9 @@
     {
       "date": "2026-08-30",
       "btcPrice": 77682,
-      "mstrCost": 75415.66,
+      "mstrCost": 75388.45,
       "mstrHoldings": 840447,
-      "mstrBuyVelocity30d": 0,
+      "mstrBuyVelocity30d": -110.9,
       "mnav": 1.033,
       "mnavEstimated": false,
       "us1y": 4.15,
@@ -38100,10 +38100,10 @@
     {
       "date": "2026-09-20",
       "btcPrice": 81178,
-      "mstrCost": 75416,
-      "mstrHoldings": 846000,
-      "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.179,
+      "mstrCost": 75415.66,
+      "mstrHoldings": 845050,
+      "mstrBuyVelocity30d": 153.4,
+      "mnav": 1.18,
       "mnavEstimated": true,
       "us1y": 4.44,
       "us10y": 5.01,
@@ -38120,7 +38120,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.21,
+      "mnav": 1.211,
       "mnavEstimated": true,
       "us1y": 4.45,
       "us10y": 4.96,
@@ -38137,7 +38137,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.207,
+      "mnav": 1.208,
       "mnavEstimated": true,
       "us1y": 4.43,
       "us10y": 4.96,
@@ -38154,7 +38154,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.195,
+      "mnav": 1.196,
       "mnavEstimated": true,
       "us1y": 4.49,
       "us10y": 5.11,
@@ -38171,7 +38171,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.19,
+      "mnav": 1.192,
       "mnavEstimated": true,
       "us1y": 4.51,
       "us10y": 5.18,
@@ -38188,7 +38188,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.173,
+      "mnav": 1.174,
       "mnavEstimated": true,
       "us1y": 4.5,
       "us10y": 5.17,
@@ -38205,7 +38205,7 @@
       "mstrCost": 75416,
       "mstrHoldings": 846000,
       "mstrBuyVelocity30d": 185.1,
-      "mnav": 1.168,
+      "mnav": 1.169,
       "mnavEstimated": true,
       "us1y": 4.5,
       "us10y": 5.17,
@@ -38219,10 +38219,10 @@
     {
       "date": "2026-09-27",
       "btcPrice": 84472,
-      "mstrCost": 75437,
-      "mstrHoldings": 847666,
-      "mstrBuyVelocity30d": 240.6,
-      "mnav": 1.165,
+      "mstrCost": 75416,
+      "mstrHoldings": 846000,
+      "mstrBuyVelocity30d": 185.1,
+      "mnav": 1.169,
       "mnavEstimated": true,
       "us1y": 4.5,
       "us10y": 5.17,
@@ -38239,7 +38239,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 240.6,
-      "mnav": 1.168,
+      "mnav": 1.171,
       "mnavEstimated": true,
       "us1y": 4.59,
       "us10y": 5.24,
@@ -38256,7 +38256,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 240.6,
-      "mnav": 1.147,
+      "mnav": 1.15,
       "mnavEstimated": true,
       "us1y": 4.58,
       "us10y": 5.26,
@@ -38273,7 +38273,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.136,
+      "mnav": 1.139,
       "mnavEstimated": true,
       "us1y": 4.54,
       "us10y": 5.29,
@@ -38290,7 +38290,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.173,
+      "mnav": 1.177,
       "mnavEstimated": true,
       "us1y": 4.44,
       "us10y": 5.24,
@@ -38307,7 +38307,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.175,
+      "mnav": 1.178,
       "mnavEstimated": true,
       "us1y": 4.46,
       "us10y": 5.28,
@@ -38324,7 +38324,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.172,
+      "mnav": 1.175,
       "mnavEstimated": true,
       "us1y": 4.46,
       "us10y": 5.28,
@@ -38341,7 +38341,7 @@
       "mstrCost": 75437,
       "mstrHoldings": 847666,
       "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.148,
+      "mnav": 1.151,
       "mnavEstimated": true,
       "us1y": 4.46,
       "us10y": 5.28,
@@ -38355,10 +38355,10 @@
     {
       "date": "2026-10-05",
       "btcPrice": 85766.87,
-      "mstrCost": 75437,
-      "mstrHoldings": 847666,
-      "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.19,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.193,
       "mnavEstimated": true,
       "us1y": 4.47,
       "us10y": 5.31,
@@ -38372,14 +38372,14 @@
     {
       "date": "2026-10-06",
       "btcPrice": 85549.93,
-      "mstrCost": 75437,
-      "mstrHoldings": 847666,
-      "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.194,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.197,
       "mnavEstimated": true,
-      "us1y": 4.47,
-      "us10y": 5.31,
-      "yieldSpread": 0.84,
+      "us1y": 4.46,
+      "us10y": 5.27,
+      "yieldSpread": 0.81,
       "fedWalcl": 6.743,
       "fedTga": 0.949,
       "fedRrp": 0,
@@ -38388,51 +38388,109 @@
     },
     {
       "date": "2026-10-07",
-      "btcPrice": 84085.72,
-      "mstrCost": 75437,
-      "mstrHoldings": 847666,
-      "mstrBuyVelocity30d": 87.2,
-      "mnav": 1.214,
+      "btcPrice": 83321.81,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.145,
       "mnavEstimated": true,
-      "us1y": 4.47,
-      "us10y": 5.31,
-      "yieldSpread": 0.84,
-      "fedWalcl": 6.743,
-      "fedTga": 0.949,
+      "us1y": 4.42,
+      "us10y": 5.28,
+      "yieldSpread": 0.86,
+      "fedWalcl": 6.748,
+      "fedTga": 0.88,
+      "fedRrp": 0.002,
+      "fedNetLiquidity": 5.865,
+      "fedNetLiqSma20": 5.8066
+    },
+    {
+      "date": "2026-10-08",
+      "btcPrice": 81754.45,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.153,
+      "mnavEstimated": true,
+      "us1y": 4.44,
+      "us10y": 5.22,
+      "yieldSpread": 0.78,
+      "fedWalcl": 6.748,
+      "fedTga": 0.88,
       "fedRrp": 0,
-      "fedNetLiquidity": 5.7939,
-      "fedNetLiqSma20": 5.803
+      "fedNetLiquidity": 5.867,
+      "fedNetLiqSma20": 5.8065
+    },
+    {
+      "date": "2026-10-09",
+      "btcPrice": 82635.55,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.162,
+      "mnavEstimated": true,
+      "us1y": 4.44,
+      "us10y": 5.22,
+      "yieldSpread": 0.78,
+      "fedWalcl": 6.748,
+      "fedTga": 0.88,
+      "fedRrp": 0,
+      "fedNetLiquidity": 5.867,
+      "fedNetLiqSma20": 5.8064
+    },
+    {
+      "date": "2026-10-10",
+      "btcPrice": 82728.63,
+      "mstrCost": 75441,
+      "mstrHoldings": 848000,
+      "mstrBuyVelocity30d": 98.3,
+      "mnav": 1.161,
+      "mnavEstimated": true,
+      "us1y": 4.44,
+      "us10y": 5.22,
+      "yieldSpread": 0.78,
+      "fedWalcl": 6.748,
+      "fedTga": 0.88,
+      "fedRrp": 0,
+      "fedNetLiquidity": 5.867,
+      "fedNetLiqSma20": 5.8063
     }
   ],
   "summary": {
-    "currentBtc": 84085.72,
-    "currentMstrCost": 75437,
-    "currentMstrHoldings": 847666,
-    "currentMstrVelocity30d": 87.2,
+    "currentBtc": 82728.63,
+    "currentMstrCost": 75441,
+    "currentMstrHoldings": 848000,
+    "currentMstrVelocity30d": 98.3,
     "peakVelocity30d": 5714.3,
-    "currentMnav": 1.214,
+    "troughVelocity30d": -174.2,
+    "dailyIssuanceBtc": 450,
+    "velocityToIssuance": 0.22,
+    "mstrCostSource": "coinglass",
+    "mstrCostAsOf": "2026-10-05",
+    "currentMnav": 1.161,
     "mnavEstimated": true,
+    "mnavAnchorDate": "2026-09-12",
+    "mnavBasis": "equity",
     "minMnav": 0.929,
     "maxMnav": 8.006,
     "mstrPurchasesCount": 120,
-    "current1y": 4.47,
-    "current10y": 5.31,
-    "currentSpread": 0.84,
+    "current1y": 4.44,
+    "current10y": 5.22,
+    "currentSpread": 0.78,
     "isCurveInverted": false,
-    "mstrProfitMultiplier": 1.11,
-    "currentFedNetLiquidity": 5.7939,
-    "currentFedNetLiqSma20": 5.803,
-    "currentFedWalcl": 6.743,
-    "currentFedTga": 0.949,
+    "mstrProfitMultiplier": 1.1,
+    "currentFedNetLiquidity": 5.867,
+    "currentFedNetLiqSma20": 5.8063,
+    "currentFedWalcl": 6.748,
+    "currentFedTga": 0.88,
     "currentFedRrp": 0,
     "fedNetLiqDailyChange": 0,
-    "fedNetLiqChange20d": -0.0753,
-    "totalPoints": 2259,
+    "fedNetLiqChange20d": -0.0019,
+    "totalPoints": 2262,
     "dateRange": {
       "start": "2020-08-01",
-      "end": "2026-10-07"
+      "end": "2026-10-10"
     },
-    "updatedAt": "2026-10-07T03:36:30.076Z"
+    "updatedAt": "2026-10-10T05:33:48.315Z"
   },
   "rawMstr": [
     {
@@ -38843,187 +38901,207 @@
     {
       "microStrategyCost": 74000,
       "timestamp": 1760313600000,
-      "totalBitcoin": 640251
+      "totalBitcoin": 640250
     },
     {
       "microStrategyCost": 74010,
       "timestamp": 1760918400000,
-      "totalBitcoin": 640419
+      "totalBitcoin": 640418
     },
     {
       "microStrategyCost": 74032,
       "timestamp": 1761523200000,
-      "totalBitcoin": 640809
+      "totalBitcoin": 640808
     },
     {
       "microStrategyCost": 74057,
       "timestamp": 1762128000000,
-      "totalBitcoin": 641206
+      "totalBitcoin": 641205
     },
     {
       "microStrategyCost": 74079,
       "timestamp": 1762732800000,
-      "totalBitcoin": 641693
+      "totalBitcoin": 641692
     },
     {
       "microStrategyCost": 74433,
       "timestamp": 1763337600000,
-      "totalBitcoin": 649871
+      "totalBitcoin": 649870
     },
     {
       "microStrategyCost": 74436,
       "timestamp": 1764547200000,
-      "totalBitcoin": 650001
+      "totalBitcoin": 650000
     },
     {
       "microStrategyCost": 74696,
       "timestamp": 1765152000000,
-      "totalBitcoin": 660625
+      "totalBitcoin": 660624
     },
     {
       "microStrategyCost": 74972,
       "timestamp": 1765756800000,
-      "totalBitcoin": 671270
+      "totalBitcoin": 671268
     },
     {
       "microStrategyCost": 74997,
       "timestamp": 1766966400000,
-      "totalBitcoin": 672499
+      "totalBitcoin": 672497
     },
     {
       "microStrategyCost": 74997,
       "timestamp": 1767139200000,
-      "totalBitcoin": 672502
+      "totalBitcoin": 672500
     },
     {
       "microStrategyCost": 75026,
       "timestamp": 1767571200000,
-      "totalBitcoin": 673785
+      "totalBitcoin": 673783
     },
     {
       "microStrategyCost": 75353,
       "timestamp": 1768176000000,
-      "totalBitcoin": 687412
+      "totalBitcoin": 687410
     },
     {
       "microStrategyCost": 75979,
       "timestamp": 1768867200000,
-      "totalBitcoin": 709717
+      "totalBitcoin": 709715
     },
     {
       "microStrategyCost": 76037,
       "timestamp": 1769385600000,
-      "totalBitcoin": 712649
+      "totalBitcoin": 712647
     },
     {
       "microStrategyCost": 76052,
       "timestamp": 1769990400000,
-      "totalBitcoin": 713504
+      "totalBitcoin": 713502
     },
     {
       "microStrategyCost": 76056,
       "timestamp": 1770595200000,
-      "totalBitcoin": 714646
+      "totalBitcoin": 714644
     },
     {
       "microStrategyCost": 76027,
       "timestamp": 1771286400000,
-      "totalBitcoin": 717132
+      "totalBitcoin": 717131
     },
     {
       "microStrategyCost": 76020,
       "timestamp": 1771804800000,
-      "totalBitcoin": 717724
+      "totalBitcoin": 717722
     },
     {
       "microStrategyCost": 75985,
       "timestamp": 1772409600000,
-      "totalBitcoin": 720739
+      "totalBitcoin": 720737
     },
     {
       "microStrategyCost": 75862,
       "timestamp": 1773014400000,
-      "totalBitcoin": 738733
+      "totalBitcoin": 738731
     },
     {
       "microStrategyCost": 75696,
       "timestamp": 1773619200000,
-      "totalBitcoin": 761070
+      "totalBitcoin": 761068
     },
     {
       "microStrategyCost": 75694,
       "timestamp": 1774224000000,
-      "totalBitcoin": 762101
+      "totalBitcoin": 762099
     },
     {
       "microStrategyCost": 75644,
       "timestamp": 1775433600000,
-      "totalBitcoin": 766972
+      "totalBitcoin": 766970
     },
     {
       "microStrategyCost": 75577,
       "timestamp": 1776038400000,
-      "totalBitcoin": 780899
+      "totalBitcoin": 780897
     },
     {
       "microStrategyCost": 75527,
       "timestamp": 1776643200000,
-      "totalBitcoin": 815063
+      "totalBitcoin": 815061
     },
     {
       "microStrategyCost": 75537,
       "timestamp": 1777248000000,
-      "totalBitcoin": 818336
+      "totalBitcoin": 818334
     },
     {
       "microStrategyCost": 75540,
       "timestamp": 1778457600000,
-      "totalBitcoin": 818871
+      "totalBitcoin": 818869
     },
     {
       "microStrategyCost": 75700,
       "timestamp": 1779062400000,
-      "totalBitcoin": 843740
+      "totalBitcoin": 843738
     },
     {
       "microStrategyCost": 75699,
       "timestamp": 1780272000000,
-      "totalBitcoin": 843708
+      "totalBitcoin": 843706
     },
     {
       "microStrategyCost": 75680,
       "timestamp": 1780876800000,
-      "totalBitcoin": 845258
+      "totalBitcoin": 845256
     },
     {
       "microStrategyCost": 75656,
       "timestamp": 1781481600000,
-      "totalBitcoin": 846845
+      "totalBitcoin": 846842
     },
     {
       "microStrategyCost": 75651,
       "timestamp": 1782086400000,
-      "totalBitcoin": 847365
+      "totalBitcoin": 847363
     },
     {
       "microStrategyCost": 75578,
       "timestamp": 1782777600000,
-      "totalBitcoin": 846002
+      "totalBitcoin": 846000
     },
     {
       "microStrategyCost": 75476,
       "timestamp": 1783296000000,
-      "totalBitcoin": 843777
+      "totalBitcoin": 843775
     },
     {
       "microStrategyCost": 75419,
       "timestamp": 1785715200000,
-      "totalBitcoin": 842139
+      "totalBitcoin": 842138
     },
     {
       "microStrategyCost": 75385,
       "timestamp": 1786320000000,
-      "totalBitcoin": 840449
+      "totalBitcoin": 840447
+    },
+    {
+      "microStrategyCost": 75412,
+      "timestamp": 1788134400000,
+      "totalBitcoin": 845050
+    },
+    {
+      "microStrategyCost": 75416,
+      "timestamp": 1789948800000,
+      "totalBitcoin": 846000
+    },
+    {
+      "microStrategyCost": 75437,
+      "timestamp": 1790553600000,
+      "totalBitcoin": 847666
+    },
+    {
+      "microStrategyCost": 75441,
+      "timestamp": 1791158400000,
+      "totalBitcoin": 848000
     }
   ]
 }
