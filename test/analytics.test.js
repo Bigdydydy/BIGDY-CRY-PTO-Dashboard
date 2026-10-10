@@ -449,7 +449,9 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     applyCarryMetrics,
     calculateCarryScore,
     scoreTier,
-    parseBinanceDeliveryExpiry,
+    deribitFutureName,
+    parseDeribitFutureExpiry,
+    getQuarterExpiries,
     SCHEMA_VERSION,
     CQ_MIN_DAYS
   } = require('../server/basis_fetcher');
@@ -543,21 +545,29 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     assert.equal(aggregateDailyFunding([], now, 7), null);
   });
 
-  test('daily cache is refreshed as soon as a new 00:00 UTC snapshot is due', () => {
-    const { expectedLatestDate, hasLatestSnapshot } = require('../server/basis_fetcher');
-    // 10-06 08:30 UTC+8 = 00:30 UTC: the 10-06 snapshot is due
-    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 6, 0, 30)), '2026-10-06');
-    // 10-06 07:55 UTC+8 = 23:55 UTC on 10-05: still the 10-05 snapshot
-    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 5, 23, 55)), '2026-10-05');
+  test('daily cache is refreshed as soon as a new 08:00 UTC snapshot is due', () => {
+    const { expectedLatestDate, hasLatestSnapshot, latestSnapshotTs } = require('../server/basis_fetcher');
+    // 10-06 16:30 UTC+8 = 08:30 UTC: the 10-06 snapshot is due
+    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 6, 8, 30)), '2026-10-06');
+    assert.equal(latestSnapshotTs(Date.UTC(2026, 9, 6, 8, 30)), Date.UTC(2026, 9, 6, 8));
+    // 10-06 15:55 UTC+8 = 07:55 UTC: still the 10-05 snapshot
+    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 6, 7, 55)), '2026-10-05');
+    // Just after midnight UTC the previous day's 08:00 snapshot is still the latest
+    assert.equal(expectedLatestDate(Date.UTC(2026, 9, 6, 0, 30)), '2026-10-05');
     const series = Array.from({ length: 101 }, () => ({ schema: SCHEMA_VERSION, date: '2026-10-05' }));
-    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 5, 18)), true);
+    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 6, 7)), true);
     // The old "< 48h old" rule kept this cache for all of 10-06; it must now be treated as stale
-    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 6, 0, 30)), false);
+    assert.equal(hasLatestSnapshot(series, Date.UTC(2026, 9, 6, 8, 30)), false);
   });
 
-  test('parseBinanceDeliveryExpiry reads the delivery date from the symbol', () => {
-    assert.equal(parseBinanceDeliveryExpiry('BTCUSD_261225'), Date.UTC(2026, 11, 25, 8));
-    assert.equal(parseBinanceDeliveryExpiry('BTCUSD_PERP'), null);
+  test('Deribit quarterly names round-trip with the last-Friday expiry rule', () => {
+    assert.equal(deribitFutureName(Date.UTC(2026, 11, 25, 8)), 'BTC-25DEC26');
+    assert.equal(deribitFutureName(Date.UTC(2024, 2, 29, 8)), 'BTC-29MAR24');
+    assert.equal(parseDeribitFutureExpiry('BTC-26MAR27'), Date.UTC(2027, 2, 26, 8));
+    assert.equal(parseDeribitFutureExpiry('BTC-PERPETUAL'), null);
+    const [cq, nq] = getQuarterExpiries(new Date(Date.UTC(2026, 9, 10, 8)));
+    assert.equal(deribitFutureName(cq.getTime()), 'BTC-25DEC26');
+    assert.equal(deribitFutureName(nq.getTime()), 'BTC-26MAR27');
   });
 
   test('calculateCarryScore: Sharpe-weighted, bounded, monotonic in carry', () => {
@@ -616,7 +626,7 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
   test('analyzeTermPremium (history only) returns real-tenor payload', async () => {
     const result = await analyzeTermPremium([], 0, { live: false });
     assert.equal(result.metadata.isRealHistorical, true);
-    assert.ok(result.metadata.dataSource.includes('Binance'));
+    assert.ok(result.metadata.dataSource.includes('Deribit'));
     assert.ok(result.series.length >= 900);
     const c = result.current;
     for (const k of ['fundingApr', 'nqApr', 'apr90d', 'tbill', 'carryScore', 'carrySharpe', 'etfNetCarry']) {

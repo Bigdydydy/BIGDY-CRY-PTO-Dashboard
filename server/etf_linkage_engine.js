@@ -10,7 +10,7 @@
  *                                            + Micro Bitcoin (133742, 0.1 BTC)
  *   - Daily OI: Binance futures, CME futures CoinGlass /api/openInterest/v3/chart
  *   - Daily OI: Deribit options               CoinGlass /api/option/oi/history
- *   - Carry: 90D basis excess over 3M T-Bill  Module 2 term structure (Binance COIN-M)
+ *   - Carry: 90D basis excess over 3M T-Bill  Module 2 term structure (Deribit)
  *
  * Validation framework (weekly, aligned to COT Tuesdays, ETF flows summed Wed→Tue)
  *   1. Hedge ratio: ΔLev-funds net short = α + β·ETF flow (full sample + 12-week rolling)
@@ -518,13 +518,13 @@ async function buildEtfLinkage(basisSeries) {
         etfFlows: 'CoinGlass 美国现货 BTC ETF 日净流入 (BTC/USD)',
         cme: 'CFTC Traders in Financial Futures：CME Bitcoin (5 BTC) + Micro Bitcoin (0.1 BTC)，每周二持仓',
         oi: 'CoinGlass 日度 OI：Binance 期货、CME 期货、Deribit 期权',
-        carry: 'Module 2 币安 90D 恒定期限基差 − FRED 3M 美债（CME 基差的代理变量）'
+        carry: 'Module 2 Deribit 90D 恒定期限基差 − FRED 3M 美债（CME 基差的代理变量）'
       },
       weekDefinition: 'COT 报告日 (周二) 对齐；ETF 流量与基差按 (上周二, 本周二] 汇总',
       rollingWeeks: ROLLING_WEEKS,
       caveats: [
         '杠杆基金 (Leveraged Funds) 不全是期现套利盘，β 是套利占比的上限估计而非精确值。',
-        '基差使用币安币本位交割合约，CME 基差通常更高，绝对水平存在偏差但方向一致。',
+        '基差使用 Deribit 季度合约，CME 基差通常更高，绝对水平存在偏差但方向一致。',
         '部分机构在 Binance / Deribit 对冲，CME 回归无法覆盖，离岸对冲 OI 单独展示。'
       ]
     },
