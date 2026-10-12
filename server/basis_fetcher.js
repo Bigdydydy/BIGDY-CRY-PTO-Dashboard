@@ -244,31 +244,51 @@ function applyCarryMetrics(series) {
   return series;
 }
 
-async function deribitGet(method, params) {
-  const url = `${DERIBIT_API}/${method}?${new URLSearchParams(params)}`;
-  const res = await fetchWithTimeout(url, { timeout: 20000, retries: 2 });
-  if (!res.ok) throw new Error(`Deribit ${method} HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.error) throw new Error(`Deribit ${method}: ${json.error.message || json.error.code}`);
-  return json.result;
+// Deribit rate-limits public calls per IP, and the deployed host shares its egress IP with other
+// tenants (plus this app's options modules). All calls from this module go through one queue,
+// spaced apart, and a 429 is retried with exponential backoff instead of failing the refresh.
+const DERIBIT_MIN_GAP_MS = 250;
+const DERIBIT_429_BACKOFF_MS = [1000, 3000, 8000];
+let deribitQueue = Promise.resolve();
+let deribitLastCallAt = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function deribitGet(method, params) {
+  const task = deribitQueue.then(async () => {
+    const url = `${DERIBIT_API}/${method}?${new URLSearchParams(params)}`;
+    for (let attempt = 0; ; attempt++) {
+      const wait = deribitLastCallAt + DERIBIT_MIN_GAP_MS - Date.now();
+      if (wait > 0) await sleep(wait);
+      deribitLastCallAt = Date.now();
+      const res = await fetchWithTimeout(url, { timeout: 20000, retries: 1 });
+      if (res.status === 429 && attempt < DERIBIT_429_BACKOFF_MS.length) {
+        await sleep(DERIBIT_429_BACKOFF_MS[attempt]);
+        continue;
+      }
+      if (!res.ok) throw new Error(`Deribit ${method} HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(`Deribit ${method}: ${json.error.message || json.error.code}`);
+      return json.result;
+    }
+  });
+  // Keep the queue alive after a failure
+  deribitQueue = task.catch(() => {});
+  return task;
 }
 
 /**
  * BTC-PERPETUAL hourly funding rows from startTs to endTs, as
  * { fundingTime, fundingRate (realized interest_1h), indexPrice }.
- * Requested in 30-day chunks, a few chunks at a time.
+ * Requested in 30-day chunks through the rate-limited queue.
  */
 async function fetchDeribitFundingHistory(startTs, endTs = Date.now()) {
-  const chunks = [];
-  for (let s = startTs; s < endTs; s += FUNDING_CHUNK_MS) chunks.push([s, Math.min(endTs, s + FUNDING_CHUNK_MS)]);
   const rows = [];
-  for (let i = 0; i < chunks.length; i += 4) {
-    const batch = await Promise.all(chunks.slice(i, i + 4).map(([s, e]) => deribitGet('get_funding_rate_history', {
+  for (let s = startTs; s < endTs; s += FUNDING_CHUNK_MS) {
+    rows.push(...await deribitGet('get_funding_rate_history', {
       instrument_name: 'BTC-PERPETUAL',
       start_timestamp: s,
-      end_timestamp: e
-    })));
-    for (const part of batch) rows.push(...part);
+      end_timestamp: Math.min(endTs, s + FUNDING_CHUNK_MS)
+    }));
   }
   const byTime = new Map();
   for (const r of rows) {
@@ -316,14 +336,24 @@ async function fetchTbillLookup() {
   };
 }
 
+// Incremental refresh re-derives this many trailing days (fills short gaps) and appends new ones;
+// a cache older than INCREMENTAL_MAX_AGE_DAYS, or none at all, triggers a full rebuild.
+const INCREMENTAL_OVERLAP_DAYS = 10;
+const INCREMENTAL_MAX_AGE_DAYS = 60;
+
 /**
- * Build consolidated historical term structure from real CQ / NQ / funding / T-Bill data
+ * Build the historical term structure from real CQ / NQ / funding / T-Bill data.
+ * With a usable cached series only the trailing overlap plus the missing days are fetched
+ * (≈3 Deribit calls); otherwise everything since HISTORY_START_TS is rebuilt.
  */
-async function fetchAndBuildHistoricalBasis() {
-  console.log('[BasisFetcher] Ingesting Deribit futures + perpetual funding and FRED 3M T-Bill...');
+async function fetchAndBuildHistoricalBasis(cachedSeries = null) {
   const lastSnapshot = latestSnapshotTs();
+  const cacheLast = isFreshSchema(cachedSeries) ? cachedSeries[cachedSeries.length - 1].timestamp : null;
+  const incremental = cacheLast != null && lastSnapshot - cacheLast <= INCREMENTAL_MAX_AGE_DAYS * DAY_MS;
+  const fromTs = incremental ? Math.max(HISTORY_START_TS, cacheLast - INCREMENTAL_OVERLAP_DAYS * DAY_MS) : HISTORY_START_TS;
+  console.log(`[BasisFetcher] ${incremental ? 'Incremental' : 'Full'} Deribit refresh from ${new Date(fromTs).toISOString().slice(0, 10)}...`);
   const snapshots = [];
-  for (let ts = HISTORY_START_TS; ts <= lastSnapshot; ts += DAY_MS) snapshots.push(ts);
+  for (let ts = fromTs; ts <= lastSnapshot; ts += DAY_MS) snapshots.push(ts);
 
   // Every quarterly that served as CQ or NQ on some snapshot, with the window it was needed for
   const contracts = new Map();
@@ -336,17 +366,16 @@ async function fetchAndBuildHistoricalBasis() {
     }
   }
 
-  const [fundingRows, tbillLookup, closesList] = await Promise.all([
-    fetchDeribitFundingHistory(HISTORY_START_TS - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, lastSnapshot + HOUR_MS),
-    fetchTbillLookup(),
-    Promise.all([...contracts.values()].map(c => fetchDeribitDailyCloses(c.name, c.from, c.to)
-      .then(closes => [c.name, closes])))
-  ]);
-  const closesByName = new Map(closesList);
+  const tbillLookup = await fetchTbillLookup();
+  const fundingRows = await fetchDeribitFundingHistory(fromTs - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, lastSnapshot + HOUR_MS);
+  const closesByName = new Map();
+  for (const c of contracts.values()) {
+    closesByName.set(c.name, await fetchDeribitDailyCloses(c.name, c.from, c.to));
+  }
   const indexAt = new Map(fundingRows.map(r => [r.fundingTime, r.indexPrice]));
 
   const resultSeries = [];
-  let lastTbill = tbillLookup.at(new Date(HISTORY_START_TS).toISOString().slice(0, 10)) ?? tbillLookup.latest ?? DEFAULT_TBILL;
+  let lastTbill = tbillLookup.at(new Date(fromTs).toISOString().slice(0, 10)) ?? tbillLookup.latest ?? DEFAULT_TBILL;
   let skipped = 0;
 
   for (const ts of snapshots) {
@@ -380,17 +409,22 @@ async function fetchAndBuildHistoricalBasis() {
     throw new Error(`Deribit history incomplete: latest snapshot ${new Date(lastSnapshot).toISOString()} missing`);
   }
 
-  applyCarryMetrics(resultSeries);
+  // Keep cached days before the re-derived window; rolling vol / momentum / score are recomputed
+  // over the whole merged series because they look back up to 30 days
+  const merged = incremental
+    ? cachedSeries.filter(r => r.timestamp < fromTs).map(r => ({ ...r })).concat(resultSeries)
+    : resultSeries;
+  applyCarryMetrics(merged);
 
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(resultSeries, null, 2), 'utf8');
-    console.log(`[BasisFetcher] Archived ${resultSeries.length} daily term-structure records to ${CACHE_FILE}`);
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    console.log(`[BasisFetcher] Archived ${merged.length} daily term-structure records (${resultSeries.length} re-derived) to ${CACHE_FILE}`);
   } catch (err) {
     console.warn('[BasisFetcher] Error persisting historical basis:', err.message);
   }
 
-  inMemoryCache = resultSeries;
-  return resultSeries;
+  inMemoryCache = merged;
+  return merged;
 }
 
 /**
@@ -521,7 +555,7 @@ async function getHistoricalBasisData(forceRefresh = false) {
 
   fetchStatus.lastAttemptAt = now;
   try {
-    const series = await fetchAndBuildHistoricalBasis();
+    const series = await fetchAndBuildHistoricalBasis(forceRefresh ? null : (inMemoryCache || readDiskCache()));
     fetchStatus.lastSuccessAt = Date.now();
     fetchStatus.lastError = null;
     return series;

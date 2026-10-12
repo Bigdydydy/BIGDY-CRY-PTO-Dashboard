@@ -130,22 +130,6 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
 }
 
 /**
- * Fetch Deribit futures book summary for term structure calculation
- */
-async function fetchDeribitFutures(currency = 'BTC') {
-  try {
-    const url = `https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${currency}&kind=future`;
-    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
-    if (!resp.ok) return [];
-    const json = await resp.json();
-    return json.result || [];
-  } catch (err) {
-    console.warn('Failed to fetch Deribit futures:', err.message);
-    return [];
-  }
-}
-
-/**
  * Compare new data against fingerprints to detect actual updates
  */
 function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart, newIvSkewMonth, newAddedTrades = 0, newAtmData = null) {
@@ -261,7 +245,6 @@ async function refreshAllMarketData(currency = 'BTC') {
     skewChartRes,
     ivSkewMonthRes,
     dvolStatsRes,
-    futuresRes,
     goldRes
   ] = await Promise.allSettled([
     fetchBlockTrades(currency),
@@ -271,7 +254,6 @@ async function refreshAllMarketData(currency = 'BTC') {
     fetchGreeksDataLab('skew_chart', { currency, gap: '1d' }),
     fetchGreeksDataLab('iv_skew_month', { currency }),
     fetchDvolHistoricalStats(currency),
-    fetchDeribitFutures(currency),
     getGoldCorrelationData()
   ]);
 
@@ -295,10 +277,9 @@ async function refreshAllMarketData(currency = 'BTC') {
   const newAtmData = atmDataRes.status === 'fulfilled' ? atmDataRes.value : dataCache.atmData;
   const spotPrice = newGex?.index_price || 77400;
 
-  // Calculate Term Premium & Basis Structure
+  // Calculate Term Premium & Basis Structure (fetches its own Deribit curve through a rate-limited queue)
   try {
-    const futuresList = futuresRes.status === 'fulfilled' && Array.isArray(futuresRes.value) ? futuresRes.value : [];
-    dataCache.termPremium = await analyzeTermPremium(futuresList, spotPrice);
+    dataCache.termPremium = await analyzeTermPremium([], spotPrice);
   } catch (err) {
     console.warn('[DataFetcher] Term Premium analysis error:', err.message);
   }
