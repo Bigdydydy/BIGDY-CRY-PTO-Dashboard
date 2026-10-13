@@ -3,7 +3,7 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按当日市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "2.0.0",
-  "generated_at": "2026-10-13T14:33:13Z",
+  "generated_at": "2026-10-13T17:08:14Z",
   "benchmark_date": "2026-10-13",
   "total_days": 374,
   "parameters": {
@@ -65,7 +65,7 @@
  },
  "current": {
   "date": "2026-10-13",
-  "btc_close": 83620.0,
+  "btc_close": 83206.0,
   "core": {
    "ready": true,
    "breadth_days": 374,
@@ -86,45 +86,45 @@
    "breadth_days": 9,
    "warmup_days": 40,
    "date": "2026-10-13",
-   "advances": 47,
-   "declines": 93,
-   "unchanged": 19,
+   "advances": 49,
+   "declines": 92,
+   "unchanged": 18,
    "constituents": 159,
-   "ramo": -327.5,
+   "ramo": -305.2,
    "oscillator": null,
    "summation": null,
    "summation_change_10d": null,
    "percentile": null,
    "started": "2026-10-04",
-   "tracked_today": 159,
+   "tracked_today": 160,
    "tracked_by_chain": {
     "solana": 48,
     "bsc": 50,
-    "robinhood": 61
+    "robinhood": 62
    },
    "chains": {
     "bsc": {
-     "adv": 10,
-     "dec": 36,
+     "adv": 13,
+     "dec": 34,
      "n": 52
     },
     "robinhood": {
-     "adv": 17,
-     "dec": 32,
+     "adv": 19,
+     "dec": 30,
      "n": 60
     },
     "solana": {
-     "adv": 20,
-     "dec": 25,
+     "adv": 17,
+     "dec": 28,
      "n": 47
     }
    },
    "dead": 3,
-   "entries": 9,
+   "entries": 10,
    "exits": 9,
    "age_median": 6,
    "low_sample": false,
-   "ramo_pooled": -328.6,
+   "ramo_pooled": -305.0,
    "anchor_corr_days": 0,
    "anchor_corr": null
   }
@@ -6894,7 +6894,7 @@
   },
   {
    "date": "2026-10-13",
-   "btc_close": 83620.0,
+   "btc_close": 83206.0,
    "dex_volume": null,
    "dex_momentum": null,
    "core_adv": 16,
@@ -6903,18 +6903,18 @@
    "core_ramo": -670.1,
    "core_oscillator": -74.84,
    "core_summation": 1055.6,
-   "frontier_adv": 47,
-   "frontier_dec": 93,
+   "frontier_adv": 49,
+   "frontier_dec": 92,
    "frontier_n": 159,
-   "frontier_ramo": -327.5,
+   "frontier_ramo": -305.2,
    "frontier_oscillator": null,
    "frontier_summation": null,
    "frontier_dead": 3,
-   "frontier_entries": 9,
+   "frontier_entries": 10,
    "frontier_exits": 9,
    "frontier_age_median": 6,
    "frontier_low_sample": false,
-   "frontier_ramo_pooled": -328.6
+   "frontier_ramo_pooled": -305.0
   }
  ]
 }
