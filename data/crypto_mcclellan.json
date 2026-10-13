@@ -3,7 +3,7 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按当日市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "2.0.0",
-  "generated_at": "2026-10-12T19:18:54Z",
+  "generated_at": "2026-10-13T07:06:09Z",
   "benchmark_date": "2026-10-12",
   "total_days": 373,
   "parameters": {
@@ -58,28 +58,28 @@
  },
  "bands": {
   "core": {
-   "low": -51.41,
+   "low": -51.06,
    "high": 58.84
   },
   "frontier": null
  },
  "current": {
   "date": "2026-10-12",
-  "btc_close": 82313.0,
+  "btc_close": 83702.0,
   "core": {
    "ready": true,
    "breadth_days": 373,
    "warmup_days": 40,
    "date": "2026-10-12",
-   "advances": 13,
-   "declines": 87,
-   "unchanged": 0,
+   "advances": 19,
+   "declines": 79,
+   "unchanged": 2,
    "constituents": 100,
-   "ramo": -740.0,
-   "oscillator": -54.36,
-   "summation": 1124.0,
-   "summation_change_10d": -391.2,
-   "percentile": 9.0
+   "ramo": -612.2,
+   "oscillator": -47.97,
+   "summation": 1130.4,
+   "summation_change_10d": -384.8,
+   "percentile": 12.0
   },
   "frontier": {
    "ready": false,
@@ -87,44 +87,44 @@
    "warmup_days": 40,
    "date": "2026-10-12",
    "advances": 35,
-   "declines": 113,
-   "unchanged": 9,
+   "declines": 116,
+   "unchanged": 6,
    "constituents": 157,
-   "ramo": -530.4,
+   "ramo": -543.1,
    "oscillator": null,
    "summation": null,
    "summation_change_10d": null,
    "percentile": null,
    "started": "2026-10-04",
-   "tracked_today": 151,
+   "tracked_today": 159,
    "tracked_by_chain": {
-    "solana": 42,
-    "bsc": 51,
-    "robinhood": 58
+    "solana": 47,
+    "bsc": 52,
+    "robinhood": 60
    },
    "chains": {
     "bsc": {
-     "adv": 12,
+     "adv": 14,
      "dec": 38,
      "n": 52
     },
     "robinhood": {
      "adv": 15,
-     "dec": 36,
+     "dec": 37,
      "n": 56
     },
     "solana": {
-     "adv": 8,
-     "dec": 39,
+     "adv": 6,
+     "dec": 41,
      "n": 49
     }
    },
-   "dead": 8,
-   "entries": 11,
-   "exits": 17,
+   "dead": 11,
+   "entries": 22,
+   "exits": 20,
    "age_median": 6,
    "low_sample": false,
-   "ramo_pooled": -527.0,
+   "ramo_pooled": -536.4,
    "anchor_corr_days": 0,
    "anchor_corr": null
   }
@@ -6870,27 +6870,27 @@
   },
   {
    "date": "2026-10-12",
-   "btc_close": 82313.0,
+   "btc_close": 83702.0,
    "dex_volume": null,
    "dex_momentum": null,
-   "core_adv": 13,
-   "core_dec": 87,
+   "core_adv": 19,
+   "core_dec": 79,
    "core_n": 100,
-   "core_ramo": -740.0,
-   "core_oscillator": -54.36,
-   "core_summation": 1124.0,
+   "core_ramo": -612.2,
+   "core_oscillator": -47.97,
+   "core_summation": 1130.4,
    "frontier_adv": 35,
-   "frontier_dec": 113,
+   "frontier_dec": 116,
    "frontier_n": 157,
-   "frontier_ramo": -530.4,
+   "frontier_ramo": -543.1,
    "frontier_oscillator": null,
    "frontier_summation": null,
-   "frontier_dead": 8,
-   "frontier_entries": 11,
-   "frontier_exits": 17,
+   "frontier_dead": 11,
+   "frontier_entries": 22,
+   "frontier_exits": 20,
    "frontier_age_median": 6,
    "frontier_low_sample": false,
-   "frontier_ramo_pooled": -527.0
+   "frontier_ramo_pooled": -536.4
   }
  ]
 }
