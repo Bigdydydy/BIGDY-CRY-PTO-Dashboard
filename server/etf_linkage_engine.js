@@ -299,6 +299,63 @@ function buildWeeklyPanel({ etfFlows, cot, oiPanel, basisSeries }) {
   return weeks.filter(w => w.etfDays > 0);
 }
 
+/** COT week a date belongs to: the Tuesday on or after it */
+function cotWeekEndOf(dateStr) {
+  const t = Date.parse(dateStr);
+  const dow = new Date(t).getUTCDay();
+  return isoDate(t + ((2 - dow + 7) % 7) * DAY_MS);
+}
+
+/**
+ * ETF flows printed after the latest CFTC report, grouped into the COT weeks they will belong to.
+ * CME positioning for these weeks is not published yet (the Tuesday snapshot is released the
+ * following Friday), so they are display-only: excluded from β, the checks and the decomposition.
+ */
+function buildPendingWeeks({ etfFlows, lastCotDate, oiPanel, basisSeries, now = Date.now() }) {
+  if (!lastCotDate) return [];
+  const today = isoDate(now);
+  const basisByDate = new Map((basisSeries || []).map(r => [r.date, r]));
+  const oiByDate = new Map((oiPanel || []).map(r => [r.date, r]));
+  const groups = new Map();
+  for (const f of etfFlows) {
+    if (f.date <= lastCotDate) continue;
+    const weekEnd = cotWeekEndOf(f.date);
+    if (!groups.has(weekEnd)) groups.set(weekEnd, []);
+    groups.get(weekEnd).push(f);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([weekEnd, flows]) => {
+    const weekStart = isoDate(Math.max(Date.parse(lastCotDate), Date.parse(weekEnd) - 7 * DAY_MS));
+    const lastDay = weekEnd < today ? weekEnd : today;
+    const carry = [];
+    const apr = [];
+    let price = null;
+    for (let t = Date.parse(weekStart) + DAY_MS; t <= Date.parse(lastDay); t += DAY_MS) {
+      const d = isoDate(t);
+      const b = basisByDate.get(d);
+      if (b?.excessOverTBill != null) carry.push(b.excessOverTBill);
+      if (b?.apr90d != null) apr.push(b.apr90d);
+      price = oiByDate.get(d)?.price ?? b?.btcPrice ?? price;
+    }
+    const flowBtc = sum(flows.map(f => f.flowBtc));
+    return {
+      weekEnd,
+      provisional: true,
+      etfDays: flows.length,
+      etfFrom: flows[0].date,
+      etfTo: flows[flows.length - 1].date,
+      etfFlowBtc: round(flowBtc, 1),
+      etfFlowUsd: round(sum(flows.map(f => f.flowUsd)), 0),
+      dailyFlows: flows.map(f => ({ date: f.date, flowBtc: round(f.flowBtc, 1), flowUsd: round(f.flowUsd, 0) })),
+      excessOverTBill: carry.length ? round(mean(carry)) : null,
+      apr90d: apr.length ? round(mean(apr)) : null,
+      btcPrice: price != null ? Math.round(price) : null,
+      // CFTC publishes the Tuesday snapshot on the following Friday
+      cotExpectedRelease: isoDate(Date.parse(weekEnd) + 3 * DAY_MS),
+      dLfNetShortBtc: null
+    };
+  });
+}
+
 function analyzeLinkage(weeks, { etfFlows, oiPanel } = {}) {
   const flow = weeks.map(w => w.etfFlowBtc);
   const dLf = weeks.map(w => w.dLfNetShortBtc);
@@ -511,8 +568,17 @@ async function buildEtfLinkage(basisSeries) {
   const weeks = buildWeeklyPanel({ etfFlows, cot, oiPanel, basisSeries });
   const analysis = analyzeLinkage(weeks, { etfFlows, oiPanel });
   const latestCot = cot[cot.length - 1] || null;
+  const pendingWeeks = buildPendingWeeks({ etfFlows, lastCotDate: latestCot?.date, oiPanel, basisSeries });
   return {
     generatedAt: Date.now(),
+    // How current each input is, shown next to the section title
+    freshness: {
+      etfFlowLatest: etfFlows.length ? etfFlows[etfFlows.length - 1].date : null,
+      cotLatest: latestCot?.date || null,
+      oiLatest: oiPanel.length ? oiPanel[oiPanel.length - 1].date : null,
+      basisLatest: basisSeries?.length ? basisSeries[basisSeries.length - 1].date : null
+    },
+    pendingWeeks,
     metadata: {
       sources: {
         etfFlows: 'CoinGlass 美国现货 BTC ETF 日净流入 (BTC/USD)',
@@ -576,6 +642,8 @@ async function getEtfLinkageData(basisSeries, force = false) {
 module.exports = {
   getEtfLinkageData,
   buildWeeklyPanel,
+  buildPendingWeeks,
+  cotWeekEndOf,
   analyzeLinkage,
   simpleRegression,
   ols,

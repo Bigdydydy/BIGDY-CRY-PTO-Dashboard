@@ -77,6 +77,12 @@ async function fetchAndBuildPreferreds() {
     fetchFredSeries('DGS1MO')
   ]);
 
+  const sources = {
+    'Yahoo STRC': 'ok',
+    'Yahoo STRF': strf.size ? 'ok' : 'failed',
+    'Yahoo STRD': strd.size ? 'ok' : 'failed',
+    'FRED DGS1MO': tbill.size ? 'ok' : 'failed'
+  };
   const dates = Array.from(strc.keys()).sort();
   if (dates.length === 0) throw new Error('STRC price series empty');
 
@@ -180,6 +186,7 @@ async function fetchAndBuildPreferreds() {
     strcLatestRatedMonth: lastRated,
     hikeFailedMonths: monthly.filter(m => m.hikeFailed).length,
     hikeMonths: monthly.filter(m => m.hiked).length,
+    sources,
     updatedAt: new Date().toISOString()
   };
 
@@ -204,17 +211,44 @@ function readCacheFile() {
   }
 }
 
-async function getPreferredsData(forceRefresh = false) {
-  if (!forceRefresh && inMemoryCache && Date.now() - lastFetchTime < CACHE_TTL_MS) return inMemoryCache;
-  try {
-    return await fetchAndBuildPreferreds();
-  } catch (err) {
-    const fallback = inMemoryCache || readCacheFile();
-    if (!fallback) throw err;
-    console.warn('[Preferreds] Live rebuild failed, serving cached dataset:', err.message);
-    inMemoryCache = fallback;
-    return fallback;
+const FAILURE_RETRY_MS = 2 * 60 * 1000;
+let rebuildInflight = null;
+
+// 单飞 + 失败退避，与 macro_fetcher 一致
+function rebuildOnce() {
+  if (!rebuildInflight) {
+    rebuildInflight = fetchAndBuildPreferreds()
+      .catch((err) => {
+        lastFetchTime = Date.now() - CACHE_TTL_MS + FAILURE_RETRY_MS;
+        throw err;
+      })
+      .finally(() => { rebuildInflight = null; });
   }
+  return rebuildInflight;
+}
+
+async function getPreferredsData(forceRefresh = false) {
+  if (!inMemoryCache) {
+    const cached = readCacheFile();
+    if (cached) {
+      inMemoryCache = cached;
+      const age = Date.now() - (Date.parse(cached.summary?.updatedAt) || 0);
+      lastFetchTime = Date.now() - Math.min(age, CACHE_TTL_MS);
+    }
+  }
+  if (forceRefresh || !inMemoryCache) {
+    try {
+      return await rebuildOnce();
+    } catch (err) {
+      if (!inMemoryCache) throw err;
+      console.warn('[Preferreds] Live rebuild failed, serving cached dataset:', err.message);
+      return inMemoryCache;
+    }
+  }
+  if (Date.now() - lastFetchTime >= CACHE_TTL_MS) {
+    rebuildOnce().catch(e => console.error('[Preferreds] Background refresh failed:', e.message));
+  }
+  return inMemoryCache;
 }
 
 module.exports = { getPreferredsData };

@@ -21,11 +21,11 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20261010_1">
-  <link rel="stylesheet" href="/atelier.css?v=20261007_3">
+  <link rel="stylesheet" href="/style.css?v=20261014_1">
+  <link rel="stylesheet" href="/atelier.css?v=20261009_1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" crossorigin="anonymous">
 </head>
 <body>
   <!-- Atelier Stage: 油画背景（双层交叉淡入）+ ASCII 叠层 + 明暗罩 -->
@@ -91,6 +91,10 @@
           <span class="meta-label">BTC 现货</span>
           <span class="meta-value accent" id="index-price">$--,---</span>
         </div>
+
+        <button class="atl-header-btn" data-atl="snapshot" title="截图到剪贴板 (Alt+S)" aria-label="截图当前界面并复制到剪贴板">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
 
         <button class="atl-header-btn" data-atl="gallery" title="画廊：更换背景画作" aria-label="打开画廊">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
@@ -375,6 +379,7 @@
         <div class="card-title-group">
           <span class="card-module-tag">00 MACRO &amp; ON-CHAIN COST</span>
           <h2>美债收益率曲线与 MicroStrategy 链上持仓成本实时全景</h2>
+          <span class="data-freshness" id="macro-freshness">数据加载中</span>
         </div>
         <div class="view-switch timeframe-switch" id="macro-timeframe-switch">
           <button class="switch-btn" data-range="3m">3M</button>
@@ -2892,8 +2897,8 @@
   <script src="/echarts.min.js"></script>
   <script src="/pnl_engine.js"></script>
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
-  <script src="/atelier.js?v=20261008_1"></script>
+  <script src="/atelier.js?v=20261009_1"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
-  <script src="/app.js?v=20261010_2"></script>
+  <script src="/app.js?v=20261014_1"></script>
 </body>
 </html>

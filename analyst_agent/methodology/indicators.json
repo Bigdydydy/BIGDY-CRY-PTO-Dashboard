@@ -1,0 +1,2770 @@
+{
+  "version": "0.2.0",
+  "verified_on": "2026-10-03",
+  "description": "指标注册表：把方法论里的每个概念映射到数据源、计算方式和解读规则。数据层按 sources 拉数据并计算 transforms，评论 agent 按 rules 解读。lens 标明指标属于哪个视角：esther（美国宏观-利率-风险资产）、brooks（全球宏观-外汇-主权债务）、both。composite 指标由 snapshot.js 按 composite.type 从组件序列合成。verified=true 表示 2026-10-03 实测返回了最新数据；false 表示尚未实测。rules 中的阈值来自语料，ref 是语料文章日期。",
+  "providers": {
+    "fred": {
+      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}",
+      "auth": "none",
+      "role": "主数据层：利率、流动性、宏观数据"
+    },
+    "yahoo": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=10y&interval=1d",
+      "auth": "none（需浏览器 UA）",
+      "role": "主数据层：指数、波动率、商品、外汇；非官方接口，必须缓存并做失败降级"
+    },
+    "treasury": {
+      "url": "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query",
+      "auth": "none",
+      "role": "主数据层：国债拍卖结果"
+    },
+    "nyfed_acm": {
+      "url": "https://www.newyorkfed.org/research/data_indicators/term-premia-tabs",
+      "auth": "none",
+      "role": "ACM 期限溢价（xlsx），尚未接入"
+    },
+    "openmarket": {
+      "url": "MCP: OpenMarket",
+      "auth": "OAuth（Free 档：K线历史 167 小时）",
+      "role": "辅助层：Polymarket 美联储概率、HIP-3 永续 7x24 价格、加密衍生品"
+    },
+    "manual": {
+      "url": null,
+      "auth": null,
+      "role": "人工输入：基金经理调查、远期EPS、CTA仓位等无免费源的数据"
+    }
+  },
+  "indicators": [
+    {
+      "id": "UST2Y",
+      "name": "2年期美债利率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DGS2",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "para:2Y",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1d_bp",
+        "chg_1w_bp",
+        "chg_since_event_bp"
+      ],
+      "rules": [
+        {
+          "when": "2年期大涨且美元同步走强",
+          "meaning": "市场在给央行鹰派投信任票；股、金、债、币同跌，风险资产承压",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "UST10Y",
+      "name": "10年期美债利率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DGS10",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "yahoo",
+          "ticker": "^TNX",
+          "role": "fallback",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "para:10Y",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_bp",
+        "chg_4w_bp",
+        "chg_since_event_bp"
+      ],
+      "rules": [
+        {
+          "when": "10年期已经定价了某个政策结果（比如QT结束）后继续下行",
+          "meaning": "下降趋势随时可能反转，持有可以，但不追加仓位",
+          "ref": "2025-10-28"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "UST30Y",
+      "name": "30年期美债利率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DGS30",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "yahoo",
+          "ticker": "^TYX",
+          "role": "fallback",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "para:30Y",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_bp",
+        "distance_to_key_level_bp"
+      ],
+      "rules": [
+        {
+          "when": "长端利率逼近政策工具箱守护的关键位",
+          "meaning": "可以战术做多长债并预设止损；有效突破关键位说明政策底失守，需要切换剧本",
+          "ref": "2026-08-31"
+        }
+      ],
+      "notes": "关键位不能写死，由 agent 根据当时的价格结构和政策工具判断，并写进防线",
+      "lens": "both"
+    },
+    {
+      "id": "REAL10Y",
+      "name": "10年期实际利率(TIPS)",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DFII10",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_since_event_bp",
+        "share_of_nominal_move"
+      ],
+      "rules": [
+        {
+          "when": "名义利率涨幅中实际利率贡献占大头",
+          "meaning": "市场定价的是资金稀缺/财政溢价，不是通胀失控",
+          "ref": "2026-09-27"
+        },
+        {
+          "when": "实际利率 > 预期经济增长率",
+          "meaning": "债务雪球效应，长端不确定性上升",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "BEI10Y",
+      "name": "10年期盈亏平衡通胀",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "T10YIE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_since_event_bp",
+        "share_of_nominal_move"
+      ],
+      "rules": [
+        {
+          "when": "通胀预期突破上方关键位",
+          "meaning": "通胀叙事接管长端，长债多头逻辑失效（例：2.6% 被用作证伪条件）",
+          "ref": "2026-09-08"
+        },
+        {
+          "when": "盈亏平衡通胀稳定，而贵金属和'贬值交易'大涨",
+          "meaning": "盈亏平衡通胀短视、后视，不定价通胀不代表贬值交易错了；市场要等通胀摆在眼前才会定价",
+          "ref": "brooks 2026-01-08"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "INFL5Y5Y",
+      "name": "5年后5年远期通胀预期",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "T5YIFR",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "TERM_PREMIUM_10Y",
+      "name": "10年期期限溢价",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "nyfed_acm",
+          "series": "ACMTP10",
+          "role": "primary",
+          "verified": false
+        },
+        {
+          "provider": "fred",
+          "series": "THREEFYTP10",
+          "role": "fallback",
+          "verified": true,
+          "notes": "Kim-Wright 模型，与 ACM 口径不同"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_since_event_bp",
+        "share_of_nominal_move"
+      ],
+      "rules": [
+        {
+          "when": "期限溢价主导长端上涨",
+          "meaning": "长端从'无风险资产'变成'财政风险'定价；财政主导体制(R4)的核心信号",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "both",
+      "stale_days": 14
+    },
+    {
+      "id": "CURVE_2S10S",
+      "name": "2s10s 利差",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "T10Y2Y",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_bp",
+        "curve_regime"
+      ],
+      "rules": [
+        {
+          "when": "熊陡（长端领涨）",
+          "meaning": "银行和小盘股难有持续表现；只要长端上升速度不加快，伤不到大科技",
+          "ref": "2024-01-23"
+        },
+        {
+          "when": "牛陡且陡度达 +80~100bp、前端下降更快",
+          "meaning": "逢低买入风险资产的条件之一",
+          "ref": "2025-03-10"
+        },
+        {
+          "when": "熊平（短端领涨）",
+          "meaning": "央行鹰派按住通胀，风险资产承压",
+          "ref": "2026-08-31"
+        }
+      ],
+      "notes": "curve_regime 用 2Y 和 10Y 的周变化判断：两者同涨且10Y涨得多=熊陡；同跌且2Y跌得多=牛陡；同涨且2Y涨得多=熊平；同跌且10Y跌得多=牛平",
+      "lens": "esther"
+    },
+    {
+      "id": "CURVE_3M10Y",
+      "name": "3m10y 利差",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "T10Y3M",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "FED_FUNDS",
+      "name": "联邦基金有效利率",
+      "dimension": "policy",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DFF",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "SOFR",
+          "role": "secondary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "FED_ODDS",
+      "name": "美联储议息结果概率",
+      "dimension": "policy",
+      "layer": "direction",
+      "frequency": "realtime",
+      "unit": "probability",
+      "sources": [
+        {
+          "provider": "openmarket",
+          "exchange": "POLYMARKET",
+          "query": "symbolFilter=Fed",
+          "role": "primary",
+          "verified": true,
+          "notes": "例：'Fed Decision in October?'、'Fed Decision in December?'、'How many Fed rate hikes in 2026?'；报的是最新成交概率，不是实时报价"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1d",
+        "chg_1w"
+      ],
+      "rules": [
+        {
+          "when": "市场定价与美联储指引一致",
+          "meaning": "做多国债才比较安全",
+          "ref": "2024-02-17"
+        },
+        {
+          "when": "数据恶化速度快于美联储反应",
+          "meaning": "美联储落后于曲线，市场会定价更快更大的调整，风险资产先跌",
+          "ref": "2024-08-05"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "FED_BALANCE_SHEET",
+      "name": "美联储总资产",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "USD mn",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "WALCL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "TGA",
+      "name": "财政部一般账户",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "USD mn",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "WTREGEN",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w"
+      ],
+      "rules": [
+        {
+          "when": "TGA 快速上升（发债回补现金）",
+          "meaning": "抽走银行体系流动性",
+          "ref": "2025-08-18"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "RRP",
+      "name": "隔夜逆回购余额",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD bn",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "RRPONTSYD",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [
+        {
+          "when": "RRP 接近零",
+          "meaning": "流动性缓冲耗尽，任何冲击都可能触发流动性-波动率负循环；对冲波动率变得重要",
+          "ref": "2025-08-18"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "RESERVES",
+      "name": "银行准备金",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "USD mn",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "WRESBAL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "NET_LIQUIDITY",
+      "name": "净流动性",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "USD tn",
+      "composite": {
+        "type": "net_liquidity",
+        "inputs": {
+          "walcl": {
+            "provider": "fred",
+            "series": "WALCL"
+          },
+          "tga": {
+            "provider": "fred",
+            "series": "WTREGEN"
+          },
+          "rrp": {
+            "provider": "fred",
+            "series": "RRPONTSYD"
+          }
+        },
+        "formula": "WALCL/1e6 - WTREGEN/1e6 - RRPONTSYD/1e3（万亿美元）"
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "WALCL",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "WTREGEN",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "RRPONTSYD",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w",
+        "slope_20d"
+      ],
+      "rules": [],
+      "notes": "bold-euclid 的 server/macro_fetcher.js 已经实现了同一口径（fedNetLiquidity），可以复用",
+      "lens": "esther"
+    },
+    {
+      "id": "MOVE",
+      "name": "MOVE 债券波动率",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^MOVE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_2d_pct",
+        "percentile_1y"
+      ],
+      "rules": [
+        {
+          "when": "MOVE > 90",
+          "meaning": "全球流动性边际收缩，向股市直接传导",
+          "ref": "2026-05-19"
+        },
+        {
+          "when": "MOVE 上升",
+          "meaning": "标普相对 40 周均线的偏离度回落（两者高度负相关）",
+          "ref": "2026-05-19"
+        },
+        {
+          "when": "MOVE 处于低位",
+          "meaning": "国债看跌期权相对便宜，适合少量对冲",
+          "ref": "2025-08-18"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "UST_AUCTIONS",
+      "name": "国债拍卖结果",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "event",
+      "unit": "mixed",
+      "sources": [
+        {
+          "provider": "treasury",
+          "series": "auctions_query",
+          "role": "primary",
+          "verified": true,
+          "notes": "字段：auction_date, security_term, high_yield, bid_to_cover_ratio；尾巴需要 WI 利率（付费），先用投标倍数代替"
+        }
+      ],
+      "transforms": [
+        "bid_to_cover_vs_avg6"
+      ],
+      "rules": [
+        {
+          "when": "拍卖需求疲弱从长端蔓延到曲线腹部（银行最爱的期限）",
+          "meaning": "供大于求在扩散，利率上行压力加大",
+          "ref": "2026-09-27"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "HY_OAS",
+      "name": "高收益债利差",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "BAMLH0A0HYM2",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_since_spx_high_bp"
+      ],
+      "rules": [
+        {
+          "when": "股市调整时信用利差只象征性扩大",
+          "meaning": "信用市场没有定价衰退；信用市场对衰退比股市更敏感，可以当正面信号",
+          "ref": "2025-03-24"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "IG_OAS",
+      "name": "投资级债利差",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "BAMLC0A0CM",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "DXY",
+      "name": "美元指数",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "DX-Y.NYB",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "DTWEXBGS",
+          "role": "secondary",
+          "verified": true,
+          "notes": "广义贸易加权美元，口径不同"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "美元指数站上 100",
+          "meaning": "贵金属中期承压（曾用作黄金观点的证伪条件）",
+          "ref": "2026-08-31"
+        },
+        {
+          "when": "美元偏离 2y2y 远期利差隐含的水平（美元高于利差）",
+          "meaning": "多为避险或政策风险溢价造成的暂时偏离，风险偏好恢复后美元回到利差路径；利差（对冲需求的代理）比资本流动数据更能解释美元方向",
+          "ref": "brooks 2026-04-26; 2026-06-22"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "USDJPY",
+      "name": "美元兑日元",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "JPY",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "JPY=X",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:JPY",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct"
+      ],
+      "rules": [
+        {
+          "when": "日元急升",
+          "meaning": "套息仓位被强制平仓，杠杆资金无差别抛售，冲击是机械性的",
+          "ref": "2026-09-15"
+        },
+        {
+          "when": "日本投资者对冲后的美债收益低于日债收益",
+          "meaning": "资金回流日本，减持美债",
+          "ref": "2026-09-08"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "GOLD",
+      "name": "黄金",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD/oz",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "GC=F",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "BINANCE_FUTURES",
+          "symbol": "XAUUSDT",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "drawdown_from_high",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "同一利空下黄金跌幅小于股债",
+          "meaning": "市场的真实偏好在黄金",
+          "ref": "2024-04-15"
+        },
+        {
+          "when": "牛市中回撤 10%~13%",
+          "meaning": "属于正常回撤（以往牛市三个月回撤中位数约 13%），不代表牛市结束",
+          "ref": "2025-04-29"
+        },
+        {
+          "when": "杠杆资金集中做多",
+          "meaning": "稳健的加仓位置是等杠杆资金止损之后",
+          "ref": "2025-10-26"
+        },
+        {
+          "when": "贵金属在财政失控担忧下暴涨",
+          "meaning": "'贬值交易'：寻找对冲债务货币化的避险资产，也包括低债务国家的货币；由养老金被通胀稀释的恐惧驱动，容易形成泡沫",
+          "ref": "brooks 2026-01-01; 2026-09-06"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "WTI",
+      "name": "WTI 原油",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD/bbl",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "CL=F",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "DCOILWTICO",
+          "role": "secondary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:CL",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct"
+      ],
+      "rules": [
+        {
+          "when": "油价冲高",
+          "meaning": "PCE 下不来，鹰派窗口延长；能源多头是鹰派意外最便宜的保险",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "BRENT",
+      "name": "布伦特原油",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD/bbl",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "BZ=F",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:BRENTOIL",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "implied_oil_disruption"
+      ],
+      "rules": [
+        {
+          "when": "把当前油价相对冲突前基准的涨幅，乘以需求价格弹性（约0.15）",
+          "meaning": "得到市场隐含的供给中断规模（占全球供给比例/百万桶每日）；和实际油轮通行量对比，判断油价是否已经充分定价（隐含中断大于实际中断 → 上行空间有限）",
+          "ref": "brooks 2026-03-19"
+        }
+      ],
+      "notes": "implied_oil_disruption 需要 analysis_params.json 里的 oil.baseline_brent（冲突前基准价）、elasticity、global_supply_mbd",
+      "lens": "both"
+    },
+    {
+      "id": "DIESEL",
+      "name": "取暖油/柴油期货",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD/gal",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "HO=F",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:HO",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "crack_vs_wti"
+      ],
+      "rules": [
+        {
+          "when": "精炼油短缺、裂解价差飙升",
+          "meaning": "滞后传导到核心 PCE 和食品价格，通胀压力比原油价格显示的更大",
+          "ref": "2026-09-27"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "OIL_10Y_CORR",
+      "name": "油价与10年期利率的3个月滚动相关性",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "corr",
+      "composite": {
+        "type": "rolling_corr",
+        "inputs": {
+          "a": {
+            "provider": "yahoo",
+            "ticker": "CL=F"
+          },
+          "b": {
+            "provider": "fred",
+            "series": "DGS10"
+          }
+        },
+        "window": 63,
+        "a_mode": "pct",
+        "b_mode": "diff"
+      },
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "CL=F",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "DGS10",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "相关性处于历史高位",
+          "meaning": "利率走向更多取决于油价和地缘，而不是美联储",
+          "ref": "2026-09-27"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "SPX",
+      "name": "标普500",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^GSPC",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:SP500",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "drawdown_from_high",
+        "vs_sma200",
+        "vs_sma50w",
+        "days_below_sma200"
+      ],
+      "rules": [
+        {
+          "when": "回撤到 200 日均线附近企稳",
+          "meaning": "加仓区",
+          "ref": "2024-08-05"
+        },
+        {
+          "when": "跌破 200 日均线，一两天内没收回",
+          "meaning": "严格止损",
+          "ref": "2025-03-10"
+        },
+        {
+          "when": "见底后重新站稳 200 日均线",
+          "meaning": "底部确认",
+          "ref": "2025-03-24"
+        },
+        {
+          "when": "从高点回撤 7%~10%",
+          "meaning": "非衰退环境下的加仓窗口",
+          "ref": "2024-06-23; 2025-07-21"
+        },
+        {
+          "when": "连续两周收在 50 周均线下方",
+          "meaning": "趋势转弱的警示",
+          "ref": "2025-03-24"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "NDX",
+      "name": "纳斯达克100",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^NDX",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:XYZ100",
+          "role": "realtime",
+          "verified": true,
+          "notes": "2026-10-03 实测 30808 vs ^NDX 30807.9"
+        }
+      ],
+      "transforms": [
+        "level",
+        "drawdown_from_high",
+        "vs_sma200"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "SOX",
+      "name": "费城半导体指数",
+      "dimension": "earnings",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^SOX",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:SMH",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "drawdown_from_high",
+        "vs_sma200",
+        "rel_to_spx"
+      ],
+      "rules": [
+        {
+          "when": "半导体失守关键整数位",
+          "meaning": "半导体周期见顶确认（曾以 SOX 10000 作为证伪条件）",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "BREADTH_PROXY",
+      "name": "市场宽度代理：等权/市值加权",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "ratio",
+      "composite": {
+        "type": "ratio",
+        "inputs": {
+          "a": {
+            "provider": "yahoo",
+            "ticker": "RSP"
+          },
+          "b": {
+            "provider": "yahoo",
+            "ticker": "SPY"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "RSP",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "yahoo",
+          "ticker": "SPY",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "等权大幅跑输、指数靠少数巨头创新高",
+          "meaning": "宽度差，上涨脆弱",
+          "ref": "2026-09-27; 2025-06-30"
+        }
+      ],
+      "notes": "语料用的是'200日线以上成分股比例 ≥55%'，免费源拿不到；先用比值代理，以后用成分股自己计算",
+      "lens": "esther"
+    },
+    {
+      "id": "BREADTH_PCT_ABOVE_200D",
+      "name": "200日线以上成分股比例",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "manual",
+          "role": "primary",
+          "verified": false
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [
+        {
+          "when": ">= 55%",
+          "meaning": "反弹才持久；宽度太窄时市场脆弱、反弹不持久",
+          "ref": "2025-03-10"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "SMALLCAP",
+      "name": "罗素2000",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^RUT",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "mkts:SMALL2000",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "rel_to_spx",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "降息时经济仍有韧性",
+          "meaning": "降息的'正确姿势'，小盘股资产负债表压力缓解，利好",
+          "ref": "2024-08-05"
+        },
+        {
+          "when": "因经济疲软被迫降息",
+          "meaning": "降息的'错误姿势'，对小盘股是挑战",
+          "ref": "2024-08-05"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "REGIONAL_BANKS",
+      "name": "地区银行 KRE",
+      "dimension": "earnings",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "KRE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "rel_to_spx"
+      ],
+      "rules": [
+        {
+          "when": "长端利率见顶回落",
+          "meaning": "对长端利率敏感的 KRE、REITs 受益",
+          "ref": "2026-09-08"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "ENERGY",
+      "name": "能源板块 XLE",
+      "dimension": "earnings",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "XLE",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:XLE",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "rel_to_spx"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "VIX",
+      "name": "VIX",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^VIX",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "VIXCLS",
+          "role": "fallback",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w",
+        "divergence_vs_spx"
+      ],
+      "rules": [
+        {
+          "when": "VIX 12~13",
+          "meaning": "保护便宜，可以增加看跌期权对冲",
+          "ref": "2024-08-18; 2024-12-30"
+        },
+        {
+          "when": "VIX < 25",
+          "meaning": "下跌有序，还没有恐慌",
+          "ref": "2025-03-10"
+        },
+        {
+          "when": "VIX > 30",
+          "meaning": "恐慌；需要一次 VIX 飙升配合多头止损，抄底才更安全",
+          "ref": "2025-03-17; 2025-03-24"
+        },
+        {
+          "when": "标普创新低而 VIX 没有创新高",
+          "meaning": "背离，短期可能反弹",
+          "ref": "2025-03-24"
+        },
+        {
+          "when": "大盘接近前高而 VIX 不肯回落",
+          "meaning": "想加仓要有耐心",
+          "ref": "2025-10-19"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "VVIX",
+      "name": "VVIX",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "daily",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^VVIX",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "zscore_1y"
+      ],
+      "rules": [
+        {
+          "when": "VVIX 比长期中位数高出约 3 个标准差",
+          "meaning": "极端恐慌",
+          "ref": "2025-04-07"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "POSITIONING_MANUAL",
+      "name": "仓位与情绪（人工输入）",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "weekly",
+      "unit": "mixed",
+      "sources": [
+        {
+          "provider": "manual",
+          "role": "primary",
+          "verified": false,
+          "notes": "美银基金经理调查、美银牛熊指标、AAII、CNN 恐惧贪婪指数、CTA 股票多头规模、机构期货净多、私行现金比例、隐含相关性"
+        }
+      ],
+      "transforms": [],
+      "rules": [
+        {
+          "when": "情绪极度悲观（AAII/CNN）但基金经理仓位没有跟着下降",
+          "meaning": "底部还没到",
+          "ref": "2025-03-24"
+        },
+        {
+          "when": "隐含相关性处于史低、牛熊指标极度乐观、现金比例历史低位，三者同时出现",
+          "meaning": "买指数波动率最便宜",
+          "ref": "2026-09-08"
+        },
+        {
+          "when": "新高不是多头重仓追出来的（CTA、期货净多下降）",
+          "meaning": "上涨结构健康",
+          "ref": "2026-09-27"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "BTC",
+      "name": "比特币",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "realtime",
+      "unit": "USD",
+      "sources": [
+        {
+          "provider": "openmarket",
+          "exchange": "BINANCE_FUTURES",
+          "symbol": "BTCUSDT",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "yahoo",
+          "ticker": "BTC-USD",
+          "role": "fallback",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "funding_rate",
+        "open_interest_delta_pct"
+      ],
+      "rules": [
+        {
+          "when": "风险资产创新高而加密货币疲软",
+          "meaning": "风险偏好的风向标走弱，宽度恶化的旁证",
+          "ref": "2025-11-09"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "CPI_CORE",
+      "name": "核心CPI",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "CPILFESL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "yoy",
+        "mom_annualized_3m"
+      ],
+      "rules": [],
+      "lens": "both"
+    },
+    {
+      "id": "CPI_HEADLINE",
+      "name": "整体CPI",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "CPIAUCSL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "yoy",
+        "mom"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "PCE_CORE",
+      "name": "核心PCE",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "PCEPILFE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "yoy",
+        "mom_annualized_3m",
+        "gap_vs_core_cpi"
+      ],
+      "rules": [
+        {
+          "when": "核心PCE明显高于其他核心指标",
+          "meaning": "拆解分歧来源（组合投资服务、软件等权重差异）；如果来自股市相关项，股市回调会自然压低",
+          "ref": "2026-08-31"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "CPI_MEDIAN",
+      "name": "克利夫兰联储中位数CPI",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "MEDCPIM158SFRBCLE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "PCE_TRIMMED",
+      "name": "达拉斯联储截尾均值PCE",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "PCETRIM12M159SFRBDAL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "UMICH_INFL_1Y",
+      "name": "密歇根1年通胀预期",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "MICH",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1m"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "PAYROLLS",
+      "name": "非农就业",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "thousands",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "PAYEMS",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "mom_change",
+        "avg_3m_change",
+        "revision_vs_prior_vintage"
+      ],
+      "rules": [
+        {
+          "when": "每月净增约 10 万",
+          "meaning": "美联储认为对薪资的压力较小",
+          "ref": "2024-03-10"
+        }
+      ],
+      "notes": "前值修正需要对比不同版本的数据，FRED 的 ALFRED 接口可以拿到历史版本",
+      "lens": "both"
+    },
+    {
+      "id": "UNRATE",
+      "name": "失业率",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "UNRATE",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m",
+        "sahm"
+      ],
+      "rules": [
+        {
+          "when": "失业率加速上升",
+          "meaning": "看速度和加速度，不只看水平；失业率'下降像羽毛，上升像火箭'",
+          "ref": "2024-08-05"
+        }
+      ],
+      "lens": "both"
+    },
+    {
+      "id": "SAHM",
+      "name": "萨姆规则实时指标",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "pp",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "SAHMREALTIME",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [
+        {
+          "when": ">= 0.5",
+          "meaning": "按萨姆规则定义，衰退已经开始，进入 R2 增长恐慌体制",
+          "ref": "2024-08-05"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "CLAIMS",
+      "name": "初请失业金",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "persons",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "ICSA",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "avg_4w"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "JOLTS",
+      "name": "JOLTS 职位空缺",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "thousands",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "JTSJOL",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "GDPNOW",
+      "name": "亚特兰大联储 GDPNow",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "irregular",
+      "unit": "%",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "GDPNOW",
+          "role": "primary",
+          "verified": true,
+          "notes": "FRED 上是季度值，盘中更新需要去亚特兰大联储官网"
+        }
+      ],
+      "transforms": [
+        "level"
+      ],
+      "rules": [],
+      "lens": "esther"
+    },
+    {
+      "id": "REGIONAL_SURVEYS",
+      "name": "地区联储制造业调查",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "diffusion",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "GACDFSA066MSFRBPHI",
+          "role": "primary",
+          "verified": true,
+          "notes": "费城联储"
+        },
+        {
+          "provider": "fred",
+          "series": "GACDISA066MSFRBNY",
+          "role": "primary",
+          "verified": true,
+          "notes": "纽约 Empire"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1m"
+      ],
+      "rules": [
+        {
+          "when": "增长分项走弱，同时价格分项居高",
+          "meaning": "潜在滞胀迹象",
+          "ref": "2025-03-24"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "EARNINGS_MANUAL",
+      "name": "盈利与估值（人工输入）",
+      "dimension": "earnings",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "mixed",
+      "sources": [
+        {
+          "provider": "manual",
+          "role": "primary",
+          "verified": false,
+          "notes": "标普远期EPS和增速、远期市盈率、云厂资本开支指引、订单积压"
+        }
+      ],
+      "transforms": [],
+      "rules": [
+        {
+          "when": "指数上涨主要来自盈利增长而不是估值扩张",
+          "meaning": "上涨有基本面支撑",
+          "ref": "2026-09-27"
+        },
+        {
+          "when": "资本开支增速见顶（即使绝对值还在增长）",
+          "meaning": "先杀估值，后杀盈利",
+          "ref": "2026-08-31"
+        },
+        {
+          "when": "标普远期市盈率回到约 16.7 倍",
+          "meaning": "历史上可以逢低买入的估值",
+          "ref": "2025-03-10"
+        }
+      ],
+      "lens": "esther"
+    },
+    {
+      "id": "FWD_10Y10Y",
+      "name": "美债10y10y远期利率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "brooks",
+      "composite": {
+        "type": "forward",
+        "inputs": {
+          "short": {
+            "provider": "fred",
+            "series": "DGS10"
+          },
+          "long": {
+            "provider": "fred",
+            "series": "DGS20"
+          }
+        },
+        "m1": 10,
+        "m2": 20
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DGS10",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "DGS20",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1d_bp",
+        "chg_1w_bp",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "10y10y 远期突破 2006 年以来高点",
+          "meaning": "长端上行不是'正常化'：剔除近端货币政策预期后仍创新高，是财政/风险溢价问题",
+          "ref": "brooks 2026-09-29"
+        },
+        {
+          "when": "单日变动达到多倍标准差（比如 +11bp）",
+          "meaning": "高频警报；危机总从最脆弱的地方开始，再向外扩散",
+          "ref": "brooks 2026-09-29"
+        }
+      ],
+      "notes": "用平价收益率线性近似：(20*y20 - 10*y10)/10"
+    },
+    {
+      "id": "FWD_10Y20Y",
+      "name": "美债10y20y远期利率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "brooks",
+      "composite": {
+        "type": "forward",
+        "inputs": {
+          "short": {
+            "provider": "fred",
+            "series": "DGS10"
+          },
+          "long": {
+            "provider": "fred",
+            "series": "DGS30"
+          }
+        },
+        "m1": 10,
+        "m2": 30
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DGS10",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "DGS30",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_bp",
+        "percentile_10y"
+      ],
+      "rules": []
+    },
+    {
+      "id": "DE10Y",
+      "name": "德国10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01DEM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "JP10Y",
+      "name": "日本10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01JPM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "GB10Y",
+      "name": "英国10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01GBM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "IT10Y",
+      "name": "意大利10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01ITM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "FR10Y",
+      "name": "法国10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01FRM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "ES10Y",
+      "name": "西班牙10年期国债利率（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "%",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01ESM156N",
+          "role": "primary",
+          "verified": true,
+          "notes": "OECD 月均值，滞后约 1-2 个月；日频海外利率无免费源"
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m_bp",
+        "chg_12m_bp"
+      ],
+      "rules": []
+    },
+    {
+      "id": "IT_DE_SPREAD",
+      "name": "意大利-德国10年期利差（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "bp",
+      "lens": "brooks",
+      "composite": {
+        "type": "spread_bp",
+        "inputs": {
+          "a": {
+            "provider": "fred",
+            "series": "IRLTLT01ITM156N"
+          },
+          "b": {
+            "provider": "fred",
+            "series": "IRLTLT01DEM156N"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01ITM156N",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "IRLTLT01DEM156N",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m"
+      ],
+      "rules": [
+        {
+          "when": "外围国家长端利率飙升，但对德利差仍窄",
+          "meaning": "欧央行没有'金融碎片化'的理由出手，市场会利用这个工具箱盲区；利差要大幅走阔欧央行才能介入",
+          "ref": "brooks 2026-09-29"
+        }
+      ]
+    },
+    {
+      "id": "FR_DE_SPREAD",
+      "name": "法国-德国10年期利差（月均）",
+      "dimension": "global_rates",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "bp",
+      "lens": "brooks",
+      "composite": {
+        "type": "spread_bp",
+        "inputs": {
+          "a": {
+            "provider": "fred",
+            "series": "IRLTLT01FRM156N"
+          },
+          "b": {
+            "provider": "fred",
+            "series": "IRLTLT01DEM156N"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01FRM156N",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "IRLTLT01DEM156N",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m"
+      ],
+      "rules": []
+    },
+    {
+      "id": "US_DE_SPREAD",
+      "name": "美国-德国10年期利差（月均）",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "bp",
+      "lens": "brooks",
+      "composite": {
+        "type": "spread_bp",
+        "inputs": {
+          "a": {
+            "provider": "fred",
+            "series": "IRLTLT01USM156N"
+          },
+          "b": {
+            "provider": "fred",
+            "series": "IRLTLT01DEM156N"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "IRLTLT01USM156N",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "IRLTLT01DEM156N",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_3m",
+        "chg_12m"
+      ],
+      "rules": [
+        {
+          "when": "EUR/USD 和利差走势脱钩",
+          "meaning": "脱钩部分是风险溢价（例：美国政策混乱溢价）；要判断溢价的驱动是否持续，而不是机械地认为汇率会回归",
+          "ref": "brooks 2026-06-22"
+        }
+      ],
+      "notes": "Brooks 用 2y2y 远期利差（终端利率的代理）；日频欧元区 2 年期利率无免费源，这里用月均 10 年期利差作粗略代理"
+    },
+    {
+      "id": "EURUSD",
+      "name": "欧元兑美元",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "G10",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "EURUSD=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "GBPUSD",
+      "name": "英镑兑美元",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "G10",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "GBPUSD=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "AUDUSD",
+      "name": "澳元兑美元",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "G10 商品货币",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "AUDUSD=X",
+          "role": "primary",
+          "verified": false
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDCAD",
+      "name": "美元兑加元",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "G10 商品货币",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "CAD=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDCNY",
+      "name": "美元兑人民币",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "亚洲顺差国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "CNY=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "经常账户顺差创新高，货币却不升值，官方储备也不涨",
+          "meaning": "干预被隐藏（由国有银行代行），货币被人为低估（人民币约 20%）",
+          "ref": "brooks 2026-06-24"
+        }
+      ]
+    },
+    {
+      "id": "USDKRW",
+      "name": "美元兑韩元",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "亚洲顺差国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "KRW=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDTWD",
+      "name": "美元兑新台币",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "亚洲顺差国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "TWD=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDBRL",
+      "name": "美元兑巴西雷亚尔",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 商品出口国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "BRL=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "油价冲击后，商品出口国货币（BRL、ZAR、AUD、CAD）走强，进口国货币（INR、THB、PHP）走弱",
+          "meaning": "'EM 分化交易'；只要油价没回到冲击前，分化还有空间，长期低估的货币（如 BRL）弹性最大",
+          "ref": "brooks 2026-03-10"
+        }
+      ]
+    },
+    {
+      "id": "USDZAR",
+      "name": "美元兑南非兰特",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 商品出口国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "ZAR=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDMXN",
+      "name": "美元兑墨西哥比索",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "MXN=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDINR",
+      "name": "美元兑印度卢比",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 商品进口国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "INR=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDTHB",
+      "name": "美元兑泰铢",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 商品进口国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "THB=X",
+          "role": "primary",
+          "verified": false
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDPHP",
+      "name": "美元兑菲律宾比索",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 商品进口国",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "PHP=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "USDTRY",
+      "name": "美元兑土耳其里拉",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "rate",
+      "lens": "brooks",
+      "group": "EM 外部失衡",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "TRY=X",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "chg_12m_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "外部失衡扩大 + 储备流失",
+          "meaning": "货币贬值压力，老问题反复",
+          "ref": "brooks 2026-02-24; 2026-03-30"
+        }
+      ]
+    },
+    {
+      "id": "EM_EQUITY",
+      "name": "新兴市场股票 EEM",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "EEM",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "发达国家制度质量下降（财政主导、央行压收益率）",
+          "meaning": "发达和新兴市场的界限变模糊，资金流向非中国 EM",
+          "ref": "brooks 2026-01-01"
+        }
+      ]
+    },
+    {
+      "id": "REER_US",
+      "name": "美国实际有效汇率（BIS）",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "RBUSBIS",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "percentile_10y",
+        "chg_12m_pct"
+      ],
+      "rules": [],
+      "stale_days": 120
+    },
+    {
+      "id": "REER_CN",
+      "name": "中国实际有效汇率（BIS）",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "RBCNBIS",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "percentile_10y",
+        "chg_12m_pct"
+      ],
+      "rules": [
+        {
+          "when": "实际有效汇率处于历史低位，同时经常账户大额顺差",
+          "meaning": "货币被低估；日元弱是财政问题（央行压收益率），中韩台弱是汇率操纵",
+          "ref": "brooks 2026-06-24"
+        }
+      ],
+      "stale_days": 120
+    },
+    {
+      "id": "REER_JP",
+      "name": "日本实际有效汇率（BIS）",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "RBJPBIS",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "percentile_10y",
+        "chg_12m_pct"
+      ],
+      "rules": [
+        {
+          "when": "实际有效汇率处于历史低位，同时经常账户大额顺差",
+          "meaning": "货币被低估；日元弱是财政问题（央行压收益率），中韩台弱是汇率操纵",
+          "ref": "brooks 2026-06-24"
+        }
+      ],
+      "stale_days": 120
+    },
+    {
+      "id": "REER_KR",
+      "name": "韩国实际有效汇率（BIS）",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "monthly",
+      "unit": "index",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "RBKRBIS",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "percentile_10y",
+        "chg_12m_pct"
+      ],
+      "rules": [
+        {
+          "when": "实际有效汇率处于历史低位，同时经常账户大额顺差",
+          "meaning": "货币被低估；日元弱是财政问题（央行压收益率），中韩台弱是汇率操纵",
+          "ref": "brooks 2026-06-24"
+        }
+      ],
+      "stale_days": 120
+    },
+    {
+      "id": "SILVER",
+      "name": "白银",
+      "dimension": "cross_asset",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD/oz",
+      "lens": "both",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "SI=F",
+          "role": "primary",
+          "verified": true
+        },
+        {
+          "provider": "openmarket",
+          "exchange": "HYPERLIQUID_HIP3",
+          "symbol": "xyz:SILVER",
+          "role": "realtime",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "drawdown_from_high"
+      ],
+      "rules": []
+    },
+    {
+      "id": "BROOKS_MANUAL",
+      "name": "Brooks 视角人工输入",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "mixed",
+      "lens": "brooks",
+      "sources": [
+        {
+          "provider": "manual",
+          "role": "primary",
+          "verified": false,
+          "notes": "2y2y 远期利差（美/欧/英/澳/加）、霍尔木兹等海峡油轮通行量、乌拉尔-布伦特价差、经常账户和外汇储备（季度）、TIC 资本流动、各国政府债务/赤字占 GDP"
+        }
+      ],
+      "transforms": [],
+      "rules": [
+        {
+          "when": "资本流入（如外资买美国资产）创新高",
+          "meaning": "流动数据（基本差额）和美元方向几乎无关；高频对冲行为更重要，用利差来代理",
+          "ref": "brooks 2026-04-26"
+        }
+      ]
+    }
+  ],
+  "event_calendar": {
+    "description": "每期评论前都要盘点的事件类型；具体日期由数据层或人工维护",
+    "types": [
+      "FOMC 议息 / 会议纪要 / 主席讲话",
+      "日本央行议息",
+      "CPI / PCE / 非农 / 零售销售",
+      "国债拍卖（尤其是 10/20/30 年期）",
+      "季度再融资公告 QRA",
+      "Jackson Hole",
+      "大型科技股财报（尤其英伟达）",
+      "选举 / 关税 / 地缘事件",
+      "季节性窗口（9月、报税季、年末）"
+    ]
+  }
+}

@@ -2288,7 +2288,41 @@ async function loadMacroData(forceRefresh = false) {
     renderMacroChart();
   } catch (err) {
     console.error('[MacroChart] Error loading macro data:', err);
+    const el = document.getElementById('macro-freshness');
+    if (el) {
+      el.textContent = `接口请求失败 (${err.message})，显示的是上一次加载的数据`;
+      el.classList.add('is-stale');
+    }
   }
+}
+
+// 超过 30 分钟未重建，或有数据源失败/沿用缓存时标黄提示
+const DATA_STALE_MS = 30 * 60 * 1000;
+
+function describeFreshness(summary) {
+  const updated = Date.parse(summary?.updatedAt);
+  if (!updated) return { text: '更新时间未知', stale: true };
+  const ageMin = Math.max(0, Math.round((Date.now() - updated) / 60000));
+  const ageText = ageMin < 1 ? '刚刚' : ageMin < 60 ? `${ageMin} 分钟前` : `${(ageMin / 60).toFixed(1)} 小时前`;
+  const time = new Date(updated).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const sources = summary.sources || {};
+  const failed = Object.keys(sources).filter(k => sources[k] === 'failed');
+  const fallback = Object.keys(sources).filter(k => sources[k] === 'fallback');
+  let health = '数据源正常';
+  if (failed.length) health = `${failed.join(' / ')} 不可用`;
+  else if (fallback.length) health = `${fallback.join(' / ')} 沿用上一版`;
+  return {
+    text: `更新于 ${time} (${ageText}) · ${health}`,
+    stale: Date.now() - updated > DATA_STALE_MS || failed.length > 0 || fallback.length > 0
+  };
+}
+
+function renderFreshness(elId, summary) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const f = describeFreshness(summary);
+  el.textContent = f.text;
+  el.classList.toggle('is-stale', f.stale);
 }
 
 /**
@@ -2296,6 +2330,7 @@ async function loadMacroData(forceRefresh = false) {
  */
 function renderMacroSummary(summary) {
   if (!summary) return;
+  renderFreshness('macro-freshness', summary);
 
   if (elMacroBtcVal && summary.currentBtc) {
     elMacroBtcVal.textContent = `$${Math.round(summary.currentBtc).toLocaleString()}`;
@@ -2918,7 +2953,8 @@ function renderPreferredsSummary(s, monthly) {
   };
   const signed = (v, digits = 2) => `${v >= 0 ? '+' : ''}${v.toFixed(digits)}`;
 
-  setText('pref-asof', `截至 ${s.asOf} · Yahoo / FRED`);
+  renderFreshness('pref-asof', s);
+  setText('pref-asof', `行情截至 ${s.asOf} · ${document.getElementById('pref-asof').textContent}`);
 
   setText('pref-strc-val', `$${s.strcClose.toFixed(2)}`, `mm-val ${s.strcClose < 99 ? 'text-rose' : ''}`);
   setText('pref-strc-chip', `${signed(s.strcDeviationPct)}%`,
@@ -4077,7 +4113,9 @@ function renderEtfLinkage() {
     pill.className = `el-verdict-pill ${d.verdict.level.toLowerCase()}`;
   }
   const lastWeek = d.weeks?.[d.weeks.length - 1];
-  setText('el-update-time', `COT 截至 ${lastWeek?.weekEnd || '--'} · 生成 ${formatUTC8(d.generatedAt, false)}`);
+  const fr = d.freshness || {};
+  const short = s => (s ? s.slice(5) : '--');
+  setText('el-update-time', `ETF 日流量截至 ${short(fr.etfFlowLatest)} · CME 持仓截至 ${short(fr.cotLatest || lastWeek?.weekEnd)} · OI 截至 ${short(fr.oiLatest)} · 生成 ${formatUTC8(d.generatedAt, false)}`);
 
   // KPIs
   const full = d.hedgeRatio?.full || {};
@@ -4101,7 +4139,11 @@ function renderEtfLinkage() {
   setText('el-kpi-lead-sub', `反向（流入 → 基差变化）${elFmtNum(lag1?.corrFlow)}`);
   if (lastWeek) {
     setText('el-kpi-lf', elFmtBtc(lastWeek.lfNetShortBtc, false));
-    setText('el-kpi-lf-sub', `周变化 ${elFmtBtc(lastWeek.dLfNetShortBtc)} · ETF ${elFmtBtc(lastWeek.etfFlowBtc)}`);
+    const pend = d.pendingWeeks || [];
+    const pendText = pend.length
+      ? ` · 周报后 ETF ${pend.reduce((a, w) => a + w.etfDays, 0)} 日 ${elFmtBtc(pend.reduce((a, w) => a + w.etfFlowBtc, 0))}`
+      : ` · ETF ${elFmtBtc(lastWeek.etfFlowBtc)}`;
+    setText('el-kpi-lf-sub', `周变化 ${elFmtBtc(lastWeek.dLfNetShortBtc)}${pendText}`);
   }
 
   // Verdict checks
@@ -4184,13 +4226,26 @@ function renderElWeeklyChart() {
   elWeeklyChartInstance = elInitChart(elWeeklyChartInstance, 'el-weekly-echarts');
   if (!elWeeklyChartInstance) return;
   const colors = getChartThemeColors();
-  const weeks = d.weeks;
+  // Confirmed COT weeks, then provisional weeks whose ETF flows are in but CME positioning is not
+  const pending = d.pendingWeeks || [];
+  const weeks = d.weeks.concat(pending);
+  const labels = weeks.map(w => (w.provisional ? `${w.weekEnd} 进行中` : w.weekEnd));
   const usd = elFlowUnit === 'usd';
   const flow = weeks.map(w => (usd ? w.etfFlowUsd : w.etfFlowBtc));
-  const dLf = weeks.map(w => (usd ? (w.btcPrice ? w.dLfNetShortBtc * w.btcPrice : null) : w.dLfNetShortBtc));
+  const dLf = weeks.map(w => (w.dLfNetShortBtc == null ? null : (usd ? (w.btcPrice ? w.dLfNetShortBtc * w.btcPrice : null) : w.dLfNetShortBtc)));
   const fmtAxis = v => (usd ? elFmtUsd(v, false) : `${Math.round(v / 1000)}k`);
   const rolling = d.hedgeRatio?.rolling || [];
   const common = elAxisCommon(colors);
+  const pendingTooltip = w => {
+    const daily = (w.dailyFlows || []).map(f => `<div style="padding-left:8px;">${f.date.slice(5)}: ${elFmtBtc(f.flowBtc)} (${elFmtUsd(f.flowUsd)})</div>`).join('');
+    return `<div style="font-weight:600;margin-bottom:4px;">周截至 ${w.weekEnd} · 进行中</div>
+      <div>ETF 已公布 ${w.etfDays} 个交易日（${w.etfFrom.slice(5)} → ${w.etfTo.slice(5)}）</div>
+      <div>ETF 累计净流入: <b>${elFmtBtc(w.etfFlowBtc)}</b> (${elFmtUsd(w.etfFlowUsd)})</div>
+      ${daily}
+      <div>90D 超额美债（期内均值）: ${tpPct(w.excessOverTBill)} · BTC $${w.btcPrice ? w.btcPrice.toLocaleString('en-US') : '--'}</div>
+      <div style="margin-top:4px;color:#f59e0b;">CME 杠杆基金持仓：待 CFTC 于 ${w.cotExpectedRelease}（周五）发布</div>
+      <div style="color:${colors.textSecondary};">本周暂不计入 β、R² 与各项检验</div>`;
+  };
 
   elWeeklyChartInstance.setOption({
     backgroundColor: 'transparent',
@@ -4211,6 +4266,7 @@ function renderElWeeklyChart() {
         const w = weeks[params[0].dataIndex];
         const r = rolling[params[0].dataIndex] || {};
         if (!w) return '';
+        if (w.provisional) return pendingTooltip(w);
         return `<div style="font-weight:600;margin-bottom:4px;">周截至 ${w.weekEnd}（${w.etfDays} 个交易日）</div>
           <div>ETF 净流入: <b>${elFmtBtc(w.etfFlowBtc)}</b> (${elFmtUsd(w.etfFlowUsd)})</div>
           <div>杠杆基金净空头 Δ: <b>${elFmtBtc(w.dLfNetShortBtc)}</b>（存量 ${elFmtBtc(w.lfNetShortBtc, false)}）</div>
@@ -4221,8 +4277,8 @@ function renderElWeeklyChart() {
       }
     },
     xAxis: [
-      { type: 'category', gridIndex: 0, data: weeks.map(w => w.weekEnd), ...common, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: 'category', gridIndex: 1, data: weeks.map(w => w.weekEnd), ...common, splitLine: { show: false } }
+      { type: 'category', gridIndex: 0, data: labels, ...common, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: 'category', gridIndex: 1, data: labels, ...common, splitLine: { show: false } }
     ],
     yAxis: [
       { type: 'value', gridIndex: 0, ...common, axisLabel: { ...common.axisLabel, formatter: fmtAxis }, name: usd ? 'USD' : 'BTC', nameTextStyle: { color: colors.tickColor, fontSize: 10 } },
@@ -4233,8 +4289,20 @@ function renderElWeeklyChart() {
     series: [
       {
         name: 'ETF 周净流入', type: 'bar', xAxisIndex: 0, yAxisIndex: 0, barMaxWidth: 8,
-        data: flow.map(v => ({ value: v, itemStyle: { color: v >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(244,63,94,0.75)' } })),
-        itemStyle: { color: '#10b981' }
+        data: flow.map((v, i) => {
+          const fill = v >= 0 ? 'rgba(16,185,129,' : 'rgba(244,63,94,';
+          // Provisional weeks: faint fill with a dashed outline
+          return weeks[i].provisional
+            ? { value: v, itemStyle: { color: `${fill}0.25)`, borderColor: `${fill}0.9)`, borderWidth: 1, borderType: 'dashed' } }
+            : { value: v, itemStyle: { color: `${fill}0.75)` } };
+        }),
+        itemStyle: { color: '#10b981' },
+        markArea: pending.length ? {
+          silent: true,
+          itemStyle: { color: 'rgba(245,158,11,0.07)' },
+          label: { show: true, position: 'insideTop', color: '#f59e0b', fontSize: 10, formatter: '待 CFTC 周报' },
+          data: [[{ xAxis: labels[d.weeks.length] }, { xAxis: labels[labels.length - 1] }]]
+        } : undefined
       },
       {
         name: 'CME 杠杆基金净空头 Δ', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false,

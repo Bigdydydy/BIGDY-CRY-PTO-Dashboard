@@ -657,6 +657,40 @@ describe('Phase 2-B: ETF × Carry Linkage Statistics', () => {
     assert.equal(pearson([1, 2, 3, 4, 5], [2, 4, 6, 8, 10]).r, 1);
   });
 
+  test('ETF flows after the latest COT report become provisional weeks', () => {
+    const { buildPendingWeeks, cotWeekEndOf } = require('../server/etf_linkage_engine');
+    // Tuesday maps to itself, Wednesday to the following Tuesday
+    assert.equal(cotWeekEndOf('2026-10-13'), '2026-10-13');
+    assert.equal(cotWeekEndOf('2026-10-07'), '2026-10-13');
+    assert.equal(cotWeekEndOf('2026-10-14'), '2026-10-20');
+
+    const etfFlows = [
+      { date: '2026-10-06', flowBtc: 1000, flowUsd: 1 },   // covered by the 10-06 COT week
+      { date: '2026-10-07', flowBtc: -5000, flowUsd: -400 },
+      { date: '2026-10-13', flowBtc: 2000, flowUsd: 170 },
+      { date: '2026-10-14', flowBtc: 300, flowUsd: 25 }     // already the week ending 10-20
+    ];
+    const basisSeries = [
+      { date: '2026-10-08', excessOverTBill: 1, apr90d: 5, btcPrice: 82000 },
+      { date: '2026-10-12', excessOverTBill: 2, apr90d: 6, btcPrice: 83000 },
+      { date: '2026-10-14', excessOverTBill: 4, apr90d: 8, btcPrice: 84000 }
+    ];
+    const pending = buildPendingWeeks({ etfFlows, lastCotDate: '2026-10-06', oiPanel: [], basisSeries, now: Date.UTC(2026, 9, 14, 12) });
+    assert.deepEqual(pending.map(w => w.weekEnd), ['2026-10-13', '2026-10-20']);
+    const [w1, w2] = pending;
+    assert.equal(w1.provisional, true);
+    assert.equal(w1.etfDays, 2);
+    assert.equal(w1.etfFlowBtc, -3000);
+    assert.equal(w1.etfFrom, '2026-10-07');
+    assert.equal(w1.excessOverTBill, 1.5);   // 10-08 and 10-12 fall in (10-06, 10-13]
+    assert.equal(w1.btcPrice, 83000);
+    assert.equal(w1.dLfNetShortBtc, null);    // CME positioning not published yet
+    assert.equal(w1.cotExpectedRelease, '2026-10-16');
+    assert.equal(w2.etfFlowBtc, 300);
+    assert.equal(w2.excessOverTBill, 4);
+    assert.deepEqual(buildPendingWeeks({ etfFlows, lastCotDate: '2026-10-14', oiPanel: [], basisSeries }), []);
+  });
+
   test('buildWeeklyPanel aggregates (prev Tue, Tue] and matches arbitrage flow', () => {
     const cot = [
       { date: '2026-09-01', lfNetShortBtc: 1000, amNetLongBtc: 0, oiBtc: 5000 },

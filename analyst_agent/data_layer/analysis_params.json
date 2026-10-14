@@ -1,0 +1,17 @@
+{
+  "_comment": "人工/agent 维护的分析参数。key_levels 是当期的防线和关键位（单位与指标一致），每期评论后按新的判断更新；oil 是 Brooks 油价隐含中断模型的参数。",
+  "key_levels": {
+    "UST30Y": [5.3, 5.5],
+    "UST10Y": [5.0],
+    "USDJPY": [155, 160],
+    "DXY": [100],
+    "SOX": [10000],
+    "GOLD": [4000, 4350]
+  },
+  "oil": {
+    "baseline_brent": 69,
+    "baseline_note": "冲突前（2026-02 中旬）布伦特约 69 美元，据 Brooks 2026-03-19 文中'110 美元约为 +60%'倒推；冲突结束或换新冲击时需重设",
+    "elasticity": 0.15,
+    "global_supply_mbd": 105
+  }
+}
