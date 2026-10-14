@@ -137,7 +137,7 @@
 
   /**
    * intrabar: 考虑同一根K线内高低点的先后 (只用于子浪结构判定)。主级别拐点保持原算法:
-   * 命中率回放中全局启用使总体命中/期望由 1.054 降到 1.013 (docs 第 4 节第 9 条)
+   * 主级别不需要: 在同一份数据上回放，全局启用与否的命中/期望差别在噪声范围内 (docs 第 4 节第 9 条)
    */
   function zigzagPivots(bars, thr, intrabar) {
     const n = bars.length;
