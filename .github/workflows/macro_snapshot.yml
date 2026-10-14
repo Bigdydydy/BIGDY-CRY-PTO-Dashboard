@@ -1,0 +1,51 @@
+name: Module 1 Snapshot (Macro · MSTR · Preferreds)
+
+on:
+  schedule:
+    # 每 6 小时重建一次 Module 1 数据集；线上实例冷启动时读取这份快照，避免退回部署时的旧数据
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macro-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 只用 Node 内置模块，无需 npm install
+      - name: Rebuild Module 1 datasets
+        run: node scripts/macro_snapshot.js
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/macro_chart.json data/mstr_preferreds_cache.json
+          if git diff --cached --quiet; then
+            echo "No changes; skipping commit."
+            exit 0
+          fi
+          # [skip render] 避免触发 Render 重新部署；线上从 GitHub raw 读取最新快照
+          git commit -m "chore(macro): module 1 dataset snapshot [skip ci] [skip render]"
+          pushed=0
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push; then pushed=1; break; fi
+            sleep 8
+          done
+          [ "$pushed" = 1 ]

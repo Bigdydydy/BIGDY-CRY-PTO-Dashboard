@@ -2361,6 +2361,19 @@ body {
   color: var(--text-muted);
 }
 
+.data-freshness {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.data-freshness.is-stale,
+.pref-section-asof.is-stale {
+  color: #f59e0b;
+}
+
 .mm-chip.chip-warning {
   background: rgba(245, 158, 11, 0.15);
   color: #f59e0b;

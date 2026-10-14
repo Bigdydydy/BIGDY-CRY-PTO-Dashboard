@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
@@ -134,41 +135,63 @@ async function fetchMstrCost() {
 }
 
 /**
- * Fetch latest holdings news directly from bitcointreasuries.net
+ * 该站响应头约 18KB，超过 Node fetch (undici) 默认的 16KB 上限会报 UND_ERR_HEADERS_OVERFLOW，
+ * 所以这里用 https 模块并放宽 maxHeaderSize。
  */
-async function fetchLiveBtPurchases() {
-  try {
-    const resp = await fetchWithTimeout('https://bitcointreasuries.net/public-companies/strategy', {
+function fetchTextLargeHeaders(url, { timeout = 15000, redirects = 2 } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      maxHeaderSize: 128 * 1024,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
-    });
-    if (!resp.ok) return [];
-    const text = await resp.text();
-    const regex = /\{[^{}]*kind:"holdings_news"[^{}]*facts:\{([^}]+)\}[^{}]*\}/g;
-    const matches = [...text.matchAll(regex)];
-    const events = [];
-    for (const m of matches) {
-      const factStr = m[1];
-      const balM = factStr.match(/balance:(\d+)/);
-      const dateM = factStr.match(/balance_date:"([^"]+)"/);
-      const deltaM = factStr.match(/delta:(-?\d+)/);
-      const costM = factStr.match(/cost_basis_total:(\d+|null)/);
-      if (balM && dateM) {
-        const balance = parseInt(balM[1], 10);
-        const date = dateM[1];
-        const timestamp = new Date(date + 'T00:00:00Z').getTime();
-        const delta = deltaM ? parseInt(deltaM[1], 10) : 0;
-        let costBasis = (costM && costM[1] !== 'null') ? parseFloat(costM[1]) : null;
-        let avgCost = (costBasis && balance > 0) ? Number((costBasis / balance).toFixed(2)) : null;
-        events.push({ date, timestamp, balance, delta, costBasis, avgCost });
+    }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
+        res.resume();
+        resolve(fetchTextLargeHeaders(new URL(res.headers.location, url).toString(), { timeout, redirects: redirects - 1 }));
+        return;
       }
-    }
-    return events;
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error('HTTP ' + res.statusCode));
+        return;
+      }
+      res.setEncoding('utf8');
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => resolve(body));
+    });
+    req.setTimeout(timeout, () => req.destroy(new Error('timeout ' + timeout + 'ms')));
+    req.on('error', reject);
+  });
+}
+
+/**
+ * bitcointreasuries.net 实时快照：最新持仓、成本、企业价值与市值。
+ * 页面是内嵌的 SvelteKit 数据，只给当前值（不再有逐条 holdings_news）。
+ */
+async function fetchLiveBtSnapshot() {
+  try {
+    const text = await fetchTextLargeHeaders('https://bitcointreasuries.net/public-companies/strategy');
+    const btM = text.match(/\["BTC",\{asset:\{symbol:"BTC"[^}]*\},balance:(\d+),date:"(\d{4}-\d{2}-\d{2})",cost_basis:\{value:app\.decode\('BigDecimal', "([\d.]+)"\)/);
+    if (!btM) throw new Error('holdings block not found (page format changed?)');
+    const num = (re) => { const m = text.match(re); return m ? parseFloat(m[1]) : null; };
+    const balance = parseInt(btM[1], 10);
+    const costBasis = parseFloat(btM[3]);
+    return {
+      date: btM[2],
+      timestamp: new Date(btM[2] + 'T00:00:00Z').getTime(),
+      balance,
+      costBasis,
+      avgCost: balance > 0 ? Number((costBasis / balance).toFixed(2)) : null,
+      enterpriseValue: num(/enterprise_value:\{native:([\d.]+)/),
+      marketCap: num(/market_cap_basic:\{native:([\d.]+)/),
+      stockPrice: num(/stock_price:\{native:([\d.]+)/)
+    };
   } catch (err) {
-    console.warn('[MacroFetcher] Live bitcointreasuries fetch skipped:', err.message);
-    return [];
+    console.warn('[MacroFetcher] Live bitcointreasuries fetch failed:', err.message);
+    return null;
   }
 }
 
@@ -266,9 +289,9 @@ async function fetchMstrStockPrices() {
  */
 async function fetchAndBuildMacroData() {
   console.log('[MacroFetcher] Starting data fetch for Macro Chart...');
-  const [mstrList, liveBtList, fred1y, fred10y, fredWalcl, fredWtregen, fredRrp, btcMap, mstrStockMap] = await Promise.all([
+  const [mstrList, liveBt, fred1yRaw, fred10yRaw, fredWalclRaw, fredWtregenRaw, fredRrpRaw, btcMap, mstrStockMap] = await Promise.all([
     fetchMstrCost(),
-    fetchLiveBtPurchases(),
+    fetchLiveBtSnapshot(),
     fetchFredSeries('DGS1'),
     fetchFredSeries('DGS10'),
     fetchFredSeries('WALCL'),
@@ -278,7 +301,31 @@ async function fetchAndBuildMacroData() {
     fetchMstrStockPrices()
   ]);
 
-  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, Live BT=' + liveBtList.length + ' news, FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', WALCL=' + fredWalcl.size + ', WTREGEN=' + fredWtregen.size + ', RRP=' + fredRrp.size + ', BTC=' + btcMap.size + ' days, MSTR stock=' + mstrStockMap.size + ' days');
+  // 单个数据源失败时沿用上一版数据集的同一序列，避免把空值写进缓存；并记录各源状态供前端提示
+  const previous = inMemoryCache || readMacroCacheFile();
+  const prevPoints = previous && Array.isArray(previous.points) ? previous.points : [];
+  const sources = {};
+  const withFallback = (name, fresh, field, scale) => {
+    if (fresh.size > 0) { sources[name] = 'ok'; return fresh; }
+    const restored = new Map();
+    for (const p of prevPoints) {
+      if (p[field] !== null && p[field] !== undefined) restored.set(p.date, p[field] * scale);
+    }
+    sources[name] = restored.size > 0 ? 'fallback' : 'failed';
+    return restored;
+  };
+  const fred1y = withFallback('FRED DGS1', fred1yRaw, 'us1y', 1);
+  const fred10y = withFallback('FRED DGS10', fred10yRaw, 'us10y', 1);
+  const fredWalcl = withFallback('FRED WALCL', fredWalclRaw, 'fedWalcl', 1e6);
+  const fredWtregen = withFallback('FRED WTREGEN', fredWtregenRaw, 'fedTga', 1e6);
+  const fredRrp = withFallback('FRED RRP', fredRrpRaw, 'fedRrp', 1000);
+  sources['Binance BTC'] = btcMap.size > 0 ? 'ok' : 'failed';
+  sources['Yahoo MSTR'] = mstrStockMap.size > 0 ? 'ok' : (prevPoints.length ? 'fallback' : 'failed');
+  sources['bitcointreasuries'] = liveBt ? 'ok' : 'failed';
+  sources['Coinglass'] = mstrList.length > 0 ? 'ok' : (previous?.rawMstr?.length ? 'fallback' : 'failed');
+  const prevMnavByDate = new Map(prevPoints.map(p => [p.date, p]));
+
+  console.log('[MacroFetcher] Raw data: MSTR=' + mstrList.length + ' purchases, Live BT=' + (liveBt ? liveBt.balance + '@' + liveBt.date : 'n/a') + ', FRED 1Y=' + fred1y.size + ', FRED 10Y=' + fred10y.size + ', WALCL=' + fredWalcl.size + ', WTREGEN=' + fredWtregen.size + ', RRP=' + fredRrp.size + ', BTC=' + btcMap.size + ' days, MSTR stock=' + mstrStockMap.size + ' days');
 
   // Load authoritative bitcointreasuries.net data
   const btData = loadBitcoinTreasuriesStrategy();
@@ -297,14 +344,9 @@ async function fetchAndBuildMacroData() {
   }
 
   let effectiveMstrList = mstrList;
-  if (effectiveMstrList.length === 0 && fs.existsSync(CACHE_FILE)) {
-    try {
-      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      if (cached && cached.rawMstr) {
-        effectiveMstrList = cached.rawMstr;
-        console.log('[MacroFetcher] Loaded ' + effectiveMstrList.length + ' MSTR records from cache fallback');
-      }
-    } catch (e) {}
+  if (effectiveMstrList.length === 0 && previous && Array.isArray(previous.rawMstr)) {
+    effectiveMstrList = [...previous.rawMstr];
+    console.log('[MacroFetcher] Loaded ' + effectiveMstrList.length + ' MSTR records from cache fallback');
   }
 
   effectiveMstrList.sort((a, b) => a.timestamp - b.timestamp);
@@ -327,24 +369,17 @@ async function fetchAndBuildMacroData() {
   // that postdate the snapshot, so cost/holdings keep updating continuously
   const lastOfficialPurchaseTs = btPurchases.length ? btPurchases[btPurchases.length - 1].timestamp : -Infinity;
 
-  const postSnapshotBtEvents = (liveBtList || [])
-    .filter(e => e.timestamp > lastOfficialPurchaseTs && e.balance > 0)
-    .map(e => {
-      let cost = e.avgCost;
-      if (!cost && btPurchases.length > 0) {
-        const lastOfficial = btPurchases[btPurchases.length - 1];
-        const btcPx = btcMap.get(e.date) || 85000;
-        const estCostBasis = (lastOfficial.costBasisUSD || 63800000000) + (e.delta > 0 ? e.delta * btcPx : 0);
-        cost = Number((estCostBasis / e.balance).toFixed(2));
-      }
-      return { timestamp: e.timestamp, cost: cost || 75437, holdings: e.balance, source: 'bitcointreasuries' };
-    });
+  // bitcointreasuries 的成本基数按 $0.1B 取整，精度不如 Coinglass，只在 Coinglass 尚未覆盖该日期时补位
+  const coinglassCovers = (ts) => effectiveMstrList.some(m => m.timestamp >= ts - 86400000);
+  const postSnapshotBtEvents = (liveBt && liveBt.timestamp > lastOfficialPurchaseTs && liveBt.balance > 0 && liveBt.avgCost && !coinglassCovers(liveBt.timestamp))
+    ? [{ timestamp: liveBt.timestamp, cost: liveBt.avgCost, holdings: liveBt.balance, source: 'bitcointreasuries' }]
+    : [];
 
   const mergedMstrEvents = [
     ...btPurchases.map(p => ({ timestamp: p.timestamp, cost: p.avgCostUSD, holdings: p.balance, source: 'sec' })),
     ...postSnapshotBtEvents,
     ...effectiveMstrList
-      .filter(m => m.timestamp > lastOfficialPurchaseTs && !postSnapshotBtEvents.some(b => Math.abs(b.timestamp - m.timestamp) < 86400000))
+      .filter(m => m.timestamp > lastOfficialPurchaseTs)
       .map(m => ({ timestamp: m.timestamp, cost: m.microStrategyCost, holdings: m.totalBitcoin, source: 'coinglass' }))
   ].sort((a, b) => a.timestamp - b.timestamp);
   let lastMstrCostSource = null;
@@ -366,8 +401,10 @@ async function fetchAndBuildMacroData() {
     }
     if (anchorDaily.mnav && anchorDaily.holdings && anchorBtc && anchorPx) {
       // EV = 股权市值 + 固定债权。只有股权部分随股价变动，股数由锚点反推
+      // 固定债权优先取手动配置；否则用 bitcointreasuries 实时的 EV − 股权市值
       const capital = loadMstrCapitalStructure();
-      const fixedClaims = capital ? capital.netFixedClaimsUSD : 0;
+      const liveClaims = (liveBt && liveBt.enterpriseValue && liveBt.marketCap) ? liveBt.enterpriseValue - liveBt.marketCap : null;
+      const fixedClaims = capital ? capital.netFixedClaimsUSD : (liveClaims !== null ? liveClaims : 0);
       const ev = anchorDaily.mnav * anchorDaily.holdings * anchorBtc;
       const equity = ev - fixedClaims;
       if (equity > 0) {
@@ -376,7 +413,7 @@ async function fetchAndBuildMacroData() {
           holdings: anchorDaily.holdings,
           fixedClaims,
           shares: equity / anchorPx,
-          basis: capital ? 'ev' : 'equity'
+          basis: (capital || liveClaims !== null) ? 'ev' : 'equity'
         };
         console.log('[MacroFetcher] mNAV anchor @ ' + anchorDaily.date + ': mnav=' + anchorDaily.mnav + ' mstrPx=' + anchorPx.toFixed(2) + ' btc=' + anchorBtc + ' fixedClaims=' + fixedClaims + ' basis=' + mnavAnchor.basis);
       }
@@ -435,6 +472,10 @@ async function fetchAndBuildMacroData() {
         curMnav = Number((evNow / (curHoldings * btcToday)).toFixed(3));
         mnavEstimated = true;
       }
+    } else if (!mnavAnchor && prevMnavByDate.get(date)?.mnavEstimated) {
+      // Yahoo 不可用导致无法建立锚点：沿用上一版数据集当天的估算
+      curMnav = prevMnavByDate.get(date).mnav;
+      mnavEstimated = true;
     }
 
     // 30 日平均净增持速率 (BTC/天)，保留符号：负值即净减持
@@ -542,6 +583,7 @@ async function fetchAndBuildMacroData() {
     fedNetLiqChange20d: (latest && point20dAgo && latest.fedNetLiquidity !== null && point20dAgo.fedNetLiquidity !== null)
       ? Number((latest.fedNetLiquidity - point20dAgo.fedNetLiquidity).toFixed(4))
       : null,
+    sources,
     totalPoints: points.length,
     dateRange: {
       start: points[0] ? points[0].date : null,
@@ -570,38 +612,71 @@ async function fetchAndBuildMacroData() {
   return payload;
 }
 
+const FAILURE_RETRY_MS = 2 * 60 * 1000;
+const REMOTE_SNAPSHOT_URL = process.env.MACRO_SNAPSHOT_URL
+  || 'https://raw.githubusercontent.com/Bigdydydy/BIGDY-CRY-PTO-Dashboard/main/data/macro_chart.json';
+let rebuildInflight = null;
+
+/** 单飞：并发请求共用同一次重建；失败后 2 分钟内不再重试，避免每次轮询都打满外部接口 */
+function rebuildOnce() {
+  if (!rebuildInflight) {
+    rebuildInflight = fetchAndBuildMacroData()
+      .catch((err) => {
+        lastFetchTime = Date.now() - CACHE_TTL_MS + FAILURE_RETRY_MS;
+        throw err;
+      })
+      .finally(() => { rebuildInflight = null; });
+  }
+  return rebuildInflight;
+}
+
 /**
- * Get Macro Chart Data with memory & file caching
+ * 冷启动：Render 免费实例磁盘随部署重置，本地文件只是提交时的版本。
+ * 与 GitHub 上由定时任务刷新的快照比较，取较新的一份。
+ */
+async function loadFreshestSnapshot() {
+  const local = readMacroCacheFile();
+  let remote = null;
+  try {
+    const resp = await fetchWithTimeout(REMOTE_SNAPSHOT_URL, { timeout: 10000, retries: 0 });
+    if (resp.ok) {
+      const json = await resp.json();
+      if (json && Array.isArray(json.points) && json.points.length) remote = json;
+    }
+  } catch (err) {
+    console.warn('[MacroFetcher] Remote snapshot unavailable:', err.message);
+  }
+  const ts = d => (d && d.summary && d.summary.updatedAt) ? Date.parse(d.summary.updatedAt) : 0;
+  return ts(remote) > ts(local) ? remote : local;
+}
+
+/**
+ * Get Macro Chart Data: 内存缓存过期时先返回旧数据并在后台重建 (stale-while-revalidate)
  */
 async function getMacroChartData(forceRefresh = false) {
-  const now = Date.now();
-  if (!forceRefresh && inMemoryCache && (now - lastFetchTime < CACHE_TTL_MS)) {
-    return inMemoryCache;
-  }
-
-  if (!forceRefresh && !inMemoryCache && fs.existsSync(CACHE_FILE)) {
-    try {
-      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      if (cached && cached.points && cached.points.length > 0) {
-        inMemoryCache = cached;
-        lastFetchTime = now;
-        fetchAndBuildMacroData().catch(e => console.error('[MacroFetcher] Background refresh failed:', e.message));
-        return inMemoryCache;
-      }
-    } catch (e) {
-      console.warn('[MacroFetcher] Cache file invalid, refetching...');
+  if (!inMemoryCache) {
+    const snapshot = await loadFreshestSnapshot();
+    if (snapshot) {
+      inMemoryCache = snapshot;
+      const age = Date.now() - (Date.parse(snapshot.summary?.updatedAt) || 0);
+      lastFetchTime = Date.now() - Math.min(age, CACHE_TTL_MS);
     }
   }
 
-  try {
-    return await fetchAndBuildMacroData();
-  } catch (err) {
-    const fallback = inMemoryCache || readMacroCacheFile();
-    if (!fallback) throw err;
-    console.warn('[MacroFetcher] Live rebuild failed, serving last cached dataset:', err.message);
-    inMemoryCache = fallback;
-    return fallback;
+  if (forceRefresh || !inMemoryCache) {
+    try {
+      return await rebuildOnce();
+    } catch (err) {
+      if (!inMemoryCache) throw err;
+      console.warn('[MacroFetcher] Live rebuild failed, serving last dataset:', err.message);
+      return inMemoryCache;
+    }
   }
+
+  if (Date.now() - lastFetchTime >= CACHE_TTL_MS) {
+    rebuildOnce().catch(e => console.error('[MacroFetcher] Background refresh failed:', e.message));
+  }
+  return inMemoryCache;
 }
 
 function readMacroCacheFile() {

@@ -2329,3 +2329,124 @@ html.atl-entering .atl-caption {
     display: block;
   }
 }
+
+/* --------------------------------------------------------------------------
+   20. 截图：快门闪光 + 预览卡
+   -------------------------------------------------------------------------- */
+.atl-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  pointer-events: none;
+  background: #fffaf0;
+  animation: atl-flash 0.45s ease-out forwards;
+}
+
+@keyframes atl-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.atl-shot {
+  position: fixed;
+  right: 18px;
+  bottom: 74px;
+  z-index: 2700;
+  width: 264px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--bg-modal);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  box-shadow: var(--shadow-modal);
+  color: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.96) rotate(-1.5deg);
+  transform-origin: bottom right;
+  transition: opacity 0.35s ease, transform 0.55s var(--atl-spring);
+}
+
+.atl-shot.is-on {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.atl-shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top left;
+  border-bottom: 1px solid var(--border-subtle);
+  animation: atl-develop 0.9s ease-out;
+}
+
+@keyframes atl-develop {
+  from { filter: brightness(1.8) saturate(0.2) blur(4px); }
+  to { filter: none; }
+}
+
+.atl-shot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px 14px;
+}
+
+.atl-shot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.atl-shot-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.atl-shot-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.atl-shot-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.atl-shot-actions .atl-btn-ghost {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+}
+
+.atl-shot-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--atl-iris);
+  -webkit-mask: radial-gradient(circle, transparent 52%, #000 56%);
+  mask: radial-gradient(circle, transparent 52%, #000 56%);
+  animation: atl-spin 0.9s linear infinite;
+}
+
+@media (max-width: 768px) {
+  .atl-shot {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .atl-shot img { aspect-ratio: 16 / 9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atl-shot img,
+  .atl-shot-spinner { animation: none; }
+}

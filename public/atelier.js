@@ -887,6 +887,7 @@
         run: () => commitPainting(p.id)
       }));
       const actions = [
+        { group: '命令', label: '截图到剪贴板', hint: '拍下当前界面 · Alt + S', badge: '◉', run: () => Snapshot.shoot() },
         { group: '命令', label: '打开画廊', hint: '浏览全部背景画作与其思想注解', badge: 'G', run: () => Gallery.open() },
         { group: '命令', label: '观画模式', hint: '隐去界面，只看画', badge: 'V', run: () => Contemplate.enter() },
         { group: '命令', label: '切换日间 / 夜间', hint: 'Alt + T', badge: '◐', run: () => { if (typeof window.toggleTheme === 'function') window.toggleTheme(); } },
@@ -961,6 +962,326 @@
     return { open, close, isOpen, toggle() { isOpen() ? close() : open(); } };
   })();
 
+  // ===========================================================================
+  // 截图：把当前浏览的界面拍成 PNG 写入剪贴板
+  // DOM 渲染不支持 backdrop-filter，所以分两层：先单独渲染背景舞台，在每块
+  // 毛玻璃的位置贴上模糊过的舞台，再叠上界面层——还原玻璃质感。
+  // ===========================================================================
+  const Snapshot = (function () {
+    const LIB_SRC = '/modern-screenshot.min.js?v=4.7.0';
+    const NOWRAP_SELECTOR = 'button, .legend-pill, .meta-pill, .atl-search-pill, .card-badge, .card-module-tag, .tz-badge, .mm-chip, .active-view-tag';
+    const EXCLUDED_CLASSES = ['atl-stage', 'atl-tip', 'atl-flash', 'atl-shot', 'atl-palette', 'toast-notification'];
+    let libPromise = null;
+    let busy = false;
+
+    function loadLib() {
+      if (window.modernScreenshot) return Promise.resolve(window.modernScreenshot);
+      if (!libPromise) {
+        libPromise = new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = LIB_SRC;
+          s.onload = () => resolve(window.modernScreenshot);
+          s.onerror = () => { libPromise = null; reject(new Error('截图组件加载失败')); };
+          document.head.appendChild(s);
+        });
+      }
+      return libPromise;
+    }
+
+    function isExcluded(node) {
+      if (node.nodeType !== 1 || !node.classList) return false;
+      const cl = node.classList;
+      if (EXCLUDED_CLASSES.some(c => cl.contains(c))) return true;
+      if (cl.contains('view-panel') && !cl.contains('active')) return true;
+      // 关着的浮层不进克隆树：既省时间，也避免为看不见的文字下载字体（如画廊的思源宋体）
+      if ((cl.contains('atl-gallery') || cl.contains('atl-palette')) && !cl.contains('is-open')) return true;
+      if (cl.contains('modal-backdrop') && !cl.contains('open')) return true;
+      if (cl.contains('atl-contemplate') && !root.classList.contains('atl-contemplating')) return true;
+      return node.tagName === 'SCRIPT';
+    }
+
+    /**
+     * 只嵌入拉丁字体的基本子集。字体栈里思源宋体作后备，若交给库自动收集会拉取上百个中文分片；
+     * 中文在页面上本就由系统字体渲染，截图保持一致即可。
+     */
+    function fontCssText() {
+      const WANT = /^(Inter|JetBrains Mono|Instrument Serif)$/;
+      const out = [];
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try { rules = sheet.cssRules; } catch (e) { continue; }
+        for (const r of rules) {
+          if (!(r instanceof CSSFontFaceRule)) continue;
+          const fam = r.style.getPropertyValue('font-family').replace(/['"]/g, '').trim();
+          const range = r.style.getPropertyValue('unicode-range');
+          if (!WANT.test(fam)) continue;
+          // 浏览器会把 U+0000-00FF 规范化成 U+0-FF
+          if (range && !/U\+0{1,4}-0{0,2}FF(?![0-9A-F])/i.test(range)) continue;
+          out.push(r.cssText);
+        }
+      }
+      return out.join('\n');
+    }
+
+    function isVisible(el) {
+      if (typeof el.checkVisibility === 'function') {
+        return el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+      }
+      return el.getClientRects().length > 0;
+    }
+
+    /** 记录视口内所有带 backdrop-filter 的元素：位置、圆角、模糊半径 */
+    function collectGlass(W, H) {
+      const out = [];
+      document.body.querySelectorAll('*').forEach(el => {
+        if (el.closest('.atl-stage, .atl-shot, .atl-flash, .atl-palette, .view-panel:not(.active)')) return;
+        const cs = getComputedStyle(el);
+        const bf = cs.backdropFilter || cs.webkitBackdropFilter;
+        if (!bf || bf === 'none') return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1 || r.right <= 0 || r.bottom <= 0 || r.left >= W || r.top >= H) return;
+        if (!isVisible(el)) return;
+        const m = /blur\(([\d.]+)px\)/.exec(bf);
+        const cap = Math.min(r.width, r.height) / 2;
+        const rad = k => Math.min(cap, parseFloat(cs[k]) || 0);
+        out.push({
+          x: r.left, y: r.top, w: r.width, h: r.height,
+          radii: [rad('borderTopLeftRadius'), rad('borderTopRightRadius'), rad('borderBottomRightRadius'), rad('borderBottomLeftRadius')],
+          blur: m ? parseFloat(m[1]) : 16
+        });
+      });
+      return out;
+    }
+
+    /** 按模糊半径缓存一张模糊后的舞台；不支持 canvas filter 的浏览器（Safari）用降采样近似 */
+    function makeBlurrer(src) {
+      const cache = new Map();
+      const hasFilter = typeof document.createElement('canvas').getContext('2d').filter === 'string';
+      return function (blurPx, scale) {
+        const key = Math.round(blurPx);
+        if (cache.has(key)) return cache.get(key);
+        const c = document.createElement('canvas');
+        c.width = src.width;
+        c.height = src.height;
+        const ctx = c.getContext('2d');
+        if (hasFilter) {
+          ctx.filter = `blur(${blurPx * scale}px) saturate(1.35)`;
+          // 稍微放大绘制，避免模糊在画布边缘向内渗出暗边
+          const pad = blurPx * scale * 2;
+          ctx.drawImage(src, -pad, -pad, c.width + pad * 2, c.height + pad * 2);
+        } else {
+          const f = Math.max(2, blurPx * scale / 3);
+          const small = document.createElement('canvas');
+          small.width = Math.max(1, Math.round(src.width / f));
+          small.height = Math.max(1, Math.round(src.height / f));
+          const sctx = small.getContext('2d');
+          sctx.imageSmoothingQuality = 'high';
+          sctx.drawImage(src, 0, 0, small.width, small.height);
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(small, 0, 0, c.width, c.height);
+        }
+        cache.set(key, c);
+        return c;
+      };
+    }
+
+    async function render() {
+      const ms = await loadLib();
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const scale = Math.min(window.devicePixelRatio || 1, 2);
+      const sx = window.scrollX;
+      const sy = window.scrollY;
+      const header = document.querySelector('.app-header');
+      const hr = header ? header.getBoundingClientRect() : null;
+      const glass = collectGlass(W, H);
+      const cssText = fontCssText();
+      const base = {
+        width: W,
+        height: H,
+        scale,
+        timeout: 20000,
+        features: { restoreScrollPosition: true },
+        font: cssText ? { cssText } : false
+      };
+
+      // 1) 背景舞台：油画 + 当前这一帧 ASCII + 明暗罩（不含文字，不嵌字体）
+      const stageCanvas = await ms.domToCanvas(document.getElementById('atl-stage'), Object.assign({}, base, {
+        font: false,
+        backgroundColor: getComputedStyle(document.body).backgroundColor
+      }));
+
+      // 2) 界面层：透明底；body 上移 scrollY 还原滚动位置，粘性顶栏改为固定在原处
+      const uiCanvas = await ms.domToCanvas(document.body, Object.assign({}, base, {
+        backgroundColor: null,
+        style: {
+          marginTop: `${-sy}px`,
+          marginLeft: `${-sx}px`,
+          background: 'transparent'
+        },
+        filter: node => !isExcluded(node),
+        onCloneNode: clone => {
+          if (!clone.querySelector) return;
+          // 截图里中文后备字体的宽度与页面略有差异：胶囊 / 按钮类短标签保持单行，避免被挤折行
+          // 库会给每个克隆节点内联 white-space，继承不到子元素，所以连后代一起设
+          clone.querySelectorAll(NOWRAP_SELECTOR.split(',').map(s => `${s.trim()}, ${s.trim()} *`).join(','))
+            .forEach(n => n.style.setProperty('white-space', 'nowrap'));
+          const h = clone.querySelector('.app-header');
+          if (h && hr) {
+            h.style.setProperty('position', 'fixed');
+            h.style.setProperty('top', `${hr.top}px`);
+            h.style.setProperty('left', `${hr.left}px`);
+            h.style.setProperty('width', `${hr.width}px`);
+          }
+        }
+      }));
+
+      // 3) 合成：舞台 → 玻璃区域贴模糊舞台 → 界面
+      const out = document.createElement('canvas');
+      out.width = stageCanvas.width;
+      out.height = stageCanvas.height;
+      const ctx = out.getContext('2d');
+      ctx.drawImage(stageCanvas, 0, 0);
+      const blurred = makeBlurrer(stageCanvas);
+      glass.forEach(g => {
+        ctx.save();
+        ctx.beginPath();
+        const box = [g.x * scale, g.y * scale, g.w * scale, g.h * scale];
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(...box, g.radii.map(r => r * scale));
+        else ctx.rect(...box);
+        ctx.clip();
+        ctx.drawImage(blurred(g.blur, scale), 0, 0);
+        ctx.restore();
+      });
+      ctx.drawImage(uiCanvas, 0, 0, out.width, out.height);
+      return out;
+    }
+
+    function fileName() {
+      const d = new Date();
+      const p = n => String(n).padStart(2, '0');
+      const view = String(activeViewId || 'view').replace(/^view-/, '');
+      return `BIGDY-${view}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`;
+    }
+
+    function download(blob, name) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+
+    function flash() {
+      if (prefersReducedMotion) return;
+      const f = document.createElement('div');
+      f.className = 'atl-flash';
+      f.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(f);
+      f.addEventListener('animationend', () => f.remove());
+    }
+
+    // 预览卡：拍下的画面 + 结果 + 下载
+    let shotEl = null;
+    let shotTimer = 0;
+    function armDismiss(ms = 6000) {
+      clearTimeout(shotTimer);
+      shotTimer = setTimeout(hide, ms);
+    }
+    function hide() {
+      if (shotEl) shotEl.classList.remove('is-on');
+    }
+    function showShot(state, payload = {}) {
+      if (!shotEl) {
+        shotEl = document.createElement('div');
+        shotEl.className = 'atl-shot';
+        shotEl.setAttribute('role', 'status');
+        shotEl.setAttribute('aria-live', 'polite');
+        document.body.appendChild(shotEl);
+        shotEl.addEventListener('pointerenter', () => clearTimeout(shotTimer));
+        shotEl.addEventListener('pointerleave', () => { if (!busy) armDismiss(); });
+      }
+      clearTimeout(shotTimer);
+      const old = shotEl.querySelector('img[data-url]');
+      if (old) URL.revokeObjectURL(old.dataset.url);
+
+      if (state === 'pending') {
+        shotEl.innerHTML = '<div class="atl-shot-body"><span class="atl-shot-row"><span class="atl-shot-spinner" aria-hidden="true"></span><span class="atl-shot-title">正在冲洗截图…</span></span></div>';
+      } else if (state === 'error') {
+        shotEl.innerHTML = `<div class="atl-shot-body"><span class="atl-shot-title">截图失败</span><span class="atl-shot-sub">${esc(payload.message || '')}</span></div>`;
+        armDismiss(4000);
+      } else {
+        const { blob, copied, name, leftPage } = payload;
+        const url = URL.createObjectURL(blob);
+        const sub = leftPage
+          ? '截图途中切走了页面，画面可能不完整，请停留在本页重拍'
+          : (copied ? '可直接粘贴到聊天或文档' : '浏览器不允许写入剪贴板，已下载到本地');
+        shotEl.innerHTML = `
+          <img src="${url}" data-url="${url}" alt="截图预览">
+          <div class="atl-shot-body">
+            <span class="atl-shot-title">${copied ? '已复制到剪贴板' : '已保存为 PNG'}</span>
+            <span class="atl-shot-sub">${sub}</span>
+            <div class="atl-shot-actions">
+              ${copied ? '<button class="atl-btn-ghost" data-shot="download">下载 PNG</button>' : ''}
+              <button class="atl-btn-ghost" data-shot="close">关闭</button>
+            </div>
+          </div>`;
+        shotEl.querySelector('[data-shot="close"]').addEventListener('click', hide);
+        const dl = shotEl.querySelector('[data-shot="download"]');
+        if (dl) dl.addEventListener('click', () => download(blob, name));
+        armDismiss();
+      }
+      requestAnimationFrame(() => shotEl.classList.add('is-on'));
+    }
+
+    function shoot() {
+      if (busy) return;
+      busy = true;
+      flash();
+      showShot('pending');
+      const name = fileName();
+      // 后台标签页里浏览器会推迟图片解码，截图途中切走页面可能得到不完整的画面
+      let leftPage = false;
+      const onVisibility = () => { if (document.hidden) leftPage = true; };
+      document.addEventListener('visibilitychange', onVisibility);
+      // 稍等闪光层与预览卡出现（二者都在排除名单里，不会进画面）
+      const blobPromise = new Promise(r => setTimeout(r, 60))
+        .then(render)
+        .then(canvas => new Promise((resolve, reject) => {
+          canvas.toBlob(b => (b ? resolve(b) : reject(new Error('图像编码失败'))), 'image/png');
+        }));
+
+      // 剪贴板写入要在点击的同一调用栈里发起（Safari 的要求），所以传入 Promise 而不是等它完成
+      let clipboardPromise;
+      try {
+        clipboardPromise = (navigator.clipboard && window.ClipboardItem && window.isSecureContext)
+          ? navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]).then(() => true, () => false)
+          : Promise.resolve(false);
+      } catch (e) {
+        clipboardPromise = Promise.resolve(false);
+      }
+
+      Promise.all([blobPromise, clipboardPromise])
+        .then(([blob, copied]) => {
+          if (!copied) download(blob, name);
+          showShot('done', { blob, copied, name, leftPage });
+        })
+        .catch(err => {
+          console.warn('[Atelier] 截图失败:', err);
+          showShot('error', { message: err && err.message });
+        })
+        .finally(() => {
+          busy = false;
+          document.removeEventListener('visibilitychange', onVisibility);
+        });
+    }
+
+    return { shoot };
+  })();
+
   // ---------------------------------------------------------------------------
   // 全局按键 & 入口按钮
   // ---------------------------------------------------------------------------
@@ -984,6 +1305,11 @@
       Contemplate.step(e.key === 'ArrowRight' ? 1 : -1);
       return;
     }
+    if (e.altKey && !e.metaKey && !e.ctrlKey && e.code === 'KeyS') {
+      e.preventDefault();
+      Snapshot.shoot();
+      return;
+    }
     if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '[') { Rail.toggle(); }
   });
@@ -995,6 +1321,7 @@
     if (action === 'gallery') Gallery.open();
     else if (action === 'contemplate') Contemplate.enter();
     else if (action === 'palette') Palette.open();
+    else if (action === 'snapshot') Snapshot.shoot();
   });
 
   // ===========================================================================
@@ -1104,6 +1431,7 @@
     setPainting: (id) => commitPainting(id),
     openGallery: () => Gallery.open(),
     contemplate: () => Contemplate.enter(),
-    replayIntro: (opts) => runSplash(Object.assign({}, opts, { replay: true }))
+    replayIntro: (opts) => runSplash(Object.assign({}, opts, { replay: true })),
+    snapshot: () => Snapshot.shoot()
   };
 })();

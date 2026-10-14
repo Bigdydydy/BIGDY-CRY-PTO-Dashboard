@@ -6,76 +6,36 @@
     "venueFallbackErrors": [],
     "targetReference": "Newhedge.io (Bitcoin vs. Gold Correlation & Ratio)",
     "externalUrl": "https://newhedge.io/bitcoin/gold-correlation",
-    "timeRange": "2024-01-15 至 2026-10-10",
+    "timeRange": "2024-01-19 至 2026-10-14",
     "totalDays": 1000,
     "correlationWindowDays": 30,
     "goldBenchmarkMarketCap": "$18.50T (全球存量地上黄金估算)",
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 82984,
-    "goldPrice": 4186.92,
-    "btcGoldRatio": 19.82,
-    "goldBtcRatio": 0.05045,
-    "ratioChange24h": 0.41,
-    "marketCapShare": 8.88,
-    "rollingCorr30d": 0.298,
-    "timestamp": 1791590400000,
-    "date": "2026-10-10"
+    "btcPrice": 81882,
+    "goldPrice": 4101.18,
+    "btcGoldRatio": 19.97,
+    "goldBtcRatio": 0.05009,
+    "ratioChange24h": -0.1,
+    "marketCapShare": 8.76,
+    "rollingCorr30d": 0.349,
+    "timestamp": 1791936000000,
+    "date": "2026-10-14"
   },
   "regime": {
     "regimeCode": "MODERATE_LINKAGE",
     "regimeName": "温和正向联动 (Moderate Linkage)",
     "badgeClass": "badge-cyan",
     "color": "#38bdf8",
-    "summary": "BTC 与黄金保持温和正相关 (30D r = +0.30)。宏观大宗流动性平稳有序，两者维持基准协同但各自具有资产特色。",
+    "summary": "BTC 与黄金保持温和正相关 (30D r = +0.35)。宏观大宗流动性平稳有序，两者维持基准协同但各自具有资产特色。",
     "keyPointers": [
       "流动性常态传导：宏观货币政策处于观察期，黄金稳步筑底，BTC 维持温和风险偏好。",
-      "比价震荡巩固：1 BTC 稳定在 19.8 盎司黄金区间，机构套利与再平衡策略顺畅。",
+      "比价震荡巩固：1 BTC 稳定在 20.0 盎司黄金区间，机构套利与再平衡策略顺畅。",
       "关注事件催化：密切跟踪 CPI 通胀数据与地缘局势变化，观察是否触发共振升级。"
     ]
   },
   "series": [
-    {
-      "date": "2024-01-15",
-      "timestamp": 1705276800000,
-      "btcPrice": 42511,
-      "goldPrice": 2040,
-      "btcGoldRatio": 20.84,
-      "goldBtcRatio": 0.04799,
-      "marketCapShare": 4.55,
-      "rollingCorr30d": null
-    },
-    {
-      "date": "2024-01-16",
-      "timestamp": 1705363200000,
-      "btcPrice": 43138,
-      "goldPrice": 2018,
-      "btcGoldRatio": 21.38,
-      "goldBtcRatio": 0.04678,
-      "marketCapShare": 4.62,
-      "rollingCorr30d": null
-    },
-    {
-      "date": "2024-01-17",
-      "timestamp": 1705449600000,
-      "btcPrice": 42776,
-      "goldPrice": 2005,
-      "btcGoldRatio": 21.33,
-      "goldBtcRatio": 0.04687,
-      "marketCapShare": 4.58,
-      "rollingCorr30d": null
-    },
-    {
-      "date": "2024-01-18",
-      "timestamp": 1705536000000,
-      "btcPrice": 41328,
-      "goldPrice": 2016,
-      "btcGoldRatio": 20.5,
-      "goldBtcRatio": 0.04878,
-      "marketCapShare": 4.42,
-      "rollingCorr30d": null
-    },
     {
       "date": "2024-01-19",
       "timestamp": 1705622400000,
@@ -344,7 +304,7 @@
       "btcGoldRatio": 26.16,
       "goldBtcRatio": 0.03823,
       "marketCapShare": 5.54,
-      "rollingCorr30d": -0.149
+      "rollingCorr30d": null
     },
     {
       "date": "2024-02-15",
@@ -354,7 +314,7 @@
       "btcGoldRatio": 26.18,
       "goldBtcRatio": 0.0382,
       "marketCapShare": 5.55,
-      "rollingCorr30d": -0.134
+      "rollingCorr30d": null
     },
     {
       "date": "2024-02-16",
@@ -364,7 +324,7 @@
       "btcGoldRatio": 26.25,
       "goldBtcRatio": 0.0381,
       "marketCapShare": 5.58,
-      "rollingCorr30d": -0.185
+      "rollingCorr30d": null
     },
     {
       "date": "2024-02-17",
@@ -374,7 +334,7 @@
       "btcGoldRatio": 25.94,
       "goldBtcRatio": 0.03855,
       "marketCapShare": 5.53,
-      "rollingCorr30d": -0.104
+      "rollingCorr30d": null
     },
     {
       "date": "2024-02-18",
@@ -10029,13 +9989,53 @@
     {
       "date": "2026-10-10",
       "timestamp": 1791590400000,
-      "btcPrice": 82984,
-      "goldPrice": 4186.92,
-      "btcGoldRatio": 19.82,
-      "goldBtcRatio": 0.05045,
+      "btcPrice": 82988,
+      "goldPrice": 4186,
+      "btcGoldRatio": 19.83,
+      "goldBtcRatio": 0.05044,
       "marketCapShare": 8.88,
       "rollingCorr30d": 0.298
+    },
+    {
+      "date": "2026-10-11",
+      "timestamp": 1791676800000,
+      "btcPrice": 83773,
+      "goldPrice": 4189.18,
+      "btcGoldRatio": 20,
+      "goldBtcRatio": 0.05001,
+      "marketCapShare": 8.97,
+      "rollingCorr30d": 0.295
+    },
+    {
+      "date": "2026-10-12",
+      "timestamp": 1791763200000,
+      "btcPrice": 81850,
+      "goldPrice": 4172.66,
+      "btcGoldRatio": 19.62,
+      "goldBtcRatio": 0.05098,
+      "marketCapShare": 8.76,
+      "rollingCorr30d": 0.3
+    },
+    {
+      "date": "2026-10-13",
+      "timestamp": 1791849600000,
+      "btcPrice": 83169,
+      "goldPrice": 4159.91,
+      "btcGoldRatio": 19.99,
+      "goldBtcRatio": 0.05002,
+      "marketCapShare": 8.9,
+      "rollingCorr30d": 0.29
+    },
+    {
+      "date": "2026-10-14",
+      "timestamp": 1791936000000,
+      "btcPrice": 81882,
+      "goldPrice": 4101.18,
+      "btcGoldRatio": 19.97,
+      "goldBtcRatio": 0.05009,
+      "marketCapShare": 8.76,
+      "rollingCorr30d": 0.349
     }
   ],
-  "updatedAt": "2026-10-10T14:52:22.338Z"
+  "updatedAt": "2026-10-14T15:04:38.009Z"
 }
