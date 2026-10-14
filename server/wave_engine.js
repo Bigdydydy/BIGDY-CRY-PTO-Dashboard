@@ -63,7 +63,8 @@
   // ---------------------------------------------------------------------------
   const TRACK_SHRINK_K = 15;
   // 「重新定性」的对照检验结果 (scripts/liu_threads/reclassify_control.js)
-  const RECLASSIFY = { maxSwings: 9, firePct: 63, basePct: 52 };
+  // 修正子浪拐点的假摆动后 (docs 第 4 节第 9 条) 重测: 59% vs 54%，差距约 1.5 个标准误，不显著 → 只作提示
+  const RECLASSIFY = { maxSwings: 9, firePct: 59, basePct: 54 };
   // <TRACK_RECORD> 由 scripts/wave_track_record.js 生成，勿手改
   const TRACK_RECORD = {"generatedAt":"2026-10-03","source":"BTCUSDT/ETHUSDT 4H，每 18 根回放，前 3 名候选，去重后 1593 条预测","keys":{"TRIPLE_COMBINATION|COMPLETED":{"resolved":51,"hits":43,"misses":8,"expired":1,"expected":40.67},"COMBINATION|COMPLETED":{"resolved":103,"hits":86,"misses":17,"expired":2,"expected":84.82},"FLAT|COMPLETED":{"resolved":32,"hits":24,"misses":8,"expired":1,"expected":23.98},"ZIGZAG|COMPLETED":{"resolved":142,"hits":107,"misses":35,"expired":25,"expected":98.86},"IMPULSE|RUNNING":{"resolved":254,"hits":201,"misses":53,"expired":28,"expected":182.19},"ZIGZAG|RUNNING":{"resolved":289,"hits":225,"misses":64,"expired":33,"expected":219.96},"COMBINATION|RUNNING":{"resolved":145,"hits":106,"misses":39,"expired":16,"expected":100.01},"TRIPLE_COMBINATION|RUNNING":{"resolved":90,"hits":70,"misses":20,"expired":5,"expected":66.01},"IMPULSE|COMPLETED":{"resolved":103,"hits":66,"misses":37,"expired":7,"expected":65.31},"DIAGONAL|RUNNING":{"resolved":124,"hits":107,"misses":17,"expired":14,"expected":101.89},"DIAGONAL|COMPLETED":{"resolved":19,"hits":19,"misses":0,"expired":5,"expected":14.43},"TRIANGLE|RUNNING":{"resolved":14,"hits":13,"misses":1,"expired":0,"expected":10.5},"FLAT|RUNNING":{"resolved":26,"hits":23,"misses":3,"expired":0,"expected":22.96},"EXPANDING_TRIANGLE|RUNNING":{"resolved":29,"hits":19,"misses":10,"expired":7,"expected":20.25},"DOUBLE_ZIGZAG|RUNNING":{"resolved":6,"hits":2,"misses":4,"expired":0,"expected":2.68},"TRIPLE_ZIGZAG|RUNNING":{"resolved":7,"hits":5,"misses":2,"expired":0,"expected":4.37},"TRIANGLE|COMPLETED":{"resolved":1,"hits":0,"misses":1,"expired":2,"expected":0.04},"TRIPLE_ZIGZAG|COMPLETED":{"resolved":0,"hits":0,"misses":0,"expired":1,"expected":0}}};
   // </TRACK_RECORD>
@@ -134,7 +135,11 @@
   // 1. Zigzag 拐点提取 (ATR/阈值驱动, 尾部拐点标记为未确认 open)
   // ---------------------------------------------------------------------------
 
-  function zigzagPivots(bars, thr) {
+  /**
+   * intrabar: 考虑同一根K线内高低点的先后 (只用于子浪结构判定)。主级别拐点保持原算法:
+   * 命中率回放中全局启用使总体命中/期望由 1.054 降到 1.013 (docs 第 4 节第 9 条)
+   */
+  function zigzagPivots(bars, thr, intrabar) {
     const n = bars.length;
     if (!n) return [];
     if (!(thr > 0)) thr = (avgTR(bars) || Math.abs(bars[n - 1].close - bars[0].open) / n || 1) * 1e-6;
@@ -146,25 +151,30 @@
 
     for (let i = 1; i < n; i++) {
       const b = bars[i];
-      if (b.high > runHi) { runHi = b.high; hiIdx = i; }
-      if (b.low < runLo) { runLo = b.low; loIdx = i; }
+      const newHi = b.high > runHi, newLo = b.low < runLo;
+      if (newHi) { runHi = b.high; hiIdx = i; }
+      if (newLo) { runLo = b.low; loIdx = i; }
+      // 同一根K线内高低点的先后: 创新高且收阳 → 低点在高点之前，不能用本根低点确认见顶；
+      // 创新低且收阴 → 高点在低点之前，不能用本根高点确认见底。否则单根大阳 / 大阴线会造出假摆动
+      const bull = b.close >= b.open;
+      const topBlocked = !!intrabar && newHi && bull, bottomBlocked = !!intrabar && newLo && !bull;
 
       if (side === 1) {
-        if (runHi - b.low >= thr) {
+        if (!topBlocked && runHi - b.low >= thr) {
           out.push({ idx: hiIdx, time: bars[hiIdx].time, price: runHi, type: 'high', confirmed: true });
           side = -1; runLo = b.low; loIdx = i;
         }
       } else if (side === -1) {
-        if (b.high - runLo >= thr) {
+        if (!bottomBlocked && b.high - runLo >= thr) {
           out.push({ idx: loIdx, time: bars[loIdx].time, price: runLo, type: 'low', confirmed: true });
           side = 1; runHi = b.high; hiIdx = i;
         }
       } else {
         // 首个被确认的反向极值即序列起点拐点 (另一端若未达阈值则只是噪声)
-        if (b.high - runLo >= thr) {
+        if (!bottomBlocked && b.high - runLo >= thr) {
           out.push({ idx: loIdx, time: bars[loIdx].time, price: runLo, type: 'low', confirmed: true });
           side = 1; runHi = b.high; hiIdx = i;
-        } else if (runHi - b.low >= thr) {
+        } else if (!topBlocked && runHi - b.low >= thr) {
           out.push({ idx: hiIdx, time: bars[hiIdx].time, price: runHi, type: 'high', confirmed: true });
           side = -1; runLo = b.low; loIdx = i;
         }
@@ -407,6 +417,15 @@
     rg('G7', C_G_PAT, false, null, 6, '通用（EWI延长浪惯例）', '浪3通常是三个驱动浪中最长的（至少一浪延长）', 0.5,
       g => ({ pass: g.l[2] >= Math.max(g.l[0], g.l[4]) - EPS, detail: `1:${fmtNum(g.l[0])} 3:${fmtNum(g.l[2])} 5:${fmtNum(g.l[4])}` }))
   ];
+
+  // 楔形的比率指引 (取代推动浪的 G1~G5: 楔形浪2/浪4 回撤更深，收缩楔形浪3 本就短于浪1)
+  const DIAGONAL_GUIDES = [
+    rg('DG1', C_G_RATIO, false, null, 3, '通用（EWI楔形：浪2、浪4常回撤0.66~0.81）', '楔形浪2常回撤浪1的0.66~0.81倍', 1,
+      g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.5 && r <= 0.9, detail: `回撤 ${fmtPct(r)}` }; }),
+    rg('DG2', C_G_RATIO, false, null, 5, '通用（EWI楔形：浪2、浪4常回撤0.66~0.81）', '楔形浪4常回撤浪3的0.66~0.81倍', 1,
+      g => { const r = g.l[3] / g.l[2]; return { pass: r >= 0.5 && r <= 0.9, detail: `回撤 ${fmtPct(r)}` }; })
+  ];
+  const IMPULSE_ONLY_GUIDES = new Set(['G1', 'G2', 'G3', 'G4', 'G5']);
 
   const DIAGONAL_RULES = [
     rg('D1', C_PRICE, true, 'min', 5, 'P48（楔形反向）', '楔形浪4必须切入浪1价格区', 1,
@@ -759,7 +778,7 @@
 
   const PATTERNS = {
     IMPULSE: { pts: 6, minDev: 3, name: '推动浪', category: '驱动浪', rules: MOTIVE_RULES.concat(IMPULSE_RULES), labels: ['0', '1', '2', '3', '4', '5'] },
-    DIAGONAL: { pts: 6, minDev: 5, name: '对角楔形', category: '驱动浪', rules: MOTIVE_RULES.concat(DIAGONAL_RULES), labels: ['0', '1', '2', '3', '4', '5'] },
+    DIAGONAL: { pts: 6, minDev: 5, name: '对角楔形', category: '驱动浪', rules: MOTIVE_RULES.filter(r => !IMPULSE_ONLY_GUIDES.has(r.id)).concat(DIAGONAL_GUIDES, DIAGONAL_RULES), labels: ['0', '1', '2', '3', '4', '5'] },
     ZIGZAG: { pts: 4, minDev: 3, name: '单锯齿调整浪', category: '调整浪', rules: ZIGZAG_RULES, labels: ['0', 'a', 'b', 'c'] },
     FLAT: { pts: 4, minDev: 3, name: '平台形调整浪', category: '调整浪', rules: FLAT_RULES, labels: ['0', 'a', 'b', 'c'] },
     TRIANGLE: { pts: 6, minDev: 4, name: '收缩三角形', category: '调整浪', rules: TRIANGLE_RULES, labels: ['0', 'a', 'b', 'c', 'd', 'e'] },
@@ -878,17 +897,20 @@
     const path = [0];
     let budget = 2000;
     let found = null;
+    // 跳点时每一段的两端须是该区间的极值 (与 matchCorrectiveOn 同一「一浪」定义)，
+    // 否则会挑出「低点高于前一个高点」这类同向的段，把三浪误数成五浪
+    const legOk = buildLegTable(arr);
 
     function rec(cur) {
       if (--budget <= 0) return false;
       if (path.length === 5) {
-        if (((last - cur) & 1) === 0) return false;
+        if (((last - cur) & 1) === 0 || !legOk[cur][last]) return false;
         const pts = path.concat([last]).map(i => arr[i]);
         if (ok(pts)) { found = pts; return true; }
         return false;
       }
       for (let j = cur + 1; j < last; j++) {
-        if (((j - cur) & 1) === 0) continue;
+        if (((j - cur) & 1) === 0 || !legOk[cur][j]) continue;
         path.push(j);
         const pts = path.map(i => arr[i]);
         if (ok(pts)) {
@@ -928,7 +950,7 @@
 
     for (const m of [0.10, 0.07, 0.05, 0.035]) {
       const thr = Math.max(range * m, 1.2 * sAtr);
-      const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
+      const anchored = anchorZigzag(zigzagPivots(seg, thr, true), ps, pe);
       if (anchored.length - 1 < 3) continue;
       const five = findMotiveTyped(anchored);
       return { label: five ? '5' : '3', motive: five ? five.kind : null, subPivots: anchored, source: srcName };
@@ -1142,7 +1164,7 @@
     const seen = new Set();
     for (const m of [0.3, 0.2, 0.14, 0.1, 0.07, 0.05]) {
       const thr = Math.max(range * m, 1.0 * sAtr);
-      const sub = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
+      const sub = anchorZigzag(zigzagPivots(seg, thr, true), ps, pe);
       if (sub.length < 4 || sub.length > 16) continue;
       const sig = sub.map(q => q.idx).join(',');
       if (seen.has(sig)) continue;
@@ -1680,7 +1702,12 @@
   ];
   const PROJ_SPECS = {
     IMPULSE: MOTIVE_PROJ,
-    DIAGONAL: MOTIVE_PROJ.map((x, i) => x && i === 3 ? Object.assign({}, x, { inv: null, basis: '楔形浪4须进入浪1价格区（D1），幅度按推动浪浪4常见比例近似' }) : x),
+    DIAGONAL: [null,
+      { ref: 0, r: [0.5, 0.66, 0.81], t: SAME_TIME(0), basis: 'DG1 楔形浪2常回撤浪1的0.66~0.81（EWI）', inv: { at: 0, text: '浪2越过浪1起点则计数作废（M1）' } },
+      { ref: 0, r: [0.618, 0.786, 1], t: SAME_TIME(0), basis: '收缩楔形浪3短于浪1（扩散楔形则长于浪1）', beyond: { at: 1, text: '浪3须越过浪1终点（M3）' } },
+      { ref: 2, r: [0.5, 0.66, 0.81], t: SAME_TIME(1), basis: 'DG2 楔形浪4常回撤浪3的0.66~0.81（EWI）；D1 浪4须进入浪1价格区', inv: { at: 2, text: '浪4触及浪2终点则计数作废（M4）' }, beyond: { at: 1, text: '楔形浪4须进入浪1价格区（D1）' } },
+      { ref: 2, r: [0.5, 0.618, 0.786], t: SAME_TIME(0), basis: '收缩楔形浪5短于浪3（D5）' }
+    ],
     ZIGZAG: [null,
       { ref: 0, r: [0.382, 0.5, 0.618], t: SAME_TIME(0), basis: 'ZG1 b浪常回撤a浪的0.382/0.5/0.618（P214）；ZG6 用时常为a浪的0.618~1.618倍', inv: { at: 0, text: 'b浪越过a浪起点则锯齿作废（Z2）' } },
       { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'ZG3 c浪常等于a、0.618a或1.618a（P214）；ZG7 用时', beyond: { at: 1, text: 'c浪通常越过a浪终点（ZG5，失败c浪极少见）' } }],
@@ -3428,7 +3455,7 @@
       const thr = Math.max(range * m, 1.2 * sAtr);
       if (thr === lastThr) continue;
       lastThr = thr;
-      const anchored = anchorZigzag(zigzagPivots(seg, thr), ps, pe);
+      const anchored = anchorZigzag(zigzagPivots(seg, thr, true), ps, pe);
       const swings = anchored.length - 1;
       if (swings < 3) continue;
       if (swings > PROBE_MAX_SWINGS) {
@@ -3679,7 +3706,9 @@
           if (li + 1 >= pointsUsed.length) continue;
           if (legOverrides[li]) { if (legOverrides[li].category === '5') lead++; else end++; continue; }
           const pr = probe(pointsUsed[li], pointsUsed[li + 1]);
-          if (pr.any5) lead++;
+          // 摆动段数多时总能挑出合规五浪 (见 5.4 对照检验)，不足以把楔形的腿判为五浪
+          const cleanFive = pr.any5 && ((pr.coarse && pr.coarse.label === '5') || pr.any5.swings <= RECLASSIFY.maxSwings);
+          if (cleanFive) lead++;
           else if (pr.coarse) end++;
         }
         key = end > lead ? 'DIAGONAL_THREES' : 'DIAGONAL_LEADING';
@@ -3844,9 +3873,9 @@
     // 重新定性: 画成调整浪 (xx 浪 / b 浪 / abc 反弹)，但起点以来同方向的走势已在低周期走成推动浪，
     // 或前三浪已现推动特征 (浪3 ≥ 1.618×浪1，手稿 ZG8)，则更可能是新趋势而不是调整
     // (柳玉冬 2026-08-04 / 08-14 / 08-17 连续把 07-01 起的上涨看作 xx 浪、等 z 浪下跌，之后五浪涨到 87k)
-    // 对照检验 (scripts/liu_threads/reclassify_control.js，BTC/ETH 4H 共 1092 个 0-a-b-c 三段):
-    //   低周期五浪由 ≤9 段摆动构成时，之后先突破极值 (延续) 63%，不触发的 52%；摆动更多时与不触发无差别，故不计入；
-    //   1-2-3 前缀 (浪3 ≥ 1.618×浪1) 在两个标的上结论相反，无预测力，只作提示、不计入存疑
+    // 对照检验 (scripts/liu_threads/reclassify_control.js，BTC/ETH 4H 共 1086 个 0-a-b-c 三段):
+    //   最初测得低周期五浪 (≤9 段摆动) 之后延续 63%、不触发 52%；修正子浪拐点的假摆动后重测为 59% vs 54%，不显著。
+    //   两种信号 (五浪、1-2-3 前缀) 都只作提示，不计入存疑
     let reclassify = null;
     if (PATTERNS[primary.type].category !== '驱动浪') {
       const d0 = pts[1].price > pts[0].price ? 1 : -1;
@@ -3859,8 +3888,8 @@
         const prR = probe(pts[0], { idx: ext.idx, time: ext.time, price: ext.price, type: d0 > 0 ? 'high' : 'low' });
         const dirTxtR = d0 > 0 ? '上涨' : '下跌';
         if (prR.any5 && prR.any5.kind === 'IMPULSE' && prR.any5.swings <= RECLASSIFY.maxSwings) {
-          reclassify = { basis: 'FIVE', to: 'IMPULSE', extreme: { price: ext.price, time: ext.time }, source: prR.source, swings: prR.any5.swings, coarse: prR.coarse ? prR.coarse.label : null, strict5: prR.strict5,
-            text: `起点 ${fmtNum(pts[0].price)} 以来的${dirTxtR}（至 ${fmtNum(ext.price)}）在 ${prR.source || timeframe} 上已走成合规五浪推动：不像 xx 浪 / b 浪这类调整，更可能是新趋势（「有推动浪才有做底的可能」；回测中同类情形 ${RECLASSIFY.firePct}% 之后继续越过极值，未出现此信号的 ${RECLASSIFY.basePct}%）` };
+          reclassify = { basis: 'FIVE', to: 'IMPULSE', weak: true, extreme: { price: ext.price, time: ext.time }, source: prR.source, swings: prR.any5.swings, coarse: prR.coarse ? prR.coarse.label : null, strict5: prR.strict5,
+            text: `起点 ${fmtNum(pts[0].price)} 以来的${dirTxtR}（至 ${fmtNum(ext.price)}）在 ${prR.source || timeframe} 上已走成合规五浪推动：不像 xx 浪 / b 浪这类调整，更可能是新趋势（「有推动浪才有做底的可能」；回测中同类情形 ${RECLASSIFY.firePct}% 之后继续越过极值，未出现此信号的 ${RECLASSIFY.basePct}%，区分度不显著，仅作提示）` };
         } else if (prR.coarse) {
           const pre = motivePrefix123(prR.coarse.anchored);
           if (pre) {
@@ -4152,7 +4181,7 @@
       const pe = { idx: seg.length - 1, time: pB.time, price: pB.price, type: pB.type, confirmed: true };
       for (const m of PROBE_MULTS.concat([0.035, 0.025])) {
         const thr = Math.max(range * m, 0.8 * atr);
-        const inner = zigzagPivots(seg, thr)
+        const inner = zigzagPivots(seg, thr, true)
           .filter(q => q.idx > 0 && q.idx < seg.length - 1)
           .map(q => Object.assign({}, q, { time: mainAt(q.time) }))
           .filter(q => q.time > pA.time && q.time < pB.time);

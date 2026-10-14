@@ -262,6 +262,69 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(full.projection, null);
   });
 
+  describe('楔形', () => {
+    // 15m 直线段生成K线 (阳线高点 +0.01，阴线 +0.004，相邻K线高低点不相等)
+    const mk = segs => {
+      const m15 = []; let t = T0;
+      for (const [a, b, n] of segs) for (let k = 0; k < n; k++) {
+        const o = a + (b - a) * k / n, c = a + (b - a) * (k + 1) / n;
+        m15.push({ time: t, open: o, close: c, high: Math.max(o, c) + (c > o ? 0.01 : 0.004), low: Math.min(o, c) - (c < o ? 0.01 : 0.004) });
+        t += 900;
+      }
+      const h1 = [];
+      for (let i = 0; i < m15.length; i += 4) {
+        const g = m15.slice(i, i + 4);
+        h1.push({ time: g[0].time, open: g[0].open, close: g[g.length - 1].close, high: Math.max(...g.map(x => x.high)), low: Math.min(...g.map(x => x.low)) });
+      }
+      return { m15, h1 };
+    };
+    const three = (a, b, n) => { const d = b - a; return [[a, a + 0.62 * d, n], [a + 0.62 * d, a + 0.3 * d, n], [a + 0.3 * d, b, n]]; };
+    const five = (a, b, n) => { const d = b - a; return [[a, a + 0.3 * d, n], [a + 0.3 * d, a + 0.18 * d, n], [a + 0.18 * d, a + 0.72 * d, n], [a + 0.72 * d, a + 0.6 * d, n], [a + 0.6 * d, b, n]]; };
+    function build(legs) {
+      const segs = [[legs[0][1] + 4, legs[0][1], 60]], marks = [];
+      for (const [fn, a, b, n] of legs) { marks.push(segs.reduce((x, y) => x + y[2], 0)); fn(a, b, n).forEach(q => segs.push(q)); }
+      marks.push(segs.reduce((x, y) => x + y[2], 0));
+      const last = legs[legs.length - 1][2];
+      segs.push([last, last - 6, 40]);
+      const { m15, h1 } = mk(segs);
+      const at = (i15, price) => ({ time: h1.filter(b => b.time <= m15[i15].time).pop().time, price });
+      return { m15, h1, at, marks };
+    }
+
+    it('单独画的 3-3-3-3-3 识别为三浪腿的楔形，5-3-5-3-5 识别为引导楔形；楔形不套用推动浪比率指引', () => {
+      const run = (types, v) => {
+        const d = build(types.map((k, i) => [k === 5 ? five : three, v[i], v[i + 1], 8]));
+        return E.evaluateUserCount(d.h1, 'TEST', { tool: 'IMPULSE', timeframe: '1h', subBars: { '15m': d.m15 }, points: d.marks.map((m, i) => d.at(m, v[i])) });
+      };
+      const ending = run([3, 3, 3, 3, 3], [100, 110, 102.2, 110.2, 105, 110.5]);
+      assert.strictEqual(ending.primary.type, 'DIAGONAL');
+      assert.strictEqual(ending.primary.structure, 'DIAGONAL_THREES', ending.primary.legs.map(L => L.name + ':' + L.found).join(' '));
+      assert.ok(/3-3-3-3-3/.test(ending.primary.name), ending.primary.name);
+      assert.ok(!ending.primary.ruleChecks.some(c => ['G1', 'G2', 'G3', 'G4', 'G5', 'I1'].includes(c.id)), '楔形不套用推动浪专属规则');
+      const leading = run([5, 3, 5, 3, 5], [100, 110, 102.5, 110.5, 105.2, 110.8]);
+      assert.strictEqual(leading.primary.structure, 'DIAGONAL_LEADING');
+      assert.ok(/5-3-5-3-5/.test(leading.primary.name), leading.primary.name);
+    });
+
+    it('母浪浪5 内画终结楔形 (3-3-3-3-3、浪4 进入浪1 区)：子浪判终结楔形成立，母浪不冲突', () => {
+      const d = build([
+        [five, 100, 120, 10], [three, 120, 110, 10], [five, 110, 145, 12], [three, 145, 135, 10],
+        [three, 135, 144, 6], [three, 144, 138, 6], [three, 138, 145, 6], [three, 145, 141, 6], [three, 141, 146, 6]
+      ]);
+      const mk6 = (idx, prices) => idx.map((k, i) => d.at(d.marks[k], prices[i]));
+      const parent = mk6([0, 1, 2, 3, 4, 9], [100, 120, 110, 145, 135, 146]);
+      const child = mk6([4, 5, 6, 7, 8, 9], [135, 144, 138, 145, 141, 146]);
+      const r = E.evaluateUserSketch({ '1h': d.h1, '15m': d.m15 }, 'TEST', { drawings: [{ id: 'P', tool: 'IMPULSE', timeframe: '1h', points: parent }, { id: 'C', tool: 'IMPULSE', timeframe: '1h', points: child }] });
+      const P = r.nodes.find(x => x.id === 'P'), C = r.nodes.find(x => x.id === 'C');
+      assert.strictEqual(C.parentId, 'P');
+      assert.strictEqual(C.result.primary.type, 'DIAGONAL');
+      assert.ok(/终结楔形/.test(C.name) && /3-3-3-3-3/.test(C.name), C.name);
+      assert.strictEqual(C.verdict, 'VALID', C.result.reasons.concat(C.result.doubts).join(' / '));
+      assert.ok(P.result.primary.ruleChecks.filter(c => c.hard).every(c => c.pass), '母浪铁律全过');
+      assert.ok(/浪5为终结楔形/.test(P.name), P.name);
+    });
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
