@@ -570,7 +570,7 @@
   "address": "0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-13",
+  "last_qualified": "2026-10-14",
   "symbol": "MOW"
  },
  "robinhood:0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b": {
@@ -909,6 +909,13 @@
   "last_qualified": "2026-10-14",
   "symbol": "VRAX"
  },
+ "robinhood:0x95a82318c41274c122399d6b4006697bbf79cea8": {
+  "address": "0x95a82318c41274c122399d6b4006697bbf79cea8",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-14",
+  "last_qualified": "2026-10-14",
+  "symbol": "FALCONMARGIN"
+ },
  "robinhood:0x97d4c3c1b72aebb599b70002e9109b88248d51e3": {
   "address": "0x97d4c3c1b72aebb599b70002e9109b88248d51e3",
   "chain": "robinhood",
@@ -957,6 +964,13 @@
   "first_qualified": "2026-10-12",
   "last_qualified": "2026-10-14",
   "symbol": "HOUND"
+ },
+ "robinhood:0xa4f22f4b690fb7e3cb5c830db4d02eedd437508f": {
+  "address": "0xa4f22f4b690fb7e3cb5c830db4d02eedd437508f",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-14",
+  "last_qualified": "2026-10-14",
+  "symbol": "SI"
  },
  "robinhood:0xa74f62386bdac20b9beb63b0751a03576dbf63ad": {
   "address": "0xa74f62386bdac20b9beb63b0751a03576dbf63ad",
@@ -1571,7 +1585,7 @@
   "address": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
   "chain": "solana",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-10",
+  "last_qualified": "2026-10-14",
   "symbol": "CATE"
  },
  "solana:ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg": {
@@ -1627,7 +1641,7 @@
   "address": "CQCDTp8rsFV3PhaPeYjcCW5LdGTxi6jFx7eC3UXnpump",
   "chain": "solana",
   "first_qualified": "2026-10-12",
-  "last_qualified": "2026-10-13",
+  "last_qualified": "2026-10-14",
   "symbol": "CRAWLER"
  },
  "solana:CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU": {
