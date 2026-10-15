@@ -23,7 +23,8 @@
   let showMonitoring = true;
   let showTargets = true;
   let showProjection = true;
-  let projSeries = null;   // 所选浪的假设推演路径 (橙色虚线，可延伸到未来)
+  let projSeries = null;
+  let channelSeries = null; // 所选楔形的 2-4 通道线   // 所选浪的假设推演路径 (橙色虚线，可延伸到未来)
 
   // 画浪状态
   let drawTool = null;   // 正在画的工具
@@ -157,6 +158,7 @@
     activeSeries = safeCreateSeries(chart, 'Line', lineOpts('#a855f7', 2, LightweightCharts.LineStyle.Dashed));
     previewSeries = safeCreateSeries(chart, 'Line', lineOpts('#10b981', 2, LightweightCharts.LineStyle.LargeDashed));
     projSeries = safeCreateSeries(chart, 'Line', lineOpts('#f59e0b', 2, LightweightCharts.LineStyle.Dashed));
+    channelSeries = safeCreateSeries(chart, 'Line', lineOpts('#a855f7', 1, LightweightCharts.LineStyle.Dashed));
 
     chart.subscribeCrosshairMove(param => {
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -999,6 +1001,20 @@ self.onmessage = function (e) {
     }
     if (subSeries) subSeries.setData(subData);
 
+    // 3.5 所选楔形的 2-4 通道线: 从浪2 经浪4 延伸到最新K线之后几根
+    if (channelSeries) {
+      const ch = sel && sel.result && sel.result.invalidation && sel.result.invalidation.channel;
+      const cd = [];
+      if (ch && showMonitoring && currentBars.length) {
+        const sec = TF_SEC[currentTf] || 14400;
+        const priceAt = t => ch.from.price + ch.slopePerBar * (t - ch.from.time) / (ch.tfSec || sec);
+        const t0 = currentBars[barIdxAtOrBefore(ch.from.time)].time;
+        const t1 = currentBars[currentBars.length - 1].time + 6 * sec;
+        cd.push({ time: t0, value: priceAt(ch.from.time) }, { time: t1, value: priceAt(t1) });
+      }
+      channelSeries.setData(cd);
+    }
+
     // 4. 所选浪的假设推演: 中值路径 (可延伸到最新K线之后)，各浪标注常见区间
     const proj = sel && sel.result && sel.result.projection;
     if (projSeries) {
@@ -1192,7 +1208,7 @@ self.onmessage = function (e) {
         <div class="liu-signal-title"><span>手稿铁律</span><span class="liu-chip ${failed.length ? 'neg' : nearly.length ? 'warn' : 'pos'}">${hard.length - failed.length - nearly.length}/${hard.length} 通过</span></div>
         ${failed.length || nearly.length ? '' : '<div class="ue-line">全部通过</div>'}
         ${failed.map(c => `<div class="ue-line">✗ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}</div>`).join('')}
-        ${nearly.map(c => `<div class="ue-line">≈ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}，只差阈值的 ${(100 * c.margin).toFixed(1)}%（容差带内，判存疑）</div>`).join('')}
+        ${nearly.map(c => `<div class="ue-line">≈ ${esc(c.text)}（${esc(c.page)}）${c.detail ? '：' + esc(c.detail) : ''}${c.margin != null ? `，只差阈值的 ${(100 * c.margin).toFixed(1)}%（容差带内，判存疑）` : ''}</div>`).join('')}
         ${(r.primary.liveHardFails || []).map(f => `<div class="ue-line">走势检验 ✗ ${esc(f.text)}（${esc(f.page)}）：${esc(f.detail)}</div>`).join('')}
       </div>`;
 

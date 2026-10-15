@@ -183,6 +183,42 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.strictEqual(pr.any5.kind, 'IMPULSE');
   });
 
+  it('楔形形态两种口径: 浪长为扩张但通道收敛 (浪2 回撤近 100%) → D3 判存疑而不否决', () => {
+    // 仿 BTC 2026-09-22→10-15: 1 跌 5.6%，2 回撤 97%，3 跌 8.0% (长于 1)，4 涨 4.9% (短于 2)，1-3 与 2-4 线收敛
+    const pts = [100, 94.4, 99.85, 91.9, 96.4, 91.5].map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'low' : 'high' }));
+    pts[5].open = true;
+    const sh = E.diagonalShape({ p: pts, d: -1, l: pts.slice(1).map((p, i) => Math.abs(p.price - pts[i].price)) });
+    assert.strictEqual(sh.byLength, 'expanding');
+    assert.strictEqual(sh.byChannel, 'contracting');
+    assert.ok(sh.conflict);
+    const res = E.evaluatePattern('DIAGONAL', pts, null);
+    assert.ok(!res.hardFails.some(c => c.id === 'D3'), JSON.stringify(res.hardFails.map(c => c.id)));
+    const d3 = res.nearFails.find(c => c.id === 'D3');
+    assert.ok(d3 && d3.margin == null && /两种口径相反/.test(d3.detail) && /起点位置可疑/.test(d3.detail), d3 && d3.detail);
+  });
+
+  it('楔形推演按形态选比率: 浪3 长于浪1 → 扩张楔形 (浪4 > 浪2、浪5 > 浪3)', () => {
+    const pts = [100, 110, 102, 118].map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' }));
+    const pj = E.projectRemaining('DIAGONAL', pts, 14400, false, T0 + 4 * 144000);
+    const w4 = pj.waves.find(w => w.label === '4'), w5 = pj.waves.find(w => w.label === '5');
+    assert.match(w4.basis, /扩张楔形浪4长于浪2/);
+    assert.ok(118 - w4.zone.mid > 8, '浪4 中值长于浪2 (8)');
+    assert.ok(w5.zone.mid - w4.zone.mid > 118 - 102, '浪5 中值长于浪3 (16)');
+    const contracting = E.projectRemaining('DIAGONAL', [100, 110, 103, 108].map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' })), 14400, false, T0 + 4 * 144000);
+    assert.match(contracting.waves.find(w => w.label === '5').basis, /收缩楔形浪5短于浪3/);
+  });
+
+  it('楔形 2-4 通道线: 浪5 运行或完成时给出通道线及其含义', () => {
+    const prefix = staircase(40, 105, 15, true);
+    const { v, ends } = path(prefix, DIAG_33333, [110, 116, 100]);
+    const r = evaluate(v, ends);
+    assert.strictEqual(r.primary.type, 'DIAGONAL');
+    const ch = r.invalidation.channel;
+    assert.ok(ch, '应给出 2-4 通道线');
+    assert.ok(Math.abs(ch.from.price - r.live.points[2].price) < 1e-9 && Math.abs(ch.through.price - r.live.points[4].price) < 1e-9);
+    assert.match(ch.text, /2-4 通道线/);
+  });
+
   it('楔形规则: 收缩楔形浪4须小于浪2 (D3)、浪5须小于浪3 (D5)', () => {
     const mk = arr => arr.map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' }));
     // 3<1 (收缩)，但 4(16) > 2(12)
