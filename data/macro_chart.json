@@ -38507,11 +38507,11 @@
     },
     {
       "date": "2026-10-14",
-      "btcPrice": 81867.99,
+      "btcPrice": 81682.01,
       "mstrCost": 75444,
       "mstrHoldings": 848250,
       "mstrBuyVelocity30d": 106.7,
-      "mnav": 1.068,
+      "mnav": 1.071,
       "mnavEstimated": true,
       "us1y": 4.48,
       "us10y": 5.21,
@@ -38521,10 +38521,27 @@
       "fedRrp": 0,
       "fedNetLiquidity": 5.8671,
       "fedNetLiqSma20": 5.8158
+    },
+    {
+      "date": "2026-10-15",
+      "btcPrice": 81730.85,
+      "mstrCost": 75444,
+      "mstrHoldings": 848250,
+      "mstrBuyVelocity30d": 106.7,
+      "mnav": 1.07,
+      "mnavEstimated": true,
+      "us1y": 4.48,
+      "us10y": 5.21,
+      "yieldSpread": 0.73,
+      "fedWalcl": 6.748,
+      "fedTga": 0.88,
+      "fedRrp": 0,
+      "fedNetLiquidity": 5.8671,
+      "fedNetLiqSma20": 5.8207
     }
   ],
   "summary": {
-    "currentBtc": 81867.99,
+    "currentBtc": 81730.85,
     "currentMstrCost": 75444,
     "currentMstrHoldings": 848250,
     "currentMstrVelocity30d": 106.7,
@@ -38534,7 +38551,7 @@
     "velocityToIssuance": 0.24,
     "mstrCostSource": "coinglass",
     "mstrCostAsOf": "2026-10-12",
-    "currentMnav": 1.068,
+    "currentMnav": 1.07,
     "mnavEstimated": true,
     "mnavAnchorDate": "2026-09-12",
     "mnavBasis": "ev",
@@ -38545,13 +38562,13 @@
     "current10y": 5.21,
     "currentSpread": 0.73,
     "isCurveInverted": false,
-    "mstrProfitMultiplier": 1.09,
+    "mstrProfitMultiplier": 1.08,
     "currentFedNetLiquidity": 5.8671,
-    "currentFedNetLiqSma20": 5.8158,
+    "currentFedNetLiqSma20": 5.8207,
     "currentFedWalcl": 6.748,
     "currentFedTga": 0.88,
     "currentFedRrp": 0,
-    "fedNetLiqDailyChange": 0.0001,
+    "fedNetLiqDailyChange": 0,
     "fedNetLiqChange20d": 0.0971,
     "sources": {
       "FRED DGS1": "ok",
@@ -38564,12 +38581,12 @@
       "bitcointreasuries": "ok",
       "Coinglass": "ok"
     },
-    "totalPoints": 2266,
+    "totalPoints": 2267,
     "dateRange": {
       "start": "2020-08-01",
-      "end": "2026-10-14"
+      "end": "2026-10-15"
     },
-    "updatedAt": "2026-10-14T21:49:41.557Z"
+    "updatedAt": "2026-10-15T04:54:42.187Z"
   },
   "rawMstr": [
     {
