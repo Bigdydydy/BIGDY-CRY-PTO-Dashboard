@@ -325,6 +325,29 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     });
   });
 
+  it('前序检验取同级别的前一段: 调整用时 5 段时不拿 1 段的小回调来比', () => {
+    // 71→90→86→100 的上涨后 100→93→96→84→88→80 调整 (20 点、5 段)；最近的反向拐点 86 只走了 1 段
+    const v = [62, 60, 75, 71, 90, 86, 100, 93, 96, 84, 88, 80, 83];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'WXY', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [6, 7, 8, 11].map(k => pt(v, k, 3600)) });
+    assert.ok(r.preceding, '应有前序');
+    assert.ok(Math.abs(r.preceding.from.price - 71) < 0.1, `前序起点应为 71，实际 ${r.preceding.from.price}`);
+    assert.ok(r.preceding.ratio < 1 && !r.preceding.warning, r.preceding.text);
+  });
+
+  it('楔形浪4 运行中给出浪4 价位 (浪3 终点 ± 浪2 长度)，扩张时注明两种口径分歧', () => {
+    // 下跌楔形: 100→90 (浪1=10) →98 (浪2=8) →86 (浪3=12，长于浪1) →90.5 (浪4 运行中)
+    const v = [96, 100, 90, 98, 86, 90.5];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', forceType: 'DIAGONAL', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4, 5].map(k => pt(v, k, 3600)) });
+    const lim = r.invalidation.diagLimit;
+    assert.ok(lim, '应给出楔形浪4 价位');
+    const lp = r.live.points;
+    assert.ok(Math.abs(lim.price - (lp[3].price + Math.abs(lp[2].price - lp[1].price))) < 1e-6);
+    assert.strictEqual(lim.expandingByLength, true);
+    assert.match(lim.text, /两种口径在此价分歧/);
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);

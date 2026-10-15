@@ -1054,6 +1054,9 @@ self.onmessage = function (e) {
       if (showMonitoring && inv.monitor && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || sel.timeframe})` }));
       }
+      if (showMonitoring && inv.diagLimit && v !== 'INVALID') {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.diagLimit.price, color: '#a855f7', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: inv.diagLimit.expandingByLength ? '楔形浪4分歧位' : '楔形浪4上限' }));
+      }
       if (proj && showProjection && proj.invalidation) {
         userPriceLines.push(candleSeries.createPriceLine({ price: proj.invalidation.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: '推演失效' }));
       }
