@@ -550,11 +550,23 @@ function renderAll() {
 /**
  * Render Module 1: ATM IV
  */
+function fmtSignedNum(v, digits = 1, suffix = '') {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '--';
+  return `${v >= 0 ? '+' : ''}${v.toFixed(digits)}${suffix}`;
+}
+
+function fmtGexMillions(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '--';
+  return `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(1)}M`;
+}
+
 function renderAtmIv(data) {
   if (!data) return;
 
   elIv1m.textContent = data.iv1m ? `${data.iv1m.toFixed(1)}%` : '--%';
-  elIv1mSub.textContent = data.percentile !== null ? `历史 ${data.percentile.toFixed(1)}% 分位` : '--';
+  elIv1mSub.textContent = (typeof data.vrp30 === 'number' && typeof data.hv30 === 'number')
+    ? `HV30 ${data.hv30.toFixed(1)}% · VRP ${fmtSignedNum(data.vrp30)}`
+    : 'HV30 --';
 
   elIv3m.textContent = data.iv3m ? `${data.iv3m.toFixed(1)}%` : '--%';
   elIv3mSub.textContent = data.iv1m && data.iv3m ? `1M-3M Spread: ${(data.iv1m - data.iv3m).toFixed(1)}%` : '--';
@@ -562,20 +574,24 @@ function renderAtmIv(data) {
   elIv6m.textContent = data.iv6m ? `${data.iv6m.toFixed(1)}%` : '--%';
   elIv6mSub.textContent = data.iv3m && data.iv6m ? `3M-6M Spread: ${(data.iv3m - data.iv6m).toFixed(1)}%` : '--';
 
-  elIvCurveType.textContent = data.curveType || '--';
+  elIvCurveType.textContent = data.frontEvent ? `${data.curveType || '--'} · 近端事件` : (data.curveType || '--');
   elIvCurveSub.textContent = data.curveDesc || '--';
 
   elIvRegimeBadge.textContent = data.regimeTag;
-  if (data.extremeAlert) {
-    elIvRegimeBadge.className = 'card-badge badge-extreme';
-  } else {
-    elIvRegimeBadge.className = 'card-badge badge-normal';
-  }
+  elIvRegimeBadge.className = data.extremeAlert ? 'card-badge badge-extreme' : 'card-badge badge-normal';
 
-  if (data.percentile !== null) {
-    elIvPercentileLabel.textContent = `当前处于历史 ${data.percentile.toFixed(1)}% 分位 (近2年)`;
+  if (data.percentile !== null && data.percentile !== undefined) {
+    const dvolText = typeof data.dvolLatest === 'number' ? `DVOL ${data.dvolLatest.toFixed(1)} ` : '';
+    elIvPercentileLabel.textContent = `${dvolText}处于近 2 年 ${data.percentile.toFixed(1)}% 分位`;
     elIvGaugeFill.style.width = `${Math.min(100, Math.max(0, data.percentile))}%`;
+  } else {
+    elIvPercentileLabel.textContent = '缺少 DVOL 历史，无法评估分位';
+    elIvGaugeFill.style.width = '0%';
   }
+  const fmtVol = v => (typeof v === 'number' ? `${v.toFixed(1)}%` : '--');
+  setTextIfPresent('gauge-min', `Min: ${fmtVol(data.dvolMin)}`);
+  setTextIfPresent('gauge-med', `中位数: ${fmtVol(data.dvolMedian)}`);
+  setTextIfPresent('gauge-max', `Max: ${fmtVol(data.dvolMax)}`);
 
   const elIvExpectedMove = document.getElementById('iv-expected-move');
   const elIvStraddleSub = document.getElementById('iv-straddle-sub');
@@ -583,7 +599,7 @@ function renderAtmIv(data) {
     elIvExpectedMove.textContent = `日 ±${data.dailyExpectedMovePct}% | 周 ±${data.weeklyExpectedMovePct}%`;
   }
   if (elIvStraddleSub && data.atmStraddleEstPct) {
-    elIvStraddleSub.textContent = `1M 跨式平价约 ${data.atmStraddleEstPct}% (时间平方根估值)`;
+    elIvStraddleSub.textContent = `1M 跨式约 ${data.atmStraddleEstPct}% (365 日历日 √T 估值)`;
   }
 
   elIvNarrativeText.textContent = data.paragraph || '计算完成。';
@@ -597,6 +613,22 @@ function renderGex(data) {
 
   elGexRuleText.textContent = data.dynamicRuleDescription || '';
   elGexNarrativeText.textContent = data.paragraph || '';
+
+  const setGexValue = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = fmtGexMillions(v);
+    el.className = `m-value ${typeof v === 'number' ? (v >= 0 ? 'text-pos' : 'text-neg') : ''}`;
+  };
+  setGexValue('gex-total-all', data.totalAllGexM);
+  setGexValue('gex-total-near', data.totalNearGexM);
+  setGexValue('gex-total-focused', data.totalFocusedGexM);
+  setTextIfPresent('gex-near-label', `近端 ${data.nearTermDays || 10} 天净 GEX`);
+  setTextIfPresent('gex-regime-sub', data.marketMakerRegime ? data.marketMakerRegime.split('(')[0].trim() : '--');
+  setTextIfPresent('gex-flip', data.gammaFlip ? `$${Number(data.gammaFlip.strike).toLocaleString()}` : '未变号');
+  setTextIfPresent('gex-flip-sub', data.gammaFlip
+    ? `累计 GEX 由${data.gammaFlip.from > 0 ? '正' : '负'}转${data.gammaFlip.to > 0 ? '正' : '负'}${data.gammaFlip.farFromSpot ? ' · 距现货 >20%' : ''}`
+    : '累计 GEX 全区间同号');
 
   const list = currentGexMode === 'focused' ? data.focusedExpiries : data.allExpiries;
   if (!list || !list.length) {
@@ -641,7 +673,7 @@ function renderGex(data) {
 }
 
 /**
- * Render Module 4: IV Smile (微笑曲线)
+ * Render Module 4: IV Smile (25Δ RR / BF)
  */
 function renderIvSmile(data) {
   if (!data || data.status === 'insufficient_data') {
@@ -651,22 +683,24 @@ function renderIvSmile(data) {
 
   elSmileShapeBadge.textContent = data.skewShape ? data.skewShape.split('/')[0].trim() : '标准微笑';
   elSmileAtmIv.textContent = `${Number(data.atmIv || 0).toFixed(1)}%`;
-  elSmileAtmStrike.textContent = `行权价: $${data.atmStrike?.toLocaleString()}`;
+  elSmileAtmStrike.textContent = `ATM: $${data.atmStrike?.toLocaleString()}`;
 
-  elSmilePutWing.textContent = `+${Number(data.putWingPremium || 0).toFixed(1)}%`;
-  elSmilePutSub.textContent = `行权价: $${data.lowestStrike?.toLocaleString()} (IV: ${Number(data.lowestIv || 0).toFixed(1)}%)`;
+  elSmilePutWing.textContent = fmtSignedNum(data.putWingPremium, 1, '%');
+  elSmilePutSub.textContent = data.put25
+    ? `$${Number(data.put25.strike).toLocaleString()} (IV: ${Number(data.put25.iv).toFixed(1)}%)`
+    : '--';
 
-  elSmileCallWing.textContent = `+${Number(data.callWingPremium || 0).toFixed(1)}%`;
-  elSmileCallSub.textContent = `行权价: $${data.highestStrike?.toLocaleString()} (IV: ${Number(data.highestIv || 0).toFixed(1)}%)`;
+  elSmileCallWing.textContent = fmtSignedNum(data.callWingPremium, 1, '%');
+  elSmileCallSub.textContent = data.call25
+    ? `$${Number(data.call25.strike).toLocaleString()} (IV: ${Number(data.call25.iv).toFixed(1)}%)`
+    : '--';
 
-  const diff = Number(data.asymmetryDiff) || 0;
-  elSmileSmirkDiff.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
-  elSmileSmirkDesc.textContent = diff >= 0 ? 'Call 溢价高于 Put (追涨倾斜)' : 'Put 溢价高于 Call (避险倾斜)';
+  const rr = Number(data.rr25) || 0;
+  elSmileSmirkDiff.textContent = fmtSignedNum(rr, 1, '%');
+  elSmileSmirkDesc.textContent = rr >= 0 ? '25Δ Call 贵于 Put (追涨倾斜)' : '25Δ Put 贵于 Call (避险倾斜)';
 
-  const elSmileKurtosisVal = document.getElementById('smile-kurtosis-curv');
-  if (elSmileKurtosisVal && typeof data.smileCurvature === 'number') {
-    elSmileKurtosisVal.textContent = `+${data.smileCurvature.toFixed(1)}% IV`;
-  }
+  setTextIfPresent('smile-kurtosis-curv', fmtSignedNum(data.bf25, 1, '% IV'));
+  setTextIfPresent('smile-dist-title', `${data.underlying || '近月'}（剩 ${data.dte ?? '--'} 天）行权价 IV 梯度分布`);
 
   const strikes = data.strikes || [];
   if (strikes.length) {
@@ -716,18 +750,18 @@ function render25DeltaSkew(data) {
   formatSkewVal(elSkew180d, data.d180);
   formatSkewVal(elSkew365d, data.d365);
 
-  const elSkewRegimeName = document.getElementById('skew-regime-name');
-  const elSkewRegimeSub = document.getElementById('skew-regime-sub');
-  const elSkewRegimeBadge = document.getElementById('skew-regime-badge');
-  if (elSkewRegimeName && data.skewRegime) {
-    elSkewRegimeName.textContent = data.skewRegime.split('(')[0].trim();
-  }
-  if (elSkewRegimeSub && data.skewRegimeDesc) {
-    elSkewRegimeSub.textContent = data.skewRegimeDesc;
-  }
-  if (elSkewRegimeBadge && data.skewRegime) {
-    elSkewRegimeBadge.textContent = data.skewRegime.includes('Jump') ? '⚡ 状态异动' : (data.skewRegime.includes('Local') ? '📉 负相关主导' : '🎯 Sticky Delta');
-  }
+  const regimeBadge = {
+    sticky_delta: '🎯 黏性 Delta',
+    sticky_strike: '📌 黏性行权价',
+    sticky_local_vol: '⚖️ 局部波动率',
+    jumpy: '⚡ 跳跃波动率',
+    inverse: '🔄 反向联动',
+    insignificant: '… 联动不显著',
+    undetermined: '… 待判定'
+  };
+  setTextIfPresent('skew-regime-name', data.skewRegime ? data.skewRegime.split('(')[0].trim() : '--');
+  setTextIfPresent('skew-regime-sub', data.skewRegimeDesc || '--');
+  setTextIfPresent('skew-regime-badge', regimeBadge[data.skewRegimeKey] || '25D RR');
 
   elSkewNarrativeText.textContent = data.paragraph || '';
 }
