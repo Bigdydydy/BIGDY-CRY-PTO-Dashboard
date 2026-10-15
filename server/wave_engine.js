@@ -427,6 +427,42 @@
   ];
   const IMPULSE_ONLY_GUIDES = new Set(['G1', 'G2', 'G3', 'G4', 'G5']);
 
+  /**
+   * 楔形的收缩 / 扩张，两种口径:
+   *   浪长 (EWI 规则，按涨跌幅): 浪3 < 浪1 为收缩，否则扩张；其后浪4、浪5 须同向一致
+   *   通道 (柳玉冬口径「倾斜…不能扩散」): 1-3 线与 2-4 线收敛为收缩、发散为扩张 (需浪4 已出现)
+   * 浪2 回撤接近 100% 时起点落在通道之外，浪1 被量短，两种口径可能相反。
+   * 只有「浪长为扩张、通道收敛」算口径冲突 (通道支持楔形，柳玉冬口径可接受)；
+   * 通道近似平行判不出形状，听浪长；通道发散而浪长为收缩时，通道并不支持楔形，照常按浪长否决
+   */
+  const SHAPE_TXT = { contracting: '收缩', expanding: '扩张', parallel: '近似平行' };
+  function diagonalShape(g) {
+    const n = g.p.length;
+    const pct = [];
+    for (let k = 1; k < n; k++) pct.push(Math.abs(g.p[k].price / g.p[k - 1].price - 1));
+    const byLength = n >= 4 ? (pct[2] < pct[0] - EPS ? 'contracting' : 'expanding') : null;
+    let byChannel = null;
+    if (n >= 5) {
+      const s13 = (g.p[3].price - g.p[1].price) / Math.max(1, g.p[3].idx - g.p[1].idx);
+      const s24 = (g.p[4].price - g.p[2].price) / Math.max(1, g.p[4].idx - g.p[2].idx);
+      const scale = g.l[0] / Math.max(1, g.p[3].idx - g.p[0].idx);
+      const conv = (s24 - s13) * g.d;
+      byChannel = Math.abs(s24 - s13) <= 0.1 * scale ? 'parallel' : conv > 0 ? 'contracting' : 'expanding';
+    }
+    const retr2 = n >= 3 ? g.l[1] / g.l[0] : null;
+    return { pct, byLength, byChannel, conflict: byLength === 'expanding' && byChannel === 'contracting', retr2 };
+  }
+  function shapeRule(g, k, label) {
+    const sh = diagonalShape(g);
+    const contracting = sh.byLength === 'contracting';
+    const r = sh.pct[k] / sh.pct[k - 2];
+    const pass = contracting ? r < 1 + EPS : r > 1 - EPS;
+    const detail = `${SHAPE_TXT[sh.byLength]}（按浪长、涨跌幅）3/1=${(sh.pct[2] / sh.pct[0]).toFixed(2)} ${label}=${r.toFixed(2)}${sh.byChannel ? `；通道线 1-3 与 2-4 ${sh.byChannel === 'contracting' ? '收敛' : sh.byChannel === 'expanding' ? '发散' : '近似平行'}` : ''}`;
+    if (pass || !sh.conflict) return { pass, detail };
+    // 两种口径相反: 不一票否决，判存疑并说明
+    return { pass: false, doubt: true, detail: `${detail}——按浪长是${SHAPE_TXT[sh.byLength]}楔形，不满足；按通道线（柳玉冬「不能扩散」口径）是${SHAPE_TXT[sh.byChannel]}，两种口径相反，判存疑${sh.retr2 >= 0.85 ? `；浪2 回撤浪1 的 ${Math.round(100 * sh.retr2)}%，起点落在通道之外，浪1 被量短，起点位置可疑` : ''}` };
+  }
+
   const DIAGONAL_RULES = [
     rg('D1', C_PRICE, true, 'min', 5, 'P48（楔形反向）', '楔形浪4必须切入浪1价格区', 1,
       g => ({ pass: g.d * (g.p[4].price - g.p[1].price) <= EPS, detail: `浪4终点 ${fmtNum(g.p[4].price)} vs 浪1终点 ${fmtNum(g.p[1].price)}` })),
@@ -439,15 +475,9 @@
       }),
     // 收缩/扩散由浪3与浪1之比决定，其后各浪须同向一致 (EWI 列为楔形定义)
     rg('D3', C_PRICE, true, 'min', 5, '通用（EWI楔形条则）', '收缩楔形浪4<浪2、扩散楔形浪4>浪2（与浪3/浪1同向一致）', 1,
-      g => {
-        const contracting = g.l[2] < g.l[0];
-        return { pass: contracting ? g.l[3] < g.l[1] + EPS : g.l[3] > g.l[1] - EPS, detail: `${contracting ? '收缩' : '扩散'} 3/1=${(g.l[2] / g.l[0]).toFixed(2)} 4/2=${(g.l[3] / g.l[1]).toFixed(2)}` };
-      }),
+      g => shapeRule(g, 3, '4/2')),
     rg('D5', C_PRICE, true, 'min', 6, '通用（EWI楔形条则）', '收缩楔形浪5<浪3、扩散楔形浪5>浪3', 1,
-      g => {
-        const contracting = g.l[2] < g.l[0];
-        return { pass: contracting ? g.l[4] < g.l[2] + EPS : g.l[4] > g.l[2] - EPS, detail: `${contracting ? '收缩' : '扩散'} 5/3=${(g.l[4] / g.l[2]).toFixed(2)}` };
-      }),
+      g => shapeRule(g, 4, '5/3')),
     rg('D4', C_STRUCT, false, 'min', 4, '通用（EWI：引导楔形5-3-5-3-5或3-3-3-3-3；终结楔形3-3-3-3-3）', '楔形浪1/3/5结构须一致，且与所处位置相符', 2,
       (g, ev) => diagonalStructCheck(g, ev), { deferred: true })
   ];
@@ -1327,6 +1357,9 @@
       if (r.hard && !check.pass && !check.pending && !check.neutral && nearOK(r, g, ev)) {
         check.near = true;
         check.margin = +tolMargin(r, g).toFixed(4);
+      } else if (r.hard && !check.pass && !check.pending && !check.neutral && res.doubt) {
+        check.near = true;
+        check.margin = null; // 口径冲突，不是接近阈值
       }
       checks.push(check);
 
@@ -1350,7 +1383,7 @@
     for (const r of def.rules) {
       if (!r.hard || r.need !== n || r.struct || r.slow || r.manual) continue;
       const res = r.test(g, ev) || {};
-      if (res.pass === false && !(lastOpen && r.pending === 'min') && !nearOK(r, g, ev)) return { rule: r, res, g };
+      if (res.pass === false && !(lastOpen && r.pending === 'min') && !nearOK(r, g, ev) && !res.doubt) return { rule: r, res, g };
     }
     return null;
   }
@@ -1700,6 +1733,13 @@
     { ref: 2, r: [0.236, 0.382, 0.5], t: SAME_TIME(1), basis: 'G4 浪4常回撤浪3的0.236~0.5（P42）；用时不超过浪3的2倍（M8）', inv: { at: 1, text: '浪4进入浪1价格区则推动浪作废（I1）' } },
     { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'G5 浪5常为浪1的0.618/1/1.618倍（P96/P181）' }
   ];
+  // 扩张楔形: 各浪依次放大 (EWI：浪3 常约为浪1 的 1.618 倍，浪4 > 浪2，浪5 > 浪3)
+  const DIAGONAL_EXPANDING_PROJ = [null,
+    { ref: 0, r: [0.5, 0.66, 0.81], t: SAME_TIME(0), basis: 'DG1 楔形浪2常回撤浪1的0.66~0.81（EWI）', inv: { at: 0, text: '浪2越过浪1起点则计数作废（M1）' } },
+    { ref: 0, r: [1.1, 1.618, 2], t: SAME_TIME(0), basis: '扩张楔形浪3长于浪1，常约 1.618 倍（EWI）', beyond: { at: 1, text: '浪3须越过浪1终点（M3）' } },
+    { ref: 1, r: [1.05, 1.236, 1.5], t: SAME_TIME(1), basis: '扩张楔形浪4长于浪2（D3）；D1 浪4须进入浪1价格区', inv: { at: 2, text: '浪4触及浪2终点则计数作废（M4）' }, beyond: { at: 1, text: '楔形浪4须进入浪1价格区（D1）' } },
+    { ref: 2, r: [1.05, 1.236, 1.618], t: SAME_TIME(2), basis: '扩张楔形浪5长于浪3（D5），常止于 1-3 连线附近' }
+  ];
   const PROJ_SPECS = {
     IMPULSE: MOTIVE_PROJ,
     DIAGONAL: [null,
@@ -1747,7 +1787,15 @@
    * 返回 { waves: [{ label, running, start, zone, window, basis, inv, need, note }], path, invalidation } 或 null
    */
   function projectRemaining(type, pts, tfSec, running, now) {
-    const spec = PROJ_SPECS[type];
+    let spec = PROJ_SPECS[type];
+    // 楔形按形态选比率: 通道线已可判 (浪4 已出现) 时以通道为准 (与图上楔形一致)，否则按浪长 (浪3 是否长于浪1)
+    let shapeNote = null;
+    if (type === 'DIAGONAL' && pts.length >= 4) {
+      const sh = diagonalShape(mkGeom(pts));
+      const useShape = sh.conflict ? sh.byChannel : sh.byLength;
+      if (useShape === 'expanding') spec = DIAGONAL_EXPANDING_PROJ;
+      if (sh.conflict) shapeNote = `两种口径相反，按通道线（${SHAPE_TXT[sh.byChannel]}）推演`;
+    }
     const def = PATTERNS[type];
     if (!spec || pts.length < 2 || (!running && pts.length >= def.pts)) return null;
     const timeOf = p => p.tpos !== undefined ? p.time + (p.tpos - p.idx) * tfSec : p.time;
@@ -1799,7 +1847,7 @@
         label, running: isRun, start: { time: start.time, price: start.price },
         zone: { lo: Math.min(lo, hi), hi: Math.max(lo, hi), mid },
         window: { from: start.time + dur[0], mid: start.time + dur[1], to: start.time + dur[2] },
-        basis: sp.basis, inv, need, note
+        basis: sp.basis, inv, need, note: [note, k === firstLeg ? shapeNote : null].filter(Boolean).join('；') || null
       });
       // 中值衔接为下一段的起点
       const end = { price: mid, time: start.time + dur[1] };
@@ -1967,7 +2015,8 @@
       const all5 = odd.length >= 2 && odd.every(st => st.label === '5');
       const all3 = odd.length >= 2 && odd.every(st => st.label === '3');
       diagRole = all5 ? 'LEADING' : pos;
-      const shape = n >= 4 ? (g.l[2] < g.l[0] ? '收缩' : '扩散') : '';
+      const sh = diagonalShape(g);
+      const shape = sh.conflict || !sh.byLength ? '' : sh.byLength === 'contracting' ? '收缩' : '扩散';
       const base = diagRole === 'LEADING' ? '引导楔形' : diagRole === 'ENDING' ? '终结楔形' : '楔形';
       subtype = `${shape}${base}${all5 ? '（5-3-5-3-5）' : all3 ? '（3-3-3-3-3）' : ''}`;
       if (all5 && pos === 'ENDING') structNotes.push('5-3-5-3-5 只能是引导楔形，但所处位置像趋势末端');
@@ -3785,7 +3834,8 @@
       if (type === 'DIAGONAL') {
         // buildCandidate 已按结构与位置命名；用户画浪以所画各段的结构为准
         const role = sub.key === 'DIAGONAL_LEADING' ? 'LEADING' : diagonalRole(mkGeom(pts), evD);
-        const shape = pts.length >= 4 ? (Math.abs(pts[3].price - pts[2].price) < Math.abs(pts[1].price - pts[0].price) ? '收缩' : '扩散') : '';
+        const shU = diagonalShape(mkGeom(pts));
+        const shape = shU.conflict || !shU.byLength ? '' : shU.byLength === 'contracting' ? '收缩' : '扩散';
         const nm = `${shape}${role === 'LEADING' ? '引导楔形' : role === 'ENDING' ? '终结楔形' : '楔形'}${sub.key === 'DIAGONAL_LEADING' ? '（5-3-5-3-5）' : '（3-3-3-3-3）'}`;
         drawnCand.name = drawnCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
         if (liveCand) liveCand.name = liveCand.name.replace(/^.+?（(?=上升|下跌)/, nm + '（');
@@ -3863,7 +3913,8 @@
     const doubts = [];
     primary.legs.filter(L => L.severity === 'medium').forEach(L => doubts.push(L.text));
     endpointIssues.forEach(x => doubts.push(x.text));
-    primary.nearFails.forEach(f => doubts.push(`接近阈值：${f.text}（手稿${f.page}）：${f.detail}，只差阈值的 ${(100 * f.margin).toFixed(1)}%，在容差带（${Math.round(100 * tolBand)}%）内判存疑而不否决`));
+    primary.nearFails.filter(f => f.margin == null).forEach(f => doubts.push(`形态口径冲突：${f.text}：${f.detail}`));
+    primary.nearFails.filter(f => f.margin != null).forEach(f => doubts.push(`接近阈值：${f.text}（手稿${f.page}）：${f.detail}，只差阈值的 ${(100 * f.margin).toFixed(1)}%，在容差带（${Math.round(100 * tolBand)}%）内判存疑而不否决`));
     if (preceding && preceding.warning) doubts.push(preceding.text);
     if (live.extension && !primary.liveHardFails.length) {
       doubts.push(`你标的终点 ${fmtNum(live.extension.fromPrice)} 之后价格已${pts[n - 1].type === 'high' ? '涨' : '跌'}到 ${fmtNum(live.extension.toPrice)}：末浪尚未在你标的位置结束，终点应后移`);
@@ -3914,6 +3965,24 @@
     const liuSignals = lp.length >= 3 ? buildLiuSignals(slice, lp, ev) : null;
     const side = price => price < currentPrice ? '跌破' : '涨破';
     const invalidation = {};
+    // 楔形的 2-4 通道线 (柳玉冬「冲破通道上轨就破除引导楔形」): 浪5 运行中，价格越回 2-4 线另一侧
+    //   浪5 尚未越过浪3 终点 → 楔形不成立 (或浪5 失败)；已越过 → 越回 2-4 线确认楔形完成
+    if (primary.type === 'DIAGONAL' && lp.length === 6 && verdict !== 'INVALID') {
+      const q2 = lp[2], q4 = lp[4], q3 = lp[3], q5 = lp[5];
+      const slope = (q4.price - q2.price) / Math.max(1, q4.idx - q2.idx);
+      const at = idx => q2.price + slope * (idx - q2.idx);
+      const nowIdx = lastBar, nowPrice = at(nowIdx);
+      const dirD = Math.sign(pts[1].price - pts[0].price) || 1;
+      const beyond3 = dirD * (q5.price - q3.price) > 0;
+      const sideTxt = dirD < 0 ? '涨破' : '跌破';
+      invalidation.channel = {
+        price: nowPrice, from: { time: q2.time, price: q2.price }, through: { time: q4.time, price: q4.price },
+        slopePerBar: slope, tfSec,
+        text: `2-4 通道线（${fmtNum(q2.price)} → ${fmtNum(q4.price)} 连线，当前约 ${fmtNum(nowPrice)}）：${beyond3
+          ? `浪5 已越过浪3 终点，${sideTxt}此线确认楔形完成、反转开始`
+          : `浪5 尚未越过浪3 终点 ${fmtNum(q3.price)}，若先${sideTxt}此线则楔形不成立（或为失败浪5）`}`
+      };
+    }
     if (cand.monitoringPivot) {
       const mp = cand.monitoringPivot;
       const sd = side(mp.price);
@@ -3990,6 +4059,7 @@
     // 已被铁律否决的计数不再给监测点；已被证伪的计数不再给其结构防线
     if (invalidation.monitor && verdict !== 'INVALID') lines.push(invalidation.monitor.text);
     if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
+    if (invalidation.channel) lines.push(invalidation.channel.text);
     const tgts = (cand.targets || []).slice(0, 3);
     if (tgts.length && verdict !== 'INVALID' && verdict !== 'FALSIFIED_SUB') lines.push(`目标：${tgts.map(t => `${fmtNum(t.price)}（${t.label}）`).join('；')}`);
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
@@ -4509,6 +4579,7 @@
     evaluateUserSketch,
     buildSketchTree,
     countSnapshot,
+    diagonalShape,
     diffEvaluation,
     suggestCounts,
     projectRemaining,
