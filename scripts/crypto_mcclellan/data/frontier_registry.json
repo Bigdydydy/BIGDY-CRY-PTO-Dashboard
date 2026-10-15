@@ -713,6 +713,13 @@
   "last_qualified": "2026-10-05",
   "symbol": "PAWS"
  },
+ "robinhood:0x351f65928a40657c31f51bb543f8bb3844d123fa": {
+  "address": "0x351f65928a40657c31f51bb543f8bb3844d123fa",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-15",
+  "last_qualified": "2026-10-15",
+  "symbol": "VRAX"
+ },
  "robinhood:0x370dd1181288392843bf52d998eb85c735d91688": {
   "address": "0x370dd1181288392843bf52d998eb85c735d91688",
   "chain": "robinhood",
@@ -1244,6 +1251,13 @@
   "first_qualified": "2026-10-08",
   "last_qualified": "2026-10-10",
   "symbol": "CRH"
+ },
+ "robinhood:0xd7814b24b031bb0b6c5d68d64c36c8d72c0e5b07": {
+  "address": "0xd7814b24b031bb0b6c5d68d64c36c8d72c0e5b07",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-15",
+  "last_qualified": "2026-10-15",
+  "symbol": "PAPER"
  },
  "robinhood:0xd8098154e30f9f4ee5a411d294f65fe2d6e01e18": {
   "address": "0xd8098154e30f9f4ee5a411d294f65fe2d6e01e18",
@@ -1809,7 +1823,7 @@
   "address": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP",
   "chain": "solana",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-06",
+  "last_qualified": "2026-10-15",
   "symbol": "SI"
  },
  "solana:DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump": {
