@@ -3643,18 +3643,34 @@
     };
   }
 
-  /** 前序检验: 被调整的前一段 (主周期 Zigzag 上 p0 之前最近的反向拐点 → p0) */
-  function precedingSwing(bars, i0, p0) {
+  /**
+   * 前序检验: 被调整的前一段 (同级别)。
+   * ownBars: 本调整的用时 (根数)。从 p0 往回，在「干净」的前序段中 (起点是该区间的极值、p0 一路保持为极值)
+   * 取第一段用时不少于本调整 1/3 的；原先只取最近的反向拐点，常常拿到低一级的小段
+   * (BTC 2026-09-22 起的调整被拿去比浪V 内部 81,697→87,385 的小段，误报「收复 124%」)。都不够格时退回最近的反向拐点
+   */
+  function precedingSwing(bars, i0, p0, ownBars) {
     const from = Math.max(0, i0 - 300);
     const seg = bars.slice(from, i0 + 1);
     if (seg.length < 10) return null;
     const pv = zigzagPivots(seg, 2 * (avgTR(seg) || 0));
+    const top = p0.type === 'high';
+    const out = q => ({ price: q.price, time: q.time, type: q.type, length: Math.abs(p0.price - q.price), bars: seg.length - 1 - q.idx });
+    let nearest = null;
+    let sideExt = null; // 已走过的区间里，与前序起点同侧的极值 (候选须比它更极端)
     for (let k = pv.length - 1; k >= 0; k--) {
-      if (pv[k].type !== p0.type && pv[k].idx < seg.length - 1) {
-        return { price: pv[k].price, time: pv[k].time, type: pv[k].type, length: Math.abs(p0.price - pv[k].price) };
+      const q = pv[k];
+      if (q.idx >= seg.length - 1) continue;
+      if (q.type === p0.type) {
+        if (top ? q.price > p0.price : q.price < p0.price) break; // p0 不再是极值，更早的段不连贯
+        continue;
       }
+      if (!nearest) nearest = q;
+      const clean = sideExt === null || (top ? q.price < sideExt : q.price > sideExt);
+      if (clean && (!(ownBars > 0) || seg.length - 1 - q.idx >= ownBars / 3)) return out(q);
+      if (sideExt === null || (top ? q.price < sideExt : q.price > sideExt)) sideExt = q.price;
     }
-    return null;
+    return nearest ? out(nearest) : null;
   }
 
   /**
@@ -3880,12 +3896,13 @@
     alternatives.sort((a, b) => (PATTERNS[a.type].pts - PATTERNS[b.type].pts) || rank(a, b));
 
     // 前序: 调整浪不得收复被调整的前一段
-    const prev = precedingSwing(bars, i0Full, Object.assign({}, pts[0], { idx: i0Full }));
+    const dPrev = pts[1].price > pts[0].price ? 1 : -1;
+    let farPt = lp[0];
+    for (const q of lp) if (dPrev * (q.price - farPt.price) > 0) farPt = q;
+    const prev = precedingSwing(bars, i0Full, Object.assign({}, pts[0], { idx: i0Full }), farPt.idx - pts[0].idx);
     let preceding = null;
     if (prev && prev.length > 0) {
-      const d = pts[1].price > pts[0].price ? 1 : -1;
-      let far = pts[0].price;
-      for (const q of lp) if (d * (q.price - far) > 0) far = q.price;
+      const far = farPt.price;
       const ratio = Math.abs(far - pts[0].price) / prev.length;
       const corrective = PATTERNS[primary.type].category !== '驱动浪';
       preceding = {
@@ -3965,6 +3982,22 @@
     const liuSignals = lp.length >= 3 ? buildLiuSignals(slice, lp, ev) : null;
     const side = price => price < currentPrice ? '跌破' : '涨破';
     const invalidation = {};
+    // 楔形浪4 运行中: 浪4 须短于浪2 (收缩楔形 D3；2-4 线不与 1-3 线发散，柳玉冬「引导楔形不能扩散」)
+    //   BTC 2026-10-10 柳玉冬「冲破 85172 … 破除下降引导楔形的可能性」即此价位 (浪3 终点 + 浪2 长度)
+    if (primary.type === 'DIAGONAL' && lp.length === 5 && verdict !== 'INVALID') {
+      const dirD = Math.sign(pts[1].price - pts[0].price) || 1;
+      const l2 = Math.abs(lp[2].price - lp[1].price);
+      const limit = lp[3].price - dirD * l2;
+      const sideTxt = dirD < 0 ? '涨破' : '跌破';
+      const expandingByLength = diagonalShape(mkGeom(lp.slice(0, 4))).byLength === 'expanding';
+      const head = `楔形浪4 ${fmtNum(limit)}（浪3 终点 ${fmtNum(lp[3].price)} ${dirD < 0 ? '+' : '−'} 浪2 长度 ${fmtNum(l2)}）：`;
+      invalidation.diagLimit = {
+        price: limit, expandingByLength,
+        text: head + (expandingByLength
+          ? `浪3 长于浪1，按 EWI 是扩张楔形，要求浪4 ${sideTxt}此价（浪4 > 浪2）；按柳玉冬「引导楔形不能扩散」，${sideTxt}此价即否定引导楔形——两种口径在此价分歧`
+          : `收缩楔形浪4 须短于浪2（D3），${sideTxt}此价则 2-4 线与 1-3 线发散，楔形不成立`)
+      };
+    }
     // 楔形的 2-4 通道线 (柳玉冬「冲破通道上轨就破除引导楔形」): 浪5 运行中，价格越回 2-4 线另一侧
     //   浪5 尚未越过浪3 终点 → 楔形不成立 (或浪5 失败)；已越过 → 越回 2-4 线确认楔形完成
     if (primary.type === 'DIAGONAL' && lp.length === 6 && verdict !== 'INVALID') {
@@ -4060,6 +4093,7 @@
     if (invalidation.monitor && verdict !== 'INVALID') lines.push(invalidation.monitor.text);
     if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
     if (invalidation.channel) lines.push(invalidation.channel.text);
+    if (invalidation.diagLimit) lines.push(invalidation.diagLimit.text);
     const tgts = (cand.targets || []).slice(0, 3);
     if (tgts.length && verdict !== 'INVALID' && verdict !== 'FALSIFIED_SUB') lines.push(`目标：${tgts.map(t => `${fmtNum(t.price)}（${t.label}）`).join('；')}`);
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
