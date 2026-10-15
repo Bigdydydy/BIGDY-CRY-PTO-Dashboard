@@ -1421,9 +1421,9 @@
               <div class="gauge-bar-fill" id="iv-gauge-fill" style="width: 0%;"></div>
             </div>
             <div class="gauge-scale-legend">
-              <span id="gauge-min">Min: 33.8%</span>
-              <span id="gauge-med">中位数: 48.5%</span>
-              <span id="gauge-max">Max: 82.6%</span>
+              <span id="gauge-min">Min: --</span>
+              <span id="gauge-med">中位数: --</span>
+              <span id="gauge-max">Max: --</span>
             </div>
           </div>
 
@@ -1457,12 +1457,12 @@
               <span class="m-sub" id="smile-atm-strike">ATM: $--</span>
             </div>
             <div class="metric-pill-box">
-              <span class="m-label">左翼 Put 溢价</span>
+              <span class="m-label">25Δ Put 溢价</span>
               <span class="m-value text-neg" id="smile-put-wing">--%</span>
               <span class="m-sub" id="smile-put-sub">--</span>
             </div>
             <div class="metric-pill-box">
-              <span class="m-label">右翼 Call 溢价</span>
+              <span class="m-label">25Δ Call 溢价</span>
               <span class="m-value text-pos" id="smile-call-wing">--%</span>
               <span class="m-sub" id="smile-call-sub">--</span>
             </div>
@@ -1470,20 +1470,20 @@
 
           <div class="metrics-row" style="margin-top: 6px;">
             <div class="metric-pill-box">
-              <span class="m-label">偏度不对称性 (Smirk)</span>
+              <span class="m-label">25Δ 风险逆转 (RR = Call − Put)</span>
               <span class="m-value" id="smile-smirk-diff">--</span>
               <span class="m-sub" id="smile-smirk-desc">--</span>
             </div>
             <div class="metric-pill-box">
-              <span class="m-label">四阶峰度 / 肥尾 (Kurtosis)</span>
-              <span class="m-value text-accent" id="smile-kurtosis-curv">+--% IV</span>
-              <span class="m-sub">两翼较平值凸起 (Volga 敏感)</span>
+              <span class="m-label">25Δ 蝶式 / 肥尾 (BF)</span>
+              <span class="m-value text-accent" id="smile-kurtosis-curv">--</span>
+              <span class="m-sub" id="smile-kurtosis-sub">25Δ 两翼均值 − ATM (Volga 敏感)</span>
             </div>
           </div>
 
           <div class="smile-distribution-container">
             <div class="distribution-header">
-              <span>1M 期限行权价 IV 梯度分布 (BTC-1M)</span>
+              <span id="smile-dist-title">近月行权价 IV 梯度分布</span>
             </div>
             <div class="strikes-iv-strip" id="strikes-strip-container">
               <div class="loading-placeholder">加载行权价偏度中...</div>
@@ -1580,7 +1580,30 @@
       <div class="card-body">
         <div class="rule-banner">
           <span>⚙️</span>
-          <span id="gex-rule-text">动态交割期算法已激活：自动锁定当月月底、季度末及年底交割，过滤非当月普通到期。</span>
+          <span id="gex-rule-text">动态交割期算法已激活：卡片聚焦月底、季末及年底交割；Gamma 体制按全部到期日合计判定。</span>
+        </div>
+
+        <div class="metrics-row" id="gex-summary-row">
+          <div class="metric-pill-box">
+            <span class="m-label">全部到期净 GEX</span>
+            <span class="m-value" id="gex-total-all">--</span>
+            <span class="m-sub" id="gex-regime-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label" id="gex-near-label">近端到期净 GEX</span>
+            <span class="m-value" id="gex-total-near">--</span>
+            <span class="m-sub">Gamma 最大，主导近期对冲流</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">主力交割净 GEX</span>
+            <span class="m-value" id="gex-total-focused">--</span>
+            <span class="m-sub">月底 / 季末 / 年底</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">零 Gamma 翻转位 (近似)</span>
+            <span class="m-value text-accent" id="gex-flip">--</span>
+            <span class="m-sub" id="gex-flip-sub">按行权价累计 GEX 变号</span>
+          </div>
         </div>
 
         <div class="gex-cards-grid" id="gex-cards-container">

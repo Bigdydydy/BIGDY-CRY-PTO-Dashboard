@@ -26,6 +26,7 @@ describe('Module 1: ATM IV & Percentile Engine', () => {
   ];
 
   const mockDvolStats = {
+    latest: 52.0,
     count: 730,
     min: 35.0,
     max: 95.0,
@@ -56,7 +57,8 @@ describe('Module 1: ATM IV & Percentile Engine', () => {
       }
     ];
 
-    const result = analyzeAtmIv(lowIvHistory, mockDvolStats);
+    // 分位按 DVOL 自身口径：最新 DVOL 低于历史最小值时分位为 0
+    const result = analyzeAtmIv(lowIvHistory, { ...mockDvolStats, latest: 30.0 });
     assert.equal(result.percentile, 0, 'percentile should strictly be 0, not null or undefined');
     assert.equal(result.regime, 'Extreme Low');
     assert.ok(!result.paragraph.includes('undefined%'), 'narrative text must not contain undefined%');
@@ -67,7 +69,7 @@ describe('Module 1: ATM IV & Percentile Engine', () => {
     const result = analyzeAtmIv(mockIvHistory, null);
     assert.equal(result.percentile, null);
     assert.ok(!result.paragraph.includes('undefined%'));
-    assert.ok(result.paragraph.includes('参考常模'));
+    assert.ok(result.paragraph.includes('缺少 DVOL 历史分布'));
     assert.equal(result.isRealtime, false);
   });
 

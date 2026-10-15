@@ -27,6 +27,7 @@ const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
 const optionOiHistory = require('./option_oi_history');
 const blockInsight = require('./block_insight');
+const volSurfaceHistory = require('./vol_surface_history');
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
@@ -451,8 +452,13 @@ async function handleApiRequest(req, res, parsedUrl) {
       blockAnalysis.timeRange = timeRangeParam;
       blockAnalysis.activeTradesCount = activeTrades.length;
       blockAnalysis.tradeStoreStats = data.tradeStoreStats || null;
-      const smileAnalysis = analyzeIvSmile(data.ivSkewMonth, spotPrice);
-      const skewAnalysis = analyze25DeltaSkew(data.skewChart);
+      const smileAnalysis = analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date());
+      const skewAnalysis = analyze25DeltaSkew(data.skewChart, {
+        atm: atmAnalysis,
+        dvolStats: data.dvolStats,
+        history: volSurfaceHistory.getHistory()
+      });
+      volSurfaceHistory.recordSnapshot({ atm: atmAnalysis, smile: smileAnalysis, skew: skewAnalysis, spot: spotPrice });
 
       const payload = {
         code: 0,

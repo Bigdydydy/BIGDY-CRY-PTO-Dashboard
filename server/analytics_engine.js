@@ -153,8 +153,115 @@ function formatDeribitExpiry(date) {
 }
 
 /**
- * Module 1: ATM IV Term Structure & Intelligent Extreme Range Evaluation
- * Enhanced with real-time atmData feed across maturities and smooth fallback to ivHistory
+ * 加密资产 24/7 交易：年化按 365 个日历日，日波动 = 年化 / √365 ≈ 年化 / 19.1。
+ * Natenberg 的 σ/16 对应股票一年约 256 个交易日，直接搬到 BTC 会把日振幅高估约 19%。
+ */
+const CRYPTO_DAYS_PER_YEAR = 365;
+const FRONT_EVENT_MAX_DTE = 7;          // 只在一周内到期的合约里找事件溢价
+const FRONT_EVENT_MIN_DTE = 1;          // 不足 1 天的合约 IV 受离散报价噪声主导，跳空拆分公式也要求 T ≥ 1 天
+const FRONT_EVENT_MIN_PREMIUM = 5;      // 近端 IV 高出扩散基准 ≥5 个波动率点才视为事件定价
+const VRP_CHEAP_MAX = 1;                // IV − HV30 ≤ +1 点：期权相对已实现波动不贵
+const VRP_RICH_MIN = 3;                 // IV − HV30 ≥ +3 点：期权相对已实现波动明显溢价
+
+/** 经验分位 (≤ 当前值的样本占比)，0~100 */
+function percentileOf(series, value) {
+  if (!Array.isArray(series) || !series.length || !Number.isFinite(value)) return null;
+  return series.filter(v => v <= value).length / series.length * 100;
+}
+
+/**
+ * 按总方差 (σ²·T) 对期限线性插值 (Bennett 加性方差法则)，而不是直接对 IV 线性插值。
+ * points: 按 dte 升序的 [{ dte, iv }]
+ */
+function interpolateTotalVariance(points, targetDte) {
+  if (!points.length) return null;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (targetDte <= first.dte) return first.iv;
+  if (targetDte >= last.dte) return last.iv;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    if (targetDte < p1.dte || targetDte > p2.dte) continue;
+    if (p2.dte === p1.dte) return p1.iv;
+    const weight = (targetDte - p1.dte) / (p2.dte - p1.dte);
+    const w1 = p1.iv * p1.iv * p1.dte;
+    const w2 = p2.iv * p2.iv * p2.dte;
+    const w = w1 + weight * (w2 - w1);
+    const iv = w > 0 ? Math.sqrt(w / targetDte) : p1.iv + weight * (p2.iv - p1.iv);
+    return Number(iv.toFixed(2));
+  }
+  return last.iv;
+}
+
+/** 两个期限之间的远期波动率 √((σ2²T2 − σ1²T1)/(T2 − T1))；总方差倒挂时返回 null */
+function forwardVol(p1, p2) {
+  if (!p1 || !p2 || p2.dte <= p1.dte) return null;
+  const fwdVar = (p2.iv * p2.iv * p2.dte - p1.iv * p1.iv * p1.dte) / (p2.dte - p1.dte);
+  return fwdVar > 0 ? Math.sqrt(fwdVar) : null;
+}
+
+/**
+ * 近端事件溢价 (Bennett Ch5 跳空波动率提取)：σ_T²·T = σ_J² + σ_D²·(T − 1)，T 以天计。
+ * 扩散基准 σ_D 取一周以后前两个期限之间的远期波动率 (事件之后的平滑扩散)，取不到时用 1M ATM。
+ * 事件日期望绝对涨跌幅 E|e^r − 1| = e^{σ_J²/2}·[2N(σ_J) − 1]。
+ */
+function detectFrontEvent(termPoints, iv1m) {
+  if (!Array.isArray(termPoints) || !termPoints.length) return null;
+  const front = termPoints.filter(p => p.dte >= FRONT_EVENT_MIN_DTE && p.dte <= FRONT_EVENT_MAX_DTE);
+  if (!front.length) return null;
+  const after = termPoints.filter(p => p.dte > FRONT_EVENT_MAX_DTE);
+  let baseIv = after.length >= 2 ? forwardVol(after[0], after[1]) : null;
+  let baseSource = '一周后两期限间远期波动率';
+  if (!Number.isFinite(baseIv)) {
+    baseIv = iv1m;
+    baseSource = '1M ATM';
+  }
+  if (!Number.isFinite(baseIv)) return null;
+
+  const peak = front.reduce((a, b) => (b.iv > a.iv ? b : a));
+  const premium = peak.iv - baseIv;
+  if (premium < FRONT_EVENT_MIN_PREMIUM) return null;
+
+  const T = peak.dte;
+  const s = peak.iv / 100;
+  const d = baseIv / 100;
+  const jumpVar = (s * s * T - d * d * Math.max(T - 1, 0)) / CRYPTO_DAYS_PER_YEAR;
+  if (!(jumpVar > 0)) return null;
+  const sj = Math.sqrt(jumpVar);
+  const expectedAbsMovePct = Math.exp(jumpVar / 2) * (2 * cnd(sj) - 1) * 100;
+  const normalDayAbsMovePct = Math.sqrt(2 / Math.PI) * d / Math.sqrt(CRYPTO_DAYS_PER_YEAR) * 100;
+
+  return {
+    expiry: peak.expiry,
+    dte: peak.dte,
+    iv: peak.iv,
+    baseIv: Number(baseIv.toFixed(2)),
+    baseSource,
+    premium: Number(premium.toFixed(2)),
+    jumpStdPct: Number((sj * 100).toFixed(2)),
+    expectedAbsMovePct: Number(expectedAbsMovePct.toFixed(2)),
+    normalDayAbsMovePct: Number(normalDayAbsMovePct.toFixed(2))
+  };
+}
+
+/** Greeks.live iv_history 最新一行的已实现波动率期限 { 7: hv, 30: hv, ... } */
+function latestHvTerm(ivHistory) {
+  if (!Array.isArray(ivHistory) || !ivHistory.length) return null;
+  const rows = ivHistory[ivHistory.length - 1]?.data;
+  if (!Array.isArray(rows)) return null;
+  const out = {};
+  for (const r of rows) {
+    if (r && Number.isFinite(r.day) && Number.isFinite(r.hv)) out[r.day] = r.hv;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Module 1: ATM IV Term Structure & Volatility Valuation
+ * - 分位：DVOL 与 DVOL 自身 2 年历史比较 (DVOL 为 VIX 式 30D 方差口径，结构性高于 ATM，不能拿 ATM 去比)
+ * - 贵贱：隐含 vs 已实现 (VRP = 1M ATM − HV30)，Natenberg Ch4/14、Bennett Ch3
+ * - 振幅：√365 年化；近端事件溢价单独提取
  */
 function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
   let iv1m = null;
@@ -165,7 +272,7 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
   let termPoints = [];
   let isRealtime = false;
 
-  // 1. Try extracting real-time ATM IVs across maturities from live atmData
+  // 1. 实时各期限 ATM IV (atm_data)
   if (Array.isArray(atmData) && atmData.length > 0) {
     const rawPoints = [];
     for (const expItem of atmData) {
@@ -176,7 +283,6 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
         if (typeof expItem.atm_index === 'number' && list[expItem.atm_index]) {
           atmObj = list[expItem.atm_index];
         } else {
-          // Find strike with delta closest to 0.50
           atmObj = list.reduce((best, cur) => {
             if (!best) return cur;
             const diffCur = Math.abs((cur.delta || 0.5) - 0.5);
@@ -186,9 +292,10 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
         }
       }
 
-      const dte = (typeof expItem.day === 'number' && expItem.day > 0)
-        ? expItem.day
-        : (expItem.hour ? Number((expItem.hour / 24).toFixed(2)) : 0);
+      // 优先用剩余小时数，近端合约 (<1 天) 的期限精度决定事件溢价能否算准
+      const dte = (typeof expItem.hour === 'number' && expItem.hour > 0)
+        ? Number((expItem.hour / 24).toFixed(3))
+        : ((typeof expItem.day === 'number' && expItem.day > 0) ? expItem.day : 0);
 
       if (atmObj && typeof atmObj.iv === 'number' && dte > 0) {
         rawPoints.push({
@@ -205,32 +312,16 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
     if (rawPoints.length >= 2) {
       rawPoints.sort((a, b) => a.dte - b.dte);
       termPoints = rawPoints;
-
-      function interpolateDte(targetDte) {
-        if (targetDte <= rawPoints[0].dte) return rawPoints[0].iv;
-        if (targetDte >= rawPoints[rawPoints.length - 1].dte) return rawPoints[rawPoints.length - 1].iv;
-        for (let i = 0; i < rawPoints.length - 1; i++) {
-          const p1 = rawPoints[i];
-          const p2 = rawPoints[i + 1];
-          if (targetDte >= p1.dte && targetDte <= p2.dte) {
-            if (p2.dte === p1.dte) return p1.iv;
-            const weight = (targetDte - p1.dte) / (p2.dte - p1.dte);
-            return Number((p1.iv + weight * (p2.iv - p1.iv)).toFixed(2));
-          }
-        }
-        return rawPoints[rawPoints.length - 1].iv;
-      }
-
-      iv1m = interpolateDte(30);
-      iv2m = interpolateDte(60);
-      iv3m = interpolateDte(90);
-      iv6m = interpolateDte(180);
-      iv1y = interpolateDte(365);
+      iv1m = interpolateTotalVariance(rawPoints, 30);
+      iv2m = interpolateTotalVariance(rawPoints, 60);
+      iv3m = interpolateTotalVariance(rawPoints, 90);
+      iv6m = interpolateTotalVariance(rawPoints, 180);
+      iv1y = interpolateTotalVariance(rawPoints, 365);
       isRealtime = true;
     }
   }
 
-  // 2. Fallback to ivHistory if atmData is unavailable
+  // 2. 回退到 iv_history 最新行
   if (iv1m === null) {
     if (!ivHistory || !ivHistory.length) {
       return {
@@ -264,66 +355,77 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
     }
   }
 
-  let percentile = null;
+  const frontEvent = detectFrontEvent(termPoints, iv1m);
+  if (frontEvent) {
+    curveDesc = `一周内事件倒挂 + 1M 起${curveDesc}`;
+  }
+
+  // √T 法则 (加密 365 日历日)：日 = σ/√365，周 = σ/√52
+  const ivForMove = iv1m || 35.0;
+  const dailyExpectedMovePct = Number((ivForMove / Math.sqrt(CRYPTO_DAYS_PER_YEAR)).toFixed(2));
+  const weeklyExpectedMovePct = Number((ivForMove / Math.sqrt(52)).toFixed(2));
+  // ATM 跨式 ≈ 0.8·σ·√T (Bennett：单腿 ≈ 0.4·σ·√T)
+  const atmStraddleEstPct = Number((0.8 * (ivForMove / 100.0) * Math.sqrt(30 / CRYPTO_DAYS_PER_YEAR) * 100).toFixed(2));
+
+  // 已实现波动率与方差风险溢价
+  const hvTerm = latestHvTerm(ivHistory);
+  const hv30 = hvTerm && Number.isFinite(hvTerm[30]) ? hvTerm[30] : null;
+  const vrp30 = (hv30 !== null && Number.isFinite(iv1m)) ? Number((iv1m - hv30).toFixed(2)) : null;
+
+  // DVOL 与自身历史比较
+  const dvolLatest = Number.isFinite(dvolStats?.latest) ? dvolStats.latest : null;
+  const percentileRaw = dvolLatest !== null ? percentileOf(dvolStats.historicalSeries, dvolLatest) : null;
+
   let regime = 'Normal';
   let regimeTag = '历史合理区间';
   let extremeAlert = false;
   let recommendation = '';
+  let volView = 'neutral';
 
-  // Square Root of Time Rule (Natenberg Ch 4 / Bossu Ch 1): Daily vol = Annual vol / 16
-  const dailyExpectedMovePct = Number(((iv1m || 35.0) / 16.0).toFixed(2));
-  const weeklyExpectedMovePct = Number(((iv1m || 35.0) / 7.2).toFixed(2));
-  const atmStraddleEstPct = Number((0.8 * ((iv1m || 35.0) / 100.0) * Math.sqrt(30 / 365) * 100).toFixed(2));
+  const vrpText = vrp30 === null
+    ? '已实现波动率缺失，无法判断隐含相对已实现的贵贱'
+    : `1M ATM ${iv1m.toFixed(1)}% 对 HV30 ${hv30.toFixed(1)}%，方差风险溢价 VRP ${vrp30 >= 0 ? '+' : ''}${vrp30.toFixed(1)} 点`;
 
-  if (dvolStats && dvolStats.historicalSeries && dvolStats.historicalSeries.length) {
-    const series = dvolStats.historicalSeries;
-    const countBelow = series.filter(v => v <= iv1m).length;
-    percentile = (countBelow / series.length) * 100;
+  if (percentileRaw !== null) {
+    const pct = percentileRaw;
+    if (pct <= 5) { regime = 'Extreme Low'; regimeTag = '🚨 DVOL 历史极端低位'; extremeAlert = true; }
+    else if (pct <= 20) { regime = 'Low Volatility'; regimeTag = '📉 DVOL 偏低压缩区间'; }
+    else if (pct >= 90) { regime = 'Extreme High'; regimeTag = '🔥 DVOL 历史极端高位'; extremeAlert = true; }
+    else if (pct >= 75) { regime = 'High Volatility'; regimeTag = '📈 DVOL 偏高溢价区间'; }
+    else { regime = 'Normal'; regimeTag = '⚖️ DVOL 历史中性区间'; }
 
-    if (percentile <= 5) {
-      regime = 'Extreme Low';
-      regimeTag = '🚨 历史极端低估区间';
-      extremeAlert = true;
-      recommendation = `【时间平方根法则】当前 1M IV (${iv1m?.toFixed(1)}%) 隐含日预期波动仅 ±${dailyExpectedMovePct}%（周预期 ±${weeklyExpectedMovePct}%），处于历史极值底部。此时做空波动率的单位风险收益优势 (Vega/Edge) 极差，无谓承担无法对冲的隔夜跳空缺口风险 (Gap Risk)；建议关注变盘窗口的 Long Gamma、买入平值跨式/宽跨式 (Straddle/Strangle) 或做多远期波动率的日历价差 (Calendar Spread)。`;
-    } else if (percentile <= 20) {
-      regime = 'Low Volatility';
-      regimeTag = '📉 偏低压缩区间';
-      recommendation = `波动率处于偏低分位（日预期波动 ±${dailyExpectedMovePct}%），市场处于低波盘整期。期权买方保护成本较为便宜，适合以借方价差 (Debit Spread) 替代单腿期权构建不对称下行保护或现货替代。`;
-    } else if (percentile >= 90) {
-      regime = 'Extreme High';
-      regimeTag = '🔥 历史极端高估区间';
-      extremeAlert = true;
-      recommendation = `【方差溢价高企】当前 1M IV 隐含日均波动高达 ±${dailyExpectedMovePct}%。做空波动率在经济学实质上等价于承担股权风险溢价 (Equity Risk Premium)；此时可构建完全锁定尾部风险的对称蝶式 (Butterfly) 或宽幅铁鹰 (Iron Condor)，在收割丰厚 Theta 现金流的同时，彻底封死单边无限暴亏的尾部敞口。`;
-    } else if (percentile >= 75) {
-      regime = 'High Volatility';
-      regimeTag = '📈 偏高溢价区间';
-      recommendation = `隐含波动率高于历史中位数（日预期波动 ±${dailyExpectedMovePct}%），市场计入了较多宏观不确定性事件溢价。宜采取卖出虚值期权补贴买入保护的领口策略 (Collar) 或贷方价差 (Credit Spread)。`;
+    const isLow = pct <= 20;
+    const isHigh = pct >= 75;
+    if (isLow && vrp30 !== null && vrp30 <= VRP_CHEAP_MAX) {
+      volView = 'cheap';
+      recommendation = `DVOL 处于低分位，且${vrpText}，隐含已不高于已实现，期权在绝对位置与相对已实现两个维度上都便宜。可考虑买入平值跨式/宽跨式（正 Gamma、正 Vega，付 Theta 换取变盘弹性）；若只想押波动率均值回归而不愿支付近端 Theta，可单独买入远月期权做多 Vega（注意：卖近买远的日历价差是负 Gamma，与做多 Gamma 是两种不同的押注）。`;
+    } else if (isLow) {
+      volView = 'low_but_not_cheap';
+      recommendation = `DVOL 处于低分位，但${vrpText}${vrp30 === null ? '' : '，隐含仍高于已实现'}。分位低本身不构成买方优势：买跨式需要未来实现波动高于买入的隐含才能盈利（Natenberg Ch4/14）。更稳妥的是用借方价差（买平值、卖虚值）表达方向，或等待已实现波动回升、VRP 收窄后再做多波动率。`;
+    } else if (isHigh && vrp30 !== null && vrp30 >= VRP_RICH_MIN) {
+      volView = 'rich';
+      recommendation = `DVOL 处于高分位，且${vrpText}，隐含相对已实现明显溢价。可用风险完全锁定的结构卖出波动率（蝶式、铁鹰），收 Theta 的同时封住尾部；不建议裸卖跨式，跳空风险无法被连续对冲消除（Natenberg Ch18）。`;
+    } else if (isHigh) {
+      volView = 'high_but_realized_higher';
+      recommendation = `DVOL 处于高分位，但${vrpText}${vrp30 === null ? '' : '，已实现波动同样很高'}。隐含高是因为市场确实在剧烈波动，此时做空波动率没有统计优势；方向性需求优先用贷方价差（卖平值、买虚值）或领口策略。`;
     } else {
-      regime = 'Normal';
-      regimeTag = '⚖️ 历史中性合理区间';
-      recommendation = `波动率定价处于中位数附近（日预期波动 ±${dailyExpectedMovePct}%），期限结构平衡，适合结合方向性 Delta 观点构建标准垂直价差组合。`;
+      volView = 'neutral';
+      recommendation = `DVOL 处于历史中位区间，${vrpText}。波动率定价没有明显错位，适合结合方向观点构建垂直价差。`;
     }
   } else if (iv1m !== null && iv1m !== undefined) {
-    // Fallback based on absolute implied volatility thresholds when historical distribution is unavailable
-    if (iv1m <= 35.0) {
-      regime = 'Extreme Low';
-      regimeTag = '🚨 绝对值偏低区间';
-      extremeAlert = true;
-      recommendation = `当前 1M IV (${iv1m.toFixed(1)}%) 处于绝对值偏低区间（日预期波动 ±${dailyExpectedMovePct}%），期权买方溢价处于低位。`;
-    } else if (iv1m >= 70.0) {
-      regime = 'Extreme High';
-      regimeTag = '🔥 绝对值偏高区间';
-      extremeAlert = true;
-      recommendation = `当前 1M IV (${iv1m.toFixed(1)}%) 处于绝对值高估区间（日预期波动 ±${dailyExpectedMovePct}%），建议警惕高方差回撤风险。`;
-    }
+    // 无 DVOL 历史时仅给绝对值参考，不作极值判定
+    regimeTag = '参考绝对值 (缺 DVOL 历史)';
+    recommendation = `缺少 DVOL 历史分布，无法评估分位；${vrpText}。`;
   }
 
-  const percentileText = percentile !== null ? `${percentile.toFixed(1)}%` : '参考常模';
-  const paragraph = `当下 Bitcoin ATM 隐含波动率呈现【${curveDesc}】期限结构（1M: ${iv1m?.toFixed(1)}%, 3M: ${iv3m?.toFixed(1)}%, 6M: ${iv6m?.toFixed(1)}%），时间平方根法则对应【日均预期振幅 ±${dailyExpectedMovePct}%】（周预期 ±${weeklyExpectedMovePct}%，1M 跨式平价约 ${atmStraddleEstPct}%）。${
-    extremeAlert
-      ? `【极值预警】ATM 1M IV 目前处于约 ${percentileText} 历史分位，${regimeTag}。${recommendation}`
-      : `波动率处于【${regimeTag}】（历史分位约 ${percentileText}）。${recommendation}`
-  }`;
+  const percentileText = percentileRaw !== null ? `${percentileRaw.toFixed(1)}%` : '参考常模';
+  const eventText = frontEvent
+    ? `【近端事件溢价】${frontEvent.expiry}（剩 ${frontEvent.dte < 1 ? `${Math.round(frontEvent.dte * 24)} 小时` : `${frontEvent.dte} 天`}）ATM IV ${frontEvent.iv.toFixed(1)}%，高出扩散基准 ${frontEvent.baseIv.toFixed(1)}%（${frontEvent.baseSource}）${frontEvent.premium.toFixed(1)} 点；按 Bennett 跳空波动率拆分，隐含事件窗口绝对涨跌幅约 ${frontEvent.expectedAbsMovePct}%（常态单日约 ${frontEvent.normalDayAbsMovePct}%）。`
+    : '';
+  const dvolText = dvolLatest !== null
+    ? `DVOL ${dvolLatest.toFixed(1)} 处于近 2 年 ${percentileText} 分位（${regimeTag}）。`
+    : '';
+  const paragraph = `当下 Bitcoin ATM 隐含波动率呈现【${curveDesc}】期限结构（1M: ${iv1m?.toFixed(1)}%, 3M: ${iv3m?.toFixed(1)}%, 6M: ${iv6m?.toFixed(1)}%），按 365 日历日的时间平方根法则对应【日均预期振幅 ±${dailyExpectedMovePct}%】（周 ±${weeklyExpectedMovePct}%，1M 跨式约 ${atmStraddleEstPct}%）。${eventText}${extremeAlert ? '【极值预警】' : ''}${dvolText}${recommendation}`;
 
   return {
     iv1m,
@@ -333,13 +435,20 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
     iv1y,
     curveType,
     curveDesc,
-    percentile: percentile !== null ? Math.round(percentile * 10) / 10 : null,
+    frontEvent,
+    percentile: percentileRaw !== null ? Math.round(percentileRaw * 10) / 10 : null,
+    percentileBasis: percentileRaw !== null ? 'dvol_vs_dvol' : null,
+    dvolLatest,
+    hv30,
+    hvTerm,
+    vrp30,
+    volView,
     dailyExpectedMovePct,
     weeklyExpectedMovePct,
     atmStraddleEstPct,
-    dvolMin: dvolStats?.min || 33.8,
-    dvolMax: dvolStats?.max || 82.6,
-    dvolMedian: dvolStats?.median || 48.5,
+    dvolMin: dvolStats?.min ?? null,
+    dvolMax: dvolStats?.max ?? null,
+    dvolMedian: dvolStats?.median ?? null,
     isRealtime,
     termPoints,
     regime,
@@ -350,9 +459,69 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
   };
 }
 
+const GEX_NEAR_TERM_DAYS = 10; // 近端到期：Gamma ∝ 1/(σ√T)，对冲流主要来自 10 天内到期的合约
+const GEX_NEUTRAL_SHARE = 0.1;  // 全部到期净额不足各到期日绝对敞口之和的 10%：整体体制视为中性，由近端主导
+const GEX_FLIP_MAX_DIST = 0.2;  // 翻转位距现货超过 20%：对近期对冲流参考意义有限
+
 /**
- * Module 2: Dynamic GEX by Expiration Focus Algorithm & Gamma-Theta Mechanics
- * Rooted in Bossu Ch 1 & Natenberg Ch 5, 11 (Dynamic Delta-Hedging, Quadratic Scaling, Pinning)
+ * 按行权价合计 GEX，找出累计净 GEX (由低行权价向高累加) 变号的位置，取离现货最近的一个作为零 Gamma 翻转位近似。
+ * 严格的翻转位需在假想现货价下重估全部合约 Gamma；数据源只给按行权价汇总的 GEX，因此这里只是常用代理。
+ */
+function estimateGammaFlip(strikeRows, spot) {
+  const rows = (strikeRows || [])
+    .filter(r => Number.isFinite(r?.strike) && Number.isFinite(r?.number))
+    .sort((a, b) => a.strike - b.strike);
+  if (rows.length < 2) return null;
+  const crossings = [];
+  let cum = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const prev = cum;
+    cum += rows[i].number;
+    if (i > 0 && prev !== 0 && Math.sign(prev) !== Math.sign(cum) && cum !== 0) {
+      // 在相邻两个行权价之间按累计值线性插值
+      const k1 = rows[i - 1].strike;
+      const k2 = rows[i].strike;
+      const w = Math.abs(prev) / (Math.abs(prev) + Math.abs(cum));
+      crossings.push({ strike: Math.round(k1 + w * (k2 - k1)), from: Math.sign(prev), to: Math.sign(cum) });
+    }
+  }
+  if (!crossings.length) return null;
+  const ref = Number.isFinite(spot) ? spot : crossings[0].strike;
+  return crossings.reduce((best, c) => (Math.abs(c.strike - ref) < Math.abs(best.strike - ref) ? c : best));
+}
+
+/** 全部到期日按行权价合计 (优先用数据源 by_strike，缺失时由 by_expiry 汇总) */
+function aggregateByStrike(gexData) {
+  if (Array.isArray(gexData.by_strike) && gexData.by_strike.length) return gexData.by_strike;
+  const map = new Map();
+  for (const rows of Object.values(gexData.by_expiry || {})) {
+    for (const r of rows || []) {
+      if (!Number.isFinite(r?.strike) || !Number.isFinite(r?.number)) continue;
+      map.set(r.strike, (map.get(r.strike) || 0) + r.number);
+    }
+  }
+  return [...map.entries()].map(([strike, number]) => ({ strike, number }));
+}
+
+function wallsOf(rows) {
+  let callWall = null;
+  let putWall = null;
+  let maxPos = -Infinity;
+  let minNeg = Infinity;
+  for (const r of rows || []) {
+    if (r.number > maxPos) { maxPos = r.number; callWall = r.strike; }
+    if (r.number < minNeg) { minNeg = r.number; putWall = r.strike; }
+  }
+  return { callWall, putWall };
+}
+
+const fmtGexM = v => `${v >= 0 ? '+' : '-'}$${Math.abs(v / 1e6).toFixed(1)}M`;
+
+/**
+ * Module 2: Dynamic GEX by Expiration & Dealer Gamma Regime
+ * - 卡片聚焦月末/季末/年末交割，但 Gamma 体制按全部到期日 (含周度) 合计判定：近端合约 Gamma 最大，不能被过滤掉
+ * - 正负号沿用数据源惯例 (Call 记正、Put 记负 = 假设做市商持有客户卖出的 Call 与买入的 Put 的对手盘)，
+ *   这是 SqueezeMetrics 式的未经验证假设，叙述中如实披露
  */
 function analyzeDynamicGex(gexData, referenceDate = new Date()) {
   if (!gexData || !gexData.by_expiry) {
@@ -401,29 +570,13 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
   quarterExpiries.forEach(q => allowedFocusSet.add(q));
   allowedFocusSet.add(yearEndExpiryStr);
 
-  const availableExpiries = Object.keys(gexData.by_expiry);
   const focusedList = [];
   const allList = [];
 
-  for (const exp of availableExpiries) {
+  for (const exp of Object.keys(gexData.by_expiry)) {
     const strikeList = gexData.by_expiry[exp] || [];
-    let totalGex = 0;
-    let callWallStrike = null;
-    let maxCallGex = -Infinity;
-    let putWallStrike = null;
-    let minPutGex = Infinity;
-
-    for (const item of strikeList) {
-      totalGex += item.number;
-      if (item.number > maxCallGex) {
-        maxCallGex = item.number;
-        callWallStrike = item.strike;
-      }
-      if (item.number < minPutGex) {
-        minPutGex = item.number;
-        putWallStrike = item.strike;
-      }
-    }
+    const totalGex = strikeList.reduce((acc, item) => acc + (Number(item.number) || 0), 0);
+    const { callWall, putWall } = wallsOf(strikeList);
 
     const isCurMonth = exp === curMonthEndExpiryStr;
     const isQuarter = quarterExpiries.includes(exp);
@@ -436,22 +589,26 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     else if (isQuarter) categoryTag = '主季度交割';
 
     const expDate = parseDeribitExpiry(exp);
+    const dte = expDate ? (expDate.getTime() - now.getTime()) / 86400000 : null;
+    const isNearTerm = dte !== null && dte >= 0 && dte <= GEX_NEAR_TERM_DAYS;
+    if (isNearTerm && categoryTag === '普通周期') categoryTag = '近端周度';
+
     const itemData = {
       expiry: exp,
       expiryDate: expDate ? expDate.toISOString().slice(0, 10) : exp,
+      dte: dte !== null ? Number(dte.toFixed(2)) : null,
       categoryTag,
       totalGex,
       totalGexM: totalGex / 1e6,
-      callWall: callWallStrike,
-      putWall: putWallStrike,
+      callWall,
+      putWall,
       strikeCount: strikeList.length,
-      isFocused: allowedFocusSet.has(exp)
+      isFocused: allowedFocusSet.has(exp),
+      isNearTerm
     };
 
     allList.push(itemData);
-    if (allowedFocusSet.has(exp)) {
-      focusedList.push(itemData);
-    }
+    if (allowedFocusSet.has(exp)) focusedList.push(itemData);
   }
 
   const sortByDate = (a, b) => {
@@ -462,28 +619,57 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
   focusedList.sort(sortByDate);
   allList.sort(sortByDate);
 
-  let paragraph = '';
+  const spotPrice = gexData.index_price || null;
+  const strikeRows = aggregateByStrike(gexData);
+  const totalAllGex = allList.reduce((acc, c) => acc + c.totalGex, 0);
+  const nearTermList = allList.filter(e => e.isNearTerm);
+  const totalNearGex = nearTermList.reduce((acc, c) => acc + c.totalGex, 0);
+  const totalFocusedGex = focusedList.reduce((acc, c) => acc + c.totalGex, 0);
+  const aggregateWalls = wallsOf(strikeRows);
+  const gammaFlip = estimateGammaFlip(strikeRows, spotPrice);
+  if (gammaFlip && Number.isFinite(spotPrice)) {
+    gammaFlip.farFromSpot = Math.abs(gammaFlip.strike - spotPrice) / spotPrice > GEX_FLIP_MAX_DIST;
+  }
+
   let marketMakerRegime = 'Neutral';
-  let totalFocusedGex = 0;
-  let spotPrice = gexData.index_price || 77200;
+  let paragraph = '';
+  if (allList.length) {
+    const grossGex = allList.reduce((acc, c) => acc + Math.abs(c.totalGex), 0);
+    const netShare = grossGex > 0 ? Math.abs(totalAllGex) / grossGex : 0;
+    const isNeutral = netShare < GEX_NEUTRAL_SHARE;
+    const isLong = totalAllGex > 0;
+    marketMakerRegime = isNeutral
+      ? 'Neutral (Mixed Expiries)'
+      : (isLong ? 'Long Gamma (Stabilizing / Pinning)' : 'Short Gamma (Volatility Accelerating)');
 
-  if (focusedList.length > 0) {
-    const lead = focusedList[0];
-    totalFocusedGex = focusedList.reduce((acc, c) => acc + c.totalGex, 0);
+    const regimeText = isNeutral
+      ? `全部到期日合计净 GEX ${fmtGexM(totalAllGex)}，仅占各到期日绝对敞口之和的 ${(netShare * 100).toFixed(0)}%，正负相互抵消，整体 Gamma 体制不明确，短期对冲方向以近端到期为准。`
+      : isLong
+      ? `全部到期日合计净 GEX ${fmtGexM(totalAllGex)}，做市商整体处于【正 Gamma】：现货上涨卖出、下跌买入以维持 Delta 中性，对现货起减震作用，临近到期的大持仓行权价附近有钉盘 (Pinning) 倾向。`
+      : `全部到期日合计净 GEX ${fmtGexM(totalAllGex)}，做市商整体处于【负 Gamma】：现货上涨被迫追买、下跌被迫追卖，对冲流会放大单边波动，不应期待钉盘。`;
 
-    let regimeText = '';
-    if (totalFocusedGex > 0) {
-      marketMakerRegime = 'Long Gamma (Stabilizing / Pinning)';
-      regimeText = `核心主力到期日整体呈现【正 Gamma 统治态势】（合计 GEX 约 +$${(totalFocusedGex / 1e6).toFixed(1)}M）。做市商整体处于 Long Gamma 状态，在现货上涨时必须抛售现货、下跌时买入现货以维持 Delta 中性，充当了现货市场的天然“低波动减震器”；尤其临近到期（$T \\to 0$ 时 $\\Gamma \\propto \\frac{1}{S\\sigma\\sqrt{T}}$ 聚拢），将对现货产生强烈的“磁吸钉盘 (Pinning)”效应。`;
-    } else {
-      marketMakerRegime = 'Short Gamma (Volatility Accelerating)';
-      regimeText = `核心主力到期日呈现【负 Gamma 放大态势】（合计 GEX 约 -$${(Math.abs(totalFocusedGex) / 1e6).toFixed(1)}M）。依据期权动态对冲数学模型，做市商处于 Short Gamma 状态，现货上涨被迫追多、下跌被迫杀跌以对冲 Delta 风险，将剧烈放大市场单边波动，极易诱发 Gamma Squeeze 轧空或流动性踩踏。`;
+    let nearText = '';
+    if (nearTermList.length) {
+      const nearLong = totalNearGex > 0;
+      nearText = `${GEX_NEAR_TERM_DAYS} 天内到期的 ${nearTermList.length} 个合约合计 ${fmtGexM(totalNearGex)}（${nearLong ? '正' : '负'} Gamma）；近端合约 Gamma 最大，决定未来几天的对冲方向。`;
+      if (focusedList.length && Math.sign(totalFocusedGex) !== Math.sign(totalNearGex) && totalNearGex !== 0) {
+        nearText += `注意：卡片聚焦的主力交割合计 ${fmtGexM(totalFocusedGex)}，与近端周度方向相反，只看主力交割会得出相反结论。`;
+      }
     }
 
-    // Gamma-Theta Tradeoff Equation: P&L = 0.5 * (ΔS)^2 * Γ + Θ * Δt
-    const gammaThetaEquationDesc = `【Gamma-Theta 平衡方程】：做市商持仓遵循 P&L ≈ ½(ΔS)²·Γ + Θ·Δt。现货跳空盈利具有二次方递增效应（ΔS²），2% 的瞬间跳空带来的 Gamma 收益为 1% 跳空的 4 倍；而当标的日内窄幅震荡（ΔS 趋近 0）时，持仓收益完全被时间衰减 Θ·Δt 吞噬。`;
+    const flipText = gammaFlip
+      ? `累计 GEX 由${gammaFlip.from > 0 ? '正' : '负'}转${gammaFlip.to > 0 ? '正' : '负'}的翻转位约在 $${gammaFlip.strike.toLocaleString()}（按行权价累计的近似值${Number.isFinite(spotPrice) ? `，现货 ~$${Math.round(spotPrice).toLocaleString()} 位于其${spotPrice >= gammaFlip.strike ? '上方' : '下方'}` : ''}）${gammaFlip.farFromSpot ? `，距现货超过 ${GEX_FLIP_MAX_DIST * 100}%，对近期对冲流参考意义有限` : ''}。`
+      : `按行权价累计的净 GEX 在全部行权价区间内未变号（${totalAllGex >= 0 ? '全程为正' : '整体为负'}），无法用累计法近似零 Gamma 翻转位。`;
 
-    paragraph = `动态交割期算法已精准聚焦主力关键节点：${focusedList.map(f => `【${f.expiry} (${f.categoryTag})】`).join('、')}。${regimeText} ${gammaThetaEquationDesc} 近端主力交割（${lead.expiry}）关键防御位锚定在 Call Wall $${lead.callWall?.toLocaleString()}（上方最强抛压阻力）与 Put Wall $${lead.putWall?.toLocaleString()}（下方最强支撑地基），在交割前标的在当前价格（~$${Math.round(spotPrice).toLocaleString()}）附近的磁吸震荡收敛特征最为突出。`;
+    const wallText = (aggregateWalls.callWall && aggregateWalls.putWall)
+      ? `全部到期合计的最大正 GEX 行权价 $${aggregateWalls.callWall.toLocaleString()}（Call Wall），最大负 GEX 行权价 $${aggregateWalls.putWall.toLocaleString()}（Put Wall）。`
+      : '';
+
+    const gammaThetaText = `【Gamma-Theta 平衡】做市商持仓 P&L ≈ ½(ΔS)²·Γ + Θ·Δt：跳空收益随 ΔS² 增长，2% 跳空的 Gamma 损益是 1% 的 4 倍。`;
+
+    const assumptionText = `【口径说明】正负号沿用数据源惯例：Call 记正、Put 记负，即假设做市商是客户卖 Call、买 Put 的对手方；公开 OI 不区分做市商与客户方向，该假设未经 Deribit 实际成交方向验证，可结合大宗雷达的主动方向与 OI 开平仓交叉核对。GEX 数值按数据源口径展示。`;
+
+    paragraph = `${regimeText}${nearText}${flipText}${wallText}${gammaThetaText}${assumptionText}`;
   }
 
   const curDateStr = formatUTC8(now).slice(0, 10);
@@ -491,9 +677,15 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     indexPrice: spotPrice,
     focusedExpiries: focusedList,
     allExpiries: allList,
+    totalAllGexM: Number((totalAllGex / 1e6).toFixed(2)),
+    totalNearGexM: Number((totalNearGex / 1e6).toFixed(2)),
     totalFocusedGexM: Number((totalFocusedGex / 1e6).toFixed(2)),
+    nearTermDays: GEX_NEAR_TERM_DAYS,
+    gammaFlip,
+    aggregateCallWall: aggregateWalls.callWall,
+    aggregatePutWall: aggregateWalls.putWall,
     marketMakerRegime,
-    dynamicRuleDescription: `当前日期基准（${curDateStr} UTC+8）：系统自动锁定${isRolledToNextMonth ? '次月月底（当月交割已过，自动滚动至' : '当月月底（'}${curMonthEndExpiryStr}）、季末交割及年底交割（${yearEndExpiryStr}），自动隐去非当月普通到期（如 27NOV26 等，待日历推进至对应月份时将动态激活）。`,
+    dynamicRuleDescription: `当前日期基准（${curDateStr} UTC+8）：卡片默认聚焦${isRolledToNextMonth ? '次月月底（当月交割已过，自动滚动至' : '当月月底（'}${curMonthEndExpiryStr}）、季末交割及年底交割（${yearEndExpiryStr}）；Gamma 体制与翻转位按全部到期日（含周度）合计判定。`,
     paragraph
   };
 }
@@ -2069,11 +2261,107 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   };
 }
 
+// 25Δ 期权的 d1 ≈ ±0.674，两侧行权价在对数虚实值上相距约 1.349·σ·√T
+const DELTA25_LOGK_SPAN = 2 * 0.6745;
+const SKEW_SIDE_THRESHOLD = 1.2;     // |25Δ RR| > 1.2 个波动率点视为明显单侧偏斜
+const SKEW_SIGN_THRESHOLD = 0.3;     // 期限桶情绪判定阈值
+const SKEW_HISTORY_MIN_DAYS = 30;    // 偏度贵贱判定所需最少日度样本
+const SPOT_VOL_LOOKBACK_DAYS = 90;
+const SPOT_VOL_MIN_R2 = 0.05;        // 回归解释度低于 5% 时视为联动不显著，不判定机制
+
+/** 在按 key 升序的点列上线性插值 valueKey；超出范围返回 null */
+function interpolateOn(points, key, target, valueKey) {
+  if (!points.length) return null;
+  if (target < points[0][key] || target > points[points.length - 1][key]) return null;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (target < a[key] || target > b[key]) continue;
+    if (b[key] === a[key]) return a[valueKey];
+    const w = (target - a[key]) / (b[key] - a[key]);
+    return a[valueKey] + w * (b[valueKey] - a[valueKey]);
+  }
+  return points[points.length - 1][valueKey];
+}
+
+function dteOfUnderlying(underlyingIndex, now) {
+  const exp = parseDeribitExpiry(String(underlyingIndex || '').split('-')[1]);
+  return exp ? Math.max(0, (exp.getTime() - now.getTime()) / 86400000) : null;
+}
+
+const round2 = v => (Number.isFinite(v) ? Math.round(v * 100) / 100 : null);
+const signed1 = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+
 /**
- * Module 4: IV Skew 微笑曲线研判 (Volatility Smile across Strikes & Higher-Order Moments)
- * Rooted in Sébastien Bossu Ch 2 (3rd & 4th Moments, Vanna, Volga) & Sheldon Natenberg Ch 14
+ * 单个到期日的微笑度量：ATM 取远期价处插值 IV；两翼按固定 Delta 取 25Δ/10Δ (市场惯例)，
+ * 不再用列表里最低/最高行权价 (两侧虚实值距离不对称，且随数据商给出的行权价范围漂移)。
+ * iv_list 的 delta 为 Call Delta：25Δ Put ↔ Call Delta 0.75。
  */
-function analyzeIvSmile(ivSkewMonth, spotPrice = 77250) {
+function smileMetricsFor(m, now) {
+  if (!m || !Array.isArray(m.iv_list)) return null;
+  const sorted = m.iv_list
+    .filter(s => Number.isFinite(s?.strike) && Number.isFinite(s?.iv))
+    .sort((a, b) => a.strike - b.strike);
+  if (sorted.length < 3) return null;
+
+  const price = Number(m.underlying_price) > 0 ? m.underlying_price : m.fallbackPrice;
+  const dte = dteOfUnderlying(m.underlying_index, now);
+  const atmItem = sorted.reduce((best, s) => (Math.abs(s.strike - price) < Math.abs(best.strike - price) ? s : best));
+  const atmIv = interpolateOn(sorted, 'strike', price, 'iv') ?? atmItem.iv;
+
+  const byDelta = sorted.filter(s => Number.isFinite(s.delta)).sort((a, b) => a.delta - b.delta);
+  const atDelta = callDelta => {
+    const iv = interpolateOn(byDelta, 'delta', callDelta, 'iv');
+    const strike = interpolateOn(byDelta, 'delta', callDelta, 'strike');
+    return iv === null ? null : { iv, strike };
+  };
+
+  let basis = 'delta';
+  let put25 = atDelta(0.75);
+  let call25 = atDelta(0.25);
+  if (!put25 || !call25) {
+    // 无 Delta 时按 25Δ 对应的对称对数虚实值距离取点
+    basis = 'moneyness';
+    const T = (dte || 30) / 365;
+    const half = 0.6745 * (atmIv / 100) * Math.sqrt(T);
+    const kp = price * Math.exp(-half);
+    const kc = price * Math.exp(half);
+    const ivp = interpolateOn(sorted, 'strike', kp, 'iv');
+    const ivc = interpolateOn(sorted, 'strike', kc, 'iv');
+    put25 = ivp === null ? null : { iv: ivp, strike: kp };
+    call25 = ivc === null ? null : { iv: ivc, strike: kc };
+  }
+  if (!put25 || !call25) return null;
+
+  const put10 = basis === 'delta' ? atDelta(0.90) : null;
+  const call10 = basis === 'delta' ? atDelta(0.10) : null;
+
+  const rr25 = call25.iv - put25.iv;
+  const bf25 = (call25.iv + put25.iv) / 2 - atmIv;
+  return {
+    underlying: m.underlying_index,
+    underlyingPrice: price,
+    dte: dte !== null ? Number(dte.toFixed(2)) : null,
+    basis,
+    atmStrike: atmItem.strike,
+    atmIv,
+    put25: { strike: Math.round(put25.strike), iv: round2(put25.iv) },
+    call25: { strike: Math.round(call25.strike), iv: round2(call25.iv) },
+    rr25: round2(rr25),
+    bf25: round2(bf25),
+    rr10: put10 && call10 ? round2(call10.iv - put10.iv) : null,
+    bf10: put10 && call10 ? round2((call10.iv + put10.iv) / 2 - atmIv) : null,
+    // √T 法则下固定 Delta 的 RR/σ_ATM 跨期限应近似不变 (行权价偏斜 ∝ 1/√T，而 25Δ 间距 ∝ σ√T)
+    rrPerVol: atmIv > 0 ? round2(rr25 / atmIv) : null,
+    strikes: sorted
+  };
+}
+
+/**
+ * Module 4: IV Smile (25Δ Risk Reversal & Butterfly)
+ * Bennett Ch6：三阶矩 ↔ 风险逆转 (Vanna)，四阶矩 ↔ 蝶式 (Volga)；近端由峰度主导、远端由偏斜主导
+ */
+function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date()) {
   if (!ivSkewMonth || !ivSkewMonth.month1) {
     return {
       status: 'insufficient_data',
@@ -2081,104 +2369,150 @@ function analyzeIvSmile(ivSkewMonth, spotPrice = 77250) {
     };
   }
 
-  const m1 = ivSkewMonth.month1;
-  const underlying = m1.underlying_index || 'BTC-1M';
-  const price = m1.underlying_price || spotPrice;
-  const rawList = m1.iv_list || [];
-
-  if (!rawList.length) {
+  const front = smileMetricsFor({ ...ivSkewMonth.month1, fallbackPrice: spotPrice }, referenceDate);
+  if (!front) {
     return {
       status: 'insufficient_data',
-      summaryText: '微笑曲线行权价列表为空。'
+      summaryText: '微笑曲线行权价列表为空或无法定位 25Δ 两翼。'
     };
   }
+  const back = ivSkewMonth.month3 ? smileMetricsFor({ ...ivSkewMonth.month3, fallbackPrice: spotPrice }, referenceDate) : null;
 
-  // Sort by strike ascending
-  const sorted = [...rawList].sort((a, b) => a.strike - b.strike);
-
-  // Find ATM strike (closest to underlying_price)
-  let atmItem = sorted[0];
-  let minDiff = Infinity;
-  for (const item of sorted) {
-    const diff = Math.abs(item.strike - price);
-    if (diff < minDiff) {
-      minDiff = diff;
-      atmItem = item;
-    }
-  }
-
-  const atmStrike = atmItem.strike;
-  const atmIv = atmItem.iv;
-
-  const lowestStrikeItem = sorted[0];
-  const highestStrikeItem = sorted[sorted.length - 1];
-
-  // Downside slope (OTM Put wing) & Upside slope (OTM Call wing)
-  const putWingPremium = lowestStrikeItem.iv - atmIv; // e.g. 37.8 - 34.4 = +3.4%
-  const callWingPremium = highestStrikeItem.iv - atmIv; // e.g. 39.4 - 34.4 = +5.0%
-  const asymmetryDiff = callWingPremium - putWingPremium;
-
-  // 4th Moment: Kurtosis / Fat-Tail Curvature = Average wing premium over ATM
-  // bossu Ch 2: Curvature scales with 1/T, measuring jump probability and fat tails
-  const smileCurvature = Number((((lowestStrikeItem.iv + highestStrikeItem.iv) / 2.0) - atmIv).toFixed(2));
-
-  // 3rd Moment: Skewness / Vanna slope
-  // bossu Ch 2: Skewness slope scales with 1/sqrt(T)
-  const strikeSpan = highestStrikeItem.strike - lowestStrikeItem.strike;
-  const skewSlope = Number(((highestStrikeItem.iv - lowestStrikeItem.iv) / (strikeSpan || 1) * 1000).toFixed(3)); // % IV per $1000 strike
-
-  let skewShape = '对称标准微笑 (Symmetric Smile)';
-  let skewBias = '多空尾部预期平衡';
-  let theoreticalMomentExplanation = '';
-
-  if (asymmetryDiff > 1.2) {
+  const rr = front.rr25;
+  const bf = front.bf25;
+  let skewShape;
+  let skewBias;
+  let momentText;
+  if (rr > SKEW_SIDE_THRESHOLD) {
     skewShape = '右偏微笑 / 上行追涨溢价 (Call Skew / Upside Smirk)';
-    skewBias = '深度虚值 Call 获得更高波动率溢价，反映狂热买权 FOMO 情绪高于下行恐惧。';
-    theoreticalMomentExplanation = `【三阶矩偏度 (Skewness/Vanna)】：BTC 呈现典型的“右翼上偏微笑 (Upside Smirk)”，与美股标普 500 常年左偏“下行恐慌倒斜 (Crash Smirk)”形成鲜明对比。这源于加密衍生品特有的散户与宏观杠杆做多凸性（Convexity）需求，以及对右侧暴涨跳空跳跃（Jump Diffusion）的溢价定价。`;
-  } else if (asymmetryDiff < -1.2) {
+    skewBias = '25Δ Call 隐含波动率高于 25Δ Put，上行尾部定价更贵。';
+    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，右翼更贵，与股指常年的左偏相反，反映对上行跳空的凸性需求。`;
+  } else if (rr < -SKEW_SIDE_THRESHOLD) {
     skewShape = '左偏倒斜 / 下行避险溢价 (Put Skew / Fear Smirk)';
-    skewBias = '深度虚值 Put 溢价显著高于 Call，反映市场强烈的下行尾部对冲保护诉求。';
-    theoreticalMomentExplanation = `【三阶矩偏度 (Skewness/Vanna)】：市场呈现左偏“下行避险倒斜 (Put Skew)”，左翼虚值 Put 较 ATM 溢价显著放大。做市商正通过上调深度虚值 Put 的 IV 来防御负 Vanna（∂Vega/∂S）与暴跌流动性抽离风险。`;
+    skewBias = '25Δ Put 隐含波动率高于 25Δ Call，下行保护需求占优。';
+    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，左翼更贵：持有 OTM Put 的一方为每单位 Gamma 支付更高的 Skew Theta（Bennett Ch6）。`;
   } else {
     skewShape = '对称标准微笑 (Symmetric Smile)';
-    skewBias = '多空双向尾部风险溢价定价均衡。';
-    theoreticalMomentExplanation = `【三阶与四阶矩均衡】：左右两翼溢价对称，表明做市商对后市单边大跳空的恐惧与贪婪情绪高度平衡，曲度主要反映肥尾峰度（Kurtosis）。`;
+    skewBias = '25Δ 两翼定价接近，多空尾部预期均衡。';
+    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，两翼基本对称。`;
+  }
+  const kurtText = bf >= 0
+    ? `【四阶矩 / 蝶式】25Δ BF ${signed1(bf)} 点：两翼相对平值${bf >= 1 ? '明显' : '略微'}抬升，对应肥尾定价，两翼 Volga 敏感。`
+    : `【四阶矩 / 蝶式】25Δ BF ${signed1(bf)} 点：两翼低于平值，市场没有为肥尾付溢价。`;
+  const tenText = (front.rr10 !== null && front.bf10 !== null)
+    ? `10Δ 两翼 RR ${signed1(front.rr10)} / BF ${signed1(front.bf10)} 点。`
+    : '';
+
+  let termText = '';
+  if (back && front.rrPerVol !== null && back.rrPerVol !== null) {
+    termText = `与 ${back.underlying}（剩 ${back.dte} 天，RR ${signed1(back.rr25)} / BF ${signed1(back.bf25)}）相比：按 √T 法则固定 Delta 的 RR/σ 应近似不变，当前近月 ${front.rrPerVol.toFixed(3)} 对远月 ${back.rrPerVol.toFixed(3)}；近月 BF ${front.bf25 >= back.bf25 ? '高于' : '低于'}远月，${front.bf25 >= back.bf25 ? '符合' : '不符合'}"近端峰度主导、远端偏斜主导"的常态（Bennett Ch6）。`;
   }
 
-  const kurtosisExplanation = `【四阶矩峰度 (Kurtosis/Volga)】：微笑曲线两翼平均平值溢价（Curvature）为 +${smileCurvature}% IV。两翼凸起是市场对几何布朗运动正态分布失效的补偿（跳跃扩散模型），两翼深度虚值期权具备极高的 Volga（∂Vega/∂σ）敏感度；若后市波动率维持低迷，两翼虚值期权将面临更严峻的【偏度时间价值加速耗损 (Skew Theta Bleed)】。`;
-
-  const paragraph = `当前 1M 期限（标的 ${underlying} @ $${Math.round(price).toLocaleString()}）呈现【${skewShape}】形态。平值 ATM ($${atmStrike.toLocaleString()}) 隐含波动率为 ${atmIv.toFixed(1)}%；左翼虚值 Put ($${lowestStrikeItem.strike.toLocaleString()}) IV 达 ${lowestStrikeItem.iv.toFixed(1)}%（较平值溢价 +${putWingPremium.toFixed(1)}%）；右翼虚值 Call ($${highestStrikeItem.strike.toLocaleString()}) IV 达 ${highestStrikeItem.iv.toFixed(1)}%（较平值溢价 +${callWingPremium.toFixed(1)}%）。${theoreticalMomentExplanation} ${kurtosisExplanation}`;
+  const basisText = front.basis === 'delta' ? '固定 Delta' : '对称对数虚实值（无 Delta 时的近似）';
+  const paragraph = `${front.underlying}（剩 ${front.dte} 天，远期价 $${Math.round(front.underlyingPrice).toLocaleString()}）按${basisText}口径度量：ATM IV ${front.atmIv.toFixed(1)}%，25Δ Put（$${front.put25.strike.toLocaleString()}）${front.put25.iv.toFixed(1)}%，25Δ Call（$${front.call25.strike.toLocaleString()}）${front.call25.iv.toFixed(1)}%，呈【${skewShape}】。${momentText}${kurtText}${tenText}${termText}`;
 
   return {
-    underlying,
-    underlyingPrice: price,
-    atmStrike,
-    atmIv,
-    lowestStrike: lowestStrikeItem.strike,
-    lowestIv: lowestStrikeItem.iv,
-    highestStrike: highestStrikeItem.strike,
-    highestIv: highestStrikeItem.iv,
-    putWingPremium,
-    callWingPremium,
-    asymmetryDiff,
-    smileCurvature,
-    skewSlope,
+    underlying: front.underlying,
+    underlyingPrice: front.underlyingPrice,
+    dte: front.dte,
+    basis: front.basis,
+    atmStrike: front.atmStrike,
+    atmIv: front.atmIv,
+    put25: front.put25,
+    call25: front.call25,
+    putWingPremium: round2(front.put25.iv - front.atmIv),
+    callWingPremium: round2(front.call25.iv - front.atmIv),
+    rr25: front.rr25,
+    bf25: front.bf25,
+    rr10: front.rr10,
+    bf10: front.bf10,
+    asymmetryDiff: front.rr25,
+    smileCurvature: front.bf25,
     skewShape,
     skewBias,
-    strikes: sorted.map(s => ({
+    backMonth: back ? {
+      underlying: back.underlying,
+      dte: back.dte,
+      atmIv: round2(back.atmIv),
+      rr25: back.rr25,
+      bf25: back.bf25
+    } : null,
+    strikes: front.strikes.map(s => ({
       strike: s.strike,
       iv: Math.round(s.iv * 10) / 10,
-      delta: s.delta ? Math.round(s.delta * 100) / 100 : null
+      delta: Number.isFinite(s.delta) ? Math.round(s.delta * 100) / 100 : null
     })),
     paragraph
   };
 }
 
 /**
- * Module 5: 25Δ Skew 期限结构研判 (25 Delta Skew Regime & Term Structure)
- * Rooted in Bossu Ch 2 (Square Root of Time for Skew, 4 Skew Regimes) & Natenberg Ch 13, 14
+ * 现货-波动率联动：日度 ΔDVOL 对 Δln(S) 回归，β 单位为"波动率点 / 单位对数收益"
+ * DVOL 是 30D 方差口径，作为 ATM 波动率变动的代理
  */
-function analyze25DeltaSkew(skewChart) {
+function estimateSpotVolBeta(chrono, lookbackDays = SPOT_VOL_LOOKBACK_DAYS) {
+  const pts = (chrono || []).filter(p => Number.isFinite(p?.spot) && p.spot > 0 && Number.isFinite(p?.dvol));
+  const win = pts.slice(-(lookbackDays + 1));
+  if (win.length < 31) return null;
+  const xs = [];
+  const ys = [];
+  for (let i = 1; i < win.length; i++) {
+    xs.push(Math.log(win[i].spot / win[i - 1].spot));
+    ys.push(win[i].dvol - win[i - 1].dvol);
+  }
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) ** 2;
+    syy += (ys[i] - my) ** 2;
+  }
+  if (sxx === 0) return null;
+  const beta = sxy / sxx;
+  const r2 = syy > 0 ? (sxy * sxy) / (sxx * syy) : 0;
+  return { beta, r2, n };
+}
+
+/**
+ * Bennett Ch6 偏度实现机制：比较"现货变动 1 单位对数收益时 ATM 波动率的实际变动 β"与"隐含偏斜斜率 s"
+ *   β/s ≈ 0 黏性 Delta；≈ 1 黏性行权价；≈ 2 黏性局部波动率 (偏斜公允，长偏斜盈亏平衡)；> 2 跳跃；< 0 反向
+ * 这是时间序列判断，不能从单个截面的期限形态推断
+ */
+function classifySkewRegime(beta, slope) {
+  if (!Number.isFinite(beta) || !Number.isFinite(slope) || Math.abs(slope) < 1e-9) {
+    return { key: 'undetermined', name: '无法判定 (Undetermined)', ratio: null };
+  }
+  const ratio = beta / slope;
+  if (ratio < 0) return { key: 'inverse', name: '反向联动 (Inverse)', ratio };
+  if (ratio < 0.5) return { key: 'sticky_delta', name: '黏性 Delta (Sticky Delta)', ratio };
+  if (ratio < 1.5) return { key: 'sticky_strike', name: '黏性行权价 (Sticky Strike)', ratio };
+  if (ratio <= 2.5) return { key: 'sticky_local_vol', name: '黏性局部波动率 (Sticky Local Vol)', ratio };
+  return { key: 'jumpy', name: '跳跃波动率 (Jumpy Vol)', ratio };
+}
+
+function sentimentOf(values) {
+  const vals = values.filter(Number.isFinite);
+  if (!vals.length) return '数据缺失';
+  if (vals.every(v => v < -SKEW_SIGN_THRESHOLD)) return 'Put 溢价';
+  if (vals.every(v => v > SKEW_SIGN_THRESHOLD)) return 'Call 溢价';
+  if (vals.every(v => Math.abs(v) <= SKEW_SIGN_THRESHOLD)) return '平水均衡';
+  return '多空分歧';
+}
+
+const fmtSkew = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+
+/**
+ * Module 5: 25Δ Skew 期限结构
+ * ctx:
+ *   atm      analyzeAtmIv 结果 (termPoints / iv1m，用于把 RR 换算到 RR/σ 与偏斜斜率)
+ *   dvolStats 含 chrono [{ ts, dvol, spot }]，用于估计现货-波动率实际联动
+ *   history  本地累积的日度 25Δ 记录 [{ day, rr30 }]，用于判断偏度贵贱
+ */
+function analyze25DeltaSkew(skewChart, ctx = {}) {
   if (!skewChart || !skewChart.length) {
     return {
       status: 'insufficient_data',
@@ -2186,77 +2520,148 @@ function analyze25DeltaSkew(skewChart) {
     };
   }
 
-  // Get the most recent timestamp record
   const latest = skewChart[skewChart.length - 1];
-  const d1 = latest.day1 || 0;
-  const d7 = latest.days7 || 0;
-  const d30 = latest.days30 || 0; // 1M
-  const d60 = latest.days60 || 0;
-  const d90 = latest.days90 || 0; // 3M
-  const d180 = latest.days180 || 0; // 6M
-  const d365 = latest.days365 || 0; // 1Y
+  const pick = k => (Number.isFinite(latest[k]) ? latest[k] : null);
+  const d1 = pick('day1');
+  const d7 = pick('days7');
+  const d15 = pick('days15');
+  const d30 = pick('days30');
+  const d60 = pick('days60');
+  const d90 = pick('days90');
+  const d180 = pick('days180');
+  const d365 = pick('days365');
 
-  // Square Root of Time Rule for Skew (Bossu Ch 2 / Natenberg Ch 14):
-  // Skew(T) * sqrt(T) ≈ Constant. Short-term skew naturally steepens, long-term flattens out.
-  // Normalized 30D Skew = Skew(30D) * sqrt(30 / 365)
-  const normSkew7d = Number((d7 * Math.sqrt(7 / 365)).toFixed(3));
-  const normSkew30d = Number((d30 * Math.sqrt(30 / 365)).toFixed(3));
-  const normSkew90d = Number((d90 * Math.sqrt(90 / 365)).toFixed(3));
+  // RR / σ_ATM(T)：√T 法则下跨期限近似不变
+  const atm = ctx.atm || null;
+  const atmAt = dte => {
+    if (atm && Array.isArray(atm.termPoints) && atm.termPoints.length >= 2) return interpolateTotalVariance(atm.termPoints, dte);
+    return Number.isFinite(atm?.iv1m) ? atm.iv1m : null;
+  };
+  const perVol = (rr, dte) => {
+    const v = atmAt(dte);
+    return (Number.isFinite(rr) && v > 0) ? Number((rr / v).toFixed(4)) : null;
+  };
+  const normalized = {
+    d1: perVol(d1, 1),
+    d7: perVol(d7, 7),
+    d30: perVol(d30, 30),
+    d90: perVol(d90, 90),
+    d180: perVol(d180, 180),
+    d365: perVol(d365, 365)
+  };
 
-  // In standard Deribit 25D Skew (25D Call IV - 25D Put IV):
-  // Positive = Calls > Puts (Bullish greed / upside demand)
-  // Negative = Puts > Calls (Bearish fear / hedging premium)
-  let nearTermSentiment = '平水均衡';
-  if (d1 > 0.3 || d7 > 0.3) nearTermSentiment = '短端温和偏多 (Call 溢价)';
-  else if (d1 < -0.3 || d7 < -0.3) nearTermSentiment = '短端防御避险 (Put 溢价)';
-
-  let midTermSentiment = '平水均衡';
-  if (d30 < -0.3 && d90 < -0.3) midTermSentiment = '中远端持续防御贴水 (Put 结构性高估)';
-  else if (d30 > 0.3 && d90 > 0.3) midTermSentiment = '中远端普遍追逐上行 Call';
-
-  // Determine Dynamic Skew Regime (Bossu Ch 2):
-  // 1. Sticky Strike (IV curve fixed in strike space)
-  // 2. Sticky Delta / Moneyness (IV curve shifts with spot)
-  // 3. Local Volatility (Inverted relation: dIV/dS < 0)
-  // 4. Jump Diffusion (Sudden wing repricing)
-  let skewRegime = 'Sticky Delta (粘性 Delta 状态)';
-  let skewRegimeDesc = '偏度随标的平移保持相对恒定，做市商依照 Moneyness（虚值程度）稳定报价。';
-  if (Math.abs(d1 - d30) > 1.5) {
-    skewRegime = 'Jump Diffusion / Term Dislocation (跳跃扩散/期限错配状态)';
-    skewRegimeDesc = '超短端偏度与中远端发生剧烈偏离，表明市场受即时宏观事件或链上流动性催化，正在对近端尾部风险进行剧烈再定价。';
-  } else if (d30 < -1.0) {
-    skewRegime = 'Local Volatility Dominance (局部波动率主导状态)';
-    skewRegimeDesc = '看跌期权定价深嵌入下行杠杆效应（Leverage Effect），标的下挫将引发波动率全面飙升。';
+  // √T 一致性：短端 RR/σ 相对 30D
+  let termConsistency = { verdict: 'unknown', ratio7: null, ratio1: null };
+  let termText = '';
+  if (normalized.d30 !== null && Math.abs(normalized.d30) > 0.005) {
+    const ratio7 = normalized.d7 !== null ? normalized.d7 / normalized.d30 : null;
+    const ratio1 = normalized.d1 !== null ? normalized.d1 / normalized.d30 : null;
+    let verdict = 'consistent';
+    if (ratio7 !== null && ratio7 > 1.5) verdict = 'front_steeper';
+    else if (ratio7 !== null && ratio7 < 0.5) verdict = 'front_flatter';
+    termConsistency = { verdict, ratio7: round2(ratio7), ratio1: round2(ratio1) };
+    const verdictText = verdict === 'front_steeper'
+      ? '短端偏斜明显陡于 √T 法则，近端正在为单侧尾部重新定价（常见于事件前）'
+      : verdict === 'front_flatter'
+        ? (ratio7 < 0 ? '短端偏斜方向与 30D 相反，近端情绪与中期结构背离' : '短端偏斜明显平于 √T 法则，近端尾部定价相对平静')
+        : '短端与 30D 的偏斜符合 √T 法则，期限上没有错位';
+    termText = `按 √T 法则固定 Delta 的 RR/σ 跨期限应近似不变：7D/30D 比值 ${ratio7 !== null ? ratio7.toFixed(2) : '--'}${ratio1 !== null ? `（1D/30D ${ratio1.toFixed(2)}，1D 报价噪声大，仅作参考）` : ''}，${verdictText}。`;
   }
 
-  // Institutional strategy recommendation based on Skew & VRP
-  let institutionalAction = '';
-  if (d30 < -0.5) {
-    institutionalAction = `【机构偏度套利策略】：当前中远端 Put 溢价（30D: ${d30.toFixed(2)}%, 90D: ${d90.toFixed(2)}%）处于结构性高估。适合专业机构构建【牛市风险逆转组合 (Bullish Risk Reversal)】：卖出高估的 25Δ Put 赚取偏度超额溢价，以近乎零成本资助买入 25Δ Call，既做空了失真的偏度（Short Skew），又合成了廉价的现货多头杠杆。`;
-  } else if (d30 > 0.5) {
-    institutionalAction = `【机构偏度套利策略】：当前 Call 偏度处于上行狂热溢价。适合构建【备兑看涨 (Covered Call)】或【熊市风险逆转 (Bearish Risk Reversal)】卖 Call 买 Put，高位收割追涨情绪带来的膨胀权利金。`;
+  // 实现机制：β (ΔDVOL / Δln S) 对比 30D 偏斜斜率 s = RR / (1.349·σ·√T)
+  let realizedRegime = { key: 'undetermined', name: '无法判定 (Undetermined)', ratio: null, beta: null, slope: null, r2: null, n: 0 };
+  const sigma30 = atmAt(30);
+  const spotVol = estimateSpotVolBeta(ctx.dvolStats?.chrono);
+  if (Number.isFinite(d30) && sigma30 > 0 && Math.abs(d30) >= SKEW_SIGN_THRESHOLD) {
+    const slope = d30 / (DELTA25_LOGK_SPAN * (sigma30 / 100) * Math.sqrt(30 / 365));
+    let cls = { key: 'undetermined', name: '无法判定 (Undetermined)', ratio: null };
+    if (spotVol && spotVol.r2 < SPOT_VOL_MIN_R2) cls = { key: 'insignificant', name: '联动不显著 (Insignificant)', ratio: null };
+    else if (spotVol) cls = classifySkewRegime(spotVol.beta, slope);
+    realizedRegime = {
+      ...cls,
+      ratio: round2(cls.ratio),
+      beta: spotVol ? round2(spotVol.beta) : null,
+      slope: round2(slope),
+      r2: spotVol ? round2(spotVol.r2) : null,
+      n: spotVol ? spotVol.n : 0
+    };
+  }
+
+  const richSide = Number.isFinite(d30) ? (d30 < 0 ? 'put' : 'call') : null;
+  let regimeText;
+  let skewRegimeDesc;
+  if (realizedRegime.ratio !== null) {
+    const wing = richSide === 'put' ? 'OTM Put' : 'OTM Call';
+    const longSkewWins = realizedRegime.ratio > 2;
+    skewRegimeDesc = realizedRegime.key === 'inverse'
+      ? `近 ${realizedRegime.n} 日现货与波动率的联动方向与当前偏斜相反（β/s = ${realizedRegime.ratio.toFixed(2)}，β = ${realizedRegime.beta} 波动率点/单位对数收益，R² ${realizedRegime.r2}）：偏斜押注的尾部方向上波动率并没有被实际抬升，持有较贵一翼 (${wing}) 的一方难以靠曲面重估回本。`
+      : `近 ${realizedRegime.n} 日 β/s = ${realizedRegime.ratio.toFixed(2)}（β = ${realizedRegime.beta} 波动率点/单位对数收益，s = ${realizedRegime.slope}，R² ${realizedRegime.r2}）。Bennett：只有 β/s > 2 时持有较贵一翼 (${wing}) 的曲面重估收益才能覆盖 Skew Theta；当前${longSkewWins ? '高于 2，较贵一翼的持有方占优' : '低于 2，较贵一翼的持有方在付租金，卖出较贵一翼的一方收取 Skew Theta'}。`;
+    regimeText = `【实现机制：${realizedRegime.name}】${skewRegimeDesc}DVOL 作为 ATM 代理，且 BTC 现货-波动率相关性在不同阶段可正可负，需随样本滚动复核。`;
   } else {
-    institutionalAction = `【机构偏度套利策略】：偏度期限结构均衡，时间平方根归一化偏度平稳（7D 归一化: ${normSkew7d}, 30D 归一化: ${normSkew30d}），适合采用中性垂直价差进行方向性博弈。`;
+    if (realizedRegime.key === 'insignificant') {
+      skewRegimeDesc = `近 ${realizedRegime.n} 日 DVOL 变动与现货收益的回归 R² 仅 ${realizedRegime.r2}，现货-波动率联动不显著，无法判定偏斜实现机制。`;
+    } else {
+      skewRegimeDesc = !Number.isFinite(d30) || Math.abs(d30) < SKEW_SIGN_THRESHOLD
+        ? '30D 偏斜接近零，偏斜斜率太小，无法换算实现机制。'
+        : '缺少足够的 DVOL 与现货日线样本，无法估计现货-波动率实际联动。';
+    }
+    regimeText = `【实现机制：${realizedRegime.name}】${skewRegimeDesc}`;
   }
 
-  const paragraph = `当下 Bitcoin 25Δ Skew 呈现【${nearTermSentiment} / ${midTermSentiment}】期限结构。根据时间平方根偏度衰减规律（Skew(T)·√T ≈ 常数），超短端（1D: ${d1 >= 0 ? '+' : ''}${d1.toFixed(2)}%, 7D: ${d7 >= 0 ? '+' : ''}${d7.toFixed(2)}%）偏度贴近零轴，多空博弈均衡；而 1M~3M 期限（30D: ${d30.toFixed(2)}%, 90D: ${d90.toFixed(2)}%）展现长效下行保险溢价（归一化偏度约 ${normSkew30d}）。当前市场处于【${skewRegime}】：${skewRegimeDesc} ${institutionalAction}`;
+  // 偏度贵贱：与本地累积的 30D RR 日度历史比较
+  const histVals = (ctx.history || []).map(h => h?.rr30).filter(Number.isFinite);
+  let richness = { verdict: 'insufficient_history', percentile: null, n: histVals.length };
+  if (histVals.length >= SKEW_HISTORY_MIN_DAYS && Number.isFinite(d30)) {
+    const pct = percentileOf(histVals, d30);
+    let verdict = 'normal';
+    if (pct <= 20) verdict = 'put_rich';        // RR 处于历史最负区间：Put 侧相对自身历史偏贵
+    else if (pct >= 80) verdict = 'call_rich';  // RR 处于历史最正区间：Call 侧相对自身历史偏贵
+    richness = { verdict, percentile: Math.round(pct * 10) / 10, n: histVals.length };
+  }
+  const richnessText = richness.verdict === 'insufficient_history'
+    ? `本地偏度日度样本 ${richness.n}/${SKEW_HISTORY_MIN_DAYS} 天，不足以判断 30D 偏度相对自身历史的贵贱。`
+    : `30D RR 处于本地 ${richness.n} 日样本的 ${richness.percentile}% 分位${richness.verdict === 'put_rich' ? '（Put 侧相对历史偏贵）' : richness.verdict === 'call_rich' ? '（Call 侧相对历史偏贵）' : '（处于历史常态）'}。`;
+
+  // 交易倾向：需要"偏度贵"与"实现机制不支持较贵一翼"同时成立
+  const sellsRichWing = realizedRegime.ratio !== null && realizedRegime.key !== 'jumpy';
+  let institutionalAction;
+  if (richness.verdict === 'put_rich' && sellsRichWing) {
+    institutionalAction = '【偏度交易倾向】Put 侧相对历史偏贵，且实现机制不支持持有 OTM Put 回本：可考虑牛市风险逆转（卖 25Δ Put、买 25Δ Call）做空偏斜，收取 Skew Theta。该组合 Vega 近似中性但 Delta 为正、Vanna 为空，下跌加速时亏损会放大；只想交易偏斜需用永续对冲 Delta。';
+  } else if (richness.verdict === 'call_rich' && sellsRichWing) {
+    institutionalAction = '【偏度交易倾向】Call 侧相对历史偏贵，且实现机制不支持持有 OTM Call 回本：可考虑熊市风险逆转（卖 25Δ Call、买 25Δ Put）或备兑看涨收取上行溢价；Delta 为负，需按观点决定是否对冲。';
+  } else if (richness.verdict === 'insufficient_history') {
+    institutionalAction = '【偏度交易倾向】偏度贵贱尚无历史基准，暂不建议据偏斜方向开风险逆转；可先参考实现机制判断持有哪一翼更吃亏。';
+  } else {
+    institutionalAction = '【偏度交易倾向】偏度相对历史与实现机制没有形成一致的错价信号，方向性需求用垂直价差表达即可。';
+  }
+
+  const near = sentimentOf([d1, d7]);
+  const mid = sentimentOf([d30, d90]);
+  const far = sentimentOf([d180, d365]);
+  const fmt = v => (v === null ? '--' : fmtSkew(v));
+  const paragraph = `当下 Bitcoin 25Δ 风险逆转（Call − Put）期限结构：短端 1D ${fmt(d1)} / 7D ${fmt(d7)}【${near}】，中端 30D ${fmt(d30)} / 90D ${fmt(d90)}【${mid}】，远端 180D ${fmt(d180)} / 365D ${fmt(d365)}【${far}】。${termText}${regimeText}${richnessText}${institutionalAction}`;
 
   return {
     latestTimestamp: latest.timestamps,
     d1,
     d7,
+    d15,
     d30,
     d60,
     d90,
     d180,
     d365,
-    normSkew7d,
-    normSkew30d,
-    normSkew90d,
-    nearTermSentiment,
-    midTermSentiment,
-    skewRegime,
+    normalized,
+    termConsistency,
+    realizedRegime,
+    richness,
+    nearTermSentiment: near,
+    midTermSentiment: mid,
+    farTermSentiment: far,
+    skewRegime: realizedRegime.name,
+    skewRegimeKey: realizedRegime.key,
     skewRegimeDesc,
+    institutionalAction,
     paragraph
   };
 }
@@ -2268,6 +2673,11 @@ module.exports = {
   analyzeBlockTrades,
   analyzeIvSmile,
   analyze25DeltaSkew,
+  interpolateTotalVariance,
+  detectFrontEvent,
+  estimateGammaFlip,
+  estimateSpotVolBeta,
+  classifySkewRegime,
   calcGreeks,
   parseInstrument,
   parseDeribitExpiry,

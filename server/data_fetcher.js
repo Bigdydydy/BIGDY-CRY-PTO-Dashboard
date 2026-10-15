@@ -96,6 +96,43 @@ async function fetchBlockTrades(currency = 'BTC') {
 }
 
 /**
+ * Deribit 永续价格，对齐到 DVOL 日线 (同一交易所)，用于估计现货-波动率联动 (偏度实现机制)。
+ * DVOL 日线以 00:00 UTC 为界，而永续日线在 08:00 UTC 收盘，直接按日对齐会错开 8 小时；
+ * 因此取小时线中 23:00 开盘 (00:00 收盘) 的一根，映射到同一 00:00 收盘的 DVOL 日线；当日未收盘的 DVOL 配最新小时收盘。
+ * 只取最近 120 天 (回归窗口 90 天)。返回 Map<DVOL 日起点 ts, close>；失败时返回空 Map，不影响 DVOL 分位
+ */
+const SPOT_ALIGN_DAYS = 120;
+function alignHourlyToDvolDays(ticks, close) {
+  const out = new Map();
+  ticks.forEach((t, i) => {
+    if (!(typeof close[i] === 'number' && close[i] > 0)) return;
+    if (new Date(t).getUTCHours() === 23) out.set(t + 3600000 - 86400000, close[i]);
+  });
+  // 当日 DVOL 日线仍在形成中：配最新一根小时收盘
+  const lastIdx = ticks.length - 1;
+  if (lastIdx >= 0 && close[lastIdx] > 0) {
+    const dayStart = Math.floor(ticks[lastIdx] / 86400000) * 86400000;
+    if (!out.has(dayStart)) out.set(dayStart, close[lastIdx]);
+  }
+  return out;
+}
+
+async function fetchPerpetualDailyCloses(currency, startTs, endTs) {
+  const out = new Map();
+  try {
+    const from = Math.max(startTs, endTs - SPOT_ALIGN_DAYS * 86400000);
+    const url = `https://www.deribit.com/api/v2/public/get_tradingview_chart_data?instrument_name=${currency}-PERPETUAL&start_timestamp=${from}&end_timestamp=${endTs}&resolution=60`;
+    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!resp.ok) return out;
+    const json = await resp.json();
+    return alignHourlyToDvolDays(json.result?.ticks || [], json.result?.close || []);
+  } catch (err) {
+    console.warn('Failed to fetch perpetual daily closes:', err.message);
+  }
+  return out;
+}
+
+/**
  * Fetch Deribit DVOL historical statistics
  */
 async function fetchDvolHistoricalStats(currency = 'BTC') {
@@ -109,10 +146,21 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
     const data = json.result?.data || [];
     if (!data.length) return null;
 
-    const closes = data.map(d => d[4]).filter(v => typeof v === 'number' && !isNaN(v));
+    // 时间序列 (日线收盘)：最后一根为当日实时值。DVOL 与自身历史比较，避免拿 ATM 去比 VIX 式方差口径
+    const chrono = data
+      .filter(d => typeof d[4] === 'number' && !isNaN(d[4]))
+      .map(d => ({ ts: d[0], dvol: d[4] }));
+    const spotByTs = await fetchPerpetualDailyCloses(currency, startTs, endTs);
+    for (const p of chrono) {
+      if (spotByTs.has(p.ts)) p.spot = spotByTs.get(p.ts);
+    }
+
+    const closes = chrono.map(p => p.dvol);
     closes.sort((a, b) => a - b);
 
     return {
+      latest: chrono.length ? chrono[chrono.length - 1].dvol : null,
+      chrono,
       count: closes.length,
       min: closes[0],
       max: closes[closes.length - 1],
@@ -329,6 +377,8 @@ function getCachedData() {
 
 module.exports = {
   refreshAllMarketData,
+  fetchDvolHistoricalStats,
+  alignHourlyToDvolDays,
   getCachedData,
   fetchBlockTrades
 };

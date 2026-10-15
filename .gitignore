@@ -26,3 +26,6 @@ data/option_oi_history_BTC.local.json
 
 # 服务器本地补采的 4B 聪明钱登记册 (权威序列由 GitHub Actions 提交到 smart_money_BTC.json)
 data/smart_money_BTC.local.json
+
+# 服务器本地累积的波动率曲面日度档案 (25Δ 偏度贵贱基准)
+data/vol_surface_history_BTC.local.json
