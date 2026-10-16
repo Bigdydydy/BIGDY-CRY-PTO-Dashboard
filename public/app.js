@@ -5412,6 +5412,18 @@ function renderCbHistory(data) {
   }
 
   renderCbHistoryChart(data);
+
+  // 美股时段 vs 其余时段对比 (紧跟在图表下方)
+  if (elCbHistoryEcharts) {
+    let box = document.getElementById('cb-history-sessions');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'cb-history-sessions';
+      box.className = 'cb-history-sessions';
+      elCbHistoryEcharts.insertAdjacentElement('afterend', box);
+    }
+    box.innerHTML = buildCbSessionCompare(data.series || []);
+  }
 }
 
 function buildCbHistoryKpis(ind, th) {
@@ -5466,6 +5478,149 @@ function buildCbHistoryKpis(ind, th) {
     (flags.length ? `<ul class="cb-hk-flags">${flags.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : '');
 }
 
+// ----------------------------------------------------------------------------
+// 美股常规交易时段 (NYSE 09:30–16:00 America/New_York)
+// 用浏览器内置的纽约时区规则换算，夏令时 (EDT, UTC-4) 对应 UTC+8 21:30–04:00，
+// 冬令时 (EST, UTC-5) 对应 22:30–05:00，切换日按美国规则自动处理。
+// ----------------------------------------------------------------------------
+
+// NYSE 全日休市 (纽约日期)
+const NYSE_HOLIDAYS = new Set([
+  '2025-01-01', '2025-01-09', '2025-01-20', '2025-02-17', '2025-04-18', '2025-05-26', '2025-06-19',
+  '2025-07-04', '2025-09-01', '2025-11-27', '2025-12-25',
+  '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03',
+  '2026-09-07', '2026-11-26', '2026-12-25',
+  '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31', '2027-06-18', '2027-07-05',
+  '2027-09-06', '2027-11-25', '2027-12-24'
+]);
+// NYSE 13:00 提前收盘 (纽约日期)
+const NYSE_EARLY_CLOSES = new Set(['2025-07-03', '2025-11-28', '2025-12-24', '2026-11-27', '2026-12-24', '2027-11-26']);
+
+const nyPartsFmt = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short'
+});
+
+function nyParts(ts) {
+  const p = Object.fromEntries(nyPartsFmt.formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+  return {
+    date: `${p.year}-${p.month}-${p.day}`,
+    y: +p.year, m: +p.month, d: +p.day, h: +p.hour, min: +p.minute,
+    weekday: p.weekday
+  };
+}
+
+/** 纽约时区相对 UTC 的偏移 (分钟)：夏令时 -240，冬令时 -300 */
+function nyOffsetMinutes(ts) {
+  const p = nyParts(ts);
+  return Math.round((Date.UTC(p.y, p.m - 1, p.d, p.h, p.min) - Math.floor(ts / 60000) * 60000) / 60000);
+}
+
+/** 纽约本地时刻 → UTC 时间戳 */
+function nyLocalToUtc(y, m, d, h, min) {
+  const naive = Date.UTC(y, m - 1, d, h, min);
+  let ts = naive - nyOffsetMinutes(naive) * 60000;
+  ts = naive - nyOffsetMinutes(ts) * 60000; // 切换日附近再校正一次
+  return ts;
+}
+
+/** [fromTs, toTs] 范围内的美股常规交易时段 */
+function usSessionsBetween(fromTs, toTs) {
+  const sessions = [];
+  // 按纽约日历日遍历 (不按 24h 步进，避免夏/冬令时切换日被跳过或重复)
+  const first = nyParts(fromTs - 86400000);
+  const last = nyParts(toTs + 86400000);
+  const lastDay = Date.UTC(last.y, last.m - 1, last.d);
+  for (let day = Date.UTC(first.y, first.m - 1, first.d); day <= lastDay; day += 86400000) {
+    const dt = new Date(day);
+    const y = dt.getUTCFullYear();
+    const m = dt.getUTCMonth() + 1;
+    const d = dt.getUTCDate();
+    const dow = dt.getUTCDay();
+    const date = dt.toISOString().slice(0, 10);
+    if (dow === 0 || dow === 6 || NYSE_HOLIDAYS.has(date)) continue;
+    const open = nyLocalToUtc(y, m, d, 9, 30);
+    const close = nyLocalToUtc(y, m, d, NYSE_EARLY_CLOSES.has(date) ? 13 : 16, 0);
+    sessions.push({ date, open, close, dst: nyOffsetMinutes(open) === -240, earlyClose: NYSE_EARLY_CLOSES.has(date) });
+  }
+  return sessions.filter(s => s.close >= fromTs && s.open <= toTs);
+}
+
+const fmtUtc8Hm = ts => new Date(ts + 8 * 3600000).toISOString().slice(11, 16);
+
+/**
+ * 小时桶归类 (按桶中点判断)：美股交易时段 / 工作日盘外 / 周末与休市
+ */
+function cbSessionOf(ts, sessions) {
+  const mid = ts + 1800000;
+  const s = sessions.find(x => mid >= x.open && mid < x.close);
+  if (s) return { code: 'us', label: `美股交易中（${s.dst ? '夏令时' : '冬令时'}${s.earlyClose ? '·提前收盘' : ''}）`, session: s };
+  const p = nyParts(mid);
+  if (p.weekday === 'Sat' || p.weekday === 'Sun' || NYSE_HOLIDAYS.has(p.date)) {
+    return { code: 'closed', label: NYSE_HOLIDAYS.has(p.date) ? '美股休市（节假日）' : '美股休市（周末）' };
+  }
+  return { code: 'off', label: '美股盘外（工作日）' };
+}
+
+const cbMedian = arr => {
+  const a = arr.filter(Number.isFinite).sort((x, y) => x - y);
+  if (!a.length) return null;
+  const m = a.length >> 1;
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+};
+
+/**
+ * 美股时段 vs 其余时段的深度与评分中位数对比
+ */
+function buildCbSessionCompare(series) {
+  if (!series.length) return '';
+  const sessions = usSessionsBetween(series[0].ts, series[series.length - 1].ts + 3600000);
+  const groups = { us: [], off: [], closed: [] };
+  for (const s of series) groups[cbSessionOf(s.ts, sessions).code].push(s);
+  const stat = rows => ({
+    n: rows.length,
+    d10: cbMedian(rows.map(r => r.d10)),
+    d50: cbMedian(rows.map(r => r.d50)),
+    d100: cbMedian(rows.map(r => r.d100)),
+    s10: cbMedian(rows.map(r => r.s10)),
+    score: cbMedian(rows.map(r => r.score))
+  });
+  const st = { us: stat(groups.us), off: stat(groups.off), closed: stat(groups.closed) };
+  const money = v => (Number.isFinite(v) ? `$${v.toFixed(2)}M` : '--');
+  // higherIsBetter=false for slippage: a larger value is worse liquidity
+  const diff = (v, base, higherIsBetter = true) => (Number.isFinite(v) && Number.isFinite(base) && base > 0
+    ? ` <span style="color:${(v >= base) === higherIsBetter ? '#10b981' : '#f43f5e'};">${fmtSignedPct((v / base - 1) * 100)}</span>` : '');
+  const col = (key, title, sub) => {
+    const s = st[key];
+    const base = key === 'us' ? null : st.us;
+    return `<div class="cb-sess-col cb-sess-${key}">
+      <div class="cb-sess-title">${title}<span>${sub} · ${s.n} 小时</span></div>
+      <div class="cb-sess-row"><span>10 bps</span><b>${money(s.d10)}${base ? diff(s.d10, base.d10) : ''}</b></div>
+      <div class="cb-sess-row"><span>50 bps</span><b>${money(s.d50)}${base ? diff(s.d50, base.d50) : ''}</b></div>
+      <div class="cb-sess-row"><span>100 bps</span><b>${money(s.d100)}${base ? diff(s.d100, base.d100) : ''}</b></div>
+      <div class="cb-sess-row"><span>$10M 卖出滑点</span><b>${Number.isFinite(s.s10) ? `${s.s10.toFixed(1)} bps` : '--'}${base ? diff(s.s10, base.s10, false) : ''}</b></div>
+      <div class="cb-sess-row"><span>韧性评分${key === 'closed' ? '*' : ''}</span><b>${Number.isFinite(s.score) ? s.score.toFixed(2) : '--'}</b></div>
+    </div>`;
+  };
+  // 当前所处的夏/冬令时，以及换算成 UTC+8 的开收盘时刻
+  const now = Date.now();
+  const nowP = nyParts(now);
+  const todayOpen = nyLocalToUtc(nowP.y, nowP.m, nowP.d, 9, 30);
+  const todayClose = nyLocalToUtc(nowP.y, nowP.m, nowP.d, 16, 0);
+  const dstNow = nyOffsetMinutes(now) === -240;
+  const switches = sessions.filter((s, i) => i > 0 && s.dst !== sessions[i - 1].dst);
+  const switchNote = switches.length
+    ? ` · 区间内含夏/冬令时切换（${switches.map(s => `${s.date} 起${s.dst ? '夏令时' : '冬令时'}`).join('，')}），高亮按每日实际时刻绘制`
+    : '';
+  return `<div class="cb-sess-head">美股常规交易时段（NYSE 09:30–16:00 纽约时间）当前为<b>${dstNow ? '夏令时' : '冬令时'}</b>，对应 UTC+8 <b>${fmtUtc8Hm(todayOpen)}–${fmtUtc8Hm(todayClose)}</b>（次日）${switchNote}。各列为中位数，非美股列的百分比为相对美股时段的差异。</div>
+    <div class="cb-sess-grid">
+      ${col('us', '美股交易时段', '图中浅色背景')}
+      ${col('off', '工作日盘外', '亚洲 / 欧洲时段')}
+      ${col('closed', '周末与休市', '美股不开盘')}
+    </div>
+    <div class="cb-sess-note">* 韧性评分 = 100 bps 深度 ÷ 24h 成交额，周末成交额低会把评分抬高，跨时段比较请以深度和滑点为准。</div>`;
+}
+
 /**
  * 相邻样本间隔超过 2 小时处插入空点，让缺失时段在图上断开
  */
@@ -5492,6 +5647,23 @@ function renderCbHistoryChart(data) {
   const th = data.thresholds;
   const mono = { fontFamily: 'JetBrains Mono', fontSize: 10 };
   const gridTop = elCbHistoryEcharts.offsetWidth < 560 ? 54 : 30; // 窄屏图例换两行
+
+  // 美股常规交易时段背景 (两个面板各一份，图例里可整体开关)
+  const usSessions = series.length ? usSessionsBetween(series[0].ts, series[series.length - 1].ts + 3600000) : [];
+  const sessionShade = gridIdx => ({
+    name: '美股交易时段',
+    type: 'line',
+    xAxisIndex: gridIdx,
+    yAxisIndex: gridIdx === 0 ? 0 : 2,
+    data: [],
+    silent: true,
+    itemStyle: { color: 'rgba(56, 189, 248, 0.5)' },
+    markArea: {
+      silent: true,
+      itemStyle: { color: colors.isLight ? 'rgba(56, 189, 248, 0.10)' : 'rgba(56, 189, 248, 0.08)' },
+      data: usSessions.map(s => [{ xAxis: s.open }, { xAxis: s.close }])
+    }
+  });
 
   const line = (name, field, color, width = 1.6) => ({
     name,
@@ -5523,7 +5695,10 @@ function renderCbHistoryChart(data) {
         const t = new Date(ts).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         const rowHtml = (label, val, color) =>
           `<div style="display:flex;justify-content:space-between;gap:18px;"><span style="color:${color};">${label}</span><span style="font-weight:600;">${val}</span></div>`;
+        const sess = cbSessionOf(ts, usSessions);
+        const sessColor = sess.code === 'us' ? '#38bdf8' : colors.tickColor;
         return `<div style="font-weight:700;margin-bottom:4px;color:${colors.tooltipTitle};">${t} (UTC+8) · ${row.n} 次快照</div>` +
+          `<div style="margin-bottom:4px;color:${sessColor};">${sess.label}${sess.session ? ` · ${fmtUtc8Hm(sess.session.open)}–${fmtUtc8Hm(sess.session.close)}` : ''}</div>` +
           rowHtml('10 bps', `$${row.d10}M（时内低点 $${row.d10min}M）`, CB_TIER_COLORS.d10) +
           rowHtml('50 bps', `$${row.d50}M`, CB_TIER_COLORS.d50) +
           rowHtml('100 bps', `$${row.d100}M`, CB_TIER_COLORS.d100) +
@@ -5538,7 +5713,7 @@ function renderCbHistoryChart(data) {
       itemWidth: 14,
       itemHeight: 2,
       textStyle: { color: colors.tickColor, fontSize: 10 },
-      data: ['10 bps', '50 bps', '100 bps', 'BTC 中间价', '韧性评分 7D', '韧性评分 (小时)']
+      data: ['10 bps', '50 bps', '100 bps', 'BTC 中间价', '韧性评分 7D', '韧性评分 (小时)', '美股交易时段']
     },
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     grid: [
@@ -5575,6 +5750,8 @@ function renderCbHistoryChart(data) {
       { type: 'slider', xAxisIndex: [0, 1], height: 14, bottom: 6, borderColor: 'transparent', textStyle: { color: colors.tickColor, fontSize: 9 } }
     ],
     series: [
+      sessionShade(0),
+      sessionShade(1),
       line('10 bps', 'd10', CB_TIER_COLORS.d10, 2),
       line('50 bps', 'd50', CB_TIER_COLORS.d50),
       line('100 bps', 'd100', CB_TIER_COLORS.d100),
