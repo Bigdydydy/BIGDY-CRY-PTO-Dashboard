@@ -343,10 +343,12 @@ describe('期权套件 · 数据层：现货对齐与偏度日度档案', () => 
     });
     assert.deepEqual(rec, { day: '2026-10-15', ts: Date.UTC(2026, 9, 15, 6), spot: 80000, iv1m: 36, dvol: 38.8, rr7: -2.7, rr30: -2.5, rr90: -1.8, bf25: 1.4 });
 
+    // 只读写临时文件：结果与真实档案、当前日期无关
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'volhist-')), 'h.json');
+    fs.writeFileSync(file, JSON.stringify({ records: [{ day: '2026-10-14', rr30: -1.9 }] }));
     volHistory.recordSnapshot({ atm: { iv1m: 36 }, skew: { d30: -2.5 }, spot: 80000 }, { file, now: Date.UTC(2026, 9, 15) });
+    volHistory.recordSnapshot({ skew: { d30: null } }, { file, now: Date.UTC(2026, 9, 16) });
     const written = volHistory.readHistory(file);
-    assert.equal(written.length >= 1, true);
-    assert.equal(written[written.length - 1].rr30, -2.5);
+    assert.deepEqual(written.map(r => [r.day, r.rr30]), [['2026-10-14', -1.9], ['2026-10-15', -2.5]]);
   });
 });

@@ -58,18 +58,32 @@ function getHistory() {
   return cache;
 }
 
-/** 记录当日快照 (内存立即更新，磁盘写入每小时最多一次) */
+function writeHistory(file, records) {
+  try {
+    fs.writeFileSync(file, JSON.stringify({ currency: 'BTC', version: 1, records }));
+  } catch (err) {
+    console.warn('[VolSurfaceHistory] write failed:', err.message);
+  }
+}
+
+/**
+ * 记录当日快照 (内存立即更新，磁盘写入每小时最多一次)。
+ * 传入非默认 file 时 (测试用) 直接读写该文件，不触碰模块缓存与写入节流。
+ */
 function recordSnapshot(analyses, { file = HISTORY_FILE, now = Date.now() } = {}) {
   const record = recordFromAnalyses({ ...analyses, ts: now });
+  if (file !== HISTORY_FILE) {
+    const records = readHistory(file);
+    if (!record) return records;
+    const out = upsertRecord(records, record);
+    writeHistory(file, out);
+    return out;
+  }
   if (!record) return getHistory();
   cache = upsertRecord(getHistory(), record);
   if (now - lastWriteTs >= WRITE_THROTTLE_MS) {
     lastWriteTs = now;
-    try {
-      fs.writeFileSync(file, JSON.stringify({ currency: 'BTC', version: 1, records: cache }));
-    } catch (err) {
-      console.warn('[VolSurfaceHistory] write failed:', err.message);
-    }
+    writeHistory(file, cache);
   }
   return cache;
 }
