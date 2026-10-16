@@ -3839,7 +3839,7 @@
       const sub = subAnalysis(type, lp.slice(0, n));
       const evD = evFor(sub, pts);
       const drawnEval = evaluatePattern(type, pts, evD);
-      const drawnCand = buildCandidate({ type, idxs, status: drawStatus }, drawnEval, evD, pts);
+      const drawnCand = buildCandidate({ type, idxs, status: n < def.pts ? 'DEVELOPING' : drawStatus }, drawnEval, evD, pts);
       let liveEval = null, liveCand = null, liveSub = sub;
       if (lp.length <= def.pts) {
         liveSub = live.appended ? subAnalysis(type, lp) : sub;
@@ -3894,6 +3894,49 @@
       if (it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length) alternatives.push(it);
     }
     alternatives.sort((a, b) => (PATTERNS[a.type].pts - PATTERNS[b.type].pts) || rank(a, b));
+
+    // 并列假设 (柳玉冬「紫线符合双锯齿，也还不能排除引导楔形」「或者是 xx 浪反弹……或者走出引导楔形」):
+    //   画了 4 个点时，调整浪 (abc / wxy) 与驱动浪前三浪 (推动浪 / 引导楔形 1-2-3) 互为并列解读，
+    //   各给判决、历史命中率与区分条件
+    const hypotheses = [];
+    if (n === 4) {
+      const motivePrimary = PATTERNS[primary.type].category === '驱动浪';
+      const otherTypes = motivePrimary ? ['ZIGZAG', 'FLAT', 'DOUBLE_ZIGZAG', 'COMBINATION'] : ['IMPULSE', 'DIAGONAL'];
+      const others = otherTypes.filter(t => t !== primary.type).map(interpret)
+        .filter(it => it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length).sort(rank);
+      if (others.length) {
+        const dH = Math.sign(pts[1].price - pts[0].price) || 1;
+        const towards = dH > 0 ? '涨破' : '跌破', against = dH > 0 ? '跌破' : '涨破';
+        const conditionsOf = it => {
+          const c = [];
+          if (PATTERNS[it.type].category === '驱动浪') {
+            if (dH * (lp[3].price - pts[1].price) <= 0) c.push(`浪3 须${towards}浪1 终点 ${fmtNum(pts[1].price)}`);
+            if (it.type === 'IMPULSE') c.push(`浪4 不得${against}浪1 终点 ${fmtNum(pts[1].price)}（不入浪1 区，I1）`);
+            else {
+              const l2 = Math.abs(pts[2].price - pts[1].price);
+              c.push(`浪4 须进入浪1 区（${against} ${fmtNum(pts[1].price)}），但不越过浪2 终点 ${fmtNum(pts[2].price)}；收缩楔形浪4 不超过 ${fmtNum(lp[3].price - dH * l2)}（浪4 < 浪2）`);
+            }
+            c.push(`之后浪5 ${towards}浪3 终点 ${fmtNum(lp[3].price)}`);
+          } else {
+            c.push(`调整完成后反向${against}起点 ${fmtNum(pts[0].price)}（恢复原趋势）`);
+            c.push(`不再${towards} ${fmtNum(lp[3].price)}（${PATTERNS[it.type].labels[3]}浪终点）`);
+          }
+          return c;
+        };
+        const verdictOf = it => it.hardFails.length ? 'INVALID' : it.strongCount ? 'FALSIFIED_SUB' : it.liveHardFails.length ? 'FALSIFIED_PRICE'
+          : (it.mediumCount || it.nearFails.length) ? 'DOUBT' : 'VALID';
+        for (const it of [primary, others[0]]) {
+          const st = (it.live || it.drawn).status;
+          const tr = trackRecordOf({ baseType: it.type, status: st });
+          hypotheses.push({
+            type: it.type, tool: TOOL_OF_TYPE[it.type], name: it.name, verdict: verdictOf(it), verdictLabel: VERDICTS[verdictOf(it)],
+            guidePct: it.guidePct, isPrimary: it === primary,
+            trackRecord: tr ? { hitPct: tr.hitPct, expectedPct: tr.expectedPct, resolved: tr.resolved } : null,
+            conditions: conditionsOf(it)
+          });
+        }
+      }
+    }
 
     // 前序: 调整浪不得收复被调整的前一段
     const dPrev = pts[1].price > pts[0].price ? 1 : -1;
@@ -3982,6 +4025,42 @@
     const liuSignals = lp.length >= 3 ? buildLiuSignals(slice, lp, ev) : null;
     const side = price => price < currentPrice ? '跌破' : '涨破';
     const invalidation = {};
+    // 完成确认位 (柳玉冬「跌破绿点就意味着蓝线上涨结束，进行回撤」): 已完成的驱动浪，其后调整的极值点；
+    //   越过它确认该驱动浪结束、进入回撤，否则后续调整可能只是延续中的 xx / B / 延伸
+    if (PATTERNS[primary.type].category === '驱动浪' && n === PATTERNS[primary.type].pts && !lp[lp.length - 1].open && lp.length === n) {
+      const dirC = Math.sign(pts[1].price - pts[0].price) || 1;
+      const endPt = lp[n - 1];
+      const post = slice.slice(endPt.idx + 1);
+      if (post.length >= 6) {
+        // 候选: 创出调整新极值、且其后反弹收回自终点以来下跌 ≥0.382 的低点 (一段像样的调整已完成)
+        //   BTC 2026-10: 浪V 87,385 之后 Y 80,345 反弹到 84,340 收回 57% → 确认位；10-15 新低 80,188 仅反弹 18%，不取代它
+        const pvC = zigzagPivots(post, 2 * (avgTR(post) || 0)).filter(q => q.confirmed && q.type === (dirC > 0 ? 'low' : 'high'));
+        let record = null, L = null;
+        for (const q of pvC) {
+          if (record !== null && !(dirC > 0 ? q.price < record : q.price > record)) continue;
+          record = q.price;
+          const later = post.slice(q.idx + 1);
+          let reb = 0;
+          for (const b of later) {
+            if (dirC > 0 ? b.low < q.price : b.high > q.price) break;
+            reb = Math.max(reb, dirC > 0 ? b.high - q.price : q.price - b.low);
+          }
+          if (reb >= 0.382 * Math.abs(endPt.price - q.price)) L = q;
+        }
+        if (L) {
+          const after = post.slice(L.idx + 1);
+          const brk = after.find(b => dirC > 0 ? b.low < L.price : b.high > L.price);
+          const act = dirC > 0 ? '跌破' : '涨破';
+          const retr = (cand.targets || []).filter(t => /整体回撤×0\.(2|382|5|618)$/.test(t.label)).map(t => `${t.label.replace('整体回撤×', '')} ${fmtNum(t.price)}`).join('、');
+          invalidation.completion = {
+            price: L.price, time: L.time, broken: !!brk, brokenAt: brk ? brk.time : null,
+            text: brk
+              ? `完成确认：${fmtTs(brk.time)} 已${act}${legNameOf(labels[n - 1])}之后调整的极值 ${fmtNum(L.price)}（${fmtTs(L.time)}），确认「${primary.name}」已结束、进入回撤${retr ? `（回撤目标 ${retr}）` : ''}`
+              : `完成确认位 ${fmtNum(L.price)}（${legNameOf(labels[n - 1])}之后调整的极值，${fmtTs(L.time)}）：${act}则确认「${primary.name}」已结束、进入回撤${retr ? `（回撤目标 ${retr}）` : ''}；不${act}则其后的调整可能仍属延续（xx 浪 / B 浪 / 延伸）`
+          };
+        }
+      }
+    }
     // 楔形浪4 运行中: 浪4 须短于浪2 (收缩楔形 D3；2-4 线不与 1-3 线发散，柳玉冬「引导楔形不能扩散」)
     //   BTC 2026-10-10 柳玉冬「冲破 85172 … 破除下降引导楔形的可能性」即此价位 (浪3 终点 + 浪2 长度)
     if (primary.type === 'DIAGONAL' && lp.length === 5 && verdict !== 'INVALID') {
@@ -4094,6 +4173,9 @@
     if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
     if (invalidation.channel) lines.push(invalidation.channel.text);
     if (invalidation.diagLimit) lines.push(invalidation.diagLimit.text);
+    if (invalidation.completion) lines.push(invalidation.completion.text);
+    hypotheses.forEach(h => { if (h.isPrimary) { h.verdict = verdict; h.verdictLabel = VERDICTS[verdict]; } });
+    if (hypotheses.length) lines.push(`并列假设：${hypotheses.map(h => `「${h.name}」${h.verdictLabel}`).join(' vs ')}——${hypotheses.map(h => `${h.name.replace(/（.*$/, '')}：${h.conditions.join('，')}`).join('；')}`);
     const tgts = (cand.targets || []).slice(0, 3);
     if (tgts.length && verdict !== 'INVALID' && verdict !== 'FALSIFIED_SUB') lines.push(`目标：${tgts.map(t => `${fmtNum(t.price)}（${t.label}）`).join('；')}`);
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
@@ -4102,7 +4184,7 @@
       symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT', asOf: slice[lastBar].time,
       tool: options.tool, toolName: tool.name, labels,
       forcedType: forced, toolTypes: tool.types.map(t => ({ type: t, name: PATTERNS[t].name })),
-      forecast, trackRecord, reclassify, projection,
+      forecast, trackRecord, reclassify, projection, hypotheses,
       analysisTime: new Date().toISOString(), currentPrice,
       subTimeframes: subNames,
       points: pts.map((q, i) => ({ label: labels[i], time: q.time, price: q.price, type: q.type, open: !!q.open })),
@@ -4335,13 +4417,36 @@
   const isUnusual = x => RARE_TYPES.has(x.type) || /失败|扩散|穿头/.test(x.name);
 
   /** userVerdict: 所画计数的判决 (存疑 → 更好的只有成立；否决 → 成立或存疑) */
+  /**
+   * 升一级重数 (柳玉冬 2026-10-13「红线目前是 3 段」): 计数被画完后的走势证伪时，从起点起按大一级取三个转折:
+   * 第一段方向的极值 → 其后的回撤极值 → 至今的极值。回撤不越过起点才成立
+   */
+  function regroupPoints(bars, p0, dir) {
+    const i0 = barIdxAtOrBefore(bars, p0.time);
+    const seg = bars.slice(i0 + 1);
+    if (seg.length < 6) return null;
+    const ext = (arr, up) => arr.reduce((m, b, k) => (m === null || (up ? b.high > arr[m].high : b.low < arr[m].low)) ? k : m, null);
+    const k1 = ext(seg, dir > 0);
+    if (k1 === null || k1 >= seg.length - 2) return null;
+    const rest = seg.slice(k1 + 1);
+    const k2 = ext(rest, dir < 0);
+    if (k2 === null || k2 >= rest.length - 1) return null;
+    const tail = rest.slice(k2 + 1);
+    const k3 = ext(tail, dir > 0);
+    const P = (b, up) => ({ time: b.time, price: up ? b.high : b.low });
+    const E1 = P(seg[k1], dir > 0), E2 = P(rest[k2], dir < 0), E3 = P(tail[k3], dir > 0);
+    if (dir * (E2.price - p0.price) <= 0) return null;          // 回撤越过起点: 不是同一段的回撤
+    if (dir * (E3.price - E2.price) <= 0) return null;
+    return [{ time: p0.time, price: p0.price }, E1, E2, E3];
+  }
+
   function suggestCounts(bars, symbol, d, r, sub, maxOut, userVerdict) {
     const limit = VERDICT_RANK[userVerdict || r.verdict];
     const out = [];
     const sig = (type, pts) => type + '|' + pts.map(p => p.time).join(',');
     const seen = new Set([sig(r.primary.type, r.points)]);
     const pA = r.points[0], pB = r.points[r.points.length - 1];
-    const tryCount = (source, type, pts, extra) => {
+    const tryCount = (source, type, pts, extra, keepEnds = true) => {
       const tool = TOOL_OF_TYPE[type];
       if (!tool || pts.length < 3 || pts.length > USER_TOOLS[tool].labels.length) return;
       const key = sig(type, pts);
@@ -4355,7 +4460,7 @@
       if ((e.verdict !== 'VALID' && e.verdict !== 'DOUBT') || VERDICT_RANK[e.verdict] > limit) return;
       // 吸附后首尾须仍是所画的两个端点
       const q0 = e.points[0], q1 = e.points[e.points.length - 1];
-      if (q0.time !== pA.time || q1.time !== pB.time) return;
+      if (keepEnds ? (q0.time !== pA.time || q1.time !== pB.time) : q0.time !== pA.time) return;
       const tr = e.trackRecord;
       out.push(Object.assign({
         source, tool, type, name: e.primary.name, verdict: e.verdict, verdictLabel: e.verdictLabel,
@@ -4380,9 +4485,22 @@
       const mine = out.splice(before).sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || (b.guidePct - a.guidePct));
       if (mine.length) out.push(mine[0]);
     }
+    // 走势证伪时: 起点不变、按大一级重新分段
+    if ((userVerdict || r.verdict) === 'FALSIFIED_PRICE') {
+      const rg = regroupPoints(bars, pA, Math.sign(r.points[1].price - pA.price) || 1);
+      if (rg) ['ZIGZAG', 'FLAT', 'DOUBLE_ZIGZAG', 'COMBINATION', 'IMPULSE', 'DIAGONAL'].forEach(t => tryCount('REGROUP', t, rg, {}, false));
+    }
     const kept = out.filter(x => !x.sameVerdict && x.guidePct >= 50 && !(x.doubt && SLOPPY_DOUBT.test(x.doubt)) &&
       (!RARE_TYPES.has(x.type) || (x.verdict === 'VALID' && x.guidePct >= 60)));
     kept.forEach(x => { x.unusual = isUnusual(x); });
+    // 升一级重数每种画法只留最好的一个 (调整浪 / 驱动浪各一)
+    const bestRegroup = {};
+    kept.filter(x => x.source === 'REGROUP').forEach(x => {
+      const fam = PATTERNS[x.type].category === '驱动浪' ? 'M' : 'C';
+      const b = bestRegroup[fam];
+      if (!b || VERDICT_RANK[x.verdict] < VERDICT_RANK[b.verdict] || (x.verdict === b.verdict && x.guidePct > b.guidePct)) bestRegroup[fam] = x;
+    });
+    for (let i = kept.length - 1; i >= 0; i--) if (kept[i].source === 'REGROUP' && !Object.values(bestRegroup).includes(kept[i])) kept.splice(i, 1);
     kept.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || ((a.unusual ? 1 : 0) - (b.unusual ? 1 : 0)) ||
       ((b.source === 'SAME_POINTS' ? 1 : 0) - (a.source === 'SAME_POINTS' ? 1 : 0)) ||
       ((b.guidePct || 0) - (a.guidePct || 0)));
@@ -4567,7 +4685,7 @@
       const where = x.parentId ? `${byId[x.parentId] ? (USER_TOOLS[byId[x.parentId].d.tool] || {}).name : ''}·${x.parentLegName}的子浪` : '母浪';
       lines.push(`${'　'.repeat(x.depth)}${where}「${x.name}」（${x.timeframe}）：${x.verdictLabel}`);
       const sg = x.suggestions[0];
-      if (sg) lines.push(`${'　'.repeat(x.depth + 1)}更可能：「${sg.name}」${sg.verdictLabel}（${sg.source === 'SAME_POINTS' ? '同样的点换浪型' : '起点、终点与所画相同'}，指引符合度 ${sg.guidePct}%）`);
+      if (sg) lines.push(`${'　'.repeat(x.depth + 1)}更可能：「${sg.name}」${sg.verdictLabel}（${sg.source === 'SAME_POINTS' ? '同样的点换浪型' : sg.source === 'REGROUP' ? '起点不变、升一级重数' : '起点、终点与所画相同'}，指引符合度 ${sg.guidePct}%）`);
     });
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
     return {
