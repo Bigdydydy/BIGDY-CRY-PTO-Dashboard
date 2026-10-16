@@ -348,6 +348,48 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.match(lim.text, /两种口径在此价分歧/);
   });
 
+  it('并列假设: abc 画法同时给出驱动浪前三浪的解读及区分条件', () => {
+    const v = [120, 100, 110, 105, 122, 121.5];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4].map(k => pt(v, k, 3600)) });
+    assert.strictEqual(r.hypotheses.length, 2, JSON.stringify(r.hypotheses));
+    const prim = r.hypotheses.find(h => h.isPrimary), alt = r.hypotheses.find(h => !h.isPrimary);
+    assert.strictEqual(prim.type, r.primary.type);
+    assert.strictEqual(prim.verdict, r.verdict);
+    assert.ok(['IMPULSE', 'DIAGONAL'].includes(alt.type));
+    assert.ok(alt.conditions.some(c => /浪5/.test(c)), alt.conditions.join(' / '));
+    assert.ok(prim.conditions.some(c => /起点/.test(c)), prim.conditions.join(' / '));
+  });
+
+  it('完成确认位: 推动浪完成后调整低点反弹收回 ≥0.382，跌破即确认完成', () => {
+    const run = tail => {
+      const v = [96, 100, 110, 105, 122, 116, 130].concat(tail);
+      const bars = build(v);
+      return E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4, 5, 6].map(k => pt(v, k, 3600)) });
+    };
+    const before = run([122, 127, 124]);
+    assert.ok(before.invalidation.completion, '应给出完成确认位');
+    assert.ok(Math.abs(before.invalidation.completion.price - 122) < 0.1, before.invalidation.completion.text);
+    assert.strictEqual(before.invalidation.completion.broken, false);
+    const after = run([122, 127, 119, 121]);
+    assert.strictEqual(after.invalidation.completion.broken, true, after.invalidation.completion.text);
+    assert.match(after.invalidation.completion.text, /确认.*已结束/);
+  });
+
+  it('升一级重数: 小级别计数被走势证伪时，起点不变、按大一级重新取三个转折', () => {
+    // 100→103→102→106 画成楔形前三浪；之后跌到 101.5 (破浪2 终点) 再涨到 105.5
+    const v = [104, 100, 103, 102, 106, 101.5, 105.5, 105];
+    const bars = build(v);
+    const sk = E.evaluateUserSketch({ '1h': bars['1h'], '15m': bars['15m'] }, 'TEST',
+      { drawings: [{ id: 'R', tool: 'IMPULSE', type: 'DIAGONAL', timeframe: '1h', points: [1, 2, 3, 4].map(k => pt(v, k, 3600)) }] });
+    const nd = sk.nodes[0];
+    assert.strictEqual(nd.verdict, 'FALSIFIED_PRICE', nd.verdictLabel);
+    const rg = nd.suggestions.filter(x => x.source === 'REGROUP');
+    assert.ok(rg.length > 0, JSON.stringify(nd.suggestions.map(x => [x.source, x.type])));
+    const p = rg[0].points;
+    assert.ok(Math.abs(p[1].price - 106) < 0.1 && Math.abs(p[2].price - 101.5) < 0.1, p.map(q => q.price).join(','));
+  });
+
   it('三锯齿标号为 0-w-x-y-xx-z', () => {
     assert.deepStrictEqual(E.USER_TOOLS.WXYXZ.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);
     assert.deepStrictEqual(E.PATTERNS.TRIPLE_ZIGZAG.labels, ['0', 'w', 'x', 'y', 'xx', 'z']);

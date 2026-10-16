@@ -1054,6 +1054,9 @@ self.onmessage = function (e) {
       if (showMonitoring && inv.monitor && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || sel.timeframe})` }));
       }
+      if (showMonitoring && inv.completion) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.completion.price, color: '#0ea5e9', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: inv.completion.broken ? '完成确认位（已越过）' : '完成确认位' }));
+      }
       if (showMonitoring && inv.diagLimit && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.diagLimit.price, color: '#a855f7', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: inv.diagLimit.expandingByLength ? '楔形浪4分歧位' : '楔形浪4上限' }));
       }
@@ -1241,11 +1244,11 @@ self.onmessage = function (e) {
     const sugs = nd.suggestions || [];
     const sugHtml = nd.verdict !== 'VALID' && nd.verdict !== 'ERROR' ? `
       <div class="liu-signal-row">
-        <div class="liu-signal-title"><span>更可能的浪型</span><span>${sugs.length ? '起点、终点与你相同 · 按画浪规则重新验证' : ''}</span></div>
+        <div class="liu-signal-title"><span>更可能的浪型</span><span>${sugs.length ? '按画浪规则重新验证' : ''}</span></div>
         ${sugs.length ? sugs.map((sg, k) => {
           const on = previewSug && previewSug.id === nd.id && previewSug.k === k;
           const st = VERDICT_STYLE[sg.verdict] || VERDICT_STYLE.DOUBT;
-          const meta = [sg.source === 'SAME_POINTS' ? '同样的点换浪型' : '中间重新数', sg.unusual ? '非常规浪型' : '',
+          const meta = [sg.source === 'SAME_POINTS' ? '同样的点换浪型' : sg.source === 'REGROUP' ? '起点不变、升一级重数' : '中间重新数', sg.unusual ? '非常规浪型' : '',
             sg.guidePct != null ? `指引符合度 ${sg.guidePct}%` : '',
             sg.trackRecord ? `历史上同类计数先到目标 ${sg.trackRecord.hitPct}%（随机 ${sg.trackRecord.expectedPct}%）` : ''].filter(Boolean).join(' · ');
           return `<div class="ue-sug${on ? ' active' : ''}">
@@ -1274,7 +1277,25 @@ self.onmessage = function (e) {
         <div class="ue-note">每一浪按前一浪的中值推出，越往后越不确定；图上橙色虚线为中值路径（工具栏「假设推演」可隐藏）。这是在你的计数成立的假设下的常见走法，不是预测。</div>
       </div>` : '';
 
-    return verdictHtml + sugHtml + projHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
+    // 并列假设: 同样 4 个点的调整浪 / 驱动浪前三浪两种解读，及区分条件
+    const hyps = r.hypotheses || [];
+    const hypHtml = hyps.length ? `
+      <div class="liu-signal-row">
+        <div class="liu-signal-title"><span>并列假设</span><span>同样的点 · 两种解读</span></div>
+        ${hyps.map((h, k) => {
+          const st = VERDICT_STYLE[h.verdict] || VERDICT_STYLE.DOUBT;
+          const meta = [h.isPrimary ? '当前评估' : '', h.guidePct != null ? `指引符合度 ${h.guidePct}%` : '',
+            h.trackRecord ? `历史上同类计数先到目标 ${h.trackRecord.hitPct}%（随机 ${h.trackRecord.expectedPct}%）` : ''].filter(Boolean).join(' · ');
+          return `<div class="ue-sug">
+            <div class="liu-signal-title"><span>${esc(h.name)}</span><span class="liu-chip ${st.chip}">${esc(h.verdictLabel)}</span></div>
+            <div class="ue-note">${esc(meta)}</div>
+            ${h.conditions.map(c => `<div class="ue-line">· ${esc(c)}</div>`).join('')}
+            ${h.isPrimary ? '' : `<div class="wave-type-switch"><button class="chart-tool-btn" data-hyp-adopt="${k}" data-node="${esc(nd.id)}" title="用同样的点按这种解读重新评估">按此评估</button></div>`}
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    return verdictHtml + sugHtml + hypHtml + projHtml + typeHtml + subHtml + lvHtml + rulesHtml + lifeHtml + otherHtml;
   }
 
   // ---------------------------------------------------------------------------
@@ -1363,6 +1384,20 @@ self.onmessage = function (e) {
           previewSug = previewSug && previewSug.id === id && previewSug.k === k ? null : { id, k };
           renderChart();
           renderPanel();
+          return;
+        }
+        const hyBtn = e.target.closest('[data-hyp-adopt]');
+        if (hyBtn) {
+          const nd = nodeOf(hyBtn.dataset.node);
+          const h = nd && nd.result && nd.result.hypotheses && nd.result.hypotheses[+hyBtn.dataset.hypAdopt];
+          const d = sketch.find(x => x.id === hyBtn.dataset.node);
+          if (!h || !d) return;
+          d.tool = h.tool;
+          d.type = h.type;
+          const keep = d.id;
+          invalidateEval();
+          setWaveStatus(`✓ 改按「${h.name.replace(/（.*$/, '')}」评估同样的点…`);
+          evaluateAll().then(() => { if (nodeOf(keep)) { selectedId = keep; renderChart(); renderPanel(); } });
           return;
         }
         const adBtn = e.target.closest('[data-sg-adopt]');
