@@ -149,7 +149,7 @@ async function getSystemAuditData(doProbe = false) {
       id: 'term_premium_basis',
       name: '期现基差期限结构、套利评分与 ETF × 套利资金联动',
       viewId: 'view-term-premium',
-      primarySource: 'Deribit 永续资金费率 + 当季/次季季度合约 (2024.01~至今) + FRED DGS3MO + CoinGlass ETF 流量/OI + CFTC TFF',
+      primarySource: 'Deribit 当季/次季季度合约 (2024.01~至今) + CoinGlass 全市场 OI 加权资金费率 (备用 Deribit 永续) + FRED DGS3MO + CoinGlass ETF 流量/OI + CFTC TFF',
       targetEndpoints: [
         'https://www.deribit.com/api/v2/public/get_tradingview_chart_data',
         'https://www.deribit.com/api/v2/public/get_funding_rate_history?instrument_name=BTC-PERPETUAL',

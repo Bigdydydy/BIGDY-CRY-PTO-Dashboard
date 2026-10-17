@@ -533,6 +533,30 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     assert.equal(interpolateAtDay(pts, 180), null);
   });
 
+  test('resolveFunding prefers market-wide OI-weighted funding and falls back to Deribit', () => {
+    const { resolveFunding } = require('../server/basis_fetcher');
+    const ts = Date.UTC(2026, 9, 10, 8);
+    const H = 3600000;
+    // CoinGlass: one settlement every 8h at 0.01% per 8h → 3 × 365 × 0.01% = 10.95% APR
+    const cgFull = Array.from({ length: 21 }, (_, i) => ({ fundingTime: ts - i * 8 * H, fundingRate: 0.0001 }));
+    // Deribit: hourly settlements at 0.0000025 per hour → 2.19% APR
+    const deribit = Array.from({ length: 7 * 24 }, (_, i) => ({ fundingTime: ts - i * H, fundingRate: 0.0000025 }));
+
+    const cg = resolveFunding(ts, cgFull, deribit);
+    assert.equal(cg.fundingSource, 'coinglass_oi');
+    assert.ok(Math.abs(cg.fundingApr - 10.95) < 1e-9);
+    assert.ok(Math.abs(cg.fundingApr24h - 10.95) < 1e-9);
+    assert.ok(Math.abs(cg.deribitFundingApr - 2.19) < 1e-9);
+
+    // Window only half covered by CoinGlass (e.g. before its ~1000-day history) → Deribit, not a diluted average
+    const partial = resolveFunding(ts, cgFull.slice(0, 10), deribit);
+    assert.equal(partial.fundingSource, 'deribit');
+    assert.ok(Math.abs(partial.fundingApr - 2.19) < 1e-9);
+
+    // CoinGlass unavailable
+    assert.equal(resolveFunding(ts, null, deribit).fundingSource, 'deribit');
+  });
+
   test('aggregateDailyFunding sums settlements in the window and annualizes', () => {
     const now = Date.UTC(2026, 9, 5);
     const rows = [
@@ -638,6 +662,46 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     assert.equal(result.tBillRate, c.tbill);
     assert.equal(result.hurdleRate, c.hurdle);
     assert.ok(result.regime.regimeCode);
+  });
+});
+
+describe('Phase 2-C: Cross-sectional term structure curve', () => {
+  const { curveExpiries, ustAt, forwardRate, decorateCurve } = require('../server/term_curve');
+  const { deribitFutureName } = require('../server/basis_fetcher');
+
+  test('curve uses monthly + quarterly expiries with 7 to 400 days left', () => {
+    const names = curveExpiries(Date.UTC(2026, 9, 17, 8)).map(deribitFutureName);
+    assert.deepEqual(names, ['BTC-30OCT26', 'BTC-27NOV26', 'BTC-25DEC26', 'BTC-29JAN27', 'BTC-26MAR27', 'BTC-25JUN27', 'BTC-24SEP27']);
+    // A monthly inside its final week is left out
+    const lastWeek = curveExpiries(Date.UTC(2026, 9, 26, 8)).map(deribitFutureName);
+    assert.ok(!lastWeek.includes('BTC-30OCT26'));
+  });
+
+  test('Treasury yield is interpolated by tenor and flat outside 1M–1Y', () => {
+    const ust = { DGS1MO: 4.0, DGS3MO: 4.3, DGS6MO: 4.4, DGS1: 4.6 };
+    assert.equal(ustAt(10, ust), 4.0);
+    assert.ok(Math.abs(ustAt(60.5, ust) - 4.15) < 1e-9);
+    assert.equal(ustAt(365, ust), 4.6);
+    assert.equal(ustAt(400, ust), 4.6);
+    assert.equal(ustAt(90, {}), null);
+  });
+
+  test('forward rate and curve metrics', () => {
+    // Flat 5% curve → 5% forward
+    assert.ok(Math.abs(forwardRate({ apr: 5, days: 90 }, { apr: 5, days: 180 }) - 5 * (1 / (1 + 0.05 * 90 / 365))) < 1e-9);
+    const ust = { DGS1MO: 4, DGS3MO: 4, DGS6MO: 4, DGS1: 4 };
+    const out = decorateCurve([
+      { name: 'B', days: 160, apr: 5 },
+      { name: 'A', days: 30, apr: 7 },
+      { name: 'X', days: 3, apr: 20 }   // under 7 days: dropped
+    ], ust);
+    assert.deepEqual(out.points.map(p => p.name), ['A', 'B']);
+    assert.equal(out.points[0].spread, 3);
+    assert.equal(out.metrics.slope, -2);
+    assert.equal(out.metrics.avgSpread, 2);
+    assert.equal(out.metrics.widestSpread.name, 'A');
+    assert.equal(out.forwards.length, 1);
+    assert.ok(out.forwards[0].apr < 5); // a falling curve implies a lower forward
   });
 });
 

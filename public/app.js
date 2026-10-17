@@ -83,6 +83,10 @@ function reloadAllChartsForTheme() {
     termPremiumChartInstance = null;
   }
   if (typeof disposeEtfLinkageCharts === 'function') disposeEtfLinkageCharts();
+  if (typeof termCurveChartInstance !== 'undefined' && termCurveChartInstance) {
+    try { termCurveChartInstance.dispose(); } catch (e) {}
+    termCurveChartInstance = null;
+  }
   if (typeof ssroChartInstance !== 'undefined' && ssroChartInstance) {
     try { ssroChartInstance.dispose(); } catch (e) {}
     ssroChartInstance = null;
@@ -140,6 +144,9 @@ function reloadAllChartsForTheme() {
   }
   if (typeof renderEtfLinkage === 'function' && typeof rawEtfLinkageData !== 'undefined' && rawEtfLinkageData) {
     renderEtfLinkage();
+  }
+  if (typeof renderTermCurveChart === 'function' && typeof rawTermCurve !== 'undefined' && rawTermCurve) {
+    renderTermCurveChart();
   }
   if (typeof renderSsroChart === 'function' && typeof rawSsroData !== 'undefined' && rawSsroData) {
     renderSsroChart();
@@ -3737,7 +3744,17 @@ function renderTermPremium(data, forceRedraw = false) {
   if (c) {
     // 1. Real tenor points
     tpSetSigned(elTpValFunding, c.fundingApr);
-    if (elTpValFunding) elTpValFunding.title = c.fundingApr24h != null ? `过去 24h 资金费率年化: ${tpPct(c.fundingApr24h)}` : '';
+    if (elTpValFunding) {
+      const fallback = c.fundingSource === 'deribit';
+      elTpValFunding.title = [
+        fallback ? '来源：Deribit 永续（CoinGlass 暂不可用，已退回）' : '来源：CoinGlass 全市场 OI 加权，7 日已实现均值',
+        c.fundingApr24h != null ? `过去 24h 年化: ${tpPct(c.fundingApr24h)}` : '',
+        c.predictedFundingApr != null ? `当前 8h 周期累计中: ${tpPct(c.predictedFundingApr)}` : '',
+        !fallback && c.deribitFundingApr != null ? `对照 Deribit 永续 7 日: ${tpPct(c.deribitFundingApr)}` : ''
+      ].filter(Boolean).join('\n');
+      // Mark the value when the fallback source is in use
+      elTpValFunding.style.textDecoration = fallback ? 'underline dotted' : '';
+    }
     if (elTpLblCq) elTpLblCq.textContent = c.cqDays != null ? `当季 (${Math.round(c.cqDays)}D)` : '当季';
     tpSetSigned(elTpValCq, c.cqApr, { nullText: '末周剔除' });
     if (elTpLblNq) elTpLblNq.textContent = c.nqDays != null ? `次季 (${Math.round(c.nqDays)}D)` : '次季';
@@ -3862,7 +3879,7 @@ function renderTermPremiumChart() {
     seriesList.push(line('top-tbill', '3M 美债', 'tbill', '#f43f5e', { lineStyle: { width: 1.4, color: '#f43f5e', type: 'dotted' } }));
   }
   if (tpVisibleSeries.allCurves) {
-    seriesList.push(line('top-funding', '0D 资金费率 (7D均) APR', 'fundingApr', '#a1a1aa', { lineStyle: { width: 1, color: '#a1a1aa', opacity: 0.7 } }));
+    seriesList.push(line('top-funding', '0D 资金费率 (OI加权 7D均) APR', 'fundingApr', '#a1a1aa', { lineStyle: { width: 1, color: '#a1a1aa', opacity: 0.7 } }));
     seriesList.push(line('top-cq', '当季 APR', 'cqApr', '#38bdf8', { lineStyle: { width: 1.3, color: '#38bdf8' } }));
     seriesList.push(line('top-nq', '次季 APR', 'nqApr', '#10b981', { lineStyle: { width: 1.3, color: '#10b981' } }));
   }
@@ -4552,6 +4569,194 @@ function initEtfLinkageEvents() {
     });
   }
   window.addEventListener('resize', resizeEtfLinkageCharts);
+}
+
+// ============================================================================
+// Module 2-C: Cross-sectional term structure (Deribit basis vs Treasury curve)
+// ============================================================================
+
+let rawTermCurve = null;
+let termCurveChartInstance = null;
+let termCurveLastFetch = 0;
+const TERM_CURVE_REFRESH_MS = 60 * 1000;
+const tcVisible = { cmp7: true, cmp30: true, cmp90: false, forward: true };
+const TC_COMPARE_STYLE = {
+  7: { key: 'cmp7', color: '#94a3b8', type: 'dashed' },
+  30: { key: 'cmp30', color: '#64748b', type: 'dashed' },
+  90: { key: 'cmp90', color: '#475569', type: 'dotted' }
+};
+
+async function loadTermCurve(force = false) {
+  if (!force && rawTermCurve && Date.now() - termCurveLastFetch < TERM_CURVE_REFRESH_MS) return;
+  try {
+    const resp = await fetch('/api/term-curve');
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    rawTermCurve = json;
+    termCurveLastFetch = Date.now();
+    renderTermCurve();
+  } catch (err) {
+    console.error('[Term Curve] Failed to load:', err);
+    const asof = document.getElementById('tc-asof');
+    if (asof) asof.textContent = `加载失败：${err.message}`;
+  }
+}
+
+function renderTermCurve() {
+  const d = rawTermCurve;
+  if (!d?.live) return;
+  const live = d.live;
+  const asof = document.getElementById('tc-asof');
+  if (asof) asof.textContent = `${formatUTC8(live.asOf)} (UTC+8) · 指数 $${Math.round(live.index).toLocaleString('en-US')}`;
+
+  const box = document.getElementById('tc-kpis');
+  if (box) {
+    const m = live.metrics || {};
+    const month = (d.comparisons || []).find(c => c.backDays === 30);
+    // Compare at fixed tenors (30D / 180D), interpolated on each curve — the front contract of
+    // each curve has a different maturity, so contract-to-contract changes would mix tenors
+    const aprAt = (points, days) => {
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        if (days >= a.days && days <= b.days) return a.apr + (b.apr - a.apr) * (days - a.days) / (b.days - a.days);
+      }
+      return null;
+    };
+    const chg = days => {
+      if (!month) return null;
+      const now = aprAt(live.points, days), then = aprAt(month.points, days);
+      return now != null && then != null ? now - then : null;
+    };
+    const c30 = chg(30);
+    const c180 = chg(180);
+    const pp = v => (v == null || !Number.isFinite(v) ? '--' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`);
+    const tile = (label, value, sub, color) => `<div class="el-kpi"><span class="el-kpi-lbl">${label}</span><span class="el-kpi-val" style="color:${color || ''}">${value}</span><span class="el-kpi-sub">${sub}</span></div>`;
+    const shape = m.slope == null ? '--' : m.slope > 0.3 ? '向上倾斜' : m.slope < -0.3 ? '前高后平 / 倒挂' : '基本平坦';
+    box.innerHTML = [
+      tile('曲线斜率（远端 − 近端）', `${pp(m.slope)} pp`, `${shape} · 近端 ${pp(m.frontApr)}% → 远端 ${pp(m.backApr)}%`, m.slope < -0.3 ? '#f59e0b' : null),
+      tile('对美债平均溢价', `${pp(m.avgSpread)} pp`, `各合约基差 − 同期限美债的均值`, m.avgSpread != null && m.avgSpread < 1 ? '#f43f5e' : '#10b981'),
+      tile('溢价最厚的期限', m.widestSpread ? `${m.widestSpread.name.replace('BTC-', '')}` : '--', m.widestSpread ? `${Math.round(m.widestSpread.days)} 天 · 高于美债 ${pp(m.widestSpread.spread)} pp` : '--'),
+      tile('0D 资金费率（OI 加权）', d.funding0d != null ? `${pp(d.funding0d)}%` : '--', '全市场永续 7 日均值，单独标注不与期货相连'),
+      tile('较 1 个月前（固定期限）', c30 != null || c180 != null ? `30D ${pp(c30)} / 180D ${pp(c180)}` : '--',
+        c30 != null && c180 != null
+          ? (Math.abs(c30) > 2 * Math.abs(c180) ? '主要是前端在动（短期杠杆或资金冲击）' : Math.abs(c180) > 2 * Math.abs(c30) ? '主要是远端在动（结构性套利资金）' : '曲线整体平移')
+          : (month ? '期限超出某条曲线的覆盖范围' : '对比曲线加载中'))
+    ].join('');
+  }
+  renderTermCurveChart();
+}
+
+function renderTermCurveChart() {
+  const d = rawTermCurve;
+  const dom = document.getElementById('term-curve-echarts');
+  if (!d?.live || !dom || dom.offsetWidth === 0) return; // hidden view: drawn when switched to
+  if (!termCurveChartInstance) termCurveChartInstance = echarts.init(dom, getEchartsTheme());
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const live = d.live;
+  const pt = p => ({ value: [p.days, p.apr], meta: p });
+  const maxDays = Math.max(370, ...live.points.map(p => p.days + 10));
+
+  const series = [];
+  for (const c of d.comparisons || []) {
+    const st = TC_COMPARE_STYLE[c.backDays];
+    if (!st || !tcVisible[st.key]) continue;
+    series.push({
+      name: `${c.label} (${c.date.slice(5)})`, type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'circle', symbolSize: 4,
+      data: c.points.map(p => ({ value: [p.days, p.apr], meta: { ...p, curveLabel: `${c.label} ${c.date}` } })),
+      lineStyle: { width: 1.4, color: st.color, type: st.type }, itemStyle: { color: st.color }, z: 2
+    });
+  }
+  const ust = live.ust || {};
+  const ustPts = [['DGS1MO', 30], ['DGS3MO', 91], ['DGS6MO', 182], ['DGS1', 365]]
+    .filter(([id]) => Number.isFinite(ust[id])).map(([id, days]) => ({ value: [days, ust[id]], meta: { ustLabel: id.replace('DGS', '').replace('MO', 'M') } }));
+  series.push({
+    name: '美债收益率', type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'rect', symbolSize: 5, data: ustPts,
+    lineStyle: { width: 1.6, color: '#f43f5e', type: 'dashed' }, itemStyle: { color: '#f43f5e' }, z: 3
+  });
+  if (tcVisible.forward && live.forwards?.length) {
+    const fwd = [];
+    live.forwards.forEach(f => {
+      fwd.push({ value: [f.fromDays, f.apr], meta: { forward: f } }, { value: [f.toDays, f.apr], meta: { forward: f } }, { value: [f.toDays, null] });
+    });
+    series.push({
+      name: '隐含远期', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, connectNulls: false, data: fwd,
+      lineStyle: { width: 2, color: '#a855f7', opacity: 0.75 }, itemStyle: { color: '#a855f7' }, z: 4
+    });
+  }
+  series.push({
+    name: 'Deribit 当前曲线', type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'circle', symbolSize: 9, data: live.points.map(pt),
+    lineStyle: { width: 2.6, color: '#f59e0b' }, itemStyle: { color: '#f59e0b', borderColor: '#fff', borderWidth: 1 },
+    label: { show: true, position: 'top', fontSize: 10, color: colors.textSecondary, formatter: p => p.data.meta.name.replace('BTC-', '') }, z: 5
+  });
+  if (d.funding0d != null) {
+    series.push({
+      name: '0D 资金费率', type: 'scatter', xAxisIndex: 0, yAxisIndex: 0, symbol: 'diamond', symbolSize: 12,
+      data: [{ value: [0, d.funding0d], meta: { funding: d.funding0d } }], itemStyle: { color: '#a1a1aa' }, z: 5
+    });
+  }
+  series.push({
+    name: '期限利差（基差 − 美债）', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barWidth: 12,
+    data: live.points.map(p => ({ value: [p.days, p.spread], meta: p, itemStyle: { color: p.spread >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(244,63,94,0.75)' } }))
+  });
+
+  const tooltipHtml = params => {
+    const m = params.data?.meta;
+    if (!m) return '';
+    if (m.funding != null) return `<b>0D 资金费率（全市场 OI 加权）</b><br>7 日已实现年化 ${tpPct(m.funding)}<br><span style="color:${colors.textSecondary};">永续无到期日，单独标注</span>`;
+    if (m.ustLabel) return `<b>美债 ${m.ustLabel}</b><br>${Number(params.value[1]).toFixed(2)}%`;
+    if (m.forward) return `<b>隐含远期 ${m.forward.from.replace('BTC-', '')} → ${m.forward.to.replace('BTC-', '')}</b><br>${Math.round(m.forward.fromDays)} 天后再持有 ${Math.round(m.forward.toDays - m.forward.fromDays)} 天的年化: ${tpPct(m.forward.apr)}`;
+    return `<b>${m.name}</b>${m.curveLabel ? ` · ${m.curveLabel}` : ' · 当前'}<br>
+      到期 ${m.expiry} · 剩余 ${Math.round(m.days)} 天<br>
+      年化基差: <b>${tpPct(m.apr)}</b><br>
+      同期限美债: ${m.ust != null ? m.ust.toFixed(2) + '%' : '--'} · 期限利差: <b>${tpPct(m.spread)}</b>
+      ${m.oiUsd != null ? `<br>持仓 ${elFmtUsd(m.oiUsd, false)} · 24h 成交 ${elFmtUsd(m.volumeUsd, false)}` : ''}`;
+  };
+
+  termCurveChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: { ...elTooltipBase(colors), trigger: 'item', formatter: tooltipHtml },
+    grid: [
+      { left: 56, right: 24, top: 40, height: '56%' },
+      { left: 56, right: 24, top: '74%', bottom: 34 }
+    ],
+    xAxis: [
+      { type: 'value', gridIndex: 0, min: 0, max: Math.ceil(maxDays / 30) * 30, interval: 30, ...common, axisLabel: { show: false }, splitLine: { lineStyle: { color: colors.gridLine } } },
+      {
+        type: 'value', gridIndex: 1, min: 0, max: Math.ceil(maxDays / 30) * 30, interval: 30, ...common,
+        name: '剩余天数', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: colors.tickColor, fontSize: 10 },
+        splitLine: { show: false }
+      }
+    ],
+    yAxis: [
+      { type: 'value', gridIndex: 0, scale: true, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}%' }, name: '年化 (%)', nameTextStyle: { color: colors.tickColor, fontSize: 10 } },
+      { type: 'value', gridIndex: 1, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}' }, name: '利差 (pp)', nameTextStyle: { color: colors.tickColor, fontSize: 10 } }
+    ],
+    series
+  }, true);
+}
+
+function initTermCurveEvents() {
+  const legend = document.getElementById('tc-legend');
+  if (legend) {
+    legend.addEventListener('click', e => {
+      const btn = e.target.closest('[data-tc]');
+      if (!btn) return;
+      const key = btn.dataset.tc;
+      tcVisible[key] = !tcVisible[key];
+      btn.classList.toggle('active', tcVisible[key]);
+      renderTermCurveChart();
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (termCurveChartInstance) termCurveChartInstance.resize();
+  });
+  // Refresh while Module 2 is on screen (the server caches the live curve for 60 s)
+  setInterval(() => {
+    if (currentActiveView === 'view-term-premium' || currentActiveView === 'view-all') loadTermCurve(false);
+  }, TERM_CURVE_REFRESH_MS);
 }
 
 // ============================================================================
@@ -5925,6 +6130,11 @@ function switchView(viewId, updateHash = true) {
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
     resizeEtfLinkageCharts();
+    if (termCurveChartInstance) {
+      termCurveChartInstance.resize();
+    } else if (typeof rawTermCurve !== 'undefined' && rawTermCurve && (viewId === 'view-term-premium' || viewId === 'view-all')) {
+      renderTermCurveChart();
+    }
 
     if (ssroChartInstance) {
       ssroChartInstance.resize();
@@ -6907,6 +7117,7 @@ initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
 initEtfLinkageEvents();
+initTermCurveEvents();
 initSsroEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
@@ -6914,6 +7125,7 @@ initMcClellanEvents();
 initNavigation();
 loadMarketData(false);
 loadEtfLinkageData(false);
+loadTermCurve(false);
 fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 fetchCbLiquidityHistory(false);

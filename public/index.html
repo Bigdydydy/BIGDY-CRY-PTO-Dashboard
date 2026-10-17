@@ -997,7 +997,7 @@
               <dt>APR（年化基差）</dt>
               <dd><code>(期货价 − 现货指数) / 现货指数 × 365 / 剩余天数</code>，即持有到交割的年化收益率。</dd>
               <dt>0D / 当季 / 次季</dt>
-              <dd>三个真实期限点：永续合约资金费率（过去 7 日均值年化，视作 0 天期限）、最近与次近的季度交割合约。当季距交割不足 7 天时剔除，避免除以极小天数放大噪声。</dd>
+              <dd>三个真实期限点：全市场永续资金费率（CoinGlass 按各交易所持仓量加权，过去 7 日已实现均值年化，视作 0 天期限；不可用时退回 Deribit 永续）、最近与次近的 Deribit 季度合约。当季距交割不足 7 天时剔除，避免除以极小天数放大噪声。不用 Deribit 自己的资金费率作主数据，是因为它有抑制机制，小溢价直接记为 0，会让短端利差平均偏高约 1.6 个百分点。</dd>
               <dt>90D</dt>
               <dd>在相邻真实期限点之间线性插值得到的 90 天恒定期限基差，不做外推；用它跨季度比较时不受合约剩余天数影响。</dd>
               <dt>超额美债 / 机构门槛</dt>
@@ -1082,7 +1082,7 @@
             <div class="tp-data-audit-strip">
               <div class="tp-audit-left">
                 <span><strong class="text-cyan">数据源:</strong> Deribit 永续资金费率 + 当季/次季季度合约 (2024.01 ~ 至今，每日 08:00 UTC + 实时盘口)</span>
-                <span><strong class="text-cyan">期限:</strong> 0D 资金费率 (7 日均) / 当季 (距交割 &lt;7 天剔除) / 次季 / 90D 插值，不外推</span>
+                <span><strong class="text-cyan">期限:</strong> 0D 全市场 OI 加权资金费率 (7 日均，CoinGlass) / 当季 (距交割 &lt;7 天剔除) / 次季 / 90D 插值，不外推</span>
                 <span><strong class="text-cyan">基准:</strong> FRED 3M 美债 + 3.5% 机构门槛</span>
               </div>
               <span id="tp-history-points-badge" class="tp-audit-right">-- 真实历史日线</span>
@@ -1099,7 +1099,7 @@
               </div>
               <div class="tp-basis-grid">
                 <div class="tp-basis-item">
-                  <span class="tp-b-lbl" title="永续 BTCUSD_PERP 资金费率，过去 7 日结算之和年化；悬停数值可见 24h 原始值">0D 资金费率 (7D均)</span>
+                  <span class="tp-b-lbl" title="全市场永续资金费率（CoinGlass 按持仓量加权），过去 7 日已实现均值年化；悬停数值可见 24h 值与 Deribit 永续对照">0D 资金费率 (OI加权)</span>
                   <span class="tp-b-val" id="tp-val-funding">--%</span>
                 </div>
                 <div class="tp-basis-item">
@@ -1209,6 +1209,39 @@
               <ul class="tp-insights-list" id="tp-insights-list">
                 <li>加载分析要点中...</li>
               </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cross-sectional term structure: every monthly / quarterly future vs the Treasury curve -->
+        <div class="tp-chart-panel tc-panel" id="tc-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 20h18M4 16c3-6 6-9 9-9s5 2 7 4"/>
+              </svg>
+              <span>期限结构截面曲线 · Deribit 基差 vs 美债收益率（按剩余天数）</span>
+            </div>
+            <div class="tp-chart-actions">
+              <span class="tz-badge" id="tc-asof">加载中...</span>
+            </div>
+          </div>
+          <div class="el-intro tc-intro">
+            <p><strong>怎么看：</strong>每个点是一个月度或季度合约，纵轴是持有到交割的年化基差，也就是"以 BTC 作抵押借美元"的隐含利率；虚线是同期限美债收益率，两者之差（下方柱子）是该期限的加密期限溢价。曲线向上倾斜说明市场预期杠杆需求持续，前高后平说明溢价集中在短期，贴近美债说明套利资金已把溢价压平。灰色曲线为 1 周 / 1 个月 / 3 个月前同口径重建，用来看曲线整体平移还是只有前端在动。</p>
+          </div>
+          <div class="tc-kpis" id="tc-kpis"></div>
+          <div class="tp-legend-strip" id="tc-legend">
+            <button class="tp-legend-btn active" data-tc="cmp7"><span class="legend-color-dot" style="background-color: #94a3b8;"></span><span>1 周前</span></button>
+            <button class="tp-legend-btn active" data-tc="cmp30"><span class="legend-color-dot" style="background-color: #64748b;"></span><span>1 个月前</span></button>
+            <button class="tp-legend-btn" data-tc="cmp90"><span class="legend-color-dot" style="background-color: #475569;"></span><span>3 个月前</span></button>
+            <button class="tp-legend-btn active" data-tc="forward"><span class="legend-color-dot" style="background-color: #a855f7;"></span><span>隐含远期</span></button>
+          </div>
+          <div id="term-curve-echarts" class="tc-chart"></div>
+          <div class="tp-data-audit-strip">
+            <div class="tp-audit-left">
+              <span><strong class="text-cyan">合约:</strong> Deribit 月度与季度合约，剩余 ≥7 天（周 / 日合约年化噪声过大，不计入）</span>
+              <span><strong class="text-cyan">美债:</strong> FRED 1M / 3M / 6M / 1Y，按天数线性插值</span>
+              <span><strong class="text-cyan">远期:</strong> 相邻合约推出的隐含年化</span>
             </div>
           </div>
         </div>

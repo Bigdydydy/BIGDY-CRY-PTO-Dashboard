@@ -6934,3 +6934,33 @@ body {
   flex-direction: column;
   min-width: 0;
 }
+
+/* Module 2-C · 期限结构截面曲线 */
+.tc-panel {
+  margin-top: 20px;
+}
+
+.tc-intro {
+  margin-bottom: 0;
+}
+
+.tc-chart {
+  width: 100%;
+  height: 460px;
+}
+
+.tc-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.tc-kpis:empty {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .tc-chart {
+    height: 400px;
+  }
+}

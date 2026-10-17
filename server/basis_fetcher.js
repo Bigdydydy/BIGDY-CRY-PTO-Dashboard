@@ -1,6 +1,6 @@
 /**
- * Real Historical Basis & Term Structure Fetcher (schema v4, Deribit)
- * Source: Deribit BTC inverse futures + BTC-PERPETUAL funding + FRED DGS3MO
+ * Real Historical Basis & Term Structure Fetcher (schema v5)
+ * Source: Deribit BTC inverse futures + CoinGlass OI-weighted BTC funding + FRED DGS3MO
  *
  * Deribit is used because it is reachable from the deployed server: Binance answers the Render
  * host with HTTP 418 (shared egress IPs are banned), which froze this module online.
@@ -9,8 +9,11 @@
  * and quarterly expiries all fall on that hour.
  *
  * Only tenors that actually trade are used:
- *   0D   = BTC-PERPETUAL realized funding (sum of hourly interest_1h), trailing 7-day average
- *          annualized (raw 24h kept as fundingApr24h; 24h funding is far noisier than the basis)
+ *   0D   = market-wide perpetual funding: CoinGlass OI-weighted BTC funding (8h bars), trailing
+ *          7-day realized average annualized. Deribit's own perp funding is dampened toward 0
+ *          (260 of ~1000 days under 1% APR vs 78 market-wide) and biased the short-end spread
+ *          by ~1.6pp; it is kept as deribitFundingApr and used as the fallback when CoinGlass
+ *          is unavailable or does not cover a day (fundingSource records which one was used).
  *   CQ   = current-quarter future (dropped when < 7 days to expiry)
  *   NQ   = next-quarter future
  *   90D  = linear interpolation between the real points that bracket 90 days
@@ -21,9 +24,10 @@ const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchFredSeries } = require('./macro_fetcher');
+const { callCoinglassEndpoint } = require('./cdri_fetcher');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const HISTORY_START_TS = Date.UTC(2024, 0, 1, 8); // Spot ETF launch era (ETFs listed 2024-01-11)
 const SNAPSHOT_HOUR_UTC = 8;
 const DERIBIT_API = 'https://www.deribit.com/api/v2/public';
@@ -113,6 +117,71 @@ function aggregateDailyFunding(fundingRows, snapshotTs, windowDays = 1) {
 }
 
 /**
+ * CoinGlass BTC OI-weighted funding, 8h bars (~1000 days; the endpoint does not page further back).
+ * Bar t covers [t, t + 8h]; its close is the rate settled at t + 8h, in % per 8h. Returned as
+ * funding rows { fundingTime: settlement time, fundingRate: decimal per 8h } so the same window
+ * aggregation as Deribit applies. The still-open bar settles in the future and is never counted.
+ */
+const CG_FUNDING_TTL_MS = 30 * 60 * 1000;
+let cgFundingCache = null;
+let cgFundingCacheTime = 0;
+
+async function fetchCoinglassOiFunding() {
+  if (cgFundingCache && Date.now() - cgFundingCacheTime < CG_FUNDING_TTL_MS) return cgFundingCache;
+  const bars = await callCoinglassEndpoint('/api/priceAndIndicator?symbol=BTC&interval=h8&index=avg_fr_kline&limit=3000');
+  if (!Array.isArray(bars) || !bars.length) throw new Error('CoinGlass OI-weighted funding: empty response');
+  const rows = bars
+    .map(b => ({ fundingTime: Number(b.data[0]) * 1000 + 8 * HOUR_MS, fundingRate: Number(b.data[4]) / 100 }))
+    .filter(r => Number.isFinite(r.fundingTime) && Number.isFinite(r.fundingRate))
+    .sort((a, b) => a.fundingTime - b.fundingTime);
+  cgFundingCache = rows;
+  cgFundingCacheTime = Date.now();
+  return rows;
+}
+
+/** Annualized funding over the window, or null unless ≥ 90% of the expected settlements are present */
+function coveredFundingApr(rows, ts, windowDays, settlementsPerDay) {
+  if (!rows || !rows.length) return null;
+  let n = 0;
+  for (const r of rows) {
+    if (r.fundingTime > ts - windowDays * DAY_MS && r.fundingTime <= ts) n++;
+  }
+  return n >= 0.9 * windowDays * settlementsPerDay ? aggregateDailyFunding(rows, ts, windowDays) : null;
+}
+
+/**
+ * 0D tenor for one snapshot: OI-weighted market funding when CoinGlass covers the 7-day window,
+ * otherwise Deribit perpetual funding. Deribit's value is always kept for comparison.
+ */
+function resolveFunding(ts, cgRows, deribitRows) {
+  const deribit7d = aggregateDailyFunding(deribitRows, ts, FUNDING_WINDOW_DAYS);
+  const cg7d = coveredFundingApr(cgRows, ts, FUNDING_WINDOW_DAYS, 3);
+  if (cg7d != null) {
+    return {
+      fundingApr: cg7d,
+      fundingApr24h: coveredFundingApr(cgRows, ts, 1, 3),
+      fundingSource: 'coinglass_oi',
+      deribitFundingApr: deribit7d
+    };
+  }
+  return {
+    fundingApr: deribit7d,
+    fundingApr24h: aggregateDailyFunding(deribitRows, ts, 1),
+    fundingSource: 'deribit',
+    deribitFundingApr: deribit7d
+  };
+}
+
+async function fetchCoinglassOiFundingSafe() {
+  try {
+    return await fetchCoinglassOiFunding();
+  } catch (err) {
+    console.warn('[BasisFetcher] CoinGlass OI-weighted funding unavailable, falling back to Deribit:', err.message);
+    return null;
+  }
+}
+
+/**
  * Linear interpolation over sorted real curve points [{days, apr}]; null outside the observed range
  */
 function interpolateAtDay(points, targetDays) {
@@ -131,7 +200,10 @@ function interpolateAtDay(points, targetDays) {
 /**
  * Build one curve record from raw prices. All APRs are simple annualized basis in %.
  */
-function buildCurvePoint({ timestamp, indexPrice, cqPrice, nqPrice, cqExpiryTs, nqExpiryTs, fundingApr, fundingApr24h = null, tbill }) {
+function buildCurvePoint({
+  timestamp, indexPrice, cqPrice, nqPrice, cqExpiryTs, nqExpiryTs,
+  fundingApr, fundingApr24h = null, fundingSource = null, deribitFundingApr = null, tbill
+}) {
   const cqDays = (cqExpiryTs - timestamp) / DAY_MS;
   const nqDays = (nqExpiryTs - timestamp) / DAY_MS;
   const apr = (F, days) => (F > 0 && indexPrice > 0 && days > 0 ? (F - indexPrice) / indexPrice * (365 / days) * 100 : null);
@@ -154,6 +226,8 @@ function buildCurvePoint({ timestamp, indexPrice, cqPrice, nqPrice, cqExpiryTs, 
     btcPrice: Math.round(indexPrice),
     fundingApr: round(fundingApr),
     fundingApr24h: round(fundingApr24h),
+    fundingSource,
+    deribitFundingApr: round(deribitFundingApr),
     cqApr: round(cqApr),
     cqDays: round(cqDays, 2),
     cqValid,
@@ -318,8 +392,8 @@ async function fetchDeribitDailyCloses(instrument, startTs, endTs) {
 /**
  * 3-month T-Bill (FRED DGS3MO) lookup with forward fill over weekends/holidays
  */
-async function fetchTbillLookup() {
-  const map = await fetchFredSeries('DGS3MO');
+async function fetchTbillLookup(seriesId = 'DGS3MO') {
+  const map = await fetchFredSeries(seriesId);
   const dates = [...map.keys()].sort();
   return {
     latest: dates.length ? map.get(dates[dates.length - 1]) : null,
@@ -367,6 +441,7 @@ async function fetchAndBuildHistoricalBasis(cachedSeries = null) {
   }
 
   const tbillLookup = await fetchTbillLookup();
+  const cgFundingRows = await fetchCoinglassOiFundingSafe();
   const fundingRows = await fetchDeribitFundingHistory(fromTs - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, lastSnapshot + HOUR_MS);
   const closesByName = new Map();
   for (const c of contracts.values()) {
@@ -399,8 +474,7 @@ async function fetchAndBuildHistoricalBasis(cachedSeries = null) {
       nqPrice,
       cqExpiryTs: q1Expiry.getTime(),
       nqExpiryTs: q2Expiry.getTime(),
-      fundingApr: aggregateDailyFunding(fundingRows, ts, FUNDING_WINDOW_DAYS),
-      fundingApr24h: aggregateDailyFunding(fundingRows, ts, 1),
+      ...resolveFunding(ts, cgFundingRows, fundingRows),
       tbill: lastTbill
     }));
   }
@@ -440,9 +514,10 @@ async function fetchLiveCurve(tbill) {
   if (liveCache && now - liveCacheTime < LIVE_TTL_MS) {
     return { ...liveCache, tbill: round(tbill), ...rebaseOnTbill(liveCache, tbill) };
   }
-  const [book, funding] = await Promise.all([
+  const [book, funding, cgFunding] = await Promise.all([
     deribitGet('get_book_summary_by_currency', { currency: 'BTC', kind: 'future' }),
-    fetchDeribitFundingHistory(now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, now)
+    fetchDeribitFundingHistory(now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, now),
+    fetchCoinglassOiFundingSafe()
   ]);
 
   const [q1Expiry, q2Expiry] = getQuarterExpiries(new Date(now));
@@ -460,11 +535,16 @@ async function fetchLiveCurve(tbill) {
     nqPrice: Number(nq.mark_price),
     cqExpiryTs: q1Expiry.getTime(),
     nqExpiryTs: q2Expiry.getTime(),
-    fundingApr: aggregateDailyFunding(funding, now, FUNDING_WINDOW_DAYS),
-    fundingApr24h: aggregateDailyFunding(funding, now, 1),
+    ...resolveFunding(now, cgFunding, funding),
     tbill
   });
-  if (perp?.funding_8h != null) point.predictedFundingApr = round(Number(perp.funding_8h) * 3 * 365 * 100);
+  // Rate accruing in the current, not yet settled 8h period (market-wide when available)
+  const openBar = cgFunding && cgFunding[cgFunding.length - 1];
+  if (point.fundingSource === 'coinglass_oi' && openBar && openBar.fundingTime > now) {
+    point.predictedFundingApr = round(openBar.fundingRate * 3 * 365 * 100);
+  } else if (perp?.funding_8h != null) {
+    point.predictedFundingApr = round(Number(perp.funding_8h) * 3 * 365 * 100);
+  }
   point.contracts = [[cq, q1Expiry], [nq, q2Expiry]].map(([b, exp]) => {
     const days = (exp.getTime() - now) / DAY_MS;
     return {
@@ -580,6 +660,7 @@ module.exports = {
   fetchLiveCurve,
   buildCurvePoint,
   aggregateDailyFunding,
+  resolveFunding,
   interpolateAtDay,
   applyCarryMetrics,
   calculateCarryScore,
@@ -588,6 +669,11 @@ module.exports = {
   parseDeribitFutureExpiry,
   latestSnapshotTs,
   getQuarterExpiries,
+  getLastFridayOfMonth,
+  // Shared with term_curve.js so every Deribit call goes through the same rate-limited queue
+  deribitGet,
+  fetchDeribitDailyCloses,
+  fetchTbillLookup,
   CACHE_FILE,
   SCHEMA_VERSION,
   CQ_MIN_DAYS,
