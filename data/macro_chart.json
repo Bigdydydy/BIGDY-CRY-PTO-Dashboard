@@ -38558,11 +38558,11 @@
     },
     {
       "date": "2026-10-17",
-      "btcPrice": 81468,
+      "btcPrice": 81648.01,
       "mstrCost": 75444,
       "mstrHoldings": 848250,
       "mstrBuyVelocity30d": 106.7,
-      "mnav": 1.035,
+      "mnav": 1.033,
       "mnavEstimated": true,
       "us1y": 4.49,
       "us10y": 5.1,
@@ -38575,7 +38575,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 81468,
+    "currentBtc": 81648.01,
     "currentMstrCost": 75444,
     "currentMstrHoldings": 848250,
     "currentMstrVelocity30d": 106.7,
@@ -38585,7 +38585,7 @@
     "velocityToIssuance": 0.24,
     "mstrCostSource": "coinglass",
     "mstrCostAsOf": "2026-10-12",
-    "currentMnav": 1.035,
+    "currentMnav": 1.033,
     "mnavEstimated": true,
     "mnavAnchorDate": "2026-09-12",
     "mnavBasis": "ev",
@@ -38620,7 +38620,7 @@
       "start": "2020-08-01",
       "end": "2026-10-17"
     },
-    "updatedAt": "2026-10-17T15:45:13.652Z"
+    "updatedAt": "2026-10-17T20:45:27.208Z"
   },
   "rawMstr": [
     {
