@@ -1457,7 +1457,9 @@
     const p = g.p, l = g.l, d = g.d, n = p.length;
     const lastIdx = p[n - 1].idx;
     const targets = [];
-    let monitoringPivot = null, secondaryPivot = null;
+    // monitoringPivot: 本段防线 / 铁律边界；negationPivot: 本段防线之外另有的计数否定位 (铁律)。
+    //   浪3 / 浪5 / c / y / z 运行中时越过本段起点只说明前一段仍在延伸，要越过铁律边界计数才被否定
+    let monitoringPivot = null, secondaryPivot = null, negationPivot = null;
 
     if (type === 'IMPULSE' || type === 'DIAGONAL') {
       const diag = type === 'DIAGONAL';
@@ -1468,7 +1470,8 @@
       } else if (n === 4) {
         targets.push(tgt(p[1].price, '浪3最低要求: 超越浪1终点', null));
         [1, 1.618, 2.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `浪3=浪1×${r}`, r)));
-        monitoringPivot = lvl(p[2].price, '浪2终点·浪3计数防线', '“浪3运行中”计数失效（浪2尚未结束）');
+        monitoringPivot = lvl(p[2].price, '浪2终点·浪3本段防线', '“浪3运行中”不成立：浪2尚未结束（仍在延伸），计数本身未否定');
+        negationPivot = lvl(p[0].price, '浪1起点·计数否定位', '浪2（延伸中）越过浪1起点，该计数否定（手稿P32铁律）');
         secondaryPivot = lvl(p[1].price, diag ? '浪1终点·浪4须切入(P48楔形)' : '浪1终点·浪4禁区边界(P48)', diag ? '浪4切入浪1价格区，满足楔形要求（P48）' : '浪4切入浪1价格区，推动浪计数失效，只能改按楔形（P48）');
       } else if (n === 5) {
         [0.236, 0.382, 0.5].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `浪4回撤浪3×${r}`, r)));
@@ -1492,7 +1495,9 @@
         // 浪3已短于浪1时，浪5不得长于浪3（否则浪3成为最短，违反M5）——柳玉冬所称「上涨极限」
         if (l[2] < l[0]) targets.push(tgt(p[4].price + d * l[2], '浪5极限=浪4终点+浪3长度（浪3不能最短, P32/P44）', 1));
         targets.push(tgt(p[4].price + d * 0.7 * l[3], '衰竭5浪最低: 0.7×浪4 (P204)', 0.7));
-        monitoringPivot = lvl(p[4].price, '浪4终点·浪5防线', '浪5可能已经结束或计数失效');
+        monitoringPivot = lvl(p[4].price, '浪4终点·浪5本段防线', '浪5尚未展开（浪4仍在延伸），或浪5已以失败浪5结束；计数本身未否定');
+        negationPivot = diag ? lvl(p[2].price, '浪2终点·计数否定位', '浪4（延伸中）完全回撤浪3，楔形计数否定（手稿P42）')
+          : lvl(p[1].price, '浪1终点·计数否定位', '浪4（延伸中）切入浪1价格区，推动浪计数否定（手稿P48）');
         secondaryPivot = lvl(p[3].price, '浪3终点·衰竭判定线', '浪5越过浪3终点、不是衰竭5浪；始终未越过则浪5至少需达浪4的0.7倍（P204）');
       }
     } else if (type === 'ZIGZAG' || type === 'FLAT') {
@@ -1518,8 +1523,9 @@
         targets.push(tgt(p[1].price, 'a浪终点（c浪通常越过）', null));
         [0.618, 1, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `c=a×${r}`, r)));
         targets.push(tgt(p[1].price + d * 0.618 * l[0], 'a终点+0.618×a (P214)', 0.618));
-        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪起点防线', 'c浪计数失效，调整大概率已结束（监测点战法）');
-        secondaryPivot = lvl(p[0].price, 'a浪起点·反转确认线', '确认原趋势已经反转');
+        monitoringPivot = lvl(p[2].price, 'b浪终点·c浪本段防线', '“c浪运行中”不成立：b浪尚未结束（仍在延伸或复杂化），计数本身未否定');
+        negationPivot = flat ? lvl(p[1].price - d * 2 * l[0], 'b浪上限 2×a·计数否定位', 'b浪（延伸中）超过a浪2倍，平台形计数否定（P235）')
+          : lvl(p[0].price, 'a浪起点·计数否定位', 'b浪（延伸中）越过a浪起点，单锯齿计数否定（手稿P143/P213）');
       }
     } else if (type === 'TRIANGLE') {
       if (n === 3) {
@@ -1579,7 +1585,8 @@
         secondaryPivot = lvl(p[0].price, 'w浪起点·参照位', 'x浪越过w浪起点，转入顺势联合形讨论');
       } else if (!triple && status !== 'COMPLETED') {
         [0.786, 1, 1.272].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `y=w×${r}(扩展取点0-w-x, P131)`, r)));
-        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪起点防线', 'y浪计数失效（x浪尚未结束）');
+        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪本段防线', '“y浪运行中”不成立：x浪尚未结束（仍在延伸），计数本身未否定');
+        negationPivot = lvl(p[1].price - d * 1.5 * l[0], 'x浪上限 1.5×w·计数否定位', 'x浪（延伸中）超过w浪1.5倍，联合形计数否定（P301）');
         secondaryPivot = lvl(p[0].price, 'w浪起点·箱型边界', '离开箱型区间，横向整理外观被破坏（P50）');
       } else if (triple && n === 5) {
         targets.push(tgt(p[3].price - d * 0.7 * l[2], 'xx浪最低要求: 0.7×y浪(P51)', 0.7));
@@ -1588,7 +1595,8 @@
       } else if (triple && status !== 'COMPLETED') {
         targets.push(tgt(p[4].price + d * 1.0 * l[2], 'z=y×1（扩展取点x-y-xx, P132)', 1));
         targets.push(tgt(p[4].price + d * 0.786 * l[2], 'z=y×0.786', 0.786));
-        monitoringPivot = lvl(p[4].price, 'xx浪终点·z浪起点防线', 'z浪计数失效（xx浪尚未结束）');
+        monitoringPivot = lvl(p[4].price, 'xx浪终点·z浪本段防线', '“z浪运行中”不成立：xx浪尚未结束（仍在延伸），计数本身未否定');
+        negationPivot = lvl(p[3].price - d * 1.5 * l[2], 'xx浪上限 1.5×y·计数否定位', 'xx浪（延伸中）超过y浪1.5倍，三重横向整理计数否定（P301类推）');
         secondaryPivot = lvl(p[2].price, 'y浪起点·参照位', '回到y浪起点，y浪被完全回撤');
       } else {
         const end = p[n - 1].price, total = Math.abs(end - p[0].price);
@@ -1606,7 +1614,8 @@
       } else if (!triple && n === 4 && status !== 'COMPLETED') {
         targets.push(tgt(p[2].price + d * 0.9 * l[0], 'y浪最低要求: 0.9×w浪(P372)', 0.9));
         [1, 1.618].forEach(r => targets.push(tgt(p[2].price + d * r * l[0], `y=w×${r}`, r)));
-        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪禁区', 'y浪计数失效（手稿P372）');
+        monitoringPivot = lvl(p[2].price, 'x浪终点·y浪本段防线', '“y浪运行中”不成立：x浪尚未结束（仍在延伸），计数本身未否定');
+        negationPivot = lvl(p[0].price, 'w浪起点·计数否定位', 'x浪（延伸中）越过w浪起点，双锯齿计数否定（手稿P362）');
         secondaryPivot = lvl(lineVal(p[0].idx, p[0].price, p[2].idx, p[2].price, lastIdx), '0-x基线', 'y浪越过0-x基线，双锯齿计数失效（手稿P362）');
       } else if (triple && n === 5) {
         [0.3, 0.5, 0.618].forEach(r => targets.push(tgt(p[3].price - d * r * l[2], `xx浪回撤y浪×${r}`, r)));
@@ -1614,8 +1623,8 @@
       } else if (triple && status !== 'COMPLETED') {
         targets.push(tgt(p[4].price + d * 0.9 * l[1], 'z浪最低要求: 0.9×x浪', 0.9));
         [1, 1.618].forEach(r => targets.push(tgt(p[4].price + d * r * l[2], `z=y×${r}`, r)));
-        monitoringPivot = lvl(p[4].price, 'xx终点·z浪防线', 'z浪计数失效（xx浪尚未结束）');
-        secondaryPivot = lvl(p[2].price, 'y浪起点', '回到y浪起点，y浪被完全回撤');
+        monitoringPivot = lvl(p[4].price, 'xx终点·z浪本段防线', '“z浪运行中”不成立：xx浪尚未结束（仍在延伸），计数本身未否定');
+        negationPivot = lvl(p[2].price, 'y浪起点·计数否定位', 'xx浪（延伸中）越过y浪起点，三锯齿计数否定（手稿P385）');
       } else {
         const end = p[n - 1].price, total = Math.abs(end - p[0].price);
         [0.382, 0.5, 0.618].forEach(r => targets.push(tgt(end - d * r * total, `整体回撤×${r}`, r)));
@@ -1623,7 +1632,7 @@
         secondaryPivot = lvl(p[n - 2].price, `${triple ? 'xx' : 'x'}浪终点·确认线`, '该调整大概率已经结束');
       }
     }
-    return { monitoringPivot, secondaryPivot, targets };
+    return { monitoringPivot, secondaryPivot, negationPivot, targets };
   }
 
   /**
@@ -1726,12 +1735,14 @@
   //   中值依次衔接成推演路径；已在运行的一段按已走幅度 / 用时下限修正
   // ---------------------------------------------------------------------------
   const SAME_TIME = k => [k, 0.618, 1, 1.618];
+  // 历史命中率比随机游走期望高 (或低) 至少这么多个百分点才算有区分度
+  const TRACK_EDGE_PCT = 5;
   const MOTIVE_PROJ = [
     null,
     { ref: 0, r: [0.382, 0.5, 0.618], t: SAME_TIME(0), basis: 'G1 浪2常回撤浪1的0.382~0.618（P34/P94）', inv: { at: 0, text: '浪2越过浪1起点则计数作废（M1）' } },
     { ref: 0, r: [1, 1.618, 2.618], t: [0, 1, 1.272, 1.618], basis: 'G3 浪3常为浪1的1~2.618倍（P41/P180）；用时常为浪1的1~1.618倍', beyond: { at: 1, text: '浪3须越过浪1终点（M3）' } },
     { ref: 2, r: [0.236, 0.382, 0.5], t: SAME_TIME(1), basis: 'G4 浪4常回撤浪3的0.236~0.5（P42）；用时不超过浪3的2倍（M8）', inv: { at: 1, text: '浪4进入浪1价格区则推动浪作废（I1）' } },
-    { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'G5 浪5常为浪1的0.618/1/1.618倍（P96/P181）' }
+    { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'G5 浪5常为浪1的0.618/1/1.618倍（P96/P181）', min: { ref: 3, r: 0.7, text: '衰竭浪5最低 0.7×浪4（P204）' } }
   ];
   // 扩张楔形: 各浪依次放大 (EWI：浪3 常约为浪1 的 1.618 倍，浪4 > 浪2，浪5 > 浪3)
   const DIAGONAL_EXPANDING_PROJ = [null,
@@ -1749,14 +1760,19 @@
       { ref: 2, r: [0.5, 0.618, 0.786], t: SAME_TIME(0), basis: '收缩楔形浪5短于浪3（D5）' }
     ],
     ZIGZAG: [null,
-      { ref: 0, r: [0.382, 0.5, 0.618], t: SAME_TIME(0), basis: 'ZG1 b浪常回撤a浪的0.382/0.5/0.618（P214）；ZG6 用时常为a浪的0.618~1.618倍', inv: { at: 0, text: 'b浪越过a浪起点则锯齿作废（Z2）' } },
-      { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'ZG3 c浪常等于a、0.618a或1.618a（P214）；ZG7 用时', beyond: { at: 1, text: 'c浪通常越过a浪终点（ZG5，失败c浪极少见）' } }],
+      { ref: 0, r: [0.382, 0.5, 0.618], t: SAME_TIME(0), basis: 'ZG1 b浪常回撤a浪的0.382/0.5/0.618（P214）；ZG6 用时常为a浪的0.618~1.618倍', inv: { at: 0, text: 'b浪越过a浪起点则锯齿作废（Z2）' },
+        min: { ref: 0, r: 0.2, text: 'b浪最低 0.2×a（P143）' } },
+      { ref: 0, r: [0.618, 1, 1.618], t: SAME_TIME(0), basis: 'ZG3 c浪常等于a、0.618a或1.618a（P214）；ZG7 用时', beyond: { at: 1, text: 'c浪通常越过a浪终点（ZG5，失败c浪极少见）' },
+        min: { ref: 1, r: 0.9, text: 'c浪最低 0.9×b（P143/P173，硬规则；0.618 只是常见比率）' },
+        common: [{ r: 1, label: '1×a（第一常见）' }, { r: 0.618, label: '0.618×a（第二常见）' }, { r: 1.618, label: '1.618×a' }, { r: 0.618, from: 1, label: 'a终点外加0.618×a（第四常见）' }] }],
     FLAT: [null,
-      { ref: 0, r: [0.95, 1, 1.4], t: SAME_TIME(0), basis: 'FG1 b浪常为a浪的0.95~1.4倍（P234）' },
-      { ref: 0, r: [1, 1.272, 1.618], t: SAME_TIME(0), basis: 'FG2 c浪常等于a或1.618a（P237-238）；FG4 用时常为a、b较短者的0.618~1.618倍' }],
+      { ref: 0, r: [0.95, 1, 1.4], t: SAME_TIME(0), basis: 'FG1 b浪常为a浪的0.95~1.4倍（P234）', min: { ref: 0, r: 0.7, text: 'b浪最低 0.7×a（P200）' } },
+      { ref: 0, r: [1, 1.272, 1.618], t: SAME_TIME(0), basis: 'FG2 c浪常等于a或1.618a（P237-238）；FG4 用时常为a、b较短者的0.618~1.618倍',
+        min: { overlap: 0, text: 'c浪须与a浪重叠（P228，硬规则）' },
+        common: [{ at: 1, label: 'a终点附近' }, { r: 1, label: '1×a' }, { r: 0.618, from: 1, label: '超a终点0.618×a' }, { r: 1.618, label: '1.618×a' }] }],
     TRIANGLE: [null,
-      { ref: 0, r: [0.618, 0.786, 0.95], t: SAME_TIME(0), basis: 'TG1 b浪常达a浪0.618倍以上（P302）' },
-      { ref: 0, r: [0.5, 0.618, 0.786], t: SAME_TIME(1), basis: 'TG2 规则形c浪常≈0.618×a浪（P302/P327）' },
+      { ref: 0, r: [0.618, 0.786, 0.95], t: SAME_TIME(0), basis: 'TG1 b浪常达a浪0.618倍以上（P302）', min: { ref: 0, r: 0.5, text: 'b浪最低 0.5×a（P302）' } },
+      { ref: 0, r: [0.5, 0.618, 0.786], t: SAME_TIME(1), basis: 'TG2 规则形c浪常≈0.618×a浪（P302/P327）', min: { ref: 1, r: 0.5, text: 'c浪最低 0.5×b（P299）' } },
       { ref: 1, r: [0.618, 0.7, 0.786], t: SAME_TIME(2), basis: 'TG3 d浪常为b浪的0.618~0.786倍（P302/P327）' },
       { ref: 3, r: [0.5, 0.7, 0.9], t: SAME_TIME(3), basis: 'TG4 e浪常为d浪的0.7倍或c浪的0.618倍（P327）' }],
     EXPANDING_TRIANGLE: [null,
@@ -1765,20 +1781,21 @@
       { ref: 2, r: [1, 1.236, 1.618], t: SAME_TIME(2), basis: 'EG3 相邻各浪放大倍数常在1~1.618之间' },
       { ref: 3, r: [0.5, 0.786, 1.236], t: SAME_TIME(3), basis: 'E3 e浪不小于d浪的50%；EG2 常越过a-c线' }],
     DOUBLE_ZIGZAG: [null,
-      { ref: 0, r: [0.3, 0.5, 0.7], t: SAME_TIME(0), basis: 'WG1 x浪常回撤w浪的0.382/0.5/0.618（P363）；WG3 用时', inv: { at: 0, text: 'x浪越过w浪起点则作废（W2）' } },
-      { ref: 0, r: [0.9, 1, 1.618], t: SAME_TIME(0), basis: 'WG2 y浪常为w浪的1或1.618倍（P372/P377）；W4 y>0.9w' }],
+      { ref: 0, r: [0.3, 0.5, 0.7], t: SAME_TIME(0), basis: 'WG1 x浪常回撤w浪的0.382/0.5/0.618（P363）；WG3 用时', inv: { at: 0, text: 'x浪越过w浪起点则作废（W2）' },
+        min: { ref: 0, r: 0.2, text: 'x浪最低 0.2×w（P372）' }, common: [{ r: 0.382, label: '0.382×w' }, { r: 0.5, label: '0.5×w' }, { r: 0.618, label: '0.618×w' }] },
+      { ref: 0, r: [0.9, 1, 1.618], t: SAME_TIME(0), basis: 'WG2 y浪常为w浪的1或1.618倍（P372/P377）；W4 y>0.9w', min: { ref: 0, r: 0.9, text: 'y浪最低 0.9×w（P372）' } }],
     COMBINATION: [null,
-      { ref: 0, r: [0.7, 0.85, 1], t: SAME_TIME(0), basis: 'C1 x浪须回撤w浪的70%以上（P50）' },
+      { ref: 0, r: [0.7, 0.85, 1], t: SAME_TIME(0), basis: 'C1 x浪须回撤w浪的70%以上（P50）', min: { ref: 0, r: 0.7, text: 'x浪最低 0.7×w（P50，横向整理专属）' } },
       { ref: 0, r: [0.618, 1, 1.272], t: SAME_TIME(0), basis: 'CG1 y浪常见为w浪的1倍（P131）' }],
     TRIPLE_ZIGZAG: [null,
-      { ref: 0, r: [0.3, 0.5, 0.7], t: SAME_TIME(0), basis: 'WG1 x浪常回撤w浪的0.382~0.618（P363）', inv: { at: 0, text: 'x浪越过w浪起点则作废（W2）' } },
-      { ref: 0, r: [0.9, 1, 1.618], t: SAME_TIME(0), basis: 'WG2 y浪常为w浪的1或1.618倍（P372）' },
-      { ref: 2, r: [0.3, 0.5, 0.7], t: SAME_TIME(1), basis: 'xx浪按x浪常见回撤比例（P385）', inv: { at: 2, text: 'xx浪越过y浪起点则作废（X2）' } },
-      { ref: 2, r: [0.9, 1, 1.618], t: SAME_TIME(2), basis: 'X4 z浪不小于x浪的0.9倍；按y浪常见比例（P388）' }],
+      { ref: 0, r: [0.3, 0.5, 0.7], t: SAME_TIME(0), basis: 'WG1 x浪常回撤w浪的0.382~0.618（P363）', inv: { at: 0, text: 'x浪越过w浪起点则作废（W2）' }, min: { ref: 0, r: 0.2, text: 'x浪最低 0.2×w（P372）' } },
+      { ref: 0, r: [0.9, 1, 1.618], t: SAME_TIME(0), basis: 'WG2 y浪常为w浪的1或1.618倍（P372）', min: { ref: 0, r: 0.9, text: 'y浪最低 0.9×w（P372）' } },
+      { ref: 2, r: [0.3, 0.5, 0.7], t: SAME_TIME(1), basis: 'xx浪按x浪常见回撤比例（P351/P385）', inv: { at: 2, text: 'xx浪越过y浪起点则作废（X2）' } },
+      { ref: 2, r: [0.9, 1, 1.618], t: SAME_TIME(2), basis: 'X4 z浪不小于x浪的0.9倍；按y浪常见比例（P388）', min: { ref: 3, r: 0.9, text: 'z浪最低 0.9×xx（X4）' } }],
     TRIPLE_COMBINATION: [null,
-      { ref: 0, r: [0.7, 0.85, 1], t: SAME_TIME(0), basis: 'C1 x浪须回撤w浪的70%以上（P51）' },
+      { ref: 0, r: [0.7, 0.85, 1], t: SAME_TIME(0), basis: 'C1 x浪须回撤w浪的70%以上（P51）', min: { ref: 0, r: 0.7, text: 'x浪最低 0.7×w（P51）' } },
       { ref: 0, r: [0.618, 1, 1.272], t: SAME_TIME(0), basis: 'CG1 y浪常见为w浪的1倍（P131）' },
-      { ref: 2, r: [0.7, 0.85, 1], t: SAME_TIME(1), basis: 'C5 xx浪须回撤y浪的70%以上（P51）' },
+      { ref: 2, r: [0.7, 0.85, 1], t: SAME_TIME(1), basis: 'C5 xx浪须回撤y浪的70%以上（P51）', min: { ref: 2, r: 0.7, text: 'xx浪最低 0.7×y（P51）' } },
       { ref: 2, r: [0.618, 1, 1.272], t: SAME_TIME(2), basis: 'CG3 z浪常见为y浪的1倍（P132）' }]
   };
 
@@ -1842,9 +1859,26 @@
         if (dir * (lo - bp) < 0) lo = bp;
         if (dir * (mid - bp) < 0) mid = bp;
       }
+      // 硬性最低值 (手稿规则) 与常见目标 (常见比率) 分开: 常见区间的下端不是最低要求
+      let min = null;
+      if (sp.min) {
+        let mp = null;
+        if (sp.min.overlap !== undefined) {
+          const op = P[sp.min.overlap].price;
+          if (dir * (start.price - op) < 0) mp = op;          // 前一段越过了该浪起点 (扩散平台形): 须回到其区间
+        } else mp = start.price + dir * sp.min.r * legLen(sp.min.ref);
+        if (mp !== null) min = { price: mp, text: sp.min.text, reached: isRun && dir * (pts[k + 1].price - mp) >= 0 };
+      }
+      const refName = def.labels[sp.ref + 1];
+      const common = (sp.common || sp.r.map(r => ({ r, label: `${r}×${refName}` }))).map(c => ({
+        price: c.at !== undefined ? P[c.at].price : (c.from !== undefined ? P[c.from].price : start.price) + dir * c.r * refLen,
+        label: c.label
+      })).filter(c => !inv || dir * (c.price - inv.price) <= 0)
+        .sort((a, b) => dir * (a.price - b.price));
       const label = def.labels[k + 1];
       waves.push({
         label, running: isRun, start: { time: start.time, price: start.price },
+        min, common,
         zone: { lo: Math.min(lo, hi), hi: Math.max(lo, hi), mid },
         window: { from: start.time + dur[0], mid: start.time + dur[1], to: start.time + dur[2] },
         basis: sp.basis, inv, need, note: [note, k === firstLeg ? shapeNote : null].filter(Boolean).join('；') || null
@@ -2097,6 +2131,7 @@
     if (ev && ev.bars) {
       levels.monitoringPivot = annotateLevel(levels.monitoringPivot, 'invalidation', g, ev);
       levels.secondaryPivot = annotateLevel(levels.secondaryPivot, h.status === 'COMPLETED' ? 'confirmation' : 'reference', g, ev);
+      levels.negationPivot = annotateLevel(levels.negationPivot, 'invalidation', g, ev);
     }
     const timeWindows = ev && ev.bars ? buildTimeWindows(h.type, g, h.status, ev) : [];
     const fibLevels = buildFibLevels(h.type, g, h.status);
@@ -2152,6 +2187,7 @@
       channel: buildChannel(h.type, g),
       monitoringPivot: levels.monitoringPivot,
       secondaryPivot: levels.secondaryPivot,
+      negationPivot: levels.negationPivot || null,
       structuralPivot: levels.structuralPivot || null,
       targets: levels.targets,
       fibLevels,
@@ -3859,7 +3895,7 @@
       const strong = sub.legs.filter(L => L.severity === 'strong');
       const medium = sub.legs.filter(L => L.severity === 'medium');
       return {
-        type, name: drawnCand.name, structureKey: sub.key, structurePage: sub.page,
+        type, name: liveCand && live.appended ? liveCand.name : drawnCand.name, structureKey: sub.key, structurePage: sub.page,
         hardFails: drawnEval.hardFails.map(c => ({ id: c.id, text: c.text, page: c.page, detail: c.detail })),
         pending: drawnEval.pending.map(c => ({ id: c.id, text: c.text, page: c.page })),
         nearFails: drawnEval.nearFails.concat(liveEval && (live.appended || live.extension) ? liveEval.nearFails.filter(c => !drawnEval.nearFails.some(d => d.id === c.id)) : [])
@@ -4095,12 +4131,18 @@
           : `浪5 尚未越过浪3 终点 ${fmtNum(q3.price)}，若先${sideTxt}此线则楔形不成立（或为失败浪5）`}`
       };
     }
-    if (cand.monitoringPivot) {
-      const mp = cand.monitoringPivot;
-      const sd = side(mp.price);
-      invalidation.structural = { price: mp.price, label: mp.levelName, side: sd, text: `${sd} ${fmtNum(mp.price)}（${mp.levelName}）：${(mp.description || '').replace(/^(跌破|涨破)/, sd)}` };
+    // structural = 计数否定位 (铁律)；leg = 本段防线 (越过只说明前一段仍在延伸)
+    const lvTxt = (lv, sd) => `${sd} ${fmtNum(lv.price)}（${lv.levelName}）：${(lv.description || '').replace(/^(跌破|涨破)/, sd)}`;
+    const negLv = cand.negationPivot || cand.monitoringPivot;
+    if (negLv) {
+      const sd = side(negLv.price);
+      invalidation.structural = { price: negLv.price, label: negLv.levelName, side: sd, text: lvTxt(negLv, sd) };
     }
-    if (cand.secondaryPivot) {
+    if (cand.negationPivot && cand.monitoringPivot) {
+      const mp = cand.monitoringPivot, sd = side(mp.price);
+      invalidation.leg = { price: mp.price, label: mp.levelName, side: sd, text: lvTxt(mp, sd) };
+    }
+    if (cand.secondaryPivot && !(negLv && Math.abs(cand.secondaryPivot.price - negLv.price) <= EPS)) {
       const sp = cand.secondaryPivot;
       invalidation.secondary = { price: sp.price, label: sp.levelName, text: `${fmtNum(sp.price)}（${sp.levelName}）：${sp.description}` };
     }
@@ -4124,7 +4166,12 @@
       invalidation.monitor = { price: liuSignals.monitorPoint.price, time: liuSignals.monitorPoint.time, source: timeframe, text: liuSignals.monitorPoint.text };
     }
     if (liuSignals && liuSignals.monitorPoint) {
-      invalidation.confirm = { price: liuSignals.monitorPoint.confirmLevel, text: `确认位 ${fmtNum(liuSignals.monitorPoint.confirmLevel)}：越过才确认当前段结束（最大回撤判据）` };
+      const crossed = liuSignals.monitorPoint.status === 'CONFIRMED_END';
+      invalidation.confirm = {
+        price: liuSignals.monitorPoint.confirmLevel, crossed,
+        text: crossed ? `确认位 ${fmtNum(liuSignals.monitorPoint.confirmLevel)}：已越过，当前段已经结束（最大回撤判据）`
+          : `确认位 ${fmtNum(liuSignals.monitorPoint.confirmLevel)}：越过才确认当前段结束（最大回撤判据）`
+      };
     }
 
     // 引擎自动计数对照 (同一区间)
@@ -4144,40 +4191,27 @@
 
     // 柳氏口吻研判
     const dirTxt = pts[1].price > pts[0].price ? '上升' : '下跌';
+    // 评语只写表格 / 卡片里没有的内容: 判决理由、存疑原因、运行中的段、可检验的预测、有区分度的历史记录；
+    //   子浪结构、价位、目标、推演、更可能的浪型、并列假设各有专门区块，不在这里重复
     const lines = [];
     lines.push(`你画的是「${tool.name}」（${dirTxt}），按「${primary.name}」评估：${VERDICTS[verdict]}。`);
-    if (adjustments.length) lines.push(`已将 ${adjustments.map(a => a.point).join('、')} 点吸附到附近K线的真实高/低点。`);
     reasons.forEach(r => lines.push(r));
-    const subSrc = Array.from(new Set(primary.legs.map(L => L.source).filter(Boolean)));
-    lines.push(`子浪结构（${subSrc.length ? subSrc.join('/') : '低周期数据不足'}，手稿${primary.structurePage}）：` +
-      primary.legs.map(L => `${L.name}${L.status === 'PASS' ? '✓' : L.status === 'FAIL' ? '✗' : L.status === 'DOUBT' ? '?' : L.status === 'RUNNING' ? '…' : '—'}`).join(' '));
+    doubts.forEach(x => lines.push(`存疑：${x}`));
     if (live.appended && runLeg) lines.push(runLeg.text);
-    if (verdict !== 'VALID' && alternatives.length) lines.push(`同样的点按「${alternatives[0].name}」可以成立。`);
-    if (reclassify) lines.push(`重新定性：${reclassify.text}`);
+    if (reclassify && !reclassify.weak) lines.push(`重新定性：${reclassify.text}`);
     // 标准化预测 (否定条件 + 期限) 与历史命中率
     const forecast = verdict === 'INVALID' ? null : buildForecast(cand, slice[lastBar], tfSec);
     // 假设推演: 提前结束 (未画满) 或末浪仍在运行时，推演其余各浪
     const lastLp = lp[lp.length - 1];
     const runningTail = !!lastLp.open || lastLp.idx >= lastBar - 1;
     const projection = verdict === 'INVALID' ? null : projectRemaining(primary.type, lp, tfSec, runningTail, slice[lastBar].time + tfSec);
-    if (projection) {
-      lines.push(`假设推演（按手稿常见比率与时间，中值衔接）：` + projection.waves.map(w =>
-        `${legNameOf(w.label)}${w.running ? '（运行中）' : ''} ${fmtNum(w.zone.lo)}~${fmtNum(w.zone.hi)}（中值 ${fmtNum(w.zone.mid)}），约 ${fmtTs(w.window.from)}~${fmtTs(w.window.to)} 结束`).join('；'));
-      if (projection.invalidation) lines.push(`推演失效：${projection.invalidation.text}（${fmtNum(projection.invalidation.price)}）`);
-    }
     const trackRecord = trackRecordOf({ baseType: primary.type, status: cand.status });
     if (forecast) lines.push(`可检验的预测：${forecast.text}；随机游走下先到目标的概率约 ${forecast.randomWalkPct}%`);
-    if (trackRecord) lines.push(`历史记录（${TRACK_RECORD.source || '回放'}）：同类计数先到目标 ${trackRecord.hitPct}%，随机游走期望 ${trackRecord.expectedPct}%（${trackRecord.resolved} 次）`);
-    // 已被铁律否决的计数不再给监测点；已被证伪的计数不再给其结构防线
-    if (invalidation.monitor && verdict !== 'INVALID') lines.push(invalidation.monitor.text);
-    if (invalidation.structural && (verdict === 'VALID' || verdict === 'DOUBT')) lines.push(invalidation.structural.text);
-    if (invalidation.channel) lines.push(invalidation.channel.text);
-    if (invalidation.diagLimit) lines.push(invalidation.diagLimit.text);
-    if (invalidation.completion) lines.push(invalidation.completion.text);
+    // 历史命中率与随机游走相差不到 TRACK_EDGE_PCT 个百分点时没有区分度，不写进评语
+    if (trackRecord && Math.abs(trackRecord.hitPct - trackRecord.expectedPct) >= TRACK_EDGE_PCT) {
+      lines.push(`历史记录（${TRACK_RECORD.source || '回放'}）：同类计数先到目标 ${trackRecord.hitPct}%，随机游走期望 ${trackRecord.expectedPct}%（${trackRecord.resolved} 次）`);
+    }
     hypotheses.forEach(h => { if (h.isPrimary) { h.verdict = verdict; h.verdictLabel = VERDICTS[verdict]; } });
-    if (hypotheses.length) lines.push(`并列假设：${hypotheses.map(h => `「${h.name}」${h.verdictLabel}`).join(' vs ')}——${hypotheses.map(h => `${h.name.replace(/（.*$/, '')}：${h.conditions.join('，')}`).join('；')}`);
-    const tgts = (cand.targets || []).slice(0, 3);
-    if (tgts.length && verdict !== 'INVALID' && verdict !== 'FALSIFIED_SUB') lines.push(`目标：${tgts.map(t => `${fmtNum(t.price)}（${t.label}）`).join('；')}`);
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');
 
     return {

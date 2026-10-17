@@ -1032,7 +1032,7 @@ self.onmessage = function (e) {
           if (w && showMarkers) {
             const up = w.zone.mid > w.start.price;
             pm.push({ time: t, position: up ? 'aboveBar' : 'belowBar', color: '#f59e0b', shape: 'circle', size: 0.8,
-              text: `${w.label}? ${Math.round(w.zone.lo).toLocaleString()}~${Math.round(w.zone.hi).toLocaleString()}` });
+              text: `${w.label}? ${w.min && !w.min.reached ? `最低 ${Math.round(w.min.price).toLocaleString()} · ` : ''}常见 ${(w.common || []).map(c => Math.round(c.price).toLocaleString()).join(' / ')}` });
           }
         });
       }
@@ -1049,7 +1049,10 @@ self.onmessage = function (e) {
       const inv = r.invalidation || {};
       const tag = sketchEval.nodes.length > 1 ? `·${DRAW_TOOLS[sel.tool].labels.slice(1).join('')}` : '';
       if (showMonitoring && inv.structural && (v === 'VALID' || v === 'DOUBT')) {
-        userPriceLines.push(candleSeries.createPriceLine({ price: inv.structural.price, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `失效位${tag}` }));
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.structural.price, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `计数否定位${tag}` }));
+      }
+      if (showMonitoring && inv.leg && (v === 'VALID' || v === 'DOUBT')) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.leg.price, color: '#fb923c', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `本段防线${tag}` }));
       }
       if (showMonitoring && inv.monitor && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || sel.timeframe})` }));
@@ -1159,9 +1162,12 @@ self.onmessage = function (e) {
     body.innerHTML = html;
   }
 
+  // 历史命中率比随机游走高 (低) 不到 5 个百分点时没有区分度，不显示
+  const trackTxt = tr => tr && Math.abs(tr.hitPct - tr.expectedPct) >= 5 ? `历史上同类计数先到目标 ${tr.hitPct}%（随机 ${tr.expectedPct}%）` : '';
+
   function userEvalHtml(r, nd) {
     const st = VERDICT_STYLE[nd.verdict] || VERDICT_STYLE.DOUBT;
-    const lines = (r.commentary && r.commentary.lines) || [];
+    const lines = ((r.commentary && r.commentary.lines) || []).filter(l => !/^只讨论波浪/.test(l));
     const verdictHtml = `
       <div class="liu-signal-row">
         <div class="liu-signal-title"><span>柳氏研判 · ${esc(r.primary.name)}（${esc(nd.timeframe.toUpperCase())}）</span><span class="liu-chip ${st.chip}">${esc(nd.verdictLabel)}</span></div>
@@ -1196,13 +1202,17 @@ self.onmessage = function (e) {
     const inv = r.invalidation || {};
     const lvRows = [];
     if (inv.monitor) lvRows.push(['监测点', inv.monitor.price, inv.monitor.text]);
-    if (inv.confirm) lvRows.push(['确认位', inv.confirm.price, inv.confirm.text]);
-    if (inv.structural) lvRows.push(['失效位', inv.structural.price, inv.structural.text]);
+    if (inv.confirm) lvRows.push([inv.confirm.crossed ? '确认位（已越过）' : '确认位', inv.confirm.price, inv.confirm.text]);
+    if (inv.leg) lvRows.push(['本段防线', inv.leg.price, inv.leg.text]);
+    if (inv.structural) lvRows.push(['计数否定位', inv.structural.price, inv.structural.text]);
     if (inv.secondary) lvRows.push(['次级防线', inv.secondary.price, inv.secondary.text]);
+    if (inv.channel) lvRows.push(['2-4 通道线', inv.channel.price, inv.channel.text]);
+    if (inv.diagLimit) lvRows.push([inv.diagLimit.expandingByLength ? '楔形浪4分歧位' : '楔形浪4上限', inv.diagLimit.price, inv.diagLimit.text]);
+    if (inv.completion) lvRows.push([inv.completion.broken ? '完成确认位（已越过）' : '完成确认位', inv.completion.price, inv.completion.text]);
     (r.targets || []).slice(0, 4).forEach(t => lvRows.push(['目标', t.price, t.label]));
     const lvHtml = lvRows.length ? `
       <div class="liu-signal-row">
-        <div class="liu-signal-title"><span>监测点 · 失效位 · 目标</span><span>现价 ${fmtP(r.currentPrice)}</span></div>
+        <div class="liu-signal-title"><span>监测点 · 防线 · 否定位 · 目标</span><span>现价 ${fmtP(r.currentPrice)}</span></div>
         <table class="liu-parts-table">${lvRows.map(x => `<tr><td>${x[0]}</td><td class="num">${fmtP(x[1])}</td><td>${esc(x[2])}</td></tr>`).join('')}</table>
       </div>` : '';
 
@@ -1220,8 +1230,9 @@ self.onmessage = function (e) {
 
     const other = [];
     (r.interpretations || []).forEach(it => other.push(`${esc(it.name)}：铁律违规 ${it.hardFails} · 子浪证伪 ${it.strong} · 存疑 ${it.medium}`));
-    (r.alternatives || []).forEach(a => other.push(`同样的点按「${esc(a.name)}」可成立`));
-    if (r.preceding) other.push(`前序：${esc(r.preceding.text)}`);
+    if (nd.verdict === 'VALID') (r.alternatives || []).forEach(a => other.push(`同样的点按「${esc(a.name)}」可成立`));
+    if (r.preceding && !r.preceding.warning) other.push(`前序：${esc(r.preceding.text)}`);
+    if (r.reclassify && r.reclassify.weak) other.push(`提示（回测无区分度）：${esc(r.reclassify.text.replace(/（[^（]*(区分度不显著|无预测力)[^）]*）$/, ''))}`);
     (r.adjustments || []).forEach(a => other.push(`「${esc(a.point)}」点已吸附：${fmtP(a.fromPrice)} → ${fmtP(a.toPrice)}${a.barsMoved ? `（移动 ${a.barsMoved} 根）` : ''}`));
     (r.endpointIssues || []).forEach(x => other.push(esc(x.text)));
     const otherHtml = other.length ? `
@@ -1233,7 +1244,7 @@ self.onmessage = function (e) {
     // 计数记录: 同一画法历次评估之间的改判与触发它的价格事件 (本机保存)
     const life = lifeOf(sketch.find(x => x.id === nd.id));
     const log = life ? life.log.slice().reverse() : [];
-    const lifeHtml = `
+    const lifeHtml = !log.length && !(life && life.snap && life.snap.at !== life.first) ? '' : `
       <div class="liu-signal-row">
         <div class="liu-signal-title"><span>计数记录</span><span>${life ? `首次评估 ${esc(fmtT(life.first))} · 本机保存` : '本机保存'}</span></div>
         ${log.length ? log.map(x => x.events.map(e => `<div class="ue-line">${esc(fmtT(x.at))} · ${esc(e.text)}</div>`).join('')).join('')
@@ -1250,7 +1261,7 @@ self.onmessage = function (e) {
           const st = VERDICT_STYLE[sg.verdict] || VERDICT_STYLE.DOUBT;
           const meta = [sg.source === 'SAME_POINTS' ? '同样的点换浪型' : sg.source === 'REGROUP' ? '起点不变、升一级重数' : '中间重新数', sg.unusual ? '非常规浪型' : '',
             sg.guidePct != null ? `指引符合度 ${sg.guidePct}%` : '',
-            sg.trackRecord ? `历史上同类计数先到目标 ${sg.trackRecord.hitPct}%（随机 ${sg.trackRecord.expectedPct}%）` : ''].filter(Boolean).join(' · ');
+            trackTxt(sg.trackRecord)].filter(Boolean).join(' · ');
           return `<div class="ue-sug${on ? ' active' : ''}">
             <div class="liu-signal-title"><span>${esc(sg.name)}</span><span class="liu-chip ${st.chip}">${esc(sg.verdictLabel)}</span></div>
             <div class="ue-note">${esc(meta)}</div>
@@ -1270,11 +1281,11 @@ self.onmessage = function (e) {
     const projHtml = pj ? `
       <div class="liu-signal-row">
         <div class="liu-signal-title"><span>假设推演 · ${esc(pj.name)}</span><span>手稿常见比率 · 中值衔接</span></div>
-        <table class="liu-parts-table"><tr><td>浪</td><td>价格区间（中值）</td><td>常见结束时间</td></tr>
-          ${pj.waves.map(w => `<tr><td>${esc(w.label)}${w.running ? '（运行中）' : ''}</td><td class="num">${fmtP(w.zone.lo)} ~ ${fmtP(w.zone.hi)}（${fmtP(w.zone.mid)}）</td><td>${esc(fmtT(w.window.from).slice(5))} ~ ${esc(fmtT(w.window.to).slice(5))}</td></tr>
-            <tr><td colspan="3" class="ue-note">${esc(w.basis)}${w.inv ? `；失效 ${fmtP(w.inv.price)}：${esc(w.inv.text)}` : ''}${w.need ? `；${esc(w.need.text)}` : ''}${w.note ? `；${esc(w.note)}` : ''}</td></tr>`).join('')}
+        <table class="liu-parts-table"><tr><td>浪</td><td>价格</td><td>常见结束时间</td></tr>
+          ${pj.waves.map(w => `<tr><td>${esc(w.label)}${w.running ? '（运行中）' : ''}</td><td>${w.min ? `<div>最低 <span class="num">${fmtP(w.min.price)}</span>${w.min.reached ? '（已达到）' : ''} · ${esc(w.min.text)}</div>` : ''}${w.need ? `<div>${esc(w.need.text)}：<span class="num">${fmtP(w.need.price)}</span></div>` : ''}<div>常见 ${(w.common || []).map(c => `<span class="num">${fmtP(c.price)}</span>（${esc(c.label)}）`).join(' / ')}</div></td><td>${esc(fmtT(w.window.from).slice(5))} ~ ${esc(fmtT(w.window.to).slice(5))}</td></tr>
+            <tr><td colspan="3" class="ue-note">${esc(w.basis)}${w.inv ? `；失效 ${fmtP(w.inv.price)}：${esc(w.inv.text)}` : ''}${w.note ? `；${esc(w.note)}` : ''}</td></tr>`).join('')}
         </table>
-        <div class="ue-note">每一浪按前一浪的中值推出，越往后越不确定；图上橙色虚线为中值路径（工具栏「假设推演」可隐藏）。这是在你的计数成立的假设下的常见走法，不是预测。</div>
+        <div class="ue-note">「最低」是手稿硬规则，「常见」是常见比率（不是最低要求）。每一浪按前一浪的中值推出，越往后越不确定；图上橙色虚线为中值路径（工具栏「假设推演」可隐藏）。这是在你的计数成立的假设下的常见走法，不是预测。</div>
       </div>` : '';
 
     // 并列假设: 同样 4 个点的调整浪 / 驱动浪前三浪两种解读，及区分条件
@@ -1285,7 +1296,7 @@ self.onmessage = function (e) {
         ${hyps.map((h, k) => {
           const st = VERDICT_STYLE[h.verdict] || VERDICT_STYLE.DOUBT;
           const meta = [h.isPrimary ? '当前评估' : '', h.guidePct != null ? `指引符合度 ${h.guidePct}%` : '',
-            h.trackRecord ? `历史上同类计数先到目标 ${h.trackRecord.hitPct}%（随机 ${h.trackRecord.expectedPct}%）` : ''].filter(Boolean).join(' · ');
+            trackTxt(h.trackRecord)].filter(Boolean).join(' · ');
           return `<div class="ue-sug">
             <div class="liu-signal-title"><span>${esc(h.name)}</span><span class="liu-chip ${st.chip}">${esc(h.verdictLabel)}</span></div>
             <div class="ue-note">${esc(meta)}</div>
