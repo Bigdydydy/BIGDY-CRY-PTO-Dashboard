@@ -1264,7 +1264,7 @@ self.onmessage = function (e) {
             trackTxt(sg.trackRecord)].filter(Boolean).join(' · ');
           return `<div class="ue-sug${on ? ' active' : ''}">
             <div class="liu-signal-title"><span>${esc(sg.name)}</span><span class="liu-chip ${st.chip}">${esc(sg.verdictLabel)}</span></div>
-            <div class="ue-note">${esc(meta)}</div>
+            <div class="ue-note" title="指引符合度：比率、时间与手稿常见值的吻合程度；BTC / ETH 回放中它对后续走势没有可证实的预测力，不是命中概率">${esc(meta)}</div>
             <div class="ue-line">${sg.points.map(p => `${esc(p.label)} ${fmtP(p.price)}（${esc(fmtT(p.time).slice(5, 10))}）`).join(' → ')}</div>
             ${sg.doubt ? `<div class="ue-note">存疑：${esc(sg.doubt)}</div>` : ''}
             ${sg.forecast ? `<div class="ue-note">${esc(sg.forecast)}</div>` : ''}
@@ -1299,7 +1299,7 @@ self.onmessage = function (e) {
             trackTxt(h.trackRecord)].filter(Boolean).join(' · ');
           return `<div class="ue-sug">
             <div class="liu-signal-title"><span>${esc(h.name)}</span><span class="liu-chip ${st.chip}">${esc(h.verdictLabel)}</span></div>
-            <div class="ue-note">${esc(meta)}</div>
+            <div class="ue-note" title="指引符合度：比率、时间与手稿常见值的吻合程度；BTC / ETH 回放中它对后续走势没有可证实的预测力，不是命中概率">${esc(meta)}</div>
             ${h.conditions.map(c => `<div class="ue-line">· ${esc(c)}</div>`).join('')}
             ${h.isPrimary ? '' : `<div class="wave-type-switch"><button class="chart-tool-btn" data-hyp-adopt="${k}" data-node="${esc(nd.id)}" title="用同样的点按这种解读重新评估">按此评估</button></div>`}
           </div>`;

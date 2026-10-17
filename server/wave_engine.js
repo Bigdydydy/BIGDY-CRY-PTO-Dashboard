@@ -69,6 +69,28 @@
   const TRACK_RECORD = {"generatedAt":"2026-10-03","source":"BTCUSDT/ETHUSDT 4H，每 18 根回放，前 3 名候选，去重后 1593 条预测","keys":{"TRIPLE_COMBINATION|COMPLETED":{"resolved":51,"hits":43,"misses":8,"expired":1,"expected":40.67},"COMBINATION|COMPLETED":{"resolved":103,"hits":86,"misses":17,"expired":2,"expected":84.82},"FLAT|COMPLETED":{"resolved":32,"hits":24,"misses":8,"expired":1,"expected":23.98},"ZIGZAG|COMPLETED":{"resolved":142,"hits":107,"misses":35,"expired":25,"expected":98.86},"IMPULSE|RUNNING":{"resolved":254,"hits":201,"misses":53,"expired":28,"expected":182.19},"ZIGZAG|RUNNING":{"resolved":289,"hits":225,"misses":64,"expired":33,"expected":219.96},"COMBINATION|RUNNING":{"resolved":145,"hits":106,"misses":39,"expired":16,"expected":100.01},"TRIPLE_COMBINATION|RUNNING":{"resolved":90,"hits":70,"misses":20,"expired":5,"expected":66.01},"IMPULSE|COMPLETED":{"resolved":103,"hits":66,"misses":37,"expired":7,"expected":65.31},"DIAGONAL|RUNNING":{"resolved":124,"hits":107,"misses":17,"expired":14,"expected":101.89},"DIAGONAL|COMPLETED":{"resolved":19,"hits":19,"misses":0,"expired":5,"expected":14.43},"TRIANGLE|RUNNING":{"resolved":14,"hits":13,"misses":1,"expired":0,"expected":10.5},"FLAT|RUNNING":{"resolved":26,"hits":23,"misses":3,"expired":0,"expected":22.96},"EXPANDING_TRIANGLE|RUNNING":{"resolved":29,"hits":19,"misses":10,"expired":7,"expected":20.25},"DOUBLE_ZIGZAG|RUNNING":{"resolved":6,"hits":2,"misses":4,"expired":0,"expected":2.68},"TRIPLE_ZIGZAG|RUNNING":{"resolved":7,"hits":5,"misses":2,"expired":0,"expected":4.37},"TRIANGLE|COMPLETED":{"resolved":1,"hits":0,"misses":1,"expired":2,"expected":0.04},"TRIPLE_ZIGZAG|COMPLETED":{"resolved":0,"hits":0,"misses":0,"expired":1,"expected":0}}};
   // </TRACK_RECORD>
 
+  // 指引校准 (scripts/wave_calibrate.js): 同一回放上逐条指引 (软规则) 对「先到目标」的预测力，
+  //   logit P(命中) = logit(随机游走命中率) + b0 + Σ βj·xj，xj = 通过 +1 / 不通过 −1。
+  //   只有检验段 (按时间后 30%) 的对数损失优于「只用随机游走」时才写入；null 表示指引没有可证实的预测力。
+  //   2026-10-17 回放 (BTC/ETH 4H，1,404 条近目标 / 872 条远目标预测): 指引符合度、候选概率、逐条指引的检验段 skill
+  //   分别为 −1.5% / −1.4% / −6.0% (近目标) 与 +0.2% / +0.2% / −6.2% (远目标)；单条指引与浪速 / 浪量动能项
+  //   最多约 2.5 个标准误，过不了约 60 项检验的多重比较 (约 3.2 个标准误)，见 docs 第 5.6 节
+  // <CALIBRATION> 由 scripts/wave_calibrate.js 生成，勿手改
+  const CALIBRATION = null;
+  // </CALIBRATION>
+
+  /** 校准后的先到目标概率 (无校准或无预测时 null) */
+  function calibratedOf(c, forecast) {
+    if (!CALIBRATION || !forecast) return null;
+    const rw = Math.min(0.97, Math.max(0.03, forecast.randomWalkPct / 100));
+    let z = Math.log(rw / (1 - rw)) + CALIBRATION.b0;
+    for (const x of c.ruleChecks || []) {
+      const b = CALIBRATION.coef[`${c.baseType}:${x.id}`];
+      if (b && !x.hard && !x.pending) z += b * (x.pass ? 1 : -1);
+    }
+    return { pct: Math.round(100 / (1 + Math.exp(-z))), randomWalkPct: forecast.randomWalkPct, testSkill: CALIBRATION.testSkill };
+  }
+
   function trackKeyOf(c) {
     const stage = c.status === 'COMPLETED' ? 'COMPLETED' : 'RUNNING';
     return `${c.baseType}|${stage}`;
@@ -978,14 +1000,42 @@
     const ps = { idx: 0, time: seg[0].time, price: pA.price, type: pA.type, confirmed: true };
     const pe = { idx: seg.length - 1, time: seg[seg.length - 1].time, price: pB.price, type: pB.type, confirmed: true };
 
-    for (const m of [0.10, 0.07, 0.05, 0.035]) {
+    // 多阈值投票: 3~13 段的各级分解各数一次，多数数不成五浪才判三浪；数成五浪的分解中多数只能数成楔形才判楔形。
+    //   原先第一个出现 ≥3 段的阈值单独决定，一个阈值上的噪声就能把推动段判成三浪 / 楔形
+    const sets = [], seen = new Set();
+    let first = null;
+    for (const m of STRUCT_VOTE_MULTS) {
       const thr = Math.max(range * m, 1.2 * sAtr);
       const anchored = anchorZigzag(zigzagPivots(seg, thr, true), ps, pe);
-      if (anchored.length - 1 < 3) continue;
-      const five = findMotiveTyped(anchored);
-      return { label: five ? '5' : '3', motive: five ? five.kind : null, subPivots: anchored, source: srcName };
+      const swings = anchored.length - 1;
+      if (swings < 3) continue;
+      if (!first) first = anchored;
+      if (swings > PROBE_MAX_SWINGS) break;
+      const sig = anchored.map(q => q.idx).join(',');
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      sets.push({ anchored, five: findMotiveTyped(anchored) });
     }
-    return { label: 'unknown', subPivots: [], source: srcName };
+    if (!sets.length) {
+      if (!first) return { label: 'unknown', subPivots: [], source: srcName };
+      const five = findMotiveTyped(first);
+      return { label: five ? '5' : '3', motive: five ? five.kind : null, subPivots: first, source: srcName, votes: { five: five ? 1 : 0, impulse: five && five.kind === 'IMPULSE' ? 1 : 0, total: 1 } };
+    }
+    const v = structVotes(sets);
+    const pick = v.label === '5' ? sets.find(x => x.five && x.five.kind === v.motive) : sets.find(x => !x.five);
+    return { label: v.label, motive: v.motive, subPivots: (pick || sets[0]).anchored, source: srcName, votes: v.votes };
+  }
+
+  // 子浪结构投票用的阈值 (本段幅度的比例，由粗到细)
+  const STRUCT_VOTE_MULTS = [0.10, 0.085, 0.07, 0.05, 0.035];
+  /** sets: [{five: findMotiveTyped 结果或 null}] → 多数决: 打平按五浪 / 推动浪 (疑点归于被评估的计数) */
+  function structVotes(sets) {
+    const total = sets.length;
+    const fives = sets.filter(x => x.five);
+    const imp = fives.filter(x => x.five.kind === 'IMPULSE').length;
+    const label = 2 * fives.length >= total ? '5' : '3';
+    const motive = label === '5' ? (2 * imp >= fives.length ? 'IMPULSE' : 'DIAGONAL') : null;
+    return { label, motive, votes: { five: fives.length, impulse: imp, total } };
   }
 
   /** 五浪计数并区分推动浪 / 楔形 (推动浪优先): {points, kind:'IMPULSE'|'DIAGONAL'} 或 null */
@@ -3535,7 +3585,9 @@
     const pe = { idx: seg.length - 1, time: seg[seg.length - 1].time, price: pB.price, type: pB.type, confirmed: true };
     // 由粗到细寻找该段的「自然子级别」: 首个出现 ≥3 段的阈值即本段的子浪级别；
     // 超过 13 段视为噪声级别 (低周期上逆向波动已与本段幅度相当)，不再细分
+    // 多阈值投票: 3~13 段的各级分解都数一次 (原先找到第一个五浪即停，那一级只数得成楔形就判「浪3 只能数成楔形」)
     let lastThr = null;
+    const sets = [], seen = new Set();
     for (const m of PROBE_MULTS) {
       const thr = Math.max(range * m, 1.2 * sAtr);
       if (thr === lastThr) continue;
@@ -3546,19 +3598,34 @@
       if (swings > PROBE_MAX_SWINGS) {
         if (!out.coarse) out.noisy = true;
         // 浪3等延长浪内部常超过 13 段：结构判定到此为止，但这一级仍可能数得出合规五浪 (BTC 2026-05-26→06-05 的浪3: 19 段)
-        else if (!out.any5 && swings <= PROBE_FIVE_MAX_SWINGS) {
+        else if (!sets.some(x => x.five) && swings <= PROBE_FIVE_MAX_SWINGS) {
           const five = findMotiveTyped(anchored);
-          if (five) out.any5 = { points: five.points, swings, kind: five.kind };
+          if (five) sets.push({ anchored, swings, five, extra: true });
         }
         break;
       }
+      const sig = anchored.map(q => q.idx).join(',');
+      if (seen.has(sig)) continue;
+      seen.add(sig);
       const five = anchored.length >= 6 ? findMotiveTyped(anchored) : null;
       if (!out.coarse) {
         out.coarse = { label: five ? '5' : '3', swings, anchored, motive: five ? five.points : null };
         out.strict5 = anchored.length === 6 && motiveRulesOK(anchored, 'IMPULSE');
       }
-      if (five && !out.any5) out.any5 = { points: five.points, swings, kind: five.kind };
-      if (out.any5) break;
+      sets.push({ anchored, swings, five });
+    }
+    const voting = sets.filter(x => !x.extra);
+    if (voting.length) {
+      const v = structVotes(voting);
+      out.votes = v.votes;
+      // 调整段「像清晰五浪」(→ 存疑) 也要多数阈值数得成五浪
+      if (out.strict5 && v.label !== '5') out.strict5 = false;
+    }
+    const fives = sets.filter(x => x.five);
+    if (fives.length) {
+      const imp = fives.filter(x => x.five.kind === 'IMPULSE');
+      const use = 2 * imp.length >= fives.length ? imp[0] : fives.find(x => x.five.kind === 'DIAGONAL');
+      out.any5 = { points: use.five.points, swings: use.swings, kind: use.five.kind, votes: { five: fives.length, impulse: imp.length } };
     }
     return out;
   }
@@ -4784,6 +4851,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { structVotes, calibratedOf, diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });
