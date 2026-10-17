@@ -23,6 +23,7 @@ const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { getEtfLinkageData } = require('./etf_linkage_engine');
+const { getTermCurve } = require('./term_curve');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
 const optionOiHistory = require('./option_oi_history');
@@ -537,6 +538,19 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] block-insight:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/term-curve — cross-sectional Deribit basis curve vs the Treasury curve (Module 2-C)
+  if (pathname === '/api/term-curve' && req.method === 'GET') {
+    try {
+      const funding0d = getCachedData().termPremium?.current?.fundingApr ?? null;
+      const data = await getTermCurve({ funding0d });
+      sendJsonResponse(req, res, 200, { code: 0, ...data });
+    } catch (err) {
+      console.error('[API Error] term-curve:', err.message);
+      sendJsonResponse(req, res, 502, { code: -1, error: err.message });
     }
     return;
   }

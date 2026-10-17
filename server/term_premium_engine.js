@@ -2,7 +2,8 @@
  * Module 2: Futures Basis Term Structure & Carry Radar (schema v2)
  *
  * Term structure built only from tenors that actually trade on Deribit (BTC inverse futures):
- *   0D perp funding (7-day average) → current quarter (dropped < 7D to expiry) → next quarter, plus a 90D
+ *   0D market-wide OI-weighted perp funding (7-day average; Deribit perp as fallback) → current quarter
+ *   (dropped < 7D to expiry) → next quarter, plus a 90D
  *   constant maturity interpolated between the real points that bracket it.
  * Spreads:
  *   spreadShort    = CQ APR − funding APR       (short end: futures carry vs perp leverage cost)
@@ -193,9 +194,15 @@ async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
     hurdleRate: latest.hurdle,
     hurdleSpread: HURDLE_SPREAD,
     metadata: {
-      dataSource: 'Deribit BTC 永续资金费率 + 当季/次季季度合约 (2024.01 ~ 至今，每日 08:00 UTC 快照) + Deribit 实时盘口；3M 美债 FRED DGS3MO',
+      dataSource: 'Deribit 当季/次季季度合约 (2024.01 ~ 至今，每日 08:00 UTC 快照) + Deribit 实时盘口；0D 资金费率 CoinGlass 全市场 OI 加权 (不可用时退回 Deribit 永续)；3M 美债 FRED DGS3MO',
       timeRange: `${historicalSeries[0].date} 至 ${latest.date}`,
-      tenorMethod: '仅用真实可交易期限点：0D 永续资金费率 (7 日均值年化) / 当季 (距交割 <7 天剔除) / 次季；90D 在相邻真实点间线性插值，不做外推',
+      tenorMethod: '仅用真实可交易期限点：0D 全市场 OI 加权永续资金费率 (7 日已实现均值年化) / 当季 (距交割 <7 天剔除) / 次季；90D 在相邻真实点间线性插值，不做外推',
+      // Which days used the market-wide rate vs the Deribit fallback
+      fundingSources: historicalSeries.reduce((acc, r) => {
+        const k = r.fundingSource || 'deribit';
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {}),
       scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量',
       isRealHistorical: true,
       // Daily-history and live-curve health, so a stalled exchange feed is visible in the UI
