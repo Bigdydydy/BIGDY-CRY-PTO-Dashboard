@@ -15,7 +15,7 @@ const { buildSnapshot } = require('./lib/snapshot');
 
 const KEY_TRANSFORMS = [
   'chg_1d_bp', 'chg_1w_bp', 'chg_4w_bp', 'chg_1w_pct', 'chg_4w_pct', 'chg_4w', 'chg_3m', 'chg_3m_bp', 'chg_12m_pct',
-  'yoy', 'mom_annualized_3m', 'mom_change', 'avg_3m_change', 'avg_4w', 'zscore_1y', 'chg_12m_bp', 'vs_sma200', 'vs_sma50w', 'days_below_sma200', 'drawdown_from_high', 'percentile_1y', 'percentile_10y',
+  'yoy', 'mom_annualized_3m', 'mom_change', 'avg_3m_change', 'avg_4w', 'zscore_1y', 'chg_12m_bp', 'vs_sma200', 'vs_sma50', 'vs_sma50w', 'days_below_sma200', 'drawdown_from_high', 'percentile_1y', 'percentile_10y',
   'curve_regime', 'share_of_nominal_move', 'divergence_vs_spx', 'rel_to_spx', 'gap_vs_core_cpi', 'crack_vs_wti',
   'implied_oil_disruption', 'distance_to_key_level_bp', 'chg_since_event_bp', 'chg_since_spx_high_bp'
 ];
@@ -47,7 +47,9 @@ function fmtTransform(name, t) {
   if (name === 'implied_oil_disruption') return t.implied_mbd == null ? null : 'impliedDisruption=' + t.implied_mbd + 'mb/d (+' + t.price_rise_pct + '% vs baseline)';
   if (t.value === null || t.value === undefined) return null;
   const v = t.value;
-  if (name === 'distance_to_key_level_bp') return 'keyLevels=' + v.map(l => l.level + ':' + l.distance_bp + 'bp').join(',');
+  if (name === 'distance_to_key_level_bp') {
+    return 'keyLevels=' + v.map(l => l.level + ':' + (l.distance_bp != null ? l.distance_bp + 'bp' : l.distance_pct + '%')).join(',');
+  }
   if (typeof v === 'object') return name + '=' + JSON.stringify(v);
   return name + '=' + v;
 }

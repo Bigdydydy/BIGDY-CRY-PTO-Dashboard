@@ -687,6 +687,8 @@
   //   斜度 = 平行四边形两条边 (0-x-xx 与 w-y-z) 每一步在调整方向上推进的距离 / w 浪长度，取平均。
   //   分界 30%: 横向整理 x ≥ 0.7w、y ≈ w 时斜度至多约 30%；双锯齿常见 x = 0.382~0.618w、y ≈ w 时约 38%~50%
   const PG_SLOPE_SPLIT = 0.3;
+  // 锯齿类 / 横向整理 判定用: ≥ 35% 明确倾斜 (锯齿类)，≤ 25% 明确平缓 (横向整理)，之间两可
+  const PG_SLOPE_STEEP = 0.35, PG_SLOPE_FLAT = 0.25;
   function pgSlope(g) {
     const p = g.p, l0 = g.l[0];
     if (!(l0 > 0) || p.length < 4) return null;
@@ -829,6 +831,8 @@
         }
         return { pass: worst <= tol, detail: worst > tol ? `xx子浪越过y起点 ${fmtNum(worst)}` : 'xx子浪未越y起点' };
       }, { slow: true }),
+    rg('XG1', C_G_RATIO, false, null, 5, 'P351', 'xx浪常见回撤y浪的0.3~0.7倍（0.382/0.5/0.618）', 1,
+      g => { const r = g.l[3] / g.l[2]; return { pass: r >= 0.28 && r <= 0.72, detail: `xx/y=${fmtPct(r)}` }; }),
     rg('X4', C_PRICE, true, 'min', 6, 'P388', 'z浪不小于x浪的0.9倍', 1,
       g => ({ pass: g.l[4] >= 0.9 * g.l[1] - EPS, detail: `z/x=${(g.l[4] / g.l[1]).toFixed(2)}` })),
     rg('X5', C_TIME, true, null, 5, 'P385', 'xx浪时间不超过y浪的5倍', 1,
@@ -4000,7 +4004,56 @@
     const types = forced ? [forced] : tool.types;
     const interps = types.map(interpret).filter(Boolean).sort(rank);
     if (!interps.length) throw new Error(`「${tool.name}」无法容纳 ${n} 个点`);
+    // 锯齿类与横向整理 (wxy、w-x-y-xx-z 工具): 两者铁律都过时，按手稿的区分依据依次判定，不再用指引平均分
+    //   1) 组成部分: 双锯齿 / 三锯齿须由锯齿组成 (P362)，w 或 y 明确是平台形 / 三角形则只能是横向整理
+    //   2) 外观斜度: ≥ 35% 锯齿类，≤ 25% 横向整理 (P364/P366)；之间两可，按指引排序并作为并列解读给出
+    //   x / xx 的回撤比例 (横向整理须 ≥ 0.7，锯齿类常见 0.3~0.7) 作为依据一并列出
+    const discrimination = siblingDiscrimination();
+    if (discrimination && discrimination.chosen && !forced && interps[0].type !== discrimination.chosen) {
+      const k = interps.findIndex(it => it.type === discrimination.chosen);
+      if (k > 0) interps.unshift(interps.splice(k, 1)[0]);
+    }
     const primary = interps[0];
+
+    function siblingDiscrimination() {
+      const pair = { WXY: ['DOUBLE_ZIGZAG', 'COMBINATION'], WXYXZ: ['TRIPLE_ZIGZAG', 'TRIPLE_COMBINATION'] }[options.tool];
+      if (!pair || n < 4) return null;
+      const [zzT, cbT] = pair;
+      const zz = interps.find(it => it.type === zzT) || interpret(zzT);
+      const cb = interps.find(it => it.type === cbT) || interpret(cbT);
+      if (!zz || !cb) return null;
+      const nm = { [zzT]: PATTERNS[zzT].name, [cbT]: PATTERNS[cbT].name };
+      const g = mkGeom(lp.length >= n ? lp.slice(0, n) : pts);
+      const steps = [];
+      const excluded = it => it.hardFails[0] || it.liveHardFails[0] || (it.strongCount ? { id: '子浪', text: '子浪结构证伪' } : null);
+      for (const it of [zz, cb]) {
+        const f = excluded(it);
+        if (f) steps.push({ basis: `${nm[it.type]}：${f.id} 未过（${f.text}）`, supports: it === zz ? cbT : zzT, decisive: true });
+      }
+      const xr = g.l[1] / g.l[0];
+      steps.push({ basis: `x 回撤 w ${fmtPct(xr)}（横向整理须 ≥70%，P50；锯齿类几乎不超过 0.7，P373）`, supports: xr >= 0.7 - EPS ? cbT : zzT });
+      if (g.l.length >= 4) {
+        const xxr = g.l[3] / g.l[2];
+        steps.push({ basis: `xx 回撤 y ${fmtPct(xxr)}（三重横向整理须 ≥70%，P51；三锯齿常见 0.3~0.7，P351）`, supports: xxr >= 0.7 - EPS ? cbT : zzT });
+      }
+      const wg5 = (zz.drawn.ruleChecks || []).find(c => c.id === 'WG5');
+      const compBad = wg5 && wg5.pass === false && !wg5.pending;
+      if (wg5 && !wg5.pending && !/未验|未执行/.test(wg5.detail || '')) {
+        steps.push({ basis: compBad ? `组成部分不全是锯齿（${wg5.detail}）：双锯齿须由锯齿组成，P362` : `组成部分为锯齿（${wg5.detail}）`, supports: compBad ? cbT : null, decisive: compBad });
+      }
+      const sl = pgSlope(g);
+      const slSide = sl >= PG_SLOPE_STEEP ? zzT : sl <= PG_SLOPE_FLAT ? cbT : null;
+      steps.push({ basis: `外观斜度 ${fmtPct(sl)}（≥${fmtPct(PG_SLOPE_STEEP)} 倾斜、≤${fmtPct(PG_SLOPE_FLAT)} 平缓，P364/P366）`, supports: slSide });
+
+      let chosen = null, ambiguous = false, reason;
+      const exZ = excluded(zz), exC = excluded(cb);
+      if (exZ && exC) reason = '两种浪型都有铁律或子浪结构不过，按违规程度排序';
+      else if (exZ || exC) { chosen = exZ ? cbT : zzT; reason = `${nm[exZ ? zzT : cbT]}有铁律或子浪结构不过，只能是${nm[chosen]}`; }
+      else if (compBad) { chosen = cbT; reason = `组成部分不全是锯齿，只能是${nm[cbT]}`; }
+      else if (slSide) { chosen = slSide; reason = `两者铁律都过，按外观斜度判为${nm[slSide]}`; }
+      else { ambiguous = true; reason = `两者铁律都过、外观斜度在两可区间，按指引排序，另一种作为并列解读给出`; }
+      return { types: [zzT, cbT], names: nm, steps: steps.map(x => Object.assign(x, { supportsName: x.supports ? nm[x.supports] : null })), chosen, ambiguous, reason };
+    }
 
     // 同样的点按其它浪型解读 (柳玉冬改数: 「推动浪不成立，按楔形/三角形看」)
     const alternatives = [];
@@ -4121,6 +4174,9 @@
     if (preceding && preceding.warning) doubts.push(preceding.text);
     if (live.extension && !primary.liveHardFails.length) {
       doubts.push(`你标的终点 ${fmtNum(live.extension.fromPrice)} 之后价格已${pts[n - 1].type === 'high' ? '涨' : '跌'}到 ${fmtNum(live.extension.toPrice)}：末浪尚未在你标的位置结束，终点应后移`);
+    }
+    if (discrimination && /ZIGZAG/.test(primary.type) && discrimination.steps.some(x => x.decisive && /组成部分/.test(x.basis))) {
+      doubts.push(`${primary.name.replace(/（.*$/, '')}须由锯齿组成（P362），但组成部分不全是锯齿，更像横向整理`);
     }
     if (primary.guidePct < 40) doubts.push(`指引符合度仅 ${primary.guidePct}%：比率/时间与手稿常见值偏离较大`);
 
@@ -4325,7 +4381,7 @@
       symbol, timeframe, engineVersion: VERSION, mode: 'USER_COUNT', asOf: slice[lastBar].time,
       tool: options.tool, toolName: tool.name, labels,
       forcedType: forced, toolTypes: tool.types.map(t => ({ type: t, name: PATTERNS[t].name })),
-      forecast, trackRecord, reclassify, projection, hypotheses,
+      forecast, trackRecord, reclassify, projection, hypotheses, discrimination,
       analysisTime: new Date().toISOString(), currentPrice,
       subTimeframes: subNames,
       points: pts.map((q, i) => ({ label: labels[i], time: q.time, price: q.price, type: q.type, open: !!q.open })),

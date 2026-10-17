@@ -275,6 +275,7 @@ function impliedOilDisruption(price, baseline, elasticity, globalSupplyMbd) {
 }
 
 const PARAM_RE = /^chg_(\d+)([dwmy])(?:_(bp|pct))?$/;
+const SMA_RE = /^vs_sma(\d+)$/;
 
 /**
  * Single-series transforms keyed by name. Cross-series transforms (curve_regime, rel_to_spx, ...) live in
@@ -283,13 +284,14 @@ const PARAM_RE = /^chg_(\d+)([dwmy])(?:_(bp|pct))?$/;
 function applySeriesTransform(name, series) {
   const m = name.match(PARAM_RE);
   if (m) return change(series, parseInt(m[1], 10), m[2], m[3]);
+  if (name === 'vs_sma50w') return vsSma(weekly(series), 50);
+  const sm = name.match(SMA_RE);
+  if (sm) return vsSma(series, parseInt(sm[1], 10));
   switch (name) {
     case 'level': {
       const o = last(series);
       return { value: o.value, date: o.date };
     }
-    case 'vs_sma200': return vsSma(series, 200);
-    case 'vs_sma50w': return vsSma(weekly(series), 50);
     case 'days_below_sma200': return daysBelowSma(series, 200);
     case 'drawdown_from_high': return drawdown(series);
     case 'percentile_1y': return percentile(series, 1);

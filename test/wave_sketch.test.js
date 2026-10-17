@@ -135,6 +135,23 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.ok(Math.abs(E2.pgSlope(E2.mkGeom([1, 2, 3, 4].map(k => ({ idx: k, time: k, price: v[k] })))) - 0.275) < 1e-9);
   });
 
+  it('锯齿类 / 横向整理判定: 铁律都过时按外观斜度依次判定，两可时按指引并列给出，并列出区分依据', () => {
+    const run = v => { const bars = build(v); return E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'WXY', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4].map(k => pt(v, k, 3600)) }); };
+    // x 回撤 75%，y = 1.5w：铁律两者都过，斜度约 50% → 双锯齿
+    const steep = run([125, 120, 100, 115, 85, 87]);
+    assert.strictEqual(steep.discrimination.chosen, 'DOUBLE_ZIGZAG', steep.discrimination.reason);
+    assert.strictEqual(steep.primary.type, 'DOUBLE_ZIGZAG');
+    assert.ok(steep.discrimination.steps.some(x => /外观斜度/.test(x.basis) && x.supports === 'DOUBLE_ZIGZAG'));
+    // x 回撤 90%，y ≈ w：斜度约 10% → 双重横向整理
+    const flat = run([125, 120, 100, 118, 98, 100]);
+    assert.strictEqual(flat.primary.type, 'COMBINATION', flat.discrimination.reason);
+    // 斜度在 25%~35% 之间: 两可，两种读法都作为并列解读
+    const mid = run([125, 120, 100, 115, 94, 96]);
+    assert.strictEqual(mid.discrimination.ambiguous, true, mid.discrimination.reason);
+    // 三锯齿补上 xx 常见回撤指引 (P351)
+    assert.ok(E.PATTERNS.TRIPLE_ZIGZAG.rules.some(r => r.id === 'XG1'));
+  });
+
   it('子浪多阈值投票: 多数阈值数不成五浪才判三浪，数成五浪的多数只能数成楔形才判楔形，打平归于被评估的计数', () => {
     const V = E._internal.structVotes;
     const imp = { five: { kind: 'IMPULSE' } }, dia = { five: { kind: 'DIAGONAL' } }, none = { five: null };
