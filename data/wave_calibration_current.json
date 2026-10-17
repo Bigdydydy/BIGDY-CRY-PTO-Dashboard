@@ -1,0 +1,1512 @@
+{
+ "generatedAt": "2026-10-17T06:56:54.551Z",
+ "engine": "server\\wave_engine.js",
+ "tag": "current",
+ "symbols": [
+  "BTCUSDT",
+  "ETHUSDT"
+ ],
+ "window": 1000,
+ "step": 18,
+ "top": 3,
+ "near": {
+  "label": "近目标·本段防线",
+  "trainCut": "2025-08-02",
+  "resolved": 1404,
+  "train": 981,
+  "test": 423,
+  "hitPct": 74,
+  "randomWalkPct": 73,
+  "models": [
+   {
+    "model": "随机游走基准",
+    "logLoss": 0.4474,
+    "brier": 0.1435,
+    "skill": 0
+   },
+   {
+    "model": "指引符合度 guidePct",
+    "logLoss": 0.454,
+    "brier": 0.1464,
+    "skill": -0.0149
+   },
+   {
+    "model": "候选概率 probability",
+    "logLoss": 0.4538,
+    "brier": 0.1464,
+    "skill": -0.0144
+   },
+   {
+    "model": "逐条指引（32 条）",
+    "logLoss": 0.4741,
+    "brier": 0.1552,
+    "skill": -0.0597
+   }
+  ],
+  "topTest": {
+   "engineRank": {
+    "n": 222,
+    "hits": 163,
+    "expected": 165.7,
+    "ratio": 0.984
+   },
+   "guidePct": {
+    "n": 222,
+    "hits": 164,
+    "expected": 168.7,
+    "ratio": 0.972
+   },
+   "perRuleModel": {
+    "n": 222,
+    "hits": 153,
+    "expected": 161.2,
+    "ratio": 0.949
+   }
+  },
+  "perRule": [
+   {
+    "rule": "VOL:DIAGONAL:浪3量>浪1",
+    "beta": -0.048,
+    "soloBeta": 0.225,
+    "soloSkill": 0.1415,
+    "trainPass": {
+     "n": 58,
+     "ratio": 1.1
+    },
+    "trainFail": {
+     "n": 78,
+     "ratio": 1.055
+    },
+    "testPass": {
+     "n": 18,
+     "ratio": 1.286
+    },
+    "testFail": {
+     "n": 27,
+     "ratio": 0.975
+    }
+   },
+   {
+    "rule": "DIAGONAL:DG1",
+    "beta": 0.161,
+    "soloBeta": -0.13,
+    "soloSkill": 0.0519,
+    "trainPass": {
+     "n": 119,
+     "ratio": 1.063
+    },
+    "trainFail": {
+     "n": 17,
+     "ratio": 1.169
+    },
+    "testPass": {
+     "n": 36,
+     "ratio": 1.111
+    },
+    "testFail": {
+     "n": 9,
+     "ratio": 1.01
+    }
+   },
+   {
+    "rule": "DIAGONAL:DG2",
+    "beta": 0.042,
+    "soloBeta": -0.153,
+    "soloSkill": 0.039,
+    "trainPass": {
+     "n": 93,
+     "ratio": 1.061
+    },
+    "trainFail": {
+     "n": 43,
+     "ratio": 1.104
+    },
+    "testPass": {
+     "n": 28,
+     "ratio": 1.147
+    },
+    "testFail": {
+     "n": 17,
+     "ratio": 1.004
+    }
+   },
+   {
+    "rule": "IMPULSE:G9",
+    "beta": -0.516,
+    "soloBeta": -0.41,
+    "soloSkill": 0.0271,
+    "trainPass": {
+     "n": 124,
+     "ratio": 0.914
+    },
+    "trainFail": {
+     "n": 9,
+     "ratio": 1.254
+    },
+    "testPass": {
+     "n": 74,
+     "ratio": 0.929
+    },
+    "testFail": {
+     "n": 6,
+     "ratio": 1.572
+    }
+   },
+   {
+    "rule": "TRIPLE_COMBINATION:CG3",
+    "beta": -0.312,
+    "soloBeta": -0.292,
+    "soloSkill": 0.014,
+    "trainPass": {
+     "n": 138,
+     "ratio": 1.006
+    },
+    "trainFail": {
+     "n": 14,
+     "ratio": 1.129
+    },
+    "testPass": {
+     "n": 41,
+     "ratio": 1.105
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 1.053
+    }
+   },
+   {
+    "rule": "VOL:IMPULSE:浪3量>浪1",
+    "beta": 0.111,
+    "soloBeta": 0.057,
+    "soloSkill": 0.0039,
+    "trainPass": {
+     "n": 73,
+     "ratio": 1
+    },
+    "trainFail": {
+     "n": 90,
+     "ratio": 0.969
+    },
+    "testPass": {
+     "n": 36,
+     "ratio": 1.022
+    },
+    "testFail": {
+     "n": 56,
+     "ratio": 0.937
+    }
+   },
+   {
+    "rule": "IMPULSE:M10",
+    "beta": -0.063,
+    "soloBeta": 0.031,
+    "soloSkill": 0.0023,
+    "trainPass": {
+     "n": 150,
+     "ratio": 0.972
+    },
+    "trainFail": {
+     "n": 7,
+     "ratio": 0.956
+    },
+    "testPass": {
+     "n": 91,
+     "ratio": 0.974
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 0
+    }
+   },
+   {
+    "rule": "IMPULSE:M9",
+    "beta": -0.278,
+    "soloBeta": -0.084,
+    "soloSkill": 0.001,
+    "trainPass": {
+     "n": 149,
+     "ratio": 0.98
+    },
+    "trainFail": {
+     "n": 16,
+     "ratio": 1.029
+    },
+    "testPass": {
+     "n": 89,
+     "ratio": 0.973
+    },
+    "testFail": {
+     "n": 4,
+     "ratio": 0.965
+    }
+   },
+   {
+    "rule": "IMPULSE:G8",
+    "beta": 0.064,
+    "soloBeta": 0.016,
+    "soloSkill": -0.0001,
+    "trainPass": {
+     "n": 136,
+     "ratio": 0.987
+    },
+    "trainFail": {
+     "n": 29,
+     "ratio": 0.978
+    },
+    "testPass": {
+     "n": 70,
+     "ratio": 0.927
+    },
+    "testFail": {
+     "n": 23,
+     "ratio": 1.098
+    }
+   },
+   {
+    "rule": "IMPULSE:G7",
+    "beta": -0.338,
+    "soloBeta": -0.157,
+    "soloSkill": -0.0007,
+    "trainPass": {
+     "n": 118,
+     "ratio": 0.925
+    },
+    "trainFail": {
+     "n": 15,
+     "ratio": 1.03
+    },
+    "testPass": {
+     "n": 61,
+     "ratio": 0.971
+    },
+    "testFail": {
+     "n": 19,
+     "ratio": 0.943
+    }
+   },
+   {
+    "rule": "COMBINATION:CG1",
+    "beta": -0.202,
+    "soloBeta": -0.061,
+    "soloSkill": -0.001,
+    "trainPass": {
+     "n": 171,
+     "ratio": 1.019
+    },
+    "trainFail": {
+     "n": 16,
+     "ratio": 1.043
+    },
+    "testPass": {
+     "n": 73,
+     "ratio": 0.994
+    },
+    "testFail": {
+     "n": 3,
+     "ratio": 1.124
+    }
+   },
+   {
+    "rule": "IMPULSE:G3",
+    "beta": 0.168,
+    "soloBeta": 0.046,
+    "soloSkill": -0.001,
+    "trainPass": {
+     "n": 116,
+     "ratio": 0.964
+    },
+    "trainFail": {
+     "n": 31,
+     "ratio": 0.936
+    },
+    "testPass": {
+     "n": 63,
+     "ratio": 0.98
+    },
+    "testFail": {
+     "n": 25,
+     "ratio": 0.99
+    }
+   },
+   {
+    "rule": "IMPULSE:G1",
+    "beta": -0.198,
+    "soloBeta": 0.106,
+    "soloSkill": -0.0022,
+    "trainPass": {
+     "n": 127,
+     "ratio": 1
+    },
+    "trainFail": {
+     "n": 38,
+     "ratio": 0.938
+    },
+    "testPass": {
+     "n": 69,
+     "ratio": 0.961
+    },
+    "testFail": {
+     "n": 24,
+     "ratio": 1.006
+    }
+   },
+   {
+    "rule": "IMPULSE:G5",
+    "beta": 0.3,
+    "soloBeta": 0.149,
+    "soloSkill": -0.0034,
+    "trainPass": {
+     "n": 90,
+     "ratio": 0.971
+    },
+    "trainFail": {
+     "n": 43,
+     "ratio": 0.843
+    },
+    "testPass": {
+     "n": 44,
+     "ratio": 0.967
+    },
+    "testFail": {
+     "n": 36,
+     "ratio": 0.962
+    }
+   },
+   {
+    "rule": "MOM:IMPULSE:浪3速>浪1",
+    "beta": -0.091,
+    "soloBeta": -0.173,
+    "soloSkill": -0.004,
+    "trainPass": {
+     "n": 103,
+     "ratio": 0.945
+    },
+    "trainFail": {
+     "n": 60,
+     "ratio": 1.049
+    },
+    "testPass": {
+     "n": 56,
+     "ratio": 0.975
+    },
+    "testFail": {
+     "n": 36,
+     "ratio": 0.96
+    }
+   },
+   {
+    "rule": "IMPULSE:M11",
+    "beta": -0.049,
+    "soloBeta": 0.138,
+    "soloSkill": -0.0102,
+    "trainPass": {
+     "n": 105,
+     "ratio": 0.973
+    },
+    "trainFail": {
+     "n": 10,
+     "ratio": 0.835
+    },
+    "testPass": {
+     "n": 69,
+     "ratio": 1.017
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 2.5
+    }
+   },
+   {
+    "rule": "MOM:IMPULSE:浪5速<浪3",
+    "beta": -0.162,
+    "soloBeta": -0.165,
+    "soloSkill": -0.0106,
+    "trainPass": {
+     "n": 36,
+     "ratio": 0.861
+    },
+    "trainFail": {
+     "n": 97,
+     "ratio": 0.963
+    },
+    "testPass": {
+     "n": 32,
+     "ratio": 1.014
+    },
+    "testFail": {
+     "n": 48,
+     "ratio": 0.935
+    }
+   },
+   {
+    "rule": "IMPULSE:G2",
+    "beta": 0.781,
+    "soloBeta": 0.57,
+    "soloSkill": -0.0157,
+    "trainPass": {
+     "n": 152,
+     "ratio": 1.019
+    },
+    "trainFail": {
+     "n": 13,
+     "ratio": 0.588
+    },
+    "testPass": {
+     "n": 78,
+     "ratio": 0.979
+    },
+    "testFail": {
+     "n": 15,
+     "ratio": 0.943
+    }
+   },
+   {
+    "rule": "VOL:IMPULSE:浪5量<浪3",
+    "beta": 0.318,
+    "soloBeta": 0.251,
+    "soloSkill": -0.0166,
+    "trainPass": {
+     "n": 70,
+     "ratio": 1.007
+    },
+    "trainFail": {
+     "n": 63,
+     "ratio": 0.862
+    },
+    "testPass": {
+     "n": 51,
+     "ratio": 0.936
+    },
+    "testFail": {
+     "n": 29,
+     "ratio": 1.019
+    }
+   },
+   {
+    "rule": "IMPULSE:M12",
+    "beta": 0.159,
+    "soloBeta": 0.264,
+    "soloSkill": -0.0179,
+    "trainPass": {
+     "n": 115,
+     "ratio": 0.966
+    },
+    "trainFail": {
+     "n": 5,
+     "ratio": 0.658
+    },
+    "testPass": {
+     "n": 71,
+     "ratio": 1.02
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 2.5
+    }
+   },
+   {
+    "rule": "IMPULSE:I2",
+    "beta": -0.082,
+    "soloBeta": -0.18,
+    "soloSkill": -0.0229,
+    "trainPass": {
+     "n": 102,
+     "ratio": 0.911
+    },
+    "trainFail": {
+     "n": 32,
+     "ratio": 1.023
+    },
+    "testPass": {
+     "n": 60,
+     "ratio": 1.037
+    },
+    "testFail": {
+     "n": 22,
+     "ratio": 0.771
+    }
+   },
+   {
+    "rule": "IMPULSE:G4",
+    "beta": -0.54,
+    "soloBeta": -0.722,
+    "soloSkill": -0.0251,
+    "trainPass": {
+     "n": 129,
+     "ratio": 0.913
+    },
+    "trainFail": {
+     "n": 15,
+     "ratio": 1.287
+    },
+    "testPass": {
+     "n": 87,
+     "ratio": 0.992
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 0
+    }
+   },
+   {
+    "rule": "VOL:DIAGONAL:浪5量<浪3",
+    "beta": -0.045,
+    "soloBeta": -0.139,
+    "soloSkill": -0.0375,
+    "trainPass": {
+     "n": 45,
+     "ratio": 1.104
+    },
+    "trainFail": {
+     "n": 13,
+     "ratio": 1.24
+    },
+    "testPass": {
+     "n": 15,
+     "ratio": 0.988
+    },
+    "testFail": {
+     "n": 6,
+     "ratio": 1.163
+    }
+   },
+   {
+    "rule": "MOM:DIAGONAL:浪3速>浪1",
+    "beta": 0.735,
+    "soloBeta": 0.687,
+    "soloSkill": -0.0378,
+    "trainPass": {
+     "n": 57,
+     "ratio": 1.198
+    },
+    "trainFail": {
+     "n": 79,
+     "ratio": 0.988
+    },
+    "testPass": {
+     "n": 10,
+     "ratio": 1.054
+    },
+    "testFail": {
+     "n": 35,
+     "ratio": 1.105
+    }
+   },
+   {
+    "rule": "MOM:DIAGONAL:浪5速<浪3",
+    "beta": -0.285,
+    "soloBeta": -0.058,
+    "soloSkill": -0.0427,
+    "trainPass": {
+     "n": 31,
+     "ratio": 1.11
+    },
+    "trainFail": {
+     "n": 27,
+     "ratio": 1.158
+    },
+    "testPass": {
+     "n": 11,
+     "ratio": 0.96
+    },
+    "testFail": {
+     "n": 10,
+     "ratio": 1.122
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG5",
+    "beta": 0.007,
+    "soloBeta": -0.071,
+    "soloSkill": -0.057,
+    "trainPass": {
+     "n": 128,
+     "ratio": 1.094
+    },
+    "trainFail": {
+     "n": 5,
+     "ratio": 1.153
+    },
+    "testPass": {
+     "n": 63,
+     "ratio": 0.974
+    },
+    "testFail": {
+     "n": 5,
+     "ratio": 1.073
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG3",
+    "beta": 0.219,
+    "soloBeta": 0.14,
+    "soloSkill": -0.0697,
+    "trainPass": {
+     "n": 110,
+     "ratio": 1.104
+    },
+    "trainFail": {
+     "n": 19,
+     "ratio": 1.104
+    },
+    "testPass": {
+     "n": 62,
+     "ratio": 0.981
+    },
+    "testFail": {
+     "n": 9,
+     "ratio": 0.838
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG6",
+    "beta": -0.099,
+    "soloBeta": -0.113,
+    "soloSkill": -0.0876,
+    "trainPass": {
+     "n": 164,
+     "ratio": 1.074
+    },
+    "trainFail": {
+     "n": 39,
+     "ratio": 1.107
+    },
+    "testPass": {
+     "n": 79,
+     "ratio": 0.813
+    },
+    "testFail": {
+     "n": 36,
+     "ratio": 0.991
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG8",
+    "beta": -0.176,
+    "soloBeta": 0.015,
+    "soloSkill": -0.0884,
+    "trainPass": {
+     "n": 186,
+     "ratio": 1.079
+    },
+    "trainFail": {
+     "n": 10,
+     "ratio": 1.059
+    },
+    "testPass": {
+     "n": 99,
+     "ratio": 0.865
+    },
+    "testFail": {
+     "n": 8,
+     "ratio": 0.662
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG7",
+    "beta": -0.157,
+    "soloBeta": -0.114,
+    "soloSkill": -0.1048,
+    "trainPass": {
+     "n": 156,
+     "ratio": 1.071
+    },
+    "trainFail": {
+     "n": 40,
+     "ratio": 1.106
+    },
+    "testPass": {
+     "n": 75,
+     "ratio": 0.876
+    },
+    "testFail": {
+     "n": 32,
+     "ratio": 0.805
+    }
+   },
+   {
+    "rule": "ZIGZAG:Z7",
+    "beta": -0.257,
+    "soloBeta": -0.313,
+    "soloSkill": -0.1075,
+    "trainPass": {
+     "n": 168,
+     "ratio": 1.067
+    },
+    "trainFail": {
+     "n": 9,
+     "ratio": 1.349
+    },
+    "testPass": {
+     "n": 79,
+     "ratio": 0.877
+    },
+    "testFail": {
+     "n": 7,
+     "ratio": 0.677
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG1",
+    "beta": 0.527,
+    "soloBeta": 0.468,
+    "soloSkill": -0.1131,
+    "trainPass": {
+     "n": 187,
+     "ratio": 1.099
+    },
+    "trainFail": {
+     "n": 16,
+     "ratio": 0.864
+    },
+    "testPass": {
+     "n": 80,
+     "ratio": 0.811
+    },
+    "testFail": {
+     "n": 35,
+     "ratio": 0.996
+    }
+   }
+  ]
+ },
+ "far": {
+  "label": "远目标·计数否定位",
+  "trainCut": "2025-06-30",
+  "resolved": 872,
+  "train": 608,
+  "test": 264,
+  "hitPct": 68,
+  "randomWalkPct": 63,
+  "models": [
+   {
+    "model": "随机游走基准",
+    "logLoss": 0.5087,
+    "brier": 0.1658,
+    "skill": 0
+   },
+   {
+    "model": "指引符合度 guidePct",
+    "logLoss": 0.5075,
+    "brier": 0.166,
+    "skill": 0.0023
+   },
+   {
+    "model": "候选概率 probability",
+    "logLoss": 0.5079,
+    "brier": 0.1664,
+    "skill": 0.0015
+   },
+   {
+    "model": "逐条指引（31 条）",
+    "logLoss": 0.5401,
+    "brier": 0.1784,
+    "skill": -0.0618
+   }
+  ],
+  "topTest": {
+   "engineRank": {
+    "n": 165,
+    "hits": 112,
+    "expected": 109.9,
+    "ratio": 1.019
+   },
+   "guidePct": {
+    "n": 165,
+    "hits": 114,
+    "expected": 111.5,
+    "ratio": 1.022
+   },
+   "perRuleModel": {
+    "n": 165,
+    "hits": 113,
+    "expected": 108.3,
+    "ratio": 1.043
+   }
+  },
+  "perRule": [
+   {
+    "rule": "IMPULSE:G2",
+    "beta": 0.778,
+    "soloBeta": 0.449,
+    "soloSkill": 0.1007,
+    "trainPass": {
+     "n": 94,
+     "ratio": 1.187
+    },
+    "trainFail": {
+     "n": 11,
+     "ratio": 0.675
+    },
+    "testPass": {
+     "n": 30,
+     "ratio": 1.4
+    },
+    "testFail": {
+     "n": 13,
+     "ratio": 0.844
+    }
+   },
+   {
+    "rule": "IMPULSE:G1",
+    "beta": -0.341,
+    "soloBeta": 0.072,
+    "soloSkill": 0.0607,
+    "trainPass": {
+     "n": 74,
+     "ratio": 1.156
+    },
+    "trainFail": {
+     "n": 31,
+     "ratio": 1.113
+    },
+    "testPass": {
+     "n": 29,
+     "ratio": 1.44
+    },
+    "testFail": {
+     "n": 14,
+     "ratio": 0.808
+    }
+   },
+   {
+    "rule": "MOM:IMPULSE:浪5速<浪3",
+    "beta": 0.008,
+    "soloBeta": 0.157,
+    "soloSkill": 0.0564,
+    "trainPass": {
+     "n": 25,
+     "ratio": 1.18
+    },
+    "trainFail": {
+     "n": 66,
+     "ratio": 1.033
+    },
+    "testPass": {
+     "n": 17,
+     "ratio": 1.531
+    },
+    "testFail": {
+     "n": 26,
+     "ratio": 1.022
+    }
+   },
+   {
+    "rule": "IMPULSE:M9",
+    "beta": 0.137,
+    "soloBeta": 0.092,
+    "soloSkill": 0.0528,
+    "trainPass": {
+     "n": 92,
+     "ratio": 1.159
+    },
+    "trainFail": {
+     "n": 13,
+     "ratio": 1.059
+    },
+    "testPass": {
+     "n": 41,
+     "ratio": 1.233
+    },
+    "testFail": {
+     "n": 2,
+     "ratio": 0
+    }
+   },
+   {
+    "rule": "VOL:IMPULSE:浪5量<浪3",
+    "beta": 0.473,
+    "soloBeta": 0.399,
+    "soloSkill": 0.0523,
+    "trainPass": {
+     "n": 44,
+     "ratio": 1.243
+    },
+    "trainFail": {
+     "n": 47,
+     "ratio": 0.903
+    },
+    "testPass": {
+     "n": 36,
+     "ratio": 1.21
+    },
+    "testFail": {
+     "n": 7,
+     "ratio": 1.049
+    }
+   },
+   {
+    "rule": "IMPULSE:M10",
+    "beta": 0.01,
+    "soloBeta": 0.155,
+    "soloSkill": 0.0456,
+    "trainPass": {
+     "n": 93,
+     "ratio": 1.136
+    },
+    "trainFail": {
+     "n": 7,
+     "ratio": 0.968
+    },
+    "testPass": {
+     "n": 42,
+     "ratio": 1.197
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 0
+    }
+   },
+   {
+    "rule": "MOM:IMPULSE:浪3速>浪1",
+    "beta": 0.288,
+    "soloBeta": 0.246,
+    "soloSkill": 0.0453,
+    "trainPass": {
+     "n": 58,
+     "ratio": 1.236
+    },
+    "trainFail": {
+     "n": 46,
+     "ratio": 1.023
+    },
+    "testPass": {
+     "n": 26,
+     "ratio": 1.273
+    },
+    "testFail": {
+     "n": 17,
+     "ratio": 1.092
+    }
+   },
+   {
+    "rule": "IMPULSE:G8",
+    "beta": -0.131,
+    "soloBeta": -0.04,
+    "soloSkill": 0.0415,
+    "trainPass": {
+     "n": 84,
+     "ratio": 1.137
+    },
+    "trainFail": {
+     "n": 21,
+     "ratio": 1.181
+    },
+    "testPass": {
+     "n": 36,
+     "ratio": 1.207
+    },
+    "testFail": {
+     "n": 7,
+     "ratio": 1.063
+    }
+   },
+   {
+    "rule": "IMPULSE:G7",
+    "beta": -0.026,
+    "soloBeta": 0.095,
+    "soloSkill": 0.0282,
+    "trainPass": {
+     "n": 80,
+     "ratio": 1.08
+    },
+    "trainFail": {
+     "n": 11,
+     "ratio": 0.982
+    },
+    "testPass": {
+     "n": 37,
+     "ratio": 1.189
+    },
+    "testFail": {
+     "n": 6,
+     "ratio": 1.15
+    }
+   },
+   {
+    "rule": "IMPULSE:I2",
+    "beta": -0.023,
+    "soloBeta": -0.018,
+    "soloSkill": 0.0279,
+    "trainPass": {
+     "n": 71,
+     "ratio": 1.072
+    },
+    "trainFail": {
+     "n": 20,
+     "ratio": 1.077
+    },
+    "testPass": {
+     "n": 34,
+     "ratio": 1.156
+    },
+    "testFail": {
+     "n": 9,
+     "ratio": 1.345
+    }
+   },
+   {
+    "rule": "IMPULSE:M11",
+    "beta": -0.143,
+    "soloBeta": -0.095,
+    "soloSkill": 0.0274,
+    "trainPass": {
+     "n": 69,
+     "ratio": 1.082
+    },
+    "trainFail": {
+     "n": 10,
+     "ratio": 1.251
+    },
+    "testPass": {
+     "n": 38,
+     "ratio": 1.111
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 4.813
+    }
+   },
+   {
+    "rule": "IMPULSE:G9",
+    "beta": -0.249,
+    "soloBeta": 0.007,
+    "soloSkill": 0.027,
+    "trainPass": {
+     "n": 82,
+     "ratio": 1.071
+    },
+    "trainFail": {
+     "n": 9,
+     "ratio": 1.102
+    },
+    "testPass": {
+     "n": 40,
+     "ratio": 1.138
+    },
+    "testFail": {
+     "n": 3,
+     "ratio": 2.634
+    }
+   },
+   {
+    "rule": "IMPULSE:G3",
+    "beta": -0.151,
+    "soloBeta": -0.257,
+    "soloSkill": 0.0197,
+    "trainPass": {
+     "n": 74,
+     "ratio": 1.065
+    },
+    "trainFail": {
+     "n": 20,
+     "ratio": 1.222
+    },
+    "testPass": {
+     "n": 32,
+     "ratio": 1.252
+    },
+    "testFail": {
+     "n": 11,
+     "ratio": 1.038
+    }
+   },
+   {
+    "rule": "IMPULSE:M12",
+    "beta": 0.005,
+    "soloBeta": 0.089,
+    "soloSkill": 0.0173,
+    "trainPass": {
+     "n": 76,
+     "ratio": 1.076
+    },
+    "trainFail": {
+     "n": 5,
+     "ratio": 0.96
+    },
+    "testPass": {
+     "n": 40,
+     "ratio": 1.13
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 4.813
+    }
+   },
+   {
+    "rule": "DIAGONAL:DG2",
+    "beta": -0.061,
+    "soloBeta": -0.16,
+    "soloSkill": 0.0112,
+    "trainPass": {
+     "n": 73,
+     "ratio": 1.111
+    },
+    "trainFail": {
+     "n": 18,
+     "ratio": 1.227
+    },
+    "testPass": {
+     "n": 26,
+     "ratio": 1.082
+    },
+    "testFail": {
+     "n": 4,
+     "ratio": 1.054
+    }
+   },
+   {
+    "rule": "DIAGONAL:DG1",
+    "beta": 0.24,
+    "soloBeta": 0.118,
+    "soloSkill": 0.0063,
+    "trainPass": {
+     "n": 77,
+     "ratio": 1.142
+    },
+    "trainFail": {
+     "n": 14,
+     "ratio": 1.072
+    },
+    "testPass": {
+     "n": 28,
+     "ratio": 1.062
+    },
+    "testFail": {
+     "n": 2,
+     "ratio": 1.298
+    }
+   },
+   {
+    "rule": "IMPULSE:G4",
+    "beta": -0.348,
+    "soloBeta": -0.523,
+    "soloSkill": 0.0016,
+    "trainPass": {
+     "n": 84,
+     "ratio": 1.06
+    },
+    "trainFail": {
+     "n": 10,
+     "ratio": 1.372
+    },
+    "testPass": {
+     "n": 42,
+     "ratio": 1.206
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 0
+    }
+   },
+   {
+    "rule": "IMPULSE:G5",
+    "beta": 0.474,
+    "soloBeta": 0.157,
+    "soloSkill": -0.0006,
+    "trainPass": {
+     "n": 63,
+     "ratio": 1.108
+    },
+    "trainFail": {
+     "n": 28,
+     "ratio": 0.977
+    },
+    "testPass": {
+     "n": 28,
+     "ratio": 1.051
+    },
+    "testFail": {
+     "n": 15,
+     "ratio": 1.562
+    }
+   },
+   {
+    "rule": "TRIPLE_COMBINATION:CG3",
+    "beta": -0.47,
+    "soloBeta": -0.569,
+    "soloSkill": -0.0059,
+    "trainPass": {
+     "n": 89,
+     "ratio": 0.963
+    },
+    "trainFail": {
+     "n": 11,
+     "ratio": 1.426
+    },
+    "testPass": {
+     "n": 31,
+     "ratio": 1.036
+    },
+    "testFail": {
+     "n": 0,
+     "ratio": null
+    }
+   },
+   {
+    "rule": "MOM:DIAGONAL:浪3速>浪1",
+    "beta": 0.563,
+    "soloBeta": 0.361,
+    "soloSkill": -0.0163,
+    "trainPass": {
+     "n": 35,
+     "ratio": 1.271
+    },
+    "trainFail": {
+     "n": 56,
+     "ratio": 1.048
+    },
+    "testPass": {
+     "n": 4,
+     "ratio": 0.87
+    },
+    "testFail": {
+     "n": 26,
+     "ratio": 1.119
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG3",
+    "beta": -0.339,
+    "soloBeta": -0.279,
+    "soloSkill": -0.0219,
+    "trainPass": {
+     "n": 64,
+     "ratio": 1.026
+    },
+    "trainFail": {
+     "n": 15,
+     "ratio": 1.481
+    },
+    "testPass": {
+     "n": 46,
+     "ratio": 0.988
+    },
+    "testFail": {
+     "n": 7,
+     "ratio": 0.948
+    }
+   },
+   {
+    "rule": "COMBINATION:CG1",
+    "beta": 0.052,
+    "soloBeta": 0.116,
+    "soloSkill": -0.0232,
+    "trainPass": {
+     "n": 109,
+     "ratio": 1.101
+    },
+    "trainFail": {
+     "n": 13,
+     "ratio": 1.034
+    },
+    "testPass": {
+     "n": 55,
+     "ratio": 0.998
+    },
+    "testFail": {
+     "n": 1,
+     "ratio": 1.857
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG8",
+    "beta": 0.203,
+    "soloBeta": 0.504,
+    "soloSkill": -0.0291,
+    "trainPass": {
+     "n": 117,
+     "ratio": 1.095
+    },
+    "trainFail": {
+     "n": 5,
+     "ratio": 0.493
+    },
+    "testPass": {
+     "n": 66,
+     "ratio": 0.966
+    },
+    "testFail": {
+     "n": 7,
+     "ratio": 0.676
+    }
+   },
+   {
+    "rule": "VOL:DIAGONAL:浪3量>浪1",
+    "beta": -0.35,
+    "soloBeta": -0.183,
+    "soloSkill": -0.0354,
+    "trainPass": {
+     "n": 35,
+     "ratio": 1.054
+    },
+    "trainFail": {
+     "n": 56,
+     "ratio": 1.186
+    },
+    "testPass": {
+     "n": 16,
+     "ratio": 1.258
+    },
+    "testFail": {
+     "n": 14,
+     "ratio": 0.883
+    }
+   },
+   {
+    "rule": "VOL:IMPULSE:浪3量>浪1",
+    "beta": 0.34,
+    "soloBeta": 0.292,
+    "soloSkill": -0.037,
+    "trainPass": {
+     "n": 43,
+     "ratio": 1.262
+    },
+    "trainFail": {
+     "n": 61,
+     "ratio": 1.047
+    },
+    "testPass": {
+     "n": 16,
+     "ratio": 0.854
+    },
+    "testFail": {
+     "n": 27,
+     "ratio": 1.351
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG7",
+    "beta": -0.086,
+    "soloBeta": 0.005,
+    "soloSkill": -0.0415,
+    "trainPass": {
+     "n": 99,
+     "ratio": 1.076
+    },
+    "trainFail": {
+     "n": 23,
+     "ratio": 1.104
+    },
+    "testPass": {
+     "n": 53,
+     "ratio": 1.11
+    },
+    "testFail": {
+     "n": 20,
+     "ratio": 0.481
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG1",
+    "beta": 0.295,
+    "soloBeta": 0.393,
+    "soloSkill": -0.0627,
+    "trainPass": {
+     "n": 112,
+     "ratio": 1.113
+    },
+    "trainFail": {
+     "n": 13,
+     "ratio": 0.867
+    },
+    "testPass": {
+     "n": 53,
+     "ratio": 0.935
+    },
+    "testFail": {
+     "n": 22,
+     "ratio": 1.022
+    }
+   },
+   {
+    "rule": "ZIGZAG:ZG6",
+    "beta": 0.052,
+    "soloBeta": 0.237,
+    "soloSkill": -0.0634,
+    "trainPass": {
+     "n": 101,
+     "ratio": 1.112
+    },
+    "trainFail": {
+     "n": 24,
+     "ratio": 0.987
+    },
+    "testPass": {
+     "n": 54,
+     "ratio": 0.924
+    },
+    "testFail": {
+     "n": 21,
+     "ratio": 1.052
+    }
+   },
+   {
+    "rule": "ZIGZAG:Z7",
+    "beta": -0.251,
+    "soloBeta": -0.24,
+    "soloSkill": -0.07,
+    "trainPass": {
+     "n": 101,
+     "ratio": 1.07
+    },
+    "trainFail": {
+     "n": 8,
+     "ratio": 1.464
+    },
+    "testPass": {
+     "n": 56,
+     "ratio": 0.978
+    },
+    "testFail": {
+     "n": 5,
+     "ratio": 0.638
+    }
+   },
+   {
+    "rule": "MOM:DIAGONAL:浪5速<浪3",
+    "beta": -0.197,
+    "soloBeta": -0.103,
+    "soloSkill": null,
+    "trainPass": {
+     "n": 17,
+     "ratio": 1.129
+    },
+    "trainFail": {
+     "n": 20,
+     "ratio": 1.211
+    },
+    "testPass": {
+     "n": 7,
+     "ratio": 1.088
+    },
+    "testFail": {
+     "n": 5,
+     "ratio": 1.215
+    }
+   },
+   {
+    "rule": "VOL:DIAGONAL:浪5量<浪3",
+    "beta": 0.095,
+    "soloBeta": -0.078,
+    "soloSkill": null,
+    "trainPass": {
+     "n": 28,
+     "ratio": 1.141
+    },
+    "trainFail": {
+     "n": 9,
+     "ratio": 1.304
+    },
+    "testPass": {
+     "n": 10,
+     "ratio": 1.041
+    },
+    "testFail": {
+     "n": 2,
+     "ratio": 1.781
+    }
+   }
+  ]
+ }
+}

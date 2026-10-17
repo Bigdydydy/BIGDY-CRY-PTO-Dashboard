@@ -120,6 +120,17 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(sk.nodes[0].result.primary.type, 'FLAT');
   });
 
+  it('子浪多阈值投票: 多数阈值数不成五浪才判三浪，数成五浪的多数只能数成楔形才判楔形，打平归于被评估的计数', () => {
+    const V = E._internal.structVotes;
+    const imp = { five: { kind: 'IMPULSE' } }, dia = { five: { kind: 'DIAGONAL' } }, none = { five: null };
+    assert.deepStrictEqual([V([imp, none]).label, V([imp, none]).motive], ['5', 'IMPULSE'], '打平按五浪');
+    assert.strictEqual(V([imp, none, none]).label, '3', '多数数不成五浪才判三浪');
+    assert.strictEqual(V([dia, imp, none]).motive, 'IMPULSE', '数成五浪的阈值里推动浪、楔形打平按推动浪');
+    assert.strictEqual(V([dia, dia, imp]).motive, 'DIAGONAL', '多数只能数成楔形才判楔形');
+    // 没有校准系数 (回测中指引无可证实的预测力) 时不给校准概率
+    assert.strictEqual(E._internal.calibratedOf({ baseType: 'IMPULSE', ruleChecks: [] }, { randomWalkPct: 60 }), null);
+  });
+
   it('计数否定位与本段防线分开: c浪运行中跌破 b 终点只说明 b 浪延伸，越过 a 浪起点才否定', () => {
     const v = [106, 100, 103, 101.5, 104, 102.5, 120, 112, 114, 113, 115, 114.5];
     const bars = build(v);
