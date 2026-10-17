@@ -120,6 +120,43 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(sk.nodes[0].result.primary.type, 'FLAT');
   });
 
+  it('计数否定位与本段防线分开: c浪运行中跌破 b 终点只说明 b 浪延伸，越过 a 浪起点才否定', () => {
+    const v = [106, 100, 103, 101.5, 104, 102.5, 120, 112, 114, 113, 115, 114.5];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 6, 7].map(k => pt(v, k, 3600)) });
+    assert.match(r.primary.name, /c浪运行中/, '名称按走势后的计数，与价位一致');
+    assert.ok(Math.abs(r.invalidation.structural.price - 100) < 0.1, r.invalidation.structural.text);
+    assert.match(r.invalidation.structural.label, /计数否定位/);
+    assert.ok(Math.abs(r.invalidation.leg.price - 112) < 0.1, r.invalidation.leg.text);
+    assert.match(r.invalidation.leg.text, /计数本身未否定/);
+    // 推动浪浪3运行中: 否定位是浪1起点，浪2终点只是本段防线
+    const w = [106, 100, 110, 104, 113, 112.5];
+    const b2 = build(w);
+    const m = E.evaluateUserCount(b2['1h'], 'TEST', { tool: 'IMPULSE', timeframe: '1h', subBars: { '15m': b2['15m'] }, points: [1, 2, 3].map(k => pt(w, k, 3600)) });
+    assert.ok(Math.abs(m.invalidation.structural.price - 100) < 0.1, m.invalidation.structural.text);
+    assert.ok(Math.abs(m.invalidation.leg.price - 104) < 0.1, m.invalidation.leg.text);
+  });
+
+  it('推演: c浪最低是 0.9×b（硬规则），0.618×a 只是常见目标之一', () => {
+    const v = [106, 100, 103, 101.5, 104, 102.5, 120, 112, 114, 113, 115, 114.5];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 6, 7].map(k => pt(v, k, 3600)) });
+    const c = r.projection.waves[0];
+    assert.ok(Math.abs(c.min.price - (112 + 0.9 * 8)) < 0.2, JSON.stringify(c.min));
+    assert.ok(c.min.price < c.zone.lo, '最低要求低于常见区间下端');
+    assert.ok(c.common.some(x => /0\.618×a/.test(x.label)) && c.common.some(x => /1×a/.test(x.label) && Math.abs(x.price - 132) < 0.2));
+  });
+
+  it('评语精简: 子浪结构、价位、目标、推演、并列假设不在评语里重复，免责声明只出现一次', () => {
+    const v = [106, 100, 103, 101.5, 104, 102.5, 120, 112, 114, 113, 115, 114.5];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'ABC', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 6, 7].map(k => pt(v, k, 3600)) });
+    const L = r.commentary.lines;
+    assert.ok(!L.some(l => /^(子浪结构|目标：|假设推演|并列假设|小级别监测点)/.test(l)), L.join('\n'));
+    assert.ok(!L.some(l => /计数否定位|本段防线）：/.test(l) && !/可检验的预测/.test(l)), L.join('\n'));
+    assert.strictEqual(L.filter(l => /只讨论波浪/.test(l)).length, 1);
+  });
+
   it('重新定性: 画成 abc 反弹，但起点以来已走成五浪推动 → 提出新趋势、判为存疑', () => {
     // 100 起的上涨: 110 → 105 → 122 → 116 → 130 (五浪)，用户只把 100-110-105-122 画成 abc
     const v = [120, 100, 110, 105, 122, 116, 130, 126];
@@ -129,7 +166,9 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.ok(r.reclassify, '应提出重新定性');
     assert.strictEqual(r.reclassify.to, 'IMPULSE');
     assert.notStrictEqual(r.verdict, 'VALID');
-    assert.ok(r.commentary.lines.some(l => /重新定性/.test(l)));
+    // 回测无区分度的重新定性只作提示：保留在 reclassify 里，不写进评语
+    assert.ok(r.reclassify.weak);
+    assert.ok(!r.commentary.lines.some(l => /重新定性/.test(l)));
     // 真正的推动浪画法不触发
     const imp = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', points: [1, 2, 3, 4, 5, 6].map(k => pt(v, k, 3600)), timeframe: '1h', subBars: { '15m': bars['15m'] } });
     assert.strictEqual(imp.reclassify, null);
