@@ -1288,11 +1288,11 @@ self.onmessage = function (e) {
         <div class="ue-note">「最低」是手稿硬规则，「常见」是常见比率（不是最低要求）。每一浪按前一浪的中值推出，越往后越不确定；图上橙色虚线为中值路径（工具栏「假设推演」可隐藏）。这是在你的计数成立的假设下的常见走法，不是预测。</div>
       </div>` : '';
 
-    // 并列假设: 同样 4 个点的调整浪 / 驱动浪前三浪两种解读，及区分条件
+    // 并列假设: 同样的点的并列解读 (调整浪 / 驱动浪前三浪；双锯齿 / 横向整理)，及区分条件
     const hyps = r.hypotheses || [];
     const hypHtml = hyps.length ? `
       <div class="liu-signal-row">
-        <div class="liu-signal-title"><span>并列假设</span><span>同样的点 · 两种解读</span></div>
+        <div class="liu-signal-title"><span>并列假设</span><span>同样的点 · 并列解读</span></div>
         ${hyps.map((h, k) => {
           const st = VERDICT_STYLE[h.verdict] || VERDICT_STYLE.DOUBT;
           const meta = [h.isPrimary ? '当前评估' : '', h.guidePct != null ? `指引符合度 ${h.guidePct}%` : '',

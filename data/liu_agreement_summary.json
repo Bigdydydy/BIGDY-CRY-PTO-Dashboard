@@ -1,0 +1,8380 @@
+{
+ "generatedAt": "2026-10-17T09:34:31.740Z",
+ "horizonBars1h": 72,
+ "permutations": 2000,
+ "evaluated": 299,
+ "bySymbol": {
+  "XAG": {
+   "binance": "XAGUSDT",
+   "evaluated": 63
+  },
+  "XAU": {
+   "binance": "XAUUSDT",
+   "evaluated": 106
+  },
+  "COIN": {
+   "binance": "COINUSDT",
+   "evaluated": 2
+  },
+  "SPCX": {
+   "binance": "SPCXUSDT",
+   "evaluated": 7
+  },
+  "HK1810": {
+   "binance": "HK1810USDT",
+   "evaluated": 0
+  },
+  "MSTR": {
+   "binance": "MSTRUSDT",
+   "evaluated": 6
+  },
+  "AAPL": {
+   "binance": "AAPLUSDT",
+   "evaluated": 3
+  },
+  "CRCL": {
+   "binance": "CRCLUSDT",
+   "evaluated": 25
+  },
+  "GOOGL": {
+   "binance": "GOOGLUSDT",
+   "evaluated": 4
+  },
+  "PLTR": {
+   "binance": "PLTRUSDT",
+   "evaluated": 6
+  },
+  "NVDA": {
+   "binance": "NVDAUSDT",
+   "evaluated": 7
+  },
+  "IBM": {
+   "skipped": "K线不足 0"
+  },
+  "ZM": {
+   "skipped": "K线不足 0"
+  },
+  "SNDK": {
+   "binance": "SNDKUSDT",
+   "evaluated": 9
+  },
+  "CL": {
+   "binance": "CLUSDT",
+   "evaluated": 26
+  },
+  "HK0700": {
+   "binance": "HK0700USDT",
+   "evaluated": 0
+  },
+  "BTC": {
+   "binance": "BTCUSDT",
+   "evaluated": 1
+  },
+  "INTC": {
+   "binance": "INTCUSDT",
+   "evaluated": 12
+  },
+  "HOOD": {
+   "binance": "HOODUSDT",
+   "evaluated": 1
+  },
+  "MU": {
+   "binance": "MUUSDT",
+   "evaluated": 7
+  },
+  "BABA": {
+   "binance": "BABAUSDT",
+   "evaluated": 4
+  },
+  "BE": {
+   "binance": "BEUSDT",
+   "evaluated": 4
+  },
+  "ARM": {
+   "binance": "ARMUSDT",
+   "evaluated": 3
+  },
+  "GLW": {
+   "binance": "GLWUSDT",
+   "evaluated": 2
+  },
+  "LITE": {
+   "binance": "LITEUSDT",
+   "evaluated": 1
+  }
+ },
+ "pattern": {
+  "posts": 212,
+  "top1": {
+   "observedPct": 25,
+   "chancePct": 22.7,
+   "p": 0.1509
+  },
+  "top3": {
+   "observedPct": 53.8,
+   "chancePct": 49.8,
+   "p": 0.066
+  },
+  "family": {
+   "posts": 126,
+   "observedPct": 50.8,
+   "chancePct": 48,
+   "p": 0.3318
+  },
+  "engineTopTypes": {
+   "TRIPLE_COMBINATION": 23,
+   "EXPANDING_TRIANGLE": 11,
+   "ZIGZAG": 102,
+   "COMBINATION": 33,
+   "TRIANGLE": 12,
+   "DIAGONAL": 70,
+   "IMPULSE": 42,
+   "FLAT": 6
+  },
+  "liuMentions": {
+   "推动浪": 159,
+   "三锯齿": 12,
+   "联合形": 73,
+   "双锯齿": 20,
+   "平台形": 37,
+   "单锯齿": 14,
+   "引导楔形": 15,
+   "三角形": 14
+  }
+ },
+ "direction": {
+  "posts": 156,
+  "agreement": {
+   "observedPct": 60.3,
+   "chancePct": 52.3,
+   "p": 0.033
+  },
+  "resolved": 156,
+  "upPct": 52.6,
+  "liuHitPct": 55.1,
+  "engineHitPct": 55.1,
+  "whenAgreeHitPct": 58.5,
+  "agreeN": 94,
+  "disagree": {
+   "n": 62,
+   "liuRight": 31,
+   "engineRight": 31,
+   "signTest": {
+    "n": 62,
+    "z": -0.13,
+    "p": 1
+   }
+  }
+ },
+ "rows": [
+  {
+   "code": "XAG",
+   "date": "2026-01-28",
+   "postId": "Qpbkdibvo",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-01-29",
+   "postId": "QpkGNqvLZ",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-03",
+   "postId": "Qq5zt1IXt",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "扩张三角形（下跌·d浪扩张中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-04",
+   "postId": "Qqf0GgsSd",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "扩张三角形（下跌·d浪扩张中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-07",
+   "postId": "QqHPBocz0",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-09",
+   "postId": "Qr0hZ6Bl9",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-10",
+   "postId": "Qr97e4NUe",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-14",
+   "postId": "QrLuBfcre",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-20",
+   "postId": "QsHORzB8V",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIPLE_COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-21",
+   "postId": "QsOQbwwGk",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-23",
+   "postId": "Qt8bJqjoX",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-23",
+   "postId": "Qt8pIoKD0",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "FLAT"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-24",
+   "postId": "QthjO8okA",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "FLAT",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-25",
+   "postId": "QtqNcbclW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "FLAT",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-26",
+   "postId": "QtAKy9wFz",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-27",
+   "postId": "QtK5D24LD",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "FLAT"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-02-28",
+   "postId": "QtTxvynTK",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-02",
+   "postId": "QubD98f6p",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-03",
+   "postId": "QulJMubEC",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-04",
+   "postId": "QuuPN5syp",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-05",
+   "postId": "QuEZfexmC",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·e浪收敛中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-06",
+   "postId": "QuOjT1ypn",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·e浪收敛中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-09",
+   "postId": "Qvg6L1cjW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·e浪收敛中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-10",
+   "postId": "QvphQwoJm",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-11",
+   "postId": "Qvz6gsZnO",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-12",
+   "postId": "QvHUnn6uo",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-13",
+   "postId": "QvTAj970y",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-14",
+   "postId": "Qw10YyLcX",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-16",
+   "postId": "Qwk3wnbEe",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-17",
+   "postId": "QwtGdbUeV",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-18",
+   "postId": "QwDkemzLs",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-19",
+   "postId": "QwMc8cNnW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-19",
+   "postId": "QwOHlgRLe",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "FLAT",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-20",
+   "postId": "QwXjw30cE",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-20",
+   "postId": "QwXm08UMB",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-23",
+   "postId": "QxnO5iTQM",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿",
+    "双锯齿",
+    "三锯齿",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG",
+    "DOUBLE_ZIGZAG",
+    "TRIPLE_ZIGZAG",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-24",
+   "postId": "QxxCD7BiK",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-25",
+   "postId": "QxGPpkING",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-26",
+   "postId": "QxQRa2pHW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-27",
+   "postId": "QxZAAmFTv",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-30",
+   "postId": "Qysek0zHC",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-03-31",
+   "postId": "QyBk8aVrv",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-01",
+   "postId": "QyLfnyPrL",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-02",
+   "postId": "QyV9X1yPW",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-04",
+   "postId": "QzdwcE33Q",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-06",
+   "postId": "QzvN7aTW6",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-07",
+   "postId": "QzFwArpds",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-08",
+   "postId": "QzP96hUpe",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-09",
+   "postId": "QzXili0LN",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-10",
+   "postId": "QA8a0cWBL",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-13",
+   "postId": "QAA0UbMg4",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-14",
+   "postId": "QAJQ2qx46",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DOUBLE_ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-15",
+   "postId": "QAToxcbTh",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-16",
+   "postId": "QB2k41eS2",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-17",
+   "postId": "QBduQhZMJ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-04-18",
+   "postId": "QBlC5jr7K",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿",
+    "平台形",
+    "联合形",
+    "三角形"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-07-22",
+   "postId": "R9PsQpiA6",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-07",
+   "postId": "RckjWCopF",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-12",
+   "postId": "Rd1Fr51Ox",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-13",
+   "postId": "Rdba8hQic",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-14",
+   "postId": "RdkAIbmRF",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-17",
+   "postId": "RdMH1tBfJ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "FLAT",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAG",
+   "date": "2026-08-18",
+   "postId": "RdWmZo06a",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "平台形",
+    "联合形",
+    "三角形"
+   ],
+   "liuTypes": [
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-01",
+   "postId": "Ql4EPqEsC",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-05",
+   "postId": "QlGAjyZ8V",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-06",
+   "postId": "QlPb8dNJO",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-07",
+   "postId": "QlZ6i180v",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-08",
+   "postId": "Qm8PsivJT",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIANGLE",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-14",
+   "postId": "Qn4llBOof",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-15",
+   "postId": "QncwIgyOM",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-15",
+   "postId": "QneTZzfOO",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-16",
+   "postId": "QnlWO1LfV",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-18",
+   "postId": "QnIKhwCes",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-19",
+   "postId": "QnO2VvP6k",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-20",
+   "postId": "QnZ1gpOrE",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-21",
+   "postId": "Qo74MlHlP",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-21",
+   "postId": "Qo7aMiKV5",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-22",
+   "postId": "Qogrp8F8J",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "推动浪（上升·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-23",
+   "postId": "QopC3BBRI",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-24",
+   "postId": "QozsZfzHp",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-25",
+   "postId": "QoIEii7hF",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-26",
+   "postId": "QoSgdad9H",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-27",
+   "postId": "Qp1Lec4xR",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "IMPULSE",
+     "FLAT"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·x浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-28",
+   "postId": "Qpb1emzkd",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-28",
+   "postId": "Qpbayvq1D",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-29",
+   "postId": "QpknpvDeX",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-30",
+   "postId": "QpugToKWs",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-01-31",
+   "postId": "QpCEMnfN3",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "FLAT"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-01",
+   "postId": "QpN2NEkbX",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "推动浪（上升·五浪完成·待调整）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-02",
+   "postId": "QpWlJfU4i",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-02",
+   "postId": "QpXWZjMGc",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "推动浪（上升·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-03",
+   "postId": "Qq5HLekPc",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "TRIANGLE",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "规则收缩（上升·e浪收敛中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-03",
+   "postId": "Qq9DXEy3q",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-04",
+   "postId": "QqeSwF3wU",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪3运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-05",
+   "postId": "QqnTfkX0W",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "IMPULSE",
+     "TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·d浪收敛中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-06",
+   "postId": "QqyAbgGH2",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-07",
+   "postId": "QqHozv9SV",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-07",
+   "postId": "QqHy1hP8i",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-07",
+   "postId": "QqLokcRti",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-09",
+   "postId": "Qr0E41Yxy",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-10",
+   "postId": "Qr9dsmH7I",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-12",
+   "postId": "Qrslob3B2",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "三锯齿",
+    "联合形"
+   ],
+   "liuTypes": [
+    "TRIPLE_ZIGZAG",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-13",
+   "postId": "QrBIn9Pft",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-21",
+   "postId": "QsP2t1KmR",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-23",
+   "postId": "Qt7TblVTY",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-24",
+   "postId": "Qthfnb3nw",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-25",
+   "postId": "QtqXHARPA",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-26",
+   "postId": "QtAwilwMR",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-27",
+   "postId": "QtL7nx4ss",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-28",
+   "postId": "QtThHpDri",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-02-28",
+   "postId": "QtVzyFsta",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-02",
+   "postId": "QubJmAbRE",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "扩散平台形（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-03",
+   "postId": "QulOmEolN",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-04",
+   "postId": "QuuytcZsa",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·c浪收敛中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-05",
+   "postId": "QuEDDb9Xy",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "DIAGONAL",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "规则收缩（下跌·d浪收敛中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-06",
+   "postId": "QuO6hkjej",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "TRIANGLE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-09",
+   "postId": "QvfOqxdbQ",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "三重横向整理（上升·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-10",
+   "postId": "QvpsAzPZV",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "ZIGZAG",
+     "TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-11",
+   "postId": "QvzdiBHaU",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "DIAGONAL",
+     "FLAT"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-12",
+   "postId": "QvIgxjRHw",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-13",
+   "postId": "QvR3ysh84",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "三重横向整理（上升·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-14",
+   "postId": "Qw1Ws356L",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "FLAT",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-16",
+   "postId": "QwjTrc1Yy",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-17",
+   "postId": "QwtJ1hTcP",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-18",
+   "postId": "QwDaMaCyx",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-19",
+   "postId": "QwM33nvW5",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "FLAT"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-20",
+   "postId": "QwVYhxhRm",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-21",
+   "postId": "Qx536Ddi2",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-23",
+   "postId": "Qxom4atcR",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "平台形调整浪（上升·b浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-24",
+   "postId": "QxxrYjSFY",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-25",
+   "postId": "QxHbTiF7o",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪4调整中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-26",
+   "postId": "QxQFYbdoG",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "推动浪（下跌·浪4调整中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-27",
+   "postId": "Qy09VAWIS",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-30",
+   "postId": "QysVj20vw",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "三重横向整理（上升·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-03-31",
+   "postId": "QyBtacNE9",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-01",
+   "postId": "QyLKUfLid",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形"
+   ],
+   "liuTypes": [
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-02",
+   "postId": "QyV40f0TS",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-03",
+   "postId": "Qz4RcmMxE",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-06",
+   "postId": "Qzw2a7tfA",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-07",
+   "postId": "QzGe4sgV1",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "引导楔形",
+    "单锯齿",
+    "双锯齿",
+    "平台形"
+   ],
+   "liuTypes": [
+    "DIAGONAL",
+    "ZIGZAG",
+    "DOUBLE_ZIGZAG",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-08",
+   "postId": "QzPBYEV3X",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "引导楔形",
+    "平台形"
+   ],
+   "liuTypes": [
+    "DIAGONAL",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-09",
+   "postId": "QzYCRzH5e",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形"
+   ],
+   "liuTypes": [
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-10",
+   "postId": "QA81bfyMB",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形"
+   ],
+   "liuTypes": [
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-13",
+   "postId": "QAAfBuAaB",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形"
+   ],
+   "liuTypes": [
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪5运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-14",
+   "postId": "QAKjhijGE",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形"
+   ],
+   "liuTypes": [
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "规则收缩（上升·c浪收敛中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-15",
+   "postId": "QATGR7PRE",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-16",
+   "postId": "QB2Wy4Tkf",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-17",
+   "postId": "QBchfdrhg",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-04-18",
+   "postId": "QBkZEwT4c",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "引导楔形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DIAGONAL"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-22",
+   "postId": "R9Tv0yBue",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（上升·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-23",
+   "postId": "Ra11kBCv7",
+   "tf": "3d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿",
+    "平台形"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-24",
+   "postId": "RaawidyMh",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-27",
+   "postId": "RaBgehhLn",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "三角形"
+   ],
+   "liuTypes": [
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-28",
+   "postId": "RaKJ1gaIE",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-07-29",
+   "postId": "RaT4Hje6r",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "三角形"
+   ],
+   "liuTypes": [
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-01",
+   "postId": "RbkIExsWZ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-03",
+   "postId": "RbEJ6BsgA",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-04",
+   "postId": "RbNH20daU",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-05",
+   "postId": "RbY2qyQhZ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "三角形"
+   ],
+   "liuTypes": [
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-06",
+   "postId": "Rc6gHhuUL",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-08",
+   "postId": "RcpPfp5eG",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-10",
+   "postId": "RcISu13tS",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-11",
+   "postId": "RcS3mxga5",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-12",
+   "postId": "Rd2rdzsSM",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-13",
+   "postId": "RdbDl2glR",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-14",
+   "postId": "RdjEEbuso",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIPLE_COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（上升·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-15",
+   "postId": "Rdwpdg1Vb",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIPLE_COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（上升·y浪运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-17",
+   "postId": "RdN2C1f3W",
+   "tf": "4h",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "XAU",
+   "date": "2026-08-18",
+   "postId": "RdW7NDTDz",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "COIN",
+   "date": "2026-04-02",
+   "postId": "QyXAPEhYQ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "COIN",
+   "date": "2026-04-17",
+   "postId": "QBcY3sLtY",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "扩散楔形（3-3-3-3-3）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-07-23",
+   "postId": "R9ZXxcRc7",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-07-24",
+   "postId": "Ra7WKrHh4",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-07-29",
+   "postId": "RaUgNCOCT",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-08-05",
+   "postId": "RbYkFfTXf",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·b浪运行中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-08-08",
+   "postId": "RcoOqxhBf",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-08-11",
+   "postId": "RcRqB1yV4",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "规则收缩（上升·c浪收敛中）"
+   }
+  },
+  {
+   "code": "SPCX",
+   "date": "2026-08-13",
+   "postId": "Rd9O16eQS",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-03-22",
+   "postId": "QxfgXq95e",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-03-28",
+   "postId": "QyasbxExG",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩楔形（3-3-3-3-3）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-04-01",
+   "postId": "QyMEZzxKY",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "ZIGZAG",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（上升·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-06-30",
+   "postId": "R6w80pBSj",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（下跌·e浪扩张中）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-07-24",
+   "postId": "RabhXzeMB",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中·c浪为终结楔形）"
+   }
+  },
+  {
+   "code": "MSTR",
+   "date": "2026-08-09",
+   "postId": "RcAys4CGt",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "AAPL",
+   "date": "2026-07-28",
+   "postId": "RaJwIwMWV",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中）"
+   }
+  },
+  {
+   "code": "AAPL",
+   "date": "2026-07-31",
+   "postId": "RbdiVaxFq",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形完成）"
+   }
+  },
+  {
+   "code": "AAPL",
+   "date": "2026-08-01",
+   "postId": "Rbn4dobN1",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-02-26",
+   "postId": "QtA5H8Jn3",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DOUBLE_ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "单锯齿调整浪（上升·c浪运行中·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-03",
+   "postId": "QulkjzM9k",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中·浪1为引导楔形）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-14",
+   "postId": "Qw2lJlrKt",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-17",
+   "postId": "Qwt8utRdw",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-18",
+   "postId": "QwCPQmtc8",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-19",
+   "postId": "QwODyd2oh",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中·浪5为终结楔形）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-20",
+   "postId": "QwVPNvqf5",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 0,
+    "name": "推动浪（上升·浪4调整中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-24",
+   "postId": "QxxRc90z8",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-25",
+   "postId": "QxGFVwb0n",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-27",
+   "postId": "Qy0o3DrkP",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-03-30",
+   "postId": "Qyszyfv78",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-02",
+   "postId": "QyUzrgGaH",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-03",
+   "postId": "Qz51llcBW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-06",
+   "postId": "QzydpF9F2",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-08",
+   "postId": "QzP3Wj2xb",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中·浪5为终结楔形）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-09",
+   "postId": "QzYRQAclw",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-10",
+   "postId": "QA85dllOJ",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-14",
+   "postId": "QAKBHspLu",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-04-15",
+   "postId": "QATRaqCkb",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-07-21",
+   "postId": "R9ES3wRlu",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "平台形调整浪（上升·b浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-07-22",
+   "postId": "R9PRVAOc3",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-07-24",
+   "postId": "Ra8KctdXm",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "TRIANGLE",
+     "FLAT"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（上升·y浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-08-02",
+   "postId": "RbuvOrgea",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "FLAT",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-08-05",
+   "postId": "Rc0Al8rgf",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "FLAT",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "CRCL",
+   "date": "2026-08-14",
+   "postId": "Rdk5K0ACA",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "GOOGL",
+   "date": "2026-04-07",
+   "postId": "QzFHfp3AG",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "三重横向整理（下跌·z浪运行中）"
+   }
+  },
+  {
+   "code": "GOOGL",
+   "date": "2026-04-08",
+   "postId": "QzQZnhzz4",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "GOOGL",
+   "date": "2026-04-15",
+   "postId": "QAT2LBXwf",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中）"
+   }
+  },
+  {
+   "code": "GOOGL",
+   "date": "2026-07-23",
+   "postId": "Ra2Ocd4Xa",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "DOUBLE_ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-03-21",
+   "postId": "Qx5kJc6vP",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-03-24",
+   "postId": "Qxx1uF7Gt",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-04-10",
+   "postId": "QA8DK8vWz",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "规则收缩（上升·三角形完成·等待突破）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-08-04",
+   "postId": "RbRBdzFaq",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-08-05",
+   "postId": "RbX1UAGay",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "PLTR",
+   "date": "2026-08-11",
+   "postId": "RcRRS6tln",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三锯齿",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIPLE_ZIGZAG",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "EXPANDING_TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（上升·y浪运行中）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-06-01",
+   "postId": "R25hobBTn",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-06-02",
+   "postId": "R2dvosTpz",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "收缩引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-07-23",
+   "postId": "R9ZgYnHjs",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-08-05",
+   "postId": "RbXijo5YY",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-08-06",
+   "postId": "Rc6rEb7MW",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-08-07",
+   "postId": "RcgicDao1",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "NVDA",
+   "date": "2026-08-13",
+   "postId": "RdbsdxuZt",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "单锯齿调整浪（下跌·锯齿完成·a浪为引导楔形）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-07-26",
+   "postId": "RarnckKIL",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "收缩引导楔形（5-3-5-3-5）（下跌·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-07-28",
+   "postId": "RaJntDCYR",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "COMBINATION"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-07-29",
+   "postId": "RaUV5qyCV",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "TRIPLE_COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-07-31",
+   "postId": "RbbMxr9cb",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-08-05",
+   "postId": "RbYuIbYZL",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-08-06",
+   "postId": "Rc8VtxuMI",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-08-14",
+   "postId": "RdjPR4J1Z",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-08-15",
+   "postId": "RdsRTqvFT",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "SNDK",
+   "date": "2026-08-16",
+   "postId": "RdCSgziTR",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-10",
+   "postId": "QA7RNq4HX",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-13",
+   "postId": "QAzUArPyU",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（上升·y浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-14",
+   "postId": "QAJGQ0YWT",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "三重横向整理（下跌·z浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-15",
+   "postId": "QASKq8mC0",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "楔形（3-3-3-3-3）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-16",
+   "postId": "QB24YlEXp",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "IMPULSE",
+     "FLAT"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（上升·x浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-17",
+   "postId": "QBbKItjOv",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "楔形（3-3-3-3-3）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-17",
+   "postId": "QBg2jdI70",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "平台形",
+    "联合形",
+    "三角形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION",
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-04-18",
+   "postId": "QBkcYaoOj",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-22",
+   "postId": "R9Pb8wjNq",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-23",
+   "postId": "R9YAIcM8m",
+   "tf": "3d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-24",
+   "postId": "Ra84graJS",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIPLE_COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-27",
+   "postId": "RaAib5nIf",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "ZIGZAG",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-29",
+   "postId": "RaTmS37iU",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-30",
+   "postId": "Rb4WHp6ab",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪5运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-07-31",
+   "postId": "RbcrYuU8t",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "推动浪（上升·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-03",
+   "postId": "RbDu6Calh",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-04",
+   "postId": "RbNCVurlN",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "DIAGONAL"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-05",
+   "postId": "RbWT425v8",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-06",
+   "postId": "Rc6bkp9cF",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-07",
+   "postId": "Rcg4InD2Q",
+   "tf": "1h",
+   "evalTf": "1h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "扩散引导楔形（5-3-5-3-5）（上升·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-10",
+   "postId": "RcIqdAYiv",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "DIAGONAL",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（下跌·y浪运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-11",
+   "postId": "RcReXD5cS",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "DIAGONAL",
+     "TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "引导楔形（5-3-5-3-5）（下跌·楔形浪5运行中）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-12",
+   "postId": "Rd1ontMNU",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-14",
+   "postId": "RdkWek6aA",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-17",
+   "postId": "RdMxPElMH",
+   "tf": "1w",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "三角形"
+   ],
+   "liuTypes": [
+    "TRIANGLE",
+    "EXPANDING_TRIANGLE"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIANGLE",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 1,
+    "name": "引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "CL",
+   "date": "2026-08-18",
+   "postId": "RdVTAcUZD",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "引导楔形（5-3-5-3-5）（下跌·楔形完成）"
+   }
+  },
+  {
+   "code": "BTC",
+   "date": "2026-03-15",
+   "postId": "QwdY8hyME",
+   "tf": "1M",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "COMBINATION",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "规则收缩（上升·c浪收敛中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-03",
+   "postId": "Qz3S6BTW4",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-08",
+   "postId": "QzPkN6je6",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "TRIPLE_COMBINATION",
+     "FLAT"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-09",
+   "postId": "QA0G1rbrC",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-11",
+   "postId": "QAgGri8Oq",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "EXPANDING_TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-14",
+   "postId": "QAKrir4ZZ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "EXPANDING_TRIANGLE",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·c浪扩张中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-15",
+   "postId": "QAWnOwNmX",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·扩张三角形完成）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-17",
+   "postId": "QBbU7y4Aa",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "EXPANDING_TRIANGLE",
+    "top3": [
+     "EXPANDING_TRIANGLE",
+     "EXPANDING_TRIANGLE",
+     "COMBINATION"
+    ],
+    "dir": 0,
+    "name": "扩张三角形（上升·e浪扩张中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-04-18",
+   "postId": "QBmHu0vzJ",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "联合形"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "EXPANDING_TRIANGLE",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "推动浪（上升·浪3运行中）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-07-24",
+   "postId": "Ra7uxaaFF",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "平台形",
+    "联合形"
+   ],
+   "liuTypes": [
+    "FLAT",
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "双重横向整理（下跌·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-08-01",
+   "postId": "RbnS2rvXM",
+   "tf": "1w",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "COMBINATION",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-08-06",
+   "postId": "Rc6Hi8ja2",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "推动浪（上升·浪3运行中·浪1为引导楔形）"
+   }
+  },
+  {
+   "code": "INTC",
+   "date": "2026-08-14",
+   "postId": "RdlxVe59L",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "TRIANGLE",
+    "top3": [
+     "TRIANGLE",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": 0,
+    "name": "规则收缩（上升·c浪收敛中）"
+   }
+  },
+  {
+   "code": "HOOD",
+   "date": "2026-04-30",
+   "postId": "QD9LsjaFh",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "EXPANDING_TRIANGLE",
+     "ZIGZAG"
+    ],
+    "dir": 0,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-05-27",
+   "postId": "R1j3o83Qz",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（上升·c浪运行中）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-07-21",
+   "postId": "R9HFM0VxD",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-07-22",
+   "postId": "R9TleASJv",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "双锯齿"
+   ],
+   "liuTypes": [
+    "DOUBLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "DIAGONAL"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-07-30",
+   "postId": "Rb3RJ5zaK",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-07-31",
+   "postId": "RbbSd11Go",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE",
+     "FLAT"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-08-06",
+   "postId": "RcakLy7R8",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "三锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "TRIPLE_ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "TRIPLE_COMBINATION",
+     "TRIANGLE"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（上升·z浪运行中）"
+   }
+  },
+  {
+   "code": "MU",
+   "date": "2026-08-17",
+   "postId": "RdNGBf9aO",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "联合形"
+   ],
+   "liuTypes": [
+    "COMBINATION",
+    "TRIPLE_COMBINATION"
+   ],
+   "liuFamilies": [
+    "C"
+   ],
+   "liuDir": -1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "IMPULSE",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "BABA",
+   "date": "2026-07-21",
+   "postId": "R9EFZmTG8",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "DIAGONAL",
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪4调整中）"
+   }
+  },
+  {
+   "code": "BABA",
+   "date": "2026-07-24",
+   "postId": "Ra8fpsKhl",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "ZIGZAG",
+     "TRIPLE_COMBINATION"
+    ],
+    "dir": -1,
+    "name": "推动浪（下跌·浪5运行中）"
+   }
+  },
+  {
+   "code": "BABA",
+   "date": "2026-08-03",
+   "postId": "RbDWW4iSY",
+   "tf": "1w",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "IMPULSE",
+    "top3": [
+     "IMPULSE",
+     "COMBINATION"
+    ],
+    "dir": 1,
+    "name": "推动浪（下跌·五浪完成·待调整·失败第五浪）"
+   }
+  },
+  {
+   "code": "BABA",
+   "date": "2026-08-13",
+   "postId": "Rdd4F7OK2",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": -1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（上升·锯齿完成）"
+   }
+  },
+  {
+   "code": "BE",
+   "date": "2026-07-28",
+   "postId": "RaKvOAo7b",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "规则平台形（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "BE",
+   "date": "2026-07-29",
+   "postId": "RaTbyBqhw",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "ZIGZAG",
+     "FLAT"
+    ],
+    "dir": 1,
+    "name": "规则平台形（下跌·平台形完成）"
+   }
+  },
+  {
+   "code": "BE",
+   "date": "2026-07-30",
+   "postId": "Rb6F6hR7C",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "FLAT",
+    "top3": [
+     "FLAT",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": 0,
+    "name": "规则平台形（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "BE",
+   "date": "2026-08-12",
+   "postId": "Rd5HMrWjq",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "COMBINATION",
+    "top3": [
+     "COMBINATION",
+     "ZIGZAG",
+     "FLAT"
+    ],
+    "dir": -1,
+    "name": "双重横向整理（上升·双重横向整理完成）"
+   }
+  },
+  {
+   "code": "ARM",
+   "date": "2026-07-30",
+   "postId": "Rb312tVbP",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "ARM",
+   "date": "2026-07-30",
+   "postId": "Rb7dVhvKf",
+   "tf": null,
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": -1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": -1,
+    "name": "单锯齿调整浪（下跌·c浪运行中）"
+   }
+  },
+  {
+   "code": "ARM",
+   "date": "2026-08-10",
+   "postId": "RcKz3gEfY",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪",
+    "单锯齿"
+   ],
+   "liuTypes": [
+    "IMPULSE",
+    "ZIGZAG"
+   ],
+   "liuFamilies": [
+    "M",
+    "C"
+   ],
+   "liuDir": 1,
+   "move": -1,
+   "eng": {
+    "top": "DIAGONAL",
+    "top3": [
+     "DIAGONAL",
+     "ZIGZAG",
+     "EXPANDING_TRIANGLE"
+    ],
+    "dir": -1,
+    "name": "扩散引导楔形（5-3-5-3-5）（下跌·楔形浪4运行中）"
+   }
+  },
+  {
+   "code": "GLW",
+   "date": "2026-08-03",
+   "postId": "RbGiH8uPj",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "IMPULSE",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "GLW",
+   "date": "2026-08-05",
+   "postId": "RbYb0AQ2y",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [
+    "推动浪"
+   ],
+   "liuTypes": [
+    "IMPULSE"
+   ],
+   "liuFamilies": [
+    "M"
+   ],
+   "liuDir": 1,
+   "move": 1,
+   "eng": {
+    "top": "ZIGZAG",
+    "top3": [
+     "ZIGZAG",
+     "DIAGONAL",
+     "IMPULSE"
+    ],
+    "dir": 1,
+    "name": "单锯齿调整浪（下跌·锯齿完成）"
+   }
+  },
+  {
+   "code": "LITE",
+   "date": "2026-08-15",
+   "postId": "RdtvT3YL4",
+   "tf": "1d",
+   "evalTf": "4h",
+   "liuPatterns": [],
+   "liuTypes": [],
+   "liuFamilies": [],
+   "liuDir": 0,
+   "move": 1,
+   "eng": {
+    "top": "TRIPLE_COMBINATION",
+    "top3": [
+     "TRIPLE_COMBINATION",
+     "ZIGZAG",
+     "ZIGZAG"
+    ],
+    "dir": 1,
+    "name": "三重横向整理（下跌·三重横向整理完成）"
+   }
+  }
+ ]
+}

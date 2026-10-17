@@ -682,6 +682,19 @@
       })
   ];
 
+  // 双锯齿与横向整理的外观区分 (手稿 P364「双锯齿/三锯齿的外观通常呈现为平行四边形，有较大的斜度……双重横向整理/
+  //   三重横向整理通常也呈现为平行四边形，但斜度较小，大部分情况接近于横平的矩形」；P366「双锯齿/三锯齿是逐渐下降的或逐渐上升的」)
+  //   斜度 = 平行四边形两条边 (0-x-xx 与 w-y-z) 每一步在调整方向上推进的距离 / w 浪长度，取平均。
+  //   分界 30%: 横向整理 x ≥ 0.7w、y ≈ w 时斜度至多约 30%；双锯齿常见 x = 0.382~0.618w、y ≈ w 时约 38%~50%
+  const PG_SLOPE_SPLIT = 0.3;
+  function pgSlope(g) {
+    const p = g.p, l0 = g.l[0];
+    if (!(l0 > 0) || p.length < 4) return null;
+    let sum = 0, k = 0;
+    for (; k + 2 < p.length; k++) sum += g.d * (p[k + 2].price - p[k].price) / l0;
+    return sum / k;
+  }
+
   const DOUBLE_ZIGZAG_RULES = [
     rg('W0', C_STRUCT, false, null, 2, 'P362', '出身检验：浪w内部应为三浪（调整浪结构）', 2, null,
       { struct: true, legs: [0], expect: ['3'] }),
@@ -730,6 +743,8 @@
         const bad = judged.filter(c => !c.class.alive.some(a => a.form === 'sharp'));
         return { pass: !bad.length, detail: comps.map(c => `${c.label}=${c.text}`).join('；') };
       }, { deferred: true }),
+    rg('WG6', C_G_PAT, false, null, 4, 'P364/P366', '外观为斜度较大的平行四边形、逐浪推进（双锯齿）', 1,
+      g => { const sl = pgSlope(g); return { pass: sl >= PG_SLOPE_SPLIT, detail: `平行四边形斜度 ${fmtPct(sl)}（≥${fmtPct(PG_SLOPE_SPLIT)} 为倾斜）` }; }),
     rg('WG1', C_G_RATIO, false, null, 3, 'P363', 'x浪常见回撤w浪的0.3~0.7倍（0.382/0.5/0.618）', 1,
       g => { const r = g.l[1] / g.l[0]; return { pass: r >= 0.28 && r <= 0.72, detail: `x/w=${fmtPct(r)}` }; }),
     rg('WG2', C_G_RATIO, false, 'min', 4, 'P372/P377', 'y浪常见为w浪的1或1.618倍', 1,
@@ -761,8 +776,8 @@
       }, { deferred: true }),
     rg('CG1', C_G_RATIO, false, 'min', 4, 'P131', 'y浪常见为w浪的1倍（扩展取点0-w-x）', 1,
       g => { const r = g.l[2] / g.l[0]; return { pass: near(r, [0.786, 1, 1.272], 0.22), detail: `y/w=${r.toFixed(2)}` }; }),
-    rg('CG2', C_G_PAT, false, null, 4, 'P50', '外观应接近箱型/平缓平行四边形（横向整理）', 1,
-      g => { const drift = Math.abs(g.p[3].price - g.p[0].price) / (g.l[0] + g.l[1] + g.l[2] || 1); return { pass: drift <= 0.45, detail: `净漂移占比 ${fmtPct(drift)}` }; })
+    rg('CG2', C_G_PAT, false, null, 4, 'P50/P364', '外观应接近水平矩形、斜度较小（横向整理）', 1,
+      g => { const sl = pgSlope(g); return { pass: sl <= PG_SLOPE_SPLIT, detail: `平行四边形斜度 ${fmtPct(sl)}（≤${fmtPct(PG_SLOPE_SPLIT)} 为平缓）` }; })
   ];
 
   const TRIPLE_COMBINATION_RULES = [
@@ -793,8 +808,8 @@
       }, { deferred: true }),
     rg('CG3', C_G_RATIO, false, 'min', 6, 'P132', 'z浪常见为y浪的1倍（扩展取点x-y-xx）', 1,
       g => { const r = g.l[4] / g.l[2]; return { pass: near(r, [0.786, 1, 1.272], 0.22), detail: `z/y=${r.toFixed(2)}` }; }),
-    rg('CG4', C_G_PAT, false, null, 6, 'P51', '外观应接近箱型/平缓平行四边形（横向整理）', 1,
-      g => { const drift = Math.abs(g.p[5].price - g.p[0].price) / (g.l.reduce((s, x) => s + x, 0) || 1); return { pass: drift <= 0.35, detail: `净漂移占比 ${fmtPct(drift)}` }; })
+    rg('CG4', C_G_PAT, false, null, 6, 'P51/P364', '外观应接近水平矩形、斜度较小（横向整理）', 1,
+      g => { const sl = pgSlope(g); return { pass: sl <= PG_SLOPE_SPLIT, detail: `平行四边形斜度 ${fmtPct(sl)}（≤${fmtPct(PG_SLOPE_SPLIT)} 为平缓）` }; })
   ];
 
   const TRIPLE_ZIGZAG_RULES = DOUBLE_ZIGZAG_RULES.concat([
@@ -3999,15 +4014,37 @@
     alternatives.sort((a, b) => (PATTERNS[a.type].pts - PATTERNS[b.type].pts) || rank(a, b));
 
     // 并列假设 (柳玉冬「紫线符合双锯齿，也还不能排除引导楔形」「或者是 xx 浪反弹……或者走出引导楔形」):
-    //   画了 4 个点时，调整浪 (abc / wxy) 与驱动浪前三浪 (推动浪 / 引导楔形 1-2-3) 互为并列解读，
+    //   画了 4 个点时，调整浪 (abc / wxy) 与驱动浪前三浪 (推动浪 / 引导楔形 1-2-3) 互为并列解读；
+    //   双锯齿与横向整理 (同为 w-x-y / w-x-y-xx-z) 都成立时也互为并列解读，按外观斜度与比率区分 (P364/P366/P50)。
     //   各给判决、历史命中率与区分条件
     const hypotheses = [];
-    if (n === 4) {
+    {
+      const okAlt = it => it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length ? it : null;
+      const SIBLING = { DOUBLE_ZIGZAG: 'COMBINATION', COMBINATION: 'DOUBLE_ZIGZAG', TRIPLE_ZIGZAG: 'TRIPLE_COMBINATION', TRIPLE_COMBINATION: 'TRIPLE_ZIGZAG' };
+      const sibling = SIBLING[primary.type] && n === PATTERNS[primary.type].pts ? okAlt(interpret(SIBLING[primary.type])) : null;
       const motivePrimary = PATTERNS[primary.type].category === '驱动浪';
-      const otherTypes = motivePrimary ? ['ZIGZAG', 'FLAT', 'DOUBLE_ZIGZAG', 'COMBINATION'] : ['IMPULSE', 'DIAGONAL'];
-      const others = otherTypes.filter(t => t !== primary.type).map(interpret)
-        .filter(it => it && !it.hardFails.length && !it.strongCount && !it.liveHardFails.length).sort(rank);
-      if (others.length) {
+      const otherTypes = n !== 4 ? [] : motivePrimary ? ['ZIGZAG', 'FLAT', 'DOUBLE_ZIGZAG', 'COMBINATION'] : ['IMPULSE', 'DIAGONAL'];
+      const others = otherTypes.filter(t => t !== primary.type && (!sibling || t !== sibling.type)).map(interpret).map(okAlt).filter(Boolean).sort(rank);
+      const crossAlt = others[0] || null;
+      const entries = [primary, sibling, crossAlt].filter(Boolean);
+      if (entries.length > 1) {
+        // 外观区分条件 (双锯齿 vs 横向整理)
+        const gS = mkGeom(lp.length >= n ? lp.slice(0, n) : pts);
+        const shapeConds = it => {
+          const sl = pgSlope(gS), xr = gS.l[1] / gS.l[0], yr = gS.l[2] / gS.l[0];
+          const yBeyond = gS.d * (gS.p[3].price - gS.p[1].price) > 0;
+          const xx = gS.l.length >= 4 ? gS.l[3] / gS.l[2] : null;
+          if (/ZIGZAG/.test(it.type)) {
+            return [`外观斜度 ${fmtPct(sl)}：双锯齿是斜度较大、逐浪推进的平行四边形（P364/P366，引擎以 ≥${fmtPct(PG_SLOPE_SPLIT)} 为准）`,
+              `y 浪${yBeyond ? '已' : '尚未'}越过 w 浪终点 ${fmtNum(gS.p[1].price)}（逐浪推进，P366）`,
+              `x 回撤 w ${fmtPct(xr)}（双锯齿常见 0.3~0.7，几乎不超过 0.7，P372-373）`]
+              .concat(xx !== null ? [`xx 回撤 y ${fmtPct(xx)}（三锯齿常见 0.3~0.7，P351）`] : []);
+          }
+          return [`x 回撤 w ${fmtPct(xr)}（横向整理须 ≥70%，${xr >= 0.7 - EPS ? '满足' : '不满足'}，P50）`,
+            `外观斜度 ${fmtPct(sl)}：横向整理斜度较小、接近水平矩形（P364，引擎以 ≤${fmtPct(PG_SLOPE_SPLIT)} 为准）`,
+            `y 为 w 的 ${yr.toFixed(2)} 倍（横向整理常见 0.786~1.272，P131）`]
+            .concat(xx !== null ? [`xx 回撤 y ${fmtPct(xx)}（三重横向整理须 ≥70%，P51）`] : []);
+        };
         const dH = Math.sign(pts[1].price - pts[0].price) || 1;
         const towards = dH > 0 ? '涨破' : '跌破', against = dH > 0 ? '跌破' : '涨破';
         const conditionsOf = it => {
@@ -4021,14 +4058,17 @@
             }
             c.push(`之后浪5 ${towards}浪3 终点 ${fmtNum(lp[3].price)}`);
           } else {
-            c.push(`调整完成后反向${against}起点 ${fmtNum(pts[0].price)}（恢复原趋势）`);
-            c.push(`不再${towards} ${fmtNum(lp[3].price)}（${PATTERNS[it.type].labels[3]}浪终点）`);
+            if (sibling) c.push(...shapeConds(it));
+            if (crossAlt) {
+              c.push(`调整完成后反向${against}起点 ${fmtNum(pts[0].price)}（恢复原趋势）`);
+              c.push(`不再${towards} ${fmtNum(lp[3].price)}（${PATTERNS[it.type].labels[3]}浪终点）`);
+            }
           }
           return c;
         };
         const verdictOf = it => it.hardFails.length ? 'INVALID' : it.strongCount ? 'FALSIFIED_SUB' : it.liveHardFails.length ? 'FALSIFIED_PRICE'
           : (it.mediumCount || it.nearFails.length) ? 'DOUBT' : 'VALID';
-        for (const it of [primary, others[0]]) {
+        for (const it of entries) {
           const st = (it.live || it.drawn).status;
           const tr = trackRecordOf({ baseType: it.type, status: st });
           hypotheses.push({
@@ -4851,6 +4891,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { structVotes, calibratedOf, diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { structVotes, calibratedOf, pgSlope, diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });

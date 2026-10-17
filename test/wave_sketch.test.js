@@ -120,6 +120,21 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.strictEqual(sk.nodes[0].result.primary.type, 'FLAT');
   });
 
+  it('双锯齿与横向整理都成立时互为并列解读，按外观斜度与比率区分（P364/P366/P50）', () => {
+    // w 120→100，x 回撤 75% 到 115，y 跌到 94：两种浪型的铁律都过
+    const v = [125, 120, 100, 115, 94, 96];
+    const bars = build(v);
+    const r = E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'WXY', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4].map(k => pt(v, k, 3600)) });
+    const types = (r.hypotheses || []).map(h => h.type);
+    assert.ok(types.includes('DOUBLE_ZIGZAG') && types.includes('COMBINATION'), JSON.stringify(r.hypotheses.map(h => [h.type, h.verdict])));
+    const dz = r.hypotheses.find(h => h.type === 'DOUBLE_ZIGZAG'), cb = r.hypotheses.find(h => h.type === 'COMBINATION');
+    assert.ok(dz.conditions.some(c => /^外观斜度 [\d.]+%：双锯齿/.test(c)) && dz.conditions.some(c => /已越过 w 浪终点/.test(c)), dz.conditions.join(' / '));
+    assert.ok(cb.conditions.some(c => /^外观斜度 [\d.]+%：横向整理/.test(c)) && cb.conditions.some(c => /横向整理须 ≥70%/.test(c)), cb.conditions.join(' / '));
+    // 斜度指引: 双锯齿要求倾斜 (WG6)，横向整理要求平缓 (CG2)，口径相同
+    const E2 = E._internal;
+    assert.ok(Math.abs(E2.pgSlope(E2.mkGeom([1, 2, 3, 4].map(k => ({ idx: k, time: k, price: v[k] })))) - 0.275) < 1e-9);
+  });
+
   it('子浪多阈值投票: 多数阈值数不成五浪才判三浪，数成五浪的多数只能数成楔形才判楔形，打平归于被评估的计数', () => {
     const V = E._internal.structVotes;
     const imp = { five: { kind: 'IMPULSE' } }, dia = { five: { kind: 'DIAGONAL' } }, none = { five: null };
