@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.1",
   "verified_on": "2026-10-03",
   "description": "指标注册表：把方法论里的每个概念映射到数据源、计算方式和解读规则。数据层按 sources 拉数据并计算 transforms，评论 agent 按 rules 解读。lens 标明指标属于哪个视角：esther（美国宏观-利率-风险资产）、brooks（全球宏观-外汇-主权债务）、both。composite 指标由 snapshot.js 按 composite.type 从组件序列合成。verified=true 表示 2026-10-03 实测返回了最新数据；false 表示尚未实测。rules 中的阈值来自语料，ref 是语料文章日期。",
   "providers": {
@@ -104,13 +104,19 @@
         "level",
         "chg_1w_bp",
         "chg_4w_bp",
-        "chg_since_event_bp"
+        "chg_since_event_bp",
+        "distance_to_key_level_bp"
       ],
       "rules": [
         {
           "when": "10年期已经定价了某个政策结果（比如QT结束）后继续下行",
           "meaning": "下降趋势随时可能反转，持有可以，但不追加仓位",
           "ref": "2025-10-28"
+        },
+        {
+          "when": "10年期触及公允价值上沿（公允值 = 预期政策路径 + 加息周期里典型的期限溢价；2026-09 估算 2年期 4.75%、10年期 5.1%–5.2%）",
+          "meaning": "再往上需要新的利空；可以分批左侧做多长债（例：10年期收盘站上 5.35% 减半、站上 5.55% 清仓）",
+          "ref": "2026-09-29; 2026-10-03"
         }
       ],
       "lens": "both"
@@ -153,6 +159,11 @@
           "when": "长端利率逼近政策工具箱守护的关键位",
           "meaning": "可以战术做多长债并预设止损；有效突破关键位说明政策底失守，需要切换剧本",
           "ref": "2026-08-31"
+        },
+        {
+          "when": "30年期接近软顶区间（2026-10 判断为 5.75%–6.0%）",
+          "meaning": "票息策略（持有吃票息）已有吸引力；久期策略要等\"牛平\"信号。证伪：季度再融资不削减长债供给，叠加 CPI 超预期",
+          "ref": "2026-10-13"
         }
       ],
       "notes": "关键位不能写死，由 agent 根据当时的价格结构和政策工具判断，并写进防线",
@@ -222,6 +233,11 @@
           "when": "盈亏平衡通胀稳定，而贵金属和'贬值交易'大涨",
           "meaning": "盈亏平衡通胀短视、后视，不定价通胀不代表贬值交易错了；市场要等通胀摆在眼前才会定价",
           "ref": "brooks 2026-01-08"
+        },
+        {
+          "when": "盈亏平衡通胀低于未来大概率的 CPI 路径（例：2.30%–2.33%），而油价向核心 PCE 的传导还没开始计价",
+          "meaning": "做多长期 TIPS 有利；证伪：10年期盈亏平衡通胀跌破 2.2%",
+          "ref": "2026-10-03; 2026-10-13"
         }
       ],
       "lens": "both"
@@ -280,6 +296,11 @@
           "when": "期限溢价主导长端上涨",
           "meaning": "长端从'无风险资产'变成'财政风险'定价；财政主导体制(R4)的核心信号",
           "ref": "2026-08-31"
+        },
+        {
+          "when": "长端美债的变动主要由期限溢价解释（约 80%，25 年前约 40%）",
+          "meaning": "抵押品已取代政策利率成为主要传导机制；期限溢价一周跳升（例：ACM 一周 +18bp 至 91bp）说明市场在替央行收紧",
+          "ref": "2026-10-11; 2026-10-13"
         }
       ],
       "lens": "both",
@@ -598,6 +619,11 @@
           "when": "MOVE 处于低位",
           "meaning": "国债看跌期权相对便宜，适合少量对冲",
           "ref": "2025-08-18"
+        },
+        {
+          "when": "MOVE 冲过 120 后回落，同时曲线平坦化确认",
+          "meaning": "\"牛平\"信号，久期策略的入场条件；MOVE 突破 125 是长债多头的证伪条件",
+          "ref": "2026-10-03; 2026-10-13"
         }
       ],
       "lens": "esther"
@@ -654,6 +680,11 @@
           "when": "股市调整时信用利差只象征性扩大",
           "meaning": "信用市场没有定价衰退；信用市场对衰退比股市更敏感，可以当正面信号",
           "ref": "2025-03-24"
+        },
+        {
+          "when": "信用利差开始走阔",
+          "meaning": "历史上股市通常在利差开始走阔后 7–11 个月见顶（本周期被大大延长）；利差走阔约 200bp 就可能引发风险资产抛售",
+          "ref": "2026-10-04"
         }
       ],
       "lens": "esther"
@@ -704,7 +735,8 @@
       "transforms": [
         "level",
         "chg_1w_pct",
-        "vs_sma200"
+        "vs_sma200",
+        "distance_to_key_level_bp"
       ],
       "rules": [
         {
@@ -716,6 +748,11 @@
           "when": "美元偏离 2y2y 远期利差隐含的水平（美元高于利差）",
           "meaning": "多为避险或政策风险溢价造成的暂时偏离，风险偏好恢复后美元回到利差路径；利差（对冲需求的代理）比资本流动数据更能解释美元方向",
           "ref": "brooks 2026-04-26; 2026-06-22"
+        },
+        {
+          "when": "美元走强主要来自欧元走弱（如法债危机），而非美国自身强",
+          "meaning": "强美元收紧全球金融条件，抬高外国买家持有美债的汇率对冲成本，最终回灌到美债利率",
+          "ref": "2026-10-11; 2026-10-13"
         }
       ],
       "lens": "both"
@@ -744,7 +781,8 @@
       ],
       "transforms": [
         "level",
-        "chg_1w_pct"
+        "chg_1w_pct",
+        "distance_to_key_level_bp"
       ],
       "rules": [
         {
@@ -786,7 +824,8 @@
         "level",
         "chg_1w_pct",
         "drawdown_from_high",
-        "vs_sma200"
+        "vs_sma200",
+        "distance_to_key_level_bp"
       ],
       "rules": [
         {
@@ -808,6 +847,11 @@
           "when": "贵金属在财政失控担忧下暴涨",
           "meaning": "'贬值交易'：寻找对冲债务货币化的避险资产，也包括低债务国家的货币；由养老金被通胀稀释的恐惧驱动，容易形成泡沫",
           "ref": "brooks 2026-01-01; 2026-09-06"
+        },
+        {
+          "when": "实际利率处于数十年高位，金价仍守住关键整数位（例：4100 美元）",
+          "meaning": "黄金可以左侧建仓（例：止损 3850）；证伪：实际利率升破 3% 且金价收盘失守 4000",
+          "ref": "2026-10-13"
         }
       ],
       "lens": "both"
@@ -1091,7 +1135,8 @@
         "level",
         "drawdown_from_high",
         "vs_sma200",
-        "rel_to_spx"
+        "rel_to_spx",
+        "distance_to_key_level_bp"
       ],
       "rules": [
         {
@@ -1592,6 +1637,11 @@
           "when": "每月净增约 10 万",
           "meaning": "美联储认为对薪资的压力较小",
           "ref": "2024-03-10"
+        },
+        {
+          "when": "移民锐减加婴儿潮退休，盈亏平衡的就业增长降到接近零（约每月 5 万）",
+          "meaning": "非农低增长可能是\"稳态\"而非衰退；要配合私营就业（剔除政府、医疗、教育）12个月增速和周期性部门（建筑+制造）就业一起看",
+          "ref": "2026-10-04"
         }
       ],
       "notes": "前值修正需要对比不同版本的数据，FRED 的 ALFRED 接口可以拿到历史版本",
@@ -2121,7 +2171,14 @@
         "level",
         "chg_3m"
       ],
-      "rules": []
+      "rules": [
+        {
+          "when": "法国利差飙升，同时超过 1/4 的法国投资级企业被市场定价为比主权更安全",
+          "meaning": "\"无风险利率之锚\"沉没；外国人持有约 57.5%，边际买家对价格敏感；欧央行历来先说不救、最后都救。传导六条渠道：抵押品、信用锚、汇率、财政、政策、AI 融资",
+          "ref": "2026-10-04; 2026-10-11; 2026-10-13"
+        }
+      ],
+      "notes": "FRED 只有 OECD 月均值；法德利差的日频数据需人工补充"
     },
     {
       "id": "US_DE_SPREAD",
@@ -2749,6 +2806,415 @@
           "when": "资本流入（如外资买美国资产）创新高",
           "meaning": "流动数据（基本差额）和美元方向几乎无关；高频对冲行为更重要，用利差来代理",
           "ref": "brooks 2026-04-26"
+        }
+      ]
+    },
+    {
+      "id": "CCC_OAS",
+      "name": "CCC级高收益债利差",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "BAMLH0A3HYC",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp",
+        "chg_3m_bp",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "CCC 收益率回到约 15%，且 2021–22 年的借款人陆续进入展期潮",
+          "meaning": "'更高更久'会先从信贷切入，再拖累经济",
+          "ref": "2026-10-03"
+        }
+      ]
+    },
+    {
+      "id": "BB_OAS",
+      "name": "BB级高收益债利差",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "BAMLH0A1HYBB",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp",
+        "chg_3m_bp",
+        "percentile_10y",
+        "distance_to_key_level_bp"
+      ],
+      "rules": [
+        {
+          "when": "BB 级利差升到 2%",
+          "meaning": "Esther 的'高收益债利差 2% 警戒线'（10/13 文中 1.83% 的口径与 BB 级一致，不是整体高收益债 OAS）",
+          "ref": "2026-10-13"
+        }
+      ]
+    },
+    {
+      "id": "CCC_BB_SPREAD",
+      "name": "CCC 与 BB 利差之差",
+      "dimension": "liquidity",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "bp",
+      "lens": "esther",
+      "composite": {
+        "type": "spread_bp",
+        "inputs": {
+          "a": {
+            "provider": "fred",
+            "series": "BAMLH0A3HYC"
+          },
+          "b": {
+            "provider": "fred",
+            "series": "BAMLH0A1HYBB"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "BAMLH0A3HYC",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "fred",
+          "series": "BAMLH0A1HYBB",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w",
+        "chg_3m",
+        "chg_12m"
+      ],
+      "rules": [
+        {
+          "when": "CCC–BB 利差明显走阔（2026-10 已走阔约 400bp）",
+          "meaning": "信用分层：最弱的借款人先失血，是'更高更久'传导到实体的早期信号",
+          "ref": "2026-10-04"
+        }
+      ]
+    },
+    {
+      "id": "TIPS_20Y",
+      "name": "20年期 TIPS 实际收益率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DFII20",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "长期 TIPS 实际收益率处于 20 年来最高区域（例：15年以上约 3.40%）",
+          "meaning": "长期持有吃票息的入场点有吸引力；配合盈亏平衡通胀是否低于未来 CPI 路径",
+          "ref": "2026-10-13"
+        }
+      ]
+    },
+    {
+      "id": "TIPS_30Y",
+      "name": "30年期 TIPS 实际收益率",
+      "dimension": "rates",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "%",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "DFII30",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp",
+        "percentile_10y"
+      ],
+      "rules": []
+    },
+    {
+      "id": "MORTGAGE30",
+      "name": "30年期房贷利率",
+      "dimension": "macro",
+      "layer": "direction",
+      "frequency": "weekly",
+      "unit": "%",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "fred",
+          "series": "MORTGAGE30US",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_bp",
+        "chg_12m_bp"
+      ],
+      "rules": [
+        {
+          "when": "房贷利率高企（例：7.3%）、购房和再融资申请大幅下滑",
+          "meaning": "K 型经济：加息的效果落在 K 的下半截，有资产的家庭反而从利息收入获益",
+          "ref": "2026-10-04"
+        }
+      ]
+    },
+    {
+      "id": "HYG",
+      "name": "高收益债 ETF HYG",
+      "dimension": "technical",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "USD",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "HYG",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_4w_pct",
+        "vs_sma50",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "HYG 收复 50 日均线，且纽交所净新高 10 日均值转正（两者缺一不可）",
+          "meaning": "股指看跌期权对冲的证伪条件（宽度和信用同时修复）",
+          "ref": "2026-10-13"
+        }
+      ]
+    },
+    {
+      "id": "TLT",
+      "name": "20年以上美债 ETF TLT",
+      "dimension": "rates",
+      "layer": "execution",
+      "frequency": "daily",
+      "unit": "USD",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "TLT",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "vs_sma200"
+      ],
+      "rules": []
+    },
+    {
+      "id": "EWZ",
+      "name": "巴西股票 ETF EWZ",
+      "dimension": "fx",
+      "layer": "direction",
+      "frequency": "daily",
+      "unit": "USD",
+      "lens": "both",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "EWZ",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w_pct",
+        "chg_4w_pct",
+        "vs_sma200"
+      ],
+      "rules": [
+        {
+          "when": "EWZ 出现创纪录的成交和净流入（例：单日 80 亿美元成交、7 亿净流入）",
+          "meaning": "资金押注巴西（选举、商品出口国），与视角 B 的'EM 分化'和低估货币弹性一致",
+          "ref": "esther 2026-10-13; brooks 2026-09-23"
+        }
+      ]
+    },
+    {
+      "id": "ESTHER_OCT_MANUAL",
+      "name": "Esther 2026-10 新增的人工观察项",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "weekly",
+      "unit": "mixed",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "manual",
+          "role": "primary",
+          "verified": false,
+          "notes": "纽交所净新高 10 日均值、标普成分股距高点中位数、50 日线以上成分股比例、英伟达/博通/SpaceX CDS、AI 数据中心高收益债发行票息、法德利差日频、长债基金资金流"
+        }
+      ],
+      "transforms": [],
+      "rules": [
+        {
+          "when": "聪明钱不做空股票而改买违约保险（英伟达、博通 CDS 名义交易量半年放大约十倍）",
+          "meaning": "信用比股票更敏感，定价的是资金链断裂的概率；SpaceX CDS 走阔是 AI 信用层恶化的先行信号",
+          "ref": "2026-10-11; 2026-10-13"
+        },
+        {
+          "when": "彭博综合债券指数收益率高于标普盈利收益率（2000 年以来首次）",
+          "meaning": "股票风险溢价转负，股债长期再平衡的信号",
+          "ref": "2026-10-11"
+        }
+      ]
+    },
+    {
+      "id": "SKEW",
+      "name": "CBOE SKEW 指数",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "daily",
+      "unit": "index",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^SKEW",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "SKEW 进入 10 年来前 2%（约 160 以上）且 VIX 偏低",
+          "meaning": "机构花高价买深度虚值看跌期权，属于对冲需求；历史上独立事件只有 5 次（2016-10 以来），之后 1–3 个月标普都上涨，不构成可靠的崩盘或见底信号",
+          "ref": "agent 2026-10-17 回测；付鹏 2026-10-17"
+        },
+        {
+          "when": "SKEW 极端，同时 VIX 上升、VIX 期限结构走平或倒挂",
+          "meaning": "尾部和平值波动率一起涨，更接近真实压力定价而非自满式对冲；做市商卖出看跌期权后处于负 gamma，下跌一旦触及行权区会被对冲卖盘放大",
+          "ref": "agent 2026-10-17"
+        }
+      ]
+    },
+    {
+      "id": "VIX3M",
+      "name": "VIX 3 个月",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "daily",
+      "unit": "index",
+      "lens": "esther",
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^VIX3M",
+          "role": "primary",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w"
+      ],
+      "rules": []
+    },
+    {
+      "id": "VIX_TERM",
+      "name": "VIX / VIX3M 期限结构",
+      "dimension": "sentiment",
+      "layer": "timing",
+      "frequency": "daily",
+      "unit": "ratio",
+      "lens": "esther",
+      "composite": {
+        "type": "ratio",
+        "inputs": {
+          "a": {
+            "provider": "yahoo",
+            "ticker": "^VIX"
+          },
+          "b": {
+            "provider": "yahoo",
+            "ticker": "^VIX3M"
+          }
+        }
+      },
+      "sources": [
+        {
+          "provider": "yahoo",
+          "ticker": "^VIX",
+          "role": "component",
+          "verified": true
+        },
+        {
+          "provider": "yahoo",
+          "ticker": "^VIX3M",
+          "role": "component",
+          "verified": true
+        }
+      ],
+      "transforms": [
+        "level",
+        "chg_1w",
+        "percentile_10y"
+      ],
+      "rules": [
+        {
+          "when": "比值大于 1（期限结构倒挂）",
+          "meaning": "近端恐慌高于远端，市场进入压力模式；回落到 0.9 以下常伴随恐慌缓解",
+          "ref": "agent 2026-10-17"
         }
       ]
     }

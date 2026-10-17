@@ -179,7 +179,9 @@ function crossTransform(name, ind, series, ctx) {
       const levels = (ctx.params.key_levels || {})[ind.id];
       if (!levels || !levels.length) return { value: null, note: 'analysis_params.json 未设置 key_levels.' + ind.id };
       const cur = T.last(series).value;
-      return { value: levels.map(l => ({ level: l, distance_bp: T.round((cur - l) * 100, 1) })) };
+      // Rates and spreads quoted in % get a bp distance; prices (gold, FX, indices) get a % distance.
+      if (ind.unit === '%') return { value: levels.map(l => ({ level: l, distance_bp: T.round((cur - l) * 100, 1) })) };
+      return { value: levels.map(l => ({ level: l, distance_pct: T.round((cur / l - 1) * 100, 2) })) };
     }
     case 'implied_oil_disruption': {
       const oil = ctx.params.oil || {};

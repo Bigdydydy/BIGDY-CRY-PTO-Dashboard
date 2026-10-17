@@ -142,3 +142,13 @@ describe('CLI args', () => {
     assert.throws(() => parseArgs(['--asof', '09/25/2026']));
   });
 });
+
+describe('key level distance', () => {
+  const { crossTransform } = require('../analyst_agent/data_layer/lib/snapshot');
+  const s = [{ date: '2026-10-15', value: 4200 }];
+  test('price indicators get a % distance, rate indicators a bp distance', () => {
+    const ctx = { series: new Map(), params: { key_levels: { GOLD: [4000], UST10Y: [5.35] } } };
+    assert.deepEqual(crossTransform('distance_to_key_level_bp', { id: 'GOLD', unit: 'USD/oz' }, s, ctx).value, [{ level: 4000, distance_pct: 5 }]);
+    assert.deepEqual(crossTransform('distance_to_key_level_bp', { id: 'UST10Y', unit: '%' }, [{ date: '2026-10-15', value: 5.19 }], ctx).value, [{ level: 5.35, distance_bp: -16 }]);
+  });
+});
