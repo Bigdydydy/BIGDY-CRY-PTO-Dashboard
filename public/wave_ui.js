@@ -1176,6 +1176,8 @@ self.onmessage = function (e) {
 
     // 判定浪型: 同一画法可对应多种浪型 (abc=单锯齿/平台形，wxy=双锯齿/联合形…)，自动择优或由用户指定
     const opts = r.toolTypes || [];
+    // 锯齿类 / 横向整理 的区分依据 (wxy、w-x-y-xx-z)
+    const dsc = r.discrimination;
     const typeHtml = opts.length > 1 ? `
       <div class="liu-signal-row">
         <div class="liu-signal-title"><span>判定浪型</span><span>${r.forcedType ? '已指定' : '自动择优'}</span></div>
@@ -1184,6 +1186,9 @@ self.onmessage = function (e) {
           ${opts.map(o => `<button class="chart-tool-btn${r.forcedType === o.type ? ' active' : ''}" data-force="${esc(o.type)}" data-node="${esc(nd.id)}" title="只按「${esc(o.name)}」评估">${esc(o.name)}</button>`).join('')}
         </div>
         ${!r.forcedType && r.primary ? `<div class="ue-note">自动选择了「${esc(r.primary.name)}」。若你画的是另一种，点上面的按钮指定后会重新整体评估。</div>` : ''}
+        ${dsc ? `<div class="ue-note">区分依据（锯齿类 vs 横向整理）：</div>
+          ${dsc.steps.map(x => `<div class="ue-line">${x.decisive ? '✗' : '·'} ${esc(x.basis)} → ${x.supportsName ? esc(x.supportsName) : '两者皆可'}</div>`).join('')}
+          <div class="ue-note">${esc(dsc.reason)}</div>` : ''}
       </div>` : '';
 
     const legRows = (r.primary.legs || []).map(L => {
