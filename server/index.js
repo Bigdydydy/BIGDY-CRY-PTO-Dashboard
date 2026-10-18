@@ -17,6 +17,7 @@ const { getMacroChartData } = require('./macro_fetcher');
 const { getPreferredsData } = require('./mstr_preferreds');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
+const { getFlowForce } = require('./flow_force');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const liquidityHistory = require('./liquidity_history');
 const { getGoldCorrelationData } = require('./gold_fetcher');
@@ -654,6 +655,19 @@ async function handleApiRequest(req, res, parsedUrl) {
       sendJsonResponse(req, res, 200, ssroData);
     } catch (err) {
       console.error('[API Error] ssro:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/flow-force?tf=15m|1h|4h|1d|1w (Module 5: BTC 主导力量 期货/现货 × 亚太/欧美)
+  if (pathname === '/api/flow-force' && req.method === 'GET') {
+    try {
+      const tf = String(parsedUrl.query?.tf || '1h');
+      const forceParam = parsedUrl.query?.force === '1';
+      sendJsonResponse(req, res, 200, await getFlowForce(tf, forceParam));
+    } catch (err) {
+      console.error('[API Error] flow-force:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
     }
     return;

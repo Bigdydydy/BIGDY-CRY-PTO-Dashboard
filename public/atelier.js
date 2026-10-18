@@ -716,7 +716,7 @@
     'view-options': 'Volatility · Gamma · Skew',
     'view-block-trades': 'Block Flow · Icebergs',
     'view-block-insight': 'Block Flow · Positioning · Smart Money',
-    'view-ssro': 'Stablecoin Supply Ratio',
+    'view-ssro': 'Market Force · Stablecoin Supply',
     'view-coinbase-liquidity': 'Order Book · Depth · Slippage',
     'view-gold-correlation': 'Gold × Bitcoin',
     'view-wave-radar': 'Elliott Wave · Multi-degree',

@@ -237,7 +237,7 @@
               </svg>
             </div>
             <div class="nav-label-wrap">
-              <span class="nav-title"><span class="nav-index">05/</span>稳定币供应比率 (SSRO)</span>
+              <span class="nav-title"><span class="nav-index">05/</span>主导力量 · SSRO</span>
             </div>
           </button>
 
@@ -1904,14 +1904,113 @@
     </section>
   </div> <!-- /#view-block-insight -->
 
-  <!-- View 5: 稳定币供应比率震荡指标 (SSRO) 与 BTC 宏观购买力 -->
+  <!-- View 5: BTC 主导力量 (期货/现货 × 亚太/欧美) 与 稳定币供应比率震荡指标 (SSRO) -->
   <div class="view-panel" id="view-ssro">
+    <section class="bento-card ssro-hero-card" id="module-flow-force">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">05 MARKET FORCE &amp; STABLECOIN LIQUIDITY</span>
+          <h2>BTC 主导力量雷达：期货 / 现货 × 亚太 / 欧美</h2>
+          <span class="card-subtitle-inline">TradingView COINBASE:BTCUSD • 六场所 BVC 净主动量 • 盘口深度加权去刷量</span>
+        </div>
+        <div class="header-controls">
+          <div class="view-switch timeframe-switch" id="flow-tf-switch" title="同时切换 TradingView 图表与主导力量指标的周期">
+            <button class="switch-btn" data-tf="15m">15m</button>
+            <button class="switch-btn active" data-tf="1h">1H</button>
+            <button class="switch-btn" data-tf="4h">4H</button>
+            <button class="switch-btn" data-tf="1d">1D</button>
+            <button class="switch-btn" data-tf="1w">1W</button>
+          </div>
+          <div class="view-switch" id="flow-smooth-switch" style="margin-left: 8px;" title="柱与点的 EMA 平滑">
+            <button class="switch-btn" data-smooth="1">原始</button>
+            <button class="switch-btn active" data-smooth="3">EMA3</button>
+            <button class="switch-btn" data-smooth="5">EMA5</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="macro-metrics-row flow-metrics-row">
+          <div class="macro-metric-card">
+            <span class="mm-label">产品主导 (近 3 根收盘)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="flow-leader-val">--</span>
+              <span class="mm-chip" id="flow-leader-chip">--</span>
+            </div>
+            <span class="mm-sub" id="flow-leader-sub">红柱 = 期货强 · 绿柱 = 现货强</span>
+          </div>
+          <div class="macro-metric-card">
+            <span class="mm-label">区域主导 (近 3 根收盘)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="flow-region-val">--</span>
+              <span class="mm-chip" id="flow-region-chip">--</span>
+            </div>
+            <span class="mm-sub">红点 = 亚太强 · 绿点 = 欧美强</span>
+          </div>
+          <div class="macro-metric-card flow-quad-card">
+            <span class="mm-label">四象限相对压力 (当前K线)</span>
+            <div class="flow-quad" id="flow-quad">
+              <span></span><span class="fq-head">亚太</span><span class="fq-head">欧美</span>
+              <span class="fq-head">期货</span><span class="fq-cell" id="fq-futAsia">--</span><span class="fq-cell" id="fq-futWest">--</span>
+              <span class="fq-head">现货</span><span class="fq-cell" id="fq-spotAsia">--</span><span class="fq-cell" id="fq-spotWest">--</span>
+            </div>
+          </div>
+          <div class="macro-metric-card">
+            <span class="mm-label">美元现货溢价偏离</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="flow-prem-val">--</span>
+            </div>
+            <span class="mm-sub" id="flow-prem-sub">Coinbase vs 币安现货，已剔除 USDT 汇差</span>
+          </div>
+          <div class="macro-metric-card">
+            <span class="mm-label">永续基差 (亚太)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="flow-basis-val">--</span>
+            </div>
+            <span class="mm-sub">币安/OKX 永续 vs 现货</span>
+          </div>
+        </div>
+
+        <div class="ssro-charts-wrapper flow-tv-wrapper">
+          <div class="flow-tv-chart" id="tv-btc-chart"></div>
+        </div>
+
+        <div class="ssro-charts-wrapper flow-force-wrapper">
+          <div class="flow-legend-bar">
+            <span class="flow-legend-title">主导力量指标</span>
+            <span class="flow-key"><i class="fk-bar fk-red"></i>期货主导</span>
+            <span class="flow-key"><i class="fk-bar fk-green"></i>现货主导</span>
+            <span class="flow-key"><i class="fk-dot fk-red"></i>亚太主导</span>
+            <span class="flow-key"><i class="fk-dot fk-green"></i>欧美主导</span>
+            <span class="flow-key"><i class="fk-line"></i>美元现货溢价偏离 (bps)</span>
+            <span class="flow-status" id="flow-status">加载中…</span>
+          </div>
+          <div class="flow-force-chart" id="flow-force-chart">
+            <div class="flow-crosshair" id="flow-crosshair"></div>
+          </div>
+        </div>
+
+        <details class="flow-audit" id="flow-audit">
+          <summary>场所审计：谁说话算数 (24h 成交额 · ±10bps 盘口深度 · 换手/深度比)</summary>
+          <div class="cb-table-wrap flow-audit-wrap">
+            <table class="cb-table">
+              <thead>
+                <tr><th>象限</th><th>场所 / 数据源</th><th>24h 成交额</th><th>±10bps 深度</th><th>换手/深度</th><th>格内权重</th></tr>
+              </thead>
+              <tbody id="flow-audit-body"></tbody>
+            </table>
+          </div>
+          <p class="flow-audit-note">同一象限内按盘口深度加权：挂单要占用真实资金，比成交额难伪造。换手/深度比明显高于同类场所时，多出来的成交更可能是高频对敲或刷量。每个场所的信号都先除以它自己的 50 根平均成交额，所以持续性刷量只会抬高基线，不会制造信号。</p>
+        </details>
+      </div>
+    </section>
+
     <section class="bento-card ssro-hero-card" id="module-ssro-chart">
       <div class="card-header">
         <div class="card-title-group">
-          <span class="card-module-tag">04 STABLECOIN &amp; MACRO LIQUIDITY</span>
-          <h2>稳定币供应比率震荡指标 (SSRO) 与 BTC 宏观购买力</h2>
-          <span class="card-subtitle-inline">TradingView STABLE.C 实时市值 • 全网宏观流动性 Z-Score 确界</span>
+          <span class="card-module-tag">05B STABLECOIN &amp; MACRO LIQUIDITY</span>
+          <h2>稳定币供应比率震荡指标 (SSRO)</h2>
+          <span class="card-subtitle-inline">TradingView STABLE.C 实时市值 • 全网宏观流动性 Z-Score 确界 • 日线</span>
         </div>
         <div class="header-controls">
           <div class="view-switch timeframe-switch" id="ssro-timeframe-switch">
@@ -1929,14 +2028,13 @@
       </div>
 
       <div class="card-body">
-        <!-- Quick Stats Metrics Row -->
         <div class="macro-metrics-row ssro-metrics-row">
           <div class="macro-metric-card" id="card-ssro-btc">
             <span class="mm-label">BTC 现货价格</span>
             <div class="mm-val-wrap">
               <span class="mm-val text-amber" id="ssro-btc-val">$--,---</span>
             </div>
-            <span class="mm-sub" id="ssro-btc-sub">Binance / Deribit 实时收盘</span>
+            <span class="mm-sub" id="ssro-btc-sub">日线收盘 (SSR 分子)</span>
           </div>
 
           <div class="macro-metric-card" id="card-ssro-stable">
@@ -1975,9 +2073,8 @@
           </div>
         </div>
 
-        <!-- Dual Chart Container: Upper BTC Price, Lower SSRO Oscillator -->
         <div class="ssro-charts-wrapper">
-          <div class="ssro-chart-container" id="ssro-echart-dom" style="width: 100%; height: 530px;"></div>
+          <div class="ssro-chart-container" id="ssro-echart-dom" style="width: 100%;"></div>
         </div>
 
       </div>
