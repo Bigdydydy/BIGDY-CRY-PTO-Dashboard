@@ -1911,7 +1911,7 @@
         <div class="card-title-group">
           <span class="card-module-tag">05 MARKET FORCE &amp; STABLECOIN LIQUIDITY</span>
           <h2>BTC 主导力量雷达：期货 / 现货 × 亚太 / 欧美</h2>
-          <span class="card-subtitle-inline">TradingView COINBASE:BTCUSD • 六场所 BVC 净主动量 • 盘口深度加权去刷量</span>
+          <span class="card-subtitle-inline">Coinbase BTC-USD K线 + 主导力量副图 (同轴联动) • 六场所 BVC 净主动量 • 盘口深度加权去刷量</span>
         </div>
         <div class="header-controls">
           <div class="view-switch timeframe-switch" id="flow-tf-switch" title="同时切换 TradingView 图表与主导力量指标的周期">
@@ -1971,10 +1971,6 @@
           </div>
         </div>
 
-        <div class="ssro-charts-wrapper flow-tv-wrapper">
-          <div class="flow-tv-chart" id="tv-btc-chart"></div>
-        </div>
-
         <div class="ssro-charts-wrapper flow-force-wrapper">
           <div class="flow-legend-bar">
             <span class="flow-legend-title">主导力量指标</span>
@@ -1983,9 +1979,11 @@
             <span class="flow-key"><i class="fk-dot fk-red"></i>亚太主导</span>
             <span class="flow-key"><i class="fk-dot fk-green"></i>欧美主导</span>
             <span class="flow-key"><i class="fk-line"></i>美元现货溢价偏离 (bps)</span>
+            <a class="flow-tv-link" href="https://www.tradingview.com/chart/?symbol=COINBASE%3ABTCUSD" target="_blank" rel="noopener" title="在 TradingView 打开 COINBASE:BTCUSD；Pine 版指标见仓库 tradingview/btc_flow_force.pine">在 TradingView 打开 ↗</a>
             <span class="flow-status" id="flow-status">加载中…</span>
           </div>
           <div class="flow-force-chart" id="flow-force-chart">
+            <div class="flow-ohlc" id="flow-ohlc"></div>
             <div class="flow-crosshair" id="flow-crosshair"></div>
           </div>
         </div>

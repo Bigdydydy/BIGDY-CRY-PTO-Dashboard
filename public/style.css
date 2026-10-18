@@ -3849,26 +3849,6 @@ body {
 .fq-buy { color: var(--color-pos) !important; }
 .fq-sell { color: var(--color-neg) !important; }
 
-.flow-tv-wrapper {
-  padding: 0;
-  overflow: hidden;
-  margin-bottom: 12px;
-}
-
-.flow-tv-chart {
-  width: 100%;
-  height: 540px;
-}
-
-.flow-tv-fallback {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-
 .flow-force-wrapper {
   padding: 10px 12px 8px;
   margin-bottom: 14px;
@@ -3915,8 +3895,36 @@ body {
 .flow-force-chart {
   position: relative;
   width: 100%;
-  height: 330px;
+  height: 760px;
 }
+
+.flow-ohlc {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  max-width: calc(100% - 90px);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.flow-ohlc .fc-sym { color: var(--text-primary); font-weight: 700; }
+
+.flow-tv-link {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.flow-tv-link:hover { color: var(--text-primary); border-color: var(--border-hover); }
 
 .flow-crosshair {
   position: absolute;
@@ -3961,8 +3969,8 @@ body {
   .flow-metrics-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .flow-tv-chart {
-    height: 460px;
+  .flow-force-chart {
+    height: 660px;
   }
 }
 
@@ -3973,14 +3981,12 @@ body {
   .ssro-charts-wrapper {
     padding: 8px 4px;
   }
-  .flow-tv-wrapper {
-    padding: 0;
-  }
-  .flow-tv-chart {
-    height: 400px;
-  }
   .flow-force-chart {
-    height: 260px;
+    height: 560px;
+  }
+  .flow-ohlc {
+    font-size: 0.6rem;
+    max-width: calc(100% - 60px);
   }
   .flow-crosshair {
     font-size: 0.6rem;

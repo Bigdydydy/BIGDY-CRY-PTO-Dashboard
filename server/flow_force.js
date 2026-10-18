@@ -438,6 +438,14 @@ async function buildFlowForce(tf) {
 
   const series = computeFlowForce(venueBars, depthWeights);
   if (!series.length) throw new Error('各场所K线均不可用');
+
+  // 主图K线: Coinbase (或其 Kraken 替补)；欧美现货整体缺失时退到币安现货
+  const candleKey = venueBars.usSpot.length ? 'usSpot' : 'bnSpot';
+  const firstTime = series[0].time;
+  const candles = venueBars[candleKey]
+    .filter(b => b.t / 1000 >= firstTime)
+    .map(b => ({ time: Math.floor(b.t / 1000), open: b.o, high: b.h, low: b.l, close: b.c, volumeUsd: Math.round(b.v) }));
+
   return {
     code: 0,
     tf,
@@ -449,6 +457,8 @@ async function buildFlowForce(tf) {
     audit,
     summary: summarize(series),
     latest: series[series.length - 1],
+    candleSource: sources[candleKey].source,
+    candles,
     series
   };
 }

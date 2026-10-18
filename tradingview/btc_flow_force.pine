@@ -1,0 +1,130 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// BIGDY · BTC 主导力量：推动当前行情的力量来自 期货/现货、亚太/欧美 中的哪一方
+//
+// 与仪表盘 Module 5 (server/flow_force.js) 同一套算法:
+//   1. 每个场所每根K线用 BVC (Easley-López de Prado-O'Hara 2012) 估计净主动量:
+//        V·(2Φ(r/σ) − 1)，r 为对数收益，σ 为前 n 根收益标准差
+//   2. 除以该场所自身前 n 根平均成交量 → 相对压力。持续刷量只抬高基线、不制造信号；
+//      各场所成交量单位 (币 / 张 / 美元) 不同也不影响，因为只和自己比
+//   3. 同格两个场所按"盘口深度占比"加权 (Pine 读不到订单簿，用输入值；仪表盘里是实时 ±10bps 深度)
+//   柱 = |期货| − |现货|  (红 = 期货主导，绿 = 现货主导)
+//   点 = |亚太| − |欧美|  (红 = 亚太主导，绿 = 欧美主导)
+//
+// 用法: TradingView → Pine 编辑器 → 新建 → 粘贴本文件 → 添加到图表 (建议在 COINBASE:BTCUSD 上使用)
+
+//@version=6
+indicator("BTC 主导力量 · 期货/现货 × 亚太/欧美", shorttitle = "BTC 主导力量", overlay = false, precision = 2)
+
+// ── 场所 ────────────────────────────────────────────────────────────────────
+grpV = "场所 (2×2 象限)"
+symBnPerp  = input.symbol("BINANCE:BTCUSDT.P",     "期货/亚太 · 币安 USDT 永续",  group = grpV)
+symOkxPerp = input.symbol("OKX:BTCUSDT.P",         "期货/亚太 · OKX USDT 永续",   group = grpV)
+symHlPerp  = input.symbol("HYPERLIQUID:BTCUSDC.P", "期货/欧美 · Hyperliquid 永续", group = grpV)
+symBnSpot  = input.symbol("BINANCE:BTCUSDT",       "现货/亚太 · 币安现货",        group = grpV)
+symOkxSpot = input.symbol("OKX:BTCUSDT",           "现货/亚太 · OKX 现货",        group = grpV)
+symUsSpot  = input.symbol("COINBASE:BTCUSD",       "现货/欧美 · Coinbase",        group = grpV)
+
+grpW = "格内权重 (盘口深度占比，OKX = 1 − 币安)"
+wBnPerp = input.float(0.53, "期货/亚太 · 币安永续权重", minval = 0, maxval = 1, step = 0.01, group = grpW, tooltip = "2026-10 实测 ±10bps 深度: 币安永续 $42.6M vs OKX 永续 $38.1M")
+wBnSpot = input.float(0.64, "现货/亚太 · 币安现货权重", minval = 0, maxval = 1, step = 0.01, group = grpW, tooltip = "2026-10 实测 ±10bps 深度: 币安现货 $13.6M vs OKX 现货 $7.6M")
+
+grpP = "参数"
+len      = input.int(50, "σ / 成交量基线窗口", minval = 10, group = grpP)
+smooth   = input.int(3, "EMA 平滑 (1 = 原始)", minval = 1, group = grpP)
+showPrem = input.bool(true, "显示美元现货溢价偏离 (bps ÷ 10)", group = grpP, tooltip = "Coinbase vs 币安现货价差减去前 n 根均值，剔除 USDT/USD 汇差。和柱不同量纲，因此缩小 10 倍画在同一窗格")
+showTbl  = input.bool(true, "显示研判表", group = grpP)
+
+grpC = "颜色"
+colFut  = input.color(#f43f5e, "期货主导 (柱)", group = grpC)
+colSpot = input.color(#10b981, "现货主导 (柱)", group = grpC)
+colAsia = input.color(#f43f5e, "亚太主导 (点)", group = grpC)
+colWest = input.color(#10b981, "欧美主导 (点)", group = grpC)
+
+// ── 计算 ────────────────────────────────────────────────────────────────────
+// 标准正态 CDF (Abramowitz-Stegun 7.1.26，误差 < 1.5e-7)
+normCdf(float x) =>
+    float u = math.abs(x) / math.sqrt(2.0)
+    float t = 1.0 / (1.0 + 0.3275911 * u)
+    float erf = 1.0 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * math.exp(-u * u)
+    x >= 0 ? (1.0 + erf) / 2.0 : (1.0 - erf) / 2.0
+
+// 单场所相对压力；σ 与成交量基线只用当根之前的 n 根
+venuePressure(int n) =>
+    float r     = math.log(close / close[1])
+    float sigma = ta.stdev(r, n)[1]
+    float base  = ta.sma(volume, n)[1]
+    float z     = sigma > 0 ? r / sigma : 0.0
+    float p     = base > 0 ? volume * (2.0 * normCdf(z) - 1.0) / base : na
+    [p, close]
+
+[pBnPerp, cBnPerp]   = request.security(symBnPerp,  timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+[pOkxPerp, cOkxPerp] = request.security(symOkxPerp, timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+[pHlPerp, cHlPerp]   = request.security(symHlPerp,  timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+[pBnSpot, cBnSpot]   = request.security(symBnSpot,  timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+[pOkxSpot, cOkxSpot] = request.security(symOkxSpot, timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+[pUsSpot, cUsSpot]   = request.security(symUsSpot,  timeframe.period, venuePressure(len), ignore_invalid_symbol = true)
+
+// 某个场所缺数据时，该格退化为另一个场所 / 另一格
+mix2(float a, float b, float wa) =>
+    na(a) ? b : na(b) ? a : wa * a + (1.0 - wa) * b
+avg2(float a, float b) =>
+    na(a) ? b : na(b) ? a : (a + b) / 2.0
+
+float futAsia  = mix2(pBnPerp, pOkxPerp, wBnPerp)
+float futWest  = pHlPerp
+float spotAsia = mix2(pBnSpot, pOkxSpot, wBnSpot)
+float spotWest = pUsSpot
+
+float fut  = avg2(futAsia, futWest)
+float spot = avg2(spotAsia, spotWest)
+float asia = avg2(futAsia, spotAsia)
+float west = avg2(futWest, spotWest)
+
+float histRaw   = math.abs(fut) - math.abs(spot)
+float regionRaw = math.abs(asia) - math.abs(west)
+float hist   = ta.ema(histRaw, smooth)    // smooth = 1 时等于原始值
+float region = ta.ema(regionRaw, smooth)
+
+float spotRef = na(cBnSpot) ? cOkxSpot : cBnSpot
+float prem    = (cUsSpot / spotRef - 1.0) * 1e4
+float premDev = prem - ta.sma(prem, len)[1]
+
+// ── 绘图 ────────────────────────────────────────────────────────────────────
+plot(hist, "柱: |期货| − |现货|", style = plot.style_columns, color = hist > 0 ? colFut : colSpot)
+hline(0, "零轴", color = color.new(color.gray, 50), linestyle = hline.style_solid)
+plotshape(not na(region), "点: |亚太| − |欧美|", style = shape.circle, location = location.bottom, size = size.tiny, color = region > 0 ? colAsia : colWest)
+plot(showPrem ? premDev / 10 : na, "美元现货溢价偏离 (bps ÷ 10)", color = #38bdf8, linewidth = 1)
+
+// 数据窗口里显示四象限原值
+plot(futAsia,  "期货/亚太", display = display.data_window)
+plot(futWest,  "期货/欧美", display = display.data_window)
+plot(spotAsia, "现货/亚太", display = display.data_window)
+plot(spotWest, "现货/欧美", display = display.data_window)
+plot(premDev,  "溢价偏离 bps", display = display.data_window)
+
+// ── 研判表 ──────────────────────────────────────────────────────────────────
+var table tbl = table.new(position.top_right, 3, 4, border_width = 1)
+fmt(float v) =>
+    na(v) ? "--" : (v > 0 ? "+" : "") + str.tostring(v, "0.00")
+cellCol(float v) =>
+    na(v) ? color.gray : v > 0 ? colSpot : colFut   // 象限格: 绿 = 净买，红 = 净卖
+
+if showTbl and barstate.islast
+    table.cell(tbl, 0, 0, hist > 0 ? "期货主导" : "现货主导", text_color = color.white, bgcolor = hist > 0 ? colFut : colSpot, text_size = size.small)
+    table.cell(tbl, 1, 0, "亚太", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 2, 0, "欧美", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 0, 1, "期货", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 1, 1, fmt(futAsia), text_color = cellCol(futAsia), text_size = size.small)
+    table.cell(tbl, 2, 1, fmt(futWest), text_color = cellCol(futWest), text_size = size.small)
+    table.cell(tbl, 0, 2, "现货", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 1, 2, fmt(spotAsia), text_color = cellCol(spotAsia), text_size = size.small)
+    table.cell(tbl, 2, 2, fmt(spotWest), text_color = cellCol(spotWest), text_size = size.small)
+    table.cell(tbl, 0, 3, region > 0 ? "亚太主导" : "欧美主导", text_color = color.white, bgcolor = region > 0 ? colAsia : colWest, text_size = size.small)
+    table.cell(tbl, 1, 3, "溢价偏离", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 2, 3, na(premDev) ? "--" : str.tostring(premDev, "0.0") + " bps", text_color = color.gray, text_size = size.small)
+
+// ── 警报 ────────────────────────────────────────────────────────────────────
+alertcondition(ta.crossover(hist, 0),    "转为期货主导", "BTC 主导力量: 期货转为主导")
+alertcondition(ta.crossunder(hist, 0),   "转为现货主导", "BTC 主导力量: 现货转为主导")
+alertcondition(ta.crossover(region, 0),  "转为亚太主导", "BTC 主导力量: 亚太转为主导")
+alertcondition(ta.crossunder(region, 0), "转为欧美主导", "BTC 主导力量: 欧美转为主导")
