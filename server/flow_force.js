@@ -5,7 +5,7 @@
  *   期货/亚太  币安 BTCUSDT 永续 + OKX BTC-USDT-SWAP
  *   期货/欧美  Hyperliquid BTC 永续
  *   现货/亚太  币安 BTCUSDT 现货 + OKX BTC-USDT 现货 (按盘口深度加权，币安约占 2/3)
- *   现货/欧美  Coinbase BTC-USD (被墙/限流时退到 Kraken XBT/USD)
+ *   现货/欧美  Coinbase BTC-USD (直连被拦截时经 TradingView 的 COINBASE:BTCUSD 获取同一份成交)
  *
  * 每个场所每根K线:
  *   1. 主动买卖量用 BVC (Bulk Volume Classification, Easley-López de Prado-O'Hara 2012) 估计:
@@ -17,10 +17,12 @@
  * 合成:
  *   F = 期货两格均值, S = 现货两格均值 → 柱 H = |F| − |S| (>0 期货主导, <0 现货主导)
  *   A = 亚太两格均值, U = 欧美两格均值 → 点 R = |A| − |U| (>0 亚太主导, <0 欧美主导)
- * 另附两条不受刷量影响的价格信号做交叉验证: Coinbase 溢价 (欧美现货 vs 币安现货) 与 永续基差。
+ * 另附两条不受刷量影响的价格信号做交叉验证:
+ *   Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1，以及 永续基差。
  */
 
 const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
+const { fetchTvBars } = require('./tradingview_feed');
 
 const TF_MS = { '15m': 9e5, '1h': 3.6e6, '4h': 1.44e7, '1d': 8.64e7, '1w': 6.048e8 };
 const TF_TTL_MS = { '15m': 60e3, '1h': 120e3, '4h': 300e3, '1d': 600e3, '1w': 900e3 };
@@ -119,14 +121,14 @@ async function fetchHlPerp(tf) {
 
 // Coinbase 没有 4h / 1w 粒度：由 1h / 1d 合成；单次最多 300 根，向前分页
 const CB_PLAN = { '15m': [900, 1], '1h': [3600, 1], '4h': [3600, 4], '1d': [86400, 1], '1w': [86400, 7] };
-async function fetchCoinbase(tf) {
+async function fetchCoinbase(tf, product = 'BTC-USD') {
   const [gran, mult] = CB_PLAN[tf];
   const need = Math.min(FETCH_BARS * mult + mult, 2100);
   const all = new Map();
   let end = Math.floor(Date.now() / 1000 / gran) * gran + gran;
   while (all.size < need) {
     const start = end - 300 * gran;
-    const rows = await getJson(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${gran}&start=${new Date(start * 1000).toISOString()}&end=${new Date(end * 1000).toISOString()}`, {
+    const rows = await getJson(`https://api.exchange.coinbase.com/products/${product}/candles?granularity=${gran}&start=${new Date(start * 1000).toISOString()}&end=${new Date(end * 1000).toISOString()}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
     });
     if (!Array.isArray(rows) || !rows.length) break;
@@ -142,15 +144,10 @@ async function fetchCoinbase(tf) {
   return tf === '1w' ? aggregateBars(bars, TF_MS['1w'], MONDAY_OFFSET_MS) : aggregateBars(bars, TF_MS[tf]);
 }
 
-// Kraken 只返回最近 720 根；周线同样按周四对齐，改由日线合成
-const KRAKEN_PLAN = { '15m': 15, '1h': 60, '4h': 240, '1d': 1440, '1w': 1440 };
-async function fetchKraken(tf) {
-  const json = await getJson(`https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=${KRAKEN_PLAN[tf]}`);
-  if (json.error && json.error.length) throw new Error(json.error.join(','));
-  const key = Object.keys(json.result || {}).find(k => k !== 'last');
-  // [time, o, h, l, c, vwap, volume, count]
-  const bars = json.result[key].map(r => ({ t: r[0] * 1000, o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] * +r[6] }));
-  return tf === '1w' ? aggregateBars(bars, TF_MS['1w'], MONDAY_OFFSET_MS) : bars;
+// 同一份 Coinbase 撮合成交，经 TradingView 行情通道获取 (直连 Coinbase 被网络拦截时)
+async function fetchCoinbaseViaTv(tf, symbol = 'COINBASE:BTCUSD') {
+  const rows = await fetchTvBars(symbol, tf, FETCH_BARS);
+  return rows.map(r => ({ t: r.t, o: r.o, h: r.h, l: r.l, c: r.c, v: r.vol * typical(r.h, r.l, r.c) }));
 }
 
 const FETCHERS = {
@@ -161,9 +158,28 @@ const FETCHERS = {
   okxSpot: [{ label: 'OKX 现货 BTC-USDT', fn: tf => fetchOkx('BTC-USDT', tf) }],
   usSpot: [
     { label: 'Coinbase BTC-USD', fn: fetchCoinbase },
-    { label: 'Kraken XBT/USD (Coinbase 不可达时的欧美现货替补)', fn: fetchKraken }
+    { label: 'Coinbase BTC-USD (经 TradingView)', fn: tf => fetchCoinbaseViaTv(tf) }
   ]
 };
+
+// USDT/USD 汇率 (Coinbase USDT-USD)：把币安 USDT 计价换成美元，才能得到真正的 Coinbase 溢价
+const USDT_USD_SOURCES = [
+  { label: 'Coinbase USDT-USD', fn: tf => fetchCoinbase(tf, 'USDT-USD') },
+  { label: 'Coinbase USDT-USD (经 TradingView)', fn: tf => fetchCoinbaseViaTv(tf, 'COINBASE:USDTUSD') }
+];
+
+async function fetchUsdtUsd(tf) {
+  const errors = [];
+  for (const src of USDT_USD_SOURCES) {
+    try {
+      const bars = await src.fn(tf);
+      if (bars.length) return { rates: new Map(bars.map(b => [b.t, b.c])), source: src.label, errors };
+    } catch (e) {
+      errors.push(`${src.label}: ${e.message}`);
+    }
+  }
+  return { rates: new Map(), source: null, errors };
+}
 
 async function fetchVenue(key, tf) {
   const errors = [];
@@ -221,7 +237,7 @@ const round = (v, d = 4) => (v === null || !Number.isFinite(v) ? null : Math.rou
  * @param venueBars { venueKey: bars[] }
  * @param depthWeights { venueKey: ±10bps 深度美元 } 缺失时同格按成交额基线加权
  */
-function computeFlowForce(venueBars, depthWeights = {}) {
+function computeFlowForce(venueBars, depthWeights = {}, usdtUsd = new Map()) {
   const pressures = {};
   for (const [k, bars] of Object.entries(venueBars)) if (bars && bars.length) pressures[k] = venuePressure(bars);
 
@@ -254,6 +270,7 @@ function computeFlowForce(venueBars, depthWeights = {}) {
     const bnS = px('bnSpot') || px('okxSpot');
     const us = px('usSpot');
     const perp = mean([px('bnPerp'), px('okxPerp')]);
+    const rate = usdtUsd.get(t); // 1 USDT = rate USD
 
     series.push({
       time: Math.floor(t / 1000),
@@ -262,16 +279,19 @@ function computeFlowForce(venueBars, depthWeights = {}) {
       fut: round(F), spot: round(S), asia: round(A), west: round(W),
       hist: round(Math.abs(F) - Math.abs(S)),
       region: A !== null && W !== null ? round(Math.abs(A) - Math.abs(W)) : null,
-      usPremiumBps: us && bnS ? round((us / bnS - 1) * 1e4, 2) : null,
+      // Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1，两边都换成美元后再比
+      usPremiumBps: us && bnS && rate > 0 ? round((us / (bnS * rate) - 1) * 1e4, 2) : null,
+      // 未换汇的原始价差 = 真实溢价 + USDT 相对美元的折溢价
+      usPremiumRawBps: us && bnS ? round((us / bnS - 1) * 1e4, 2) : null,
       basisBps: perp && bnS ? round((perp / bnS - 1) * 1e4, 2) : null,
       price: round(us || bnS, 2)
     });
   }
-  // 美元现货对 USDT 现货的原始价差含 USDT/USD 汇差 (缓慢漂移)，减去前 n 根均值得到真正的溢价偏离
+  // 拿不到 USDT/USD 时的退路: 原始价差减去前 n 根均值 (近似剔除缓慢漂移的 USDT 汇差)
   for (let i = 0; i < series.length; i++) {
-    const prev = series.slice(Math.max(0, i - LOOKBACK), i).map(p => p.usPremiumBps);
+    const prev = series.slice(Math.max(0, i - LOOKBACK), i).map(p => p.usPremiumRawBps);
     const base = prev.length >= 10 ? mean(prev) : null;
-    const cur = series[i].usPremiumBps;
+    const cur = series[i].usPremiumRawBps;
     series[i].usPremiumDevBps = cur !== null && base !== null ? round(cur - base, 2) : null;
   }
   return series;
@@ -351,22 +371,19 @@ const AUDIT_TASKS = {
     ]);
     return { depth: bandDepth(book.data[0].bids, book.data[0].asks), vol24h: +tk.data[0].volCcy24h };
   },
+  // 订单簿只能直连 Coinbase 获取 (TradingView 不提供盘口)；该格只有 Coinbase 一个场所，深度只用于展示
   async usSpot() {
+    const h = { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } };
+    let book, st;
     try {
-      const h = { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } };
-      const [book, st] = await Promise.all([
+      [book, st] = await Promise.all([
         getJson('https://api.exchange.coinbase.com/products/BTC-USD/book?level=2', h),
         getJson('https://api.exchange.coinbase.com/products/BTC-USD/stats', h)
       ]);
-      return { depth: bandDepth(book.bids, book.asks), vol24h: +st.volume * +st.last, source: 'Coinbase BTC-USD' };
     } catch (e) {
-      const [book, tk] = await Promise.all([
-        getJson('https://api.kraken.com/0/public/Depth?pair=XBTUSD&count=500'),
-        getJson('https://api.kraken.com/0/public/Ticker?pair=XBTUSD')
-      ]);
-      const b = Object.values(book.result)[0], t = Object.values(tk.result)[0];
-      return { depth: bandDepth(b.bids, b.asks), vol24h: +t.v[1] * +t.p[1], source: 'Kraken XBT/USD' };
+      throw new Error(`本机网络无法直连 Coinbase 盘口 (K线已改由 TradingView 获取): ${e.message}`);
     }
+    return { depth: bandDepth(book.bids, book.asks), vol24h: +st.volume * +st.last, source: 'Coinbase BTC-USD' };
   }
 };
 
@@ -415,10 +432,12 @@ const inflight = new Map();
 
 async function buildFlowForce(tf) {
   const keys = Object.keys(VENUES);
-  const [fetched, audit] = await Promise.all([
+  const [fetched, audit, usdt] = await Promise.all([
     Promise.all(keys.map(k => fetchVenue(k, tf))),
-    getVenueAudit().catch(() => null)
+    getVenueAudit().catch(() => null),
+    fetchUsdtUsd(tf)
   ]);
+  if (usdt.errors.length) console.warn(`[FlowForce] ${tf} USDT/USD: ${usdt.errors.join(' | ')}`);
   const venueBars = {};
   const sources = {};
   keys.forEach((k, i) => {
@@ -436,10 +455,12 @@ async function buildFlowForce(tf) {
   const depthWeights = {};
   if (audit) for (const [k, row] of Object.entries(audit.rows)) if (row.depthUsd) depthWeights[k] = row.depthUsd;
 
-  const series = computeFlowForce(venueBars, depthWeights);
+  const series = computeFlowForce(venueBars, depthWeights, usdt.rates);
+  // 有 USDT/USD 时画换汇后的真实溢价；拿不到时退到“原始价差减滚动均值”
+  const premiumMode = series.some(p => p.usPremiumBps !== null) ? 'usd' : 'dev';
   if (!series.length) throw new Error('各场所K线均不可用');
 
-  // 主图K线: Coinbase (或其 Kraken 替补)；欧美现货整体缺失时退到币安现货
+  // 主图K线: Coinbase (直连或经 TradingView)；欧美现货整体缺失时退到币安现货
   const candleKey = venueBars.usSpot.length ? 'usSpot' : 'bnSpot';
   const firstTime = series[0].time;
   const candles = venueBars[candleKey]
@@ -458,6 +479,8 @@ async function buildFlowForce(tf) {
     summary: summarize(series),
     latest: series[series.length - 1],
     candleSource: sources[candleKey].source,
+    premiumMode,
+    usdtUsdSource: usdt.source,
     candles,
     series
   };

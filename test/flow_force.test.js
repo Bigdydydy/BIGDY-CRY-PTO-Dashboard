@@ -81,6 +81,28 @@ test('computeFlowForce: 同格按深度加权，缺失场所不阻断计算', ()
   assert.ok(Number.isFinite(lowOkx.hist), '其余格仍可合成柱值');
 });
 
+test('Coinbase 溢价按 USDT/USD 换汇：USDT 折价 13bps 时原始价差 −13bps 对应真实溢价 ≈0', () => {
+  const rets = noise(80, 5);
+  const base = rets.map(() => 1e6);
+  const bnSpot = makeBars(rets, base);
+  const rate = 0.9987; // 1 USDT = 0.9987 USD
+  // Coinbase 美元价 = 币安 USDT 价 × 汇率 (没有真实溢价)
+  const usSpot = bnSpot.map(b => ({ ...b, o: b.o * rate, h: b.h * rate, l: b.l * rate, c: b.c * rate }));
+  const venues = { bnPerp: makeBars(rets, base), okxPerp: [], hlPerp: [], bnSpot, okxSpot: [], usSpot };
+  const rates = new Map(bnSpot.map(b => [b.t, rate]));
+  const last = computeFlowForce(venues, {}, rates).at(-1);
+  assert.ok(Math.abs(last.usPremiumRawBps - -13) < 0.01, '未换汇价差 = USDT 折价');
+  assert.ok(Math.abs(last.usPremiumBps) < 0.01, '换汇后真实溢价为 0');
+  const noRate = computeFlowForce(venues).at(-1);
+  assert.strictEqual(noRate.usPremiumBps, null, '无汇率时不给出换汇溢价');
+});
+
+test('TradingView 行情帧拆分', () => {
+  const { splitFrames } = require('../server/tradingview_feed');
+  const a = JSON.stringify({ m: 'series_completed', p: [] });
+  assert.deepStrictEqual(splitFrames(`~m~${a.length}~m~${a}~m~4~m~~h~7`), [a, '~h~7']);
+});
+
 test('aggregateBars: 1h → 4h 按 UTC 对齐并丢弃不完整首桶', () => {
   const bars = makeBars(noise(10), Array(10).fill(1), Date.UTC(2026, 0, 5, 2));
   const out = aggregateBars(bars, 4 * HOUR);

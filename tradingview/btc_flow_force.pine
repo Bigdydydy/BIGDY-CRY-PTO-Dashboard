@@ -23,6 +23,7 @@ symHlPerp  = input.symbol("HYPERLIQUID:BTCUSDC.P", "期货/欧美 · Hyperliquid
 symBnSpot  = input.symbol("BINANCE:BTCUSDT",       "现货/亚太 · 币安现货",        group = grpV)
 symOkxSpot = input.symbol("OKX:BTCUSDT",           "现货/亚太 · OKX 现货",        group = grpV)
 symUsSpot  = input.symbol("COINBASE:BTCUSD",       "现货/欧美 · Coinbase",        group = grpV)
+symUsdtUsd = input.symbol("COINBASE:USDTUSD",      "USDT/USD 汇率 (溢价换汇用)",  group = grpV)
 
 grpW = "格内权重 (盘口深度占比，OKX = 1 − 币安)"
 wBnPerp = input.float(0.53, "期货/亚太 · 币安永续权重", minval = 0, maxval = 1, step = 0.01, group = grpW, tooltip = "2026-10 实测 ±10bps 深度: 币安永续 $42.6M vs OKX 永续 $38.1M")
@@ -31,7 +32,7 @@ wBnSpot = input.float(0.64, "现货/亚太 · 币安现货权重", minval = 0, m
 grpP = "参数"
 len      = input.int(50, "σ / 成交量基线窗口", minval = 10, group = grpP)
 smooth   = input.int(3, "EMA 平滑 (1 = 原始)", minval = 1, group = grpP)
-showPrem = input.bool(true, "显示美元现货溢价偏离 (bps ÷ 10)", group = grpP, tooltip = "Coinbase vs 币安现货价差减去前 n 根均值，剔除 USDT/USD 汇差。和柱不同量纲，因此缩小 10 倍画在同一窗格")
+showPrem = input.bool(true, "显示 Coinbase 溢价 (bps ÷ 10)", group = grpP, tooltip = "Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1。和柱不同量纲，因此缩小 10 倍画在同一窗格")
 showTbl  = input.bool(true, "显示研判表", group = grpP)
 
 grpC = "颜色"
@@ -86,21 +87,26 @@ float hist   = ta.ema(histRaw, smooth)    // smooth = 1 时等于原始值
 float region = ta.ema(regionRaw, smooth)
 
 float spotRef = na(cBnSpot) ? cOkxSpot : cBnSpot
-float prem    = (cUsSpot / spotRef - 1.0) * 1e4
-float premDev = prem - ta.sma(prem, len)[1]
+float usdtUsd = request.security(symUsdtUsd, timeframe.period, close, ignore_invalid_symbol = true)
+// Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1；拿不到汇率时退到 原始价差 − 前 n 根均值
+float premRaw = (cUsSpot / spotRef - 1.0) * 1e4
+float premUsd = usdtUsd > 0 ? (cUsSpot / (spotRef * usdtUsd) - 1.0) * 1e4 : na
+float premRawMa = ta.sma(premRaw, len)[1]   // 每根都计算，避免在条件分支里调用 ta.*
+float premDev = na(premUsd) ? premRaw - premRawMa : premUsd
 
 // ── 绘图 ────────────────────────────────────────────────────────────────────
 plot(hist, "柱: |期货| − |现货|", style = plot.style_columns, color = hist > 0 ? colFut : colSpot)
 hline(0, "零轴", color = color.new(color.gray, 50), linestyle = hline.style_solid)
 plotshape(not na(region), "点: |亚太| − |欧美|", style = shape.circle, location = location.bottom, size = size.tiny, color = region > 0 ? colAsia : colWest)
-plot(showPrem ? premDev / 10 : na, "美元现货溢价偏离 (bps ÷ 10)", color = #38bdf8, linewidth = 1)
+plot(showPrem ? premDev / 10 : na, "Coinbase 溢价 (bps ÷ 10)", color = #38bdf8, linewidth = 1)
 
 // 数据窗口里显示四象限原值
 plot(futAsia,  "期货/亚太", display = display.data_window)
 plot(futWest,  "期货/欧美", display = display.data_window)
 plot(spotAsia, "现货/亚太", display = display.data_window)
 plot(spotWest, "现货/欧美", display = display.data_window)
-plot(premDev,  "溢价偏离 bps", display = display.data_window)
+plot(premDev,  "Coinbase 溢价 bps", display = display.data_window)
+plot(premRaw,  "未换汇原始价差 bps", display = display.data_window)
 
 // ── 研判表 ──────────────────────────────────────────────────────────────────
 var table tbl = table.new(position.top_right, 3, 4, border_width = 1)
@@ -120,7 +126,7 @@ if showTbl and barstate.islast
     table.cell(tbl, 1, 2, fmt(spotAsia), text_color = cellCol(spotAsia), text_size = size.small)
     table.cell(tbl, 2, 2, fmt(spotWest), text_color = cellCol(spotWest), text_size = size.small)
     table.cell(tbl, 0, 3, region > 0 ? "亚太主导" : "欧美主导", text_color = color.white, bgcolor = region > 0 ? colAsia : colWest, text_size = size.small)
-    table.cell(tbl, 1, 3, "溢价偏离", text_color = color.gray, text_size = size.small)
+    table.cell(tbl, 1, 3, "CB 溢价", text_color = color.gray, text_size = size.small)
     table.cell(tbl, 2, 3, na(premDev) ? "--" : str.tostring(premDev, "0.0") + " bps", text_color = color.gray, text_size = size.small)
 
 // ── 警报 ────────────────────────────────────────────────────────────────────

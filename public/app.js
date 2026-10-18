@@ -4950,6 +4950,12 @@ function flowEma(values, len) {
   });
 }
 
+/** Coinbase 溢价：优先用换成美元后的真实值，拿不到 USDT/USD 时用原始价差去均值 */
+function flowPremium(p) {
+  if (!p) return null;
+  return rawFlowData && rawFlowData.premiumMode === 'dev' ? p.usPremiumDevBps : p.usPremiumBps;
+}
+
 function fmtFlowSigned(v, digits = 2, unit = '') {
   if (v === null || v === undefined || !Number.isFinite(v)) return '--';
   return `${v > 0 ? '+' : ''}${v.toFixed(digits)}${unit}`;
@@ -4994,13 +5000,17 @@ function updateFlowKpis(data) {
     el.classList.toggle('fq-sell', v < -0.05);
   });
   const prem = document.getElementById('flow-prem-val');
+  const premNow = flowPremium(last);
   if (prem) {
-    prem.textContent = fmtFlowSigned(last.usPremiumDevBps, 1, ' bps');
-    prem.style.color = last.usPremiumDevBps > 0 ? FLOW_GREEN : last.usPremiumDevBps < 0 ? FLOW_RED : '';
+    prem.textContent = fmtFlowSigned(premNow, 1, ' bps');
+    prem.style.color = premNow > 0 ? FLOW_GREEN : premNow < 0 ? FLOW_RED : '';
   }
   const premSub = document.getElementById('flow-prem-sub');
-  const usSrc = data.sources && data.sources.usSpot && data.sources.usSpot.source;
-  if (premSub) premSub.textContent = `${usSrc && /Kraken/.test(usSrc) ? 'Kraken (Coinbase 替补)' : 'Coinbase'} vs 币安现货，原始 ${fmtFlowSigned(last.usPremiumBps, 1)} bps 已剔除 USDT 汇差`;
+  if (premSub) {
+    premSub.textContent = data.premiumMode === 'dev'
+      ? `USDT/USD 不可用：原始价差 ${fmtFlowSigned(last.usPremiumRawBps, 1)} bps 减去 50 根均值`
+      : `CB ÷ (币安 × USDT/USD) − 1；未换汇原始价差 ${fmtFlowSigned(last.usPremiumRawBps, 1)} bps`;
+  }
   const basis = document.getElementById('flow-basis-val');
   if (basis) basis.textContent = fmtFlowSigned(last.basisBps, 1, ' bps');
 
@@ -5008,8 +5018,11 @@ function updateFlowKpis(data) {
   if (st && data.sources) {
     const parts = Object.values(data.sources).map(v => {
       if (!v.ok) return `<span class="flow-src-bad" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${v.name} ✕</span>`;
-      const fallback = v.source && v.source !== v.name;
-      return `<span class="${fallback ? 'flow-src-warn' : ''}" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${fallback ? v.source.replace(/\s*\(.*\)$/, '') + ' (替补)' : v.name}</span>`;
+      // 经 TradingView 拿到的仍是同一交易所的成交，只是换了通道，不算替补
+      const viaTv = v.source && /经 TradingView/.test(v.source);
+      const fallback = v.source && v.source !== v.name && !viaTv;
+      const label = viaTv ? `${v.name} · 经 TradingView` : fallback ? v.source.replace(/\s*\(.*\)$/, '') + ' (替补)' : v.name;
+      return `<span class="${fallback ? 'flow-src-warn' : ''}" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${label}</span>`;
     });
     const t = new Date(data.updatedAt);
     st.innerHTML = `${parts.join(' · ')} · ${t.toLocaleTimeString('zh-CN', { hour12: false })}${data.stale ? ' · 缓存' : ''}`;
@@ -5114,7 +5127,7 @@ function buildFlowChart() {
     priceFormat: { type: 'custom', formatter: () => '' }
   }, 2);
   dots.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0.2 } });
-  // 窗格 3: 美元现货溢价偏离
+  // 窗格 3: Coinbase 溢价 (换汇后)
   const prem = flowChart.addSeries(LW.LineSeries, {
     color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: 'price', precision: 1, minMove: 0.1 }
@@ -5141,8 +5154,7 @@ function positionFlowIndicatorLegend() {
 
 function flowCandleVenueLabel() {
   const src = (rawFlowData && rawFlowData.candleSource) || '';
-  if (/Kraken/.test(src)) return 'KRAKEN:XBTUSD (Coinbase 替补)';
-  if (/币安/.test(src)) return 'BINANCE:BTCUSDT (替补)';
+  if (/币安/.test(src)) return 'BINANCE:BTCUSDT (Coinbase 不可用时的替补)';
   return 'COINBASE:BTCUSD';
 }
 
@@ -5186,7 +5198,7 @@ function updateFlowCrosshair(time) {
     <span>期·欧美 <b class="${tone(row.futWest)}">${fmtFlowSigned(row.futWest)}</b></span>
     <span>现·亚 <b class="${tone(row.spotAsia)}">${fmtFlowSigned(row.spotAsia)}</b></span>
     <span>现·欧美 <b class="${tone(row.spotWest)}">${fmtFlowSigned(row.spotWest)}</b></span>
-    <span>溢价偏离 ${fmtFlowSigned(row.usPremiumDevBps, 1)}bps</span>
+    <span>CB 溢价 ${fmtFlowSigned(flowPremium(row), 1)}bps</span>
     <span>基差 ${fmtFlowSigned(row.basisBps, 1)}bps</span>`;
 }
 
@@ -5203,7 +5215,8 @@ function renderFlowChart(resetRange = false) {
     flowRowsByTime.set(p.time, row);
     if (hs[i] !== null) histData.push({ time: p.time, value: hs[i], color: hs[i] > 0 ? FLOW_RED : FLOW_GREEN });
     if (rs[i] !== null) dotData.push({ time: p.time, value: 0, color: rs[i] > 0 ? FLOW_RED : FLOW_GREEN });
-    if (p.usPremiumDevBps !== null) premData.push({ time: p.time, value: p.usPremiumDevBps });
+    const pv = flowPremium(p);
+    if (pv !== null && pv !== undefined) premData.push({ time: p.time, value: pv });
   });
   const candles = Array.isArray(rawFlowData.candles) ? rawFlowData.candles : [];
   flowCandlesByTime = new Map(candles.map(k => [k.time, k]));
