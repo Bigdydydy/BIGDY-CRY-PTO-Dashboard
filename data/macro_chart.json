@@ -38558,11 +38558,11 @@
     },
     {
       "date": "2026-10-17",
-      "btcPrice": 81648.01,
+      "btcPrice": 81491.04,
       "mstrCost": 75444,
       "mstrHoldings": 848250,
       "mstrBuyVelocity30d": 106.7,
-      "mnav": 1.033,
+      "mnav": 1.035,
       "mnavEstimated": true,
       "us1y": 4.49,
       "us10y": 5.1,
@@ -38572,10 +38572,27 @@
       "fedRrp": 0,
       "fedNetLiquidity": 5.8722,
       "fedNetLiqSma20": 5.8313
+    },
+    {
+      "date": "2026-10-18",
+      "btcPrice": 81828.47,
+      "mstrCost": 75444,
+      "mstrHoldings": 848250,
+      "mstrBuyVelocity30d": 106.7,
+      "mnav": 1.031,
+      "mnavEstimated": true,
+      "us1y": 4.49,
+      "us10y": 5.1,
+      "yieldSpread": 0.61,
+      "fedWalcl": 6.756,
+      "fedTga": 0.883,
+      "fedRrp": 0,
+      "fedNetLiquidity": 5.8722,
+      "fedNetLiqSma20": 5.8364
     }
   ],
   "summary": {
-    "currentBtc": 81648.01,
+    "currentBtc": 81828.47,
     "currentMstrCost": 75444,
     "currentMstrHoldings": 848250,
     "currentMstrVelocity30d": 106.7,
@@ -38585,7 +38602,7 @@
     "velocityToIssuance": 0.24,
     "mstrCostSource": "coinglass",
     "mstrCostAsOf": "2026-10-12",
-    "currentMnav": 1.033,
+    "currentMnav": 1.031,
     "mnavEstimated": true,
     "mnavAnchorDate": "2026-09-12",
     "mnavBasis": "ev",
@@ -38598,12 +38615,12 @@
     "isCurveInverted": false,
     "mstrProfitMultiplier": 1.08,
     "currentFedNetLiquidity": 5.8722,
-    "currentFedNetLiqSma20": 5.8313,
+    "currentFedNetLiqSma20": 5.8364,
     "currentFedWalcl": 6.756,
     "currentFedTga": 0.883,
     "currentFedRrp": 0,
     "fedNetLiqDailyChange": 0,
-    "fedNetLiqChange20d": 0.1022,
+    "fedNetLiqChange20d": 0.1024,
     "sources": {
       "FRED DGS1": "ok",
       "FRED DGS10": "ok",
@@ -38615,12 +38632,12 @@
       "bitcointreasuries": "ok",
       "Coinglass": "ok"
     },
-    "totalPoints": 2269,
+    "totalPoints": 2270,
     "dateRange": {
       "start": "2020-08-01",
-      "end": "2026-10-17"
+      "end": "2026-10-18"
     },
-    "updatedAt": "2026-10-17T20:45:27.208Z"
+    "updatedAt": "2026-10-18T04:48:19.526Z"
   },
   "rawMstr": [
     {
