@@ -3819,21 +3819,182 @@ body {
 
 .ssro-chart-container {
   width: 100%;
-  height: 540px;
+  height: 300px;
 }
 
-@media (max-width: 900px) {
-  .ssro-chart-container {
-    height: 460px;
+/* Module 5A · BTC 主导力量 (期货/现货 × 亚太/欧美) */
+.flow-metrics-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.flow-quad {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  align-items: center;
+}
+
+.fq-head {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+
+.fq-cell {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.fq-buy { color: var(--color-pos) !important; }
+.fq-sell { color: var(--color-neg) !important; }
+
+.flow-force-wrapper {
+  padding: 10px 12px 8px;
+  margin-bottom: 14px;
+}
+
+.flow-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.flow-legend-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.flow-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fk-bar { width: 7px; height: 12px; border-radius: 1px; display: inline-block; }
+.fk-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.fk-line { width: 14px; height: 2px; background: #38bdf8; display: inline-block; }
+.fk-red { background: #f43f5e; }
+.fk-green { background: #10b981; }
+
+.flow-status {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+}
+
+.flow-src-warn { color: var(--color-warn); }
+.flow-src-bad { color: var(--color-neg); }
+
+.flow-force-chart {
+  position: relative;
+  width: 100%;
+  height: 760px;
+}
+
+.flow-ohlc {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  max-width: calc(100% - 90px);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.flow-ohlc .fc-sym { color: var(--text-primary); font-weight: 700; }
+
+.flow-tv-link {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.flow-tv-link:hover { color: var(--text-primary); border-color: var(--border-hover); }
+
+.flow-crosshair {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  max-width: calc(100% - 70px);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.flow-crosshair .fc-time { color: var(--text-primary); font-weight: 600; }
+
+.flow-audit {
+  margin-bottom: 4px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.flow-audit summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 4px 0 8px;
+}
+
+.flow-audit-wrap { max-height: none; }
+
+.flow-audit-note {
+  margin: 8px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+  .flow-metrics-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .flow-force-chart {
+    height: 660px;
   }
 }
 
 @media (max-width: 768px) {
   .ssro-chart-container {
-    height: 390px;
+    height: 260px;
   }
   .ssro-charts-wrapper {
     padding: 8px 4px;
+  }
+  .flow-force-chart {
+    height: 560px;
+  }
+  .flow-ohlc {
+    font-size: 0.6rem;
+    max-width: calc(100% - 60px);
+  }
+  .flow-crosshair {
+    font-size: 0.6rem;
+    max-width: calc(100% - 50px);
+  }
+  .flow-status {
+    margin-left: 0;
+    width: 100%;
   }
 }
 

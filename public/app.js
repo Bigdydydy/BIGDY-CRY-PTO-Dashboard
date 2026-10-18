@@ -151,6 +151,10 @@ function reloadAllChartsForTheme() {
   if (typeof renderSsroChart === 'function' && typeof rawSsroData !== 'undefined' && rawSsroData) {
     renderSsroChart();
   }
+  if (typeof flowChart !== 'undefined' && flowChart) {
+    disposeFlowChart();
+    if (rawFlowData) renderFlowChart(true);
+  }
   if (typeof renderCbDepthChart === 'function' && typeof rawCoinbaseData !== 'undefined' && rawCoinbaseData) {
     renderCbDepthChart(rawCoinbaseData);
     renderCbSlippageChart(rawCoinbaseData);
@@ -4890,7 +4894,6 @@ function renderSsroChart() {
   }
 
   const dates = filtered.map(p => p.date);
-  const btcPrices = filtered.map(p => p.btcPrice);
   const ssroVals = filtered.map(p => ssroLen === 200 ? p.ssro200 : p.ssro50);
 
   const validZ = ssroVals.filter(v => v !== null && !isNaN(v));
@@ -4959,93 +4962,30 @@ function renderSsroChart() {
     axisPointer: {
       link: [{ xAxisIndex: 'all' }]
     },
-    grid: [
-      {
-        left: 65,
-        right: 35,
-        top: '6%',
-        height: '42%'
-      },
-      {
-        left: 65,
-        right: 35,
-        top: '56%',
-        height: '34%'
+    // BTC 价格已由上方 TradingView 图表承担，这里只画 SSRO 震荡指标 (日线)
+    grid: { left: 65, right: 35, top: 16, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLine: { lineStyle: { color: colors.axisLine } },
+      axisLabel: { color: colors.tickColor, fontSize: 11 },
+      axisTick: { alignWithLabel: true }
+    },
+    yAxis: {
+      type: 'value',
+      min: minZ,
+      max: maxZ,
+      splitLine: { lineStyle: { color: colors.splitLine } },
+      axisLabel: {
+        color: '#38bdf8',
+        fontSize: 11,
+        formatter: '{value}σ'
       }
-    ],
-    xAxis: [
-      {
-        type: 'category',
-        gridIndex: 0,
-        data: dates,
-        axisLine: { lineStyle: { color: colors.axisLine } },
-        axisLabel: { show: false },
-        axisTick: { show: false }
-      },
-      {
-        type: 'category',
-        gridIndex: 1,
-        data: dates,
-        axisLine: { lineStyle: { color: colors.axisLine } },
-        axisLabel: { color: colors.tickColor, fontSize: 11 },
-        axisTick: { alignWithLabel: true }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'value',
-        gridIndex: 0,
-        scale: true,
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: colors.splitLine } },
-        axisLabel: {
-          color: '#f59e0b',
-          fontSize: 11,
-          formatter: function(val) {
-            return `$${Math.round(val / 1000)}k`;
-          }
-        }
-      },
-      {
-        type: 'value',
-        gridIndex: 1,
-        min: minZ,
-        max: maxZ,
-        splitLine: { lineStyle: { color: colors.splitLine } },
-        axisLabel: {
-          color: '#38bdf8',
-          fontSize: 11,
-          formatter: '{value}σ'
-        }
-      }
-    ],
+    },
     series: [
-      {
-        name: 'BTC 现货价格',
-        type: 'line',
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        data: btcPrices,
-        smooth: 0.2,
-        symbol: 'none',
-        lineStyle: {
-          color: '#f59e0b',
-          width: 2.2,
-          shadowColor: 'rgba(245, 158, 11, 0.35)',
-          shadowBlur: 8
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(245, 158, 11, 0.22)' },
-            { offset: 1, color: 'rgba(245, 158, 11, 0.01)' }
-          ])
-        }
-      },
       {
         name: 'SSRO 震荡指标',
         type: 'line',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
         data: ssroVals,
         smooth: 0.15,
         symbol: 'none',
@@ -5128,6 +5068,405 @@ function initSsroEvents() {
   window.addEventListener('resize', () => {
     if (ssroChartInstance) ssroChartInstance.resize();
   });
+}
+
+// ============================================================================
+// Module 5A: BTC 主导力量 (期货/现货 × 亚太/欧美)
+// 一张 lightweight-charts 图: 主图 Coinbase K线 + 副图 柱/点/溢价，同一时间轴与十字光标，
+// 和 TradingView 里主图下挂指标的读法一致 (Pine 版见 tradingview/btc_flow_force.pine)
+// ============================================================================
+
+const FLOW_RED = '#f43f5e';
+const FLOW_GREEN = '#10b981';
+const FLOW_TF_LABEL = { '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W' };
+let flowTf = '1h';
+let flowSmooth = 3;
+let rawFlowData = null;
+let flowChart = null;
+let flowSeries = null;
+let flowRowsByTime = new Map();
+let flowCandlesByTime = new Map();
+let flowModulePromise = null;
+let flowPollTimer = null;
+let flowFetchSeq = 0;
+
+function ensureFlowLibs() {
+  if (window.LightweightCharts) return Promise.resolve();
+  if (!flowModulePromise) {
+    flowModulePromise = loadScriptOnce('/lightweight-charts.min.js').catch(e => {
+      flowModulePromise = null;
+      throw e;
+    });
+  }
+  return flowModulePromise;
+}
+
+function isFlowViewVisible() {
+  const panel = document.getElementById('view-ssro');
+  return !!panel && panel.classList.contains('active');
+}
+
+/** 进入 Module 5 时调用：按需加载脚本、建图、开始轮询 */
+function activateFlowModule() {
+  ensureFlowLibs()
+    .then(() => {
+      if (rawFlowData) renderFlowChart();
+      fetchFlowForce(false);
+      if (!flowPollTimer) {
+        flowPollTimer = setInterval(() => {
+          if (isFlowViewVisible()) fetchFlowForce(false);
+        }, 60000);
+      }
+    })
+    .catch(e => {
+      const st = document.getElementById('flow-status');
+      if (st) st.textContent = `图表脚本加载失败: ${e.message}`;
+    });
+}
+
+async function fetchFlowForce(force = false) {
+  const seq = ++flowFetchSeq;
+  const tf = flowTf;
+  const st = document.getElementById('flow-status');
+  try {
+    const res = await fetch(`/api/flow-force?tf=${tf}${force ? '&force=1' : ''}`);
+    const data = await res.json();
+    if (!res.ok || data.code !== 0) throw new Error(data.error || `HTTP ${res.status}`);
+    if (seq !== flowFetchSeq) return; // 周期已切换，丢弃旧响应
+    const tfChanged = !rawFlowData || rawFlowData.tf !== data.tf;
+    rawFlowData = data;
+    updateFlowKpis(data);
+    renderFlowAudit(data);
+    if (window.LightweightCharts) renderFlowChart(tfChanged);
+  } catch (err) {
+    console.error('[Flow] 加载失败:', err);
+    if (st && seq === flowFetchSeq) st.textContent = `加载失败: ${err.message}`;
+  }
+}
+
+function flowEma(values, len) {
+  if (len <= 1) return values.slice();
+  const k = 2 / (len + 1);
+  let prev = null;
+  return values.map(v => {
+    if (v === null || !Number.isFinite(v)) return prev === null ? null : prev;
+    prev = prev === null ? v : prev + k * (v - prev);
+    return prev;
+  });
+}
+
+/** Coinbase 溢价：优先用换成美元后的真实值，拿不到 USDT/USD 时用原始价差去均值 */
+function flowPremium(p) {
+  if (!p) return null;
+  return rawFlowData && rawFlowData.premiumMode === 'dev' ? p.usPremiumDevBps : p.usPremiumBps;
+}
+
+function fmtFlowSigned(v, digits = 2, unit = '') {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '--';
+  return `${v > 0 ? '+' : ''}${v.toFixed(digits)}${unit}`;
+}
+
+function fmtFlowUsd(v) {
+  if (!Number.isFinite(v)) return '--';
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  return `$${Math.round(v / 1e3)}K`;
+}
+
+function setFlowChip(el, text, tone) {
+  if (!el) return;
+  el.textContent = text;
+  el.className = `mm-chip ${tone === 'red' ? 'chip-negative' : tone === 'green' ? 'chip-positive' : ''}`;
+}
+
+function updateFlowKpis(data) {
+  const s = data.summary;
+  const last = data.latest || {};
+  const leaderVal = document.getElementById('flow-leader-val');
+  const regionVal = document.getElementById('flow-region-val');
+  if (s && leaderVal) {
+    leaderVal.textContent = s.leaderLabel;
+    leaderVal.style.color = s.leader === 'futures' ? FLOW_RED : FLOW_GREEN;
+    setFlowChip(document.getElementById('flow-leader-chip'), fmtFlowSigned(s.hist), s.leader === 'futures' ? 'red' : 'green');
+    const sub = document.getElementById('flow-leader-sub');
+    if (sub) sub.textContent = `期货${s.futDir} · 现货${s.spotDir}`;
+  }
+  if (s && regionVal) {
+    regionVal.textContent = s.regionLabel;
+    regionVal.style.color = s.regionLeader === 'asia' ? FLOW_RED : FLOW_GREEN;
+    setFlowChip(document.getElementById('flow-region-chip'), fmtFlowSigned(s.region), s.regionLeader === 'asia' ? 'red' : 'green');
+  }
+  ['futAsia', 'futWest', 'spotAsia', 'spotWest'].forEach(k => {
+    const el = document.getElementById(`fq-${k}`);
+    if (!el) return;
+    const v = last[k];
+    el.textContent = fmtFlowSigned(v);
+    el.classList.toggle('fq-buy', v > 0.05);
+    el.classList.toggle('fq-sell', v < -0.05);
+  });
+  const prem = document.getElementById('flow-prem-val');
+  const premNow = flowPremium(last);
+  if (prem) {
+    prem.textContent = fmtFlowSigned(premNow, 1, ' bps');
+    prem.style.color = premNow > 0 ? FLOW_GREEN : premNow < 0 ? FLOW_RED : '';
+  }
+  const premSub = document.getElementById('flow-prem-sub');
+  if (premSub) {
+    premSub.textContent = data.premiumMode === 'dev'
+      ? `USDT/USD 不可用：原始价差 ${fmtFlowSigned(last.usPremiumRawBps, 1)} bps 减去 50 根均值`
+      : `CB ÷ (币安 × USDT/USD) − 1；未换汇原始价差 ${fmtFlowSigned(last.usPremiumRawBps, 1)} bps`;
+  }
+  const basis = document.getElementById('flow-basis-val');
+  if (basis) basis.textContent = fmtFlowSigned(last.basisBps, 1, ' bps');
+
+  const st = document.getElementById('flow-status');
+  if (st && data.sources) {
+    const parts = Object.values(data.sources).map(v => {
+      if (!v.ok) return `<span class="flow-src-bad" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${v.name} ✕</span>`;
+      // 经 TradingView 拿到的仍是同一交易所的成交，只是换了通道，不算替补
+      const viaTv = v.source && /经 TradingView/.test(v.source);
+      const fallback = v.source && v.source !== v.name && !viaTv;
+      const label = viaTv ? `${v.name} · 经 TradingView` : fallback ? v.source.replace(/\s*\(.*\)$/, '') + ' (替补)' : v.name;
+      return `<span class="${fallback ? 'flow-src-warn' : ''}" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${label}</span>`;
+    });
+    const t = new Date(data.updatedAt);
+    st.innerHTML = `${parts.join(' · ')} · ${t.toLocaleTimeString('zh-CN', { hour12: false })}${data.stale ? ' · 缓存' : ''}`;
+  }
+}
+
+function renderFlowAudit(data) {
+  const body = document.getElementById('flow-audit-body');
+  if (!body || !data.audit || !data.cells) return;
+  const cellLabel = { futAsia: '期货 / 亚太', futWest: '期货 / 欧美', spotAsia: '现货 / 亚太', spotWest: '现货 / 欧美' };
+  const rows = [];
+  for (const [cell, members] of Object.entries(data.cells)) {
+    members.forEach((k, i) => {
+      const r = data.audit.rows[k] || {};
+      const cellTd = i === 0 ? `<td rowspan="${members.length}">${cellLabel[cell] || cell}</td>` : '';
+      if (r.error) {
+        rows.push(`<tr>${cellTd}<td>${r.name || k}</td><td colspan="4" class="flow-src-bad">不可用: ${r.error}</td></tr>`);
+        return;
+      }
+      rows.push(`<tr>${cellTd}<td>${r.name}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td><td>${r.cellWeight !== undefined ? (r.cellWeight * 100).toFixed(0) + '%' : '--'}</td></tr>`);
+    });
+  }
+  body.innerHTML = rows.join('');
+}
+
+function flowLocalDate(sec) {
+  return new Date(sec * 1000);
+}
+
+function flowTimeLabel(sec) {
+  const d = flowLocalDate(sec);
+  const pad = n => String(n).padStart(2, '0');
+  const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return flowTf === '1d' || flowTf === '1w' ? day : `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function disposeFlowChart() {
+  if (flowChart) {
+    try { flowChart.remove(); } catch (e) {}
+  }
+  flowChart = null;
+  flowSeries = null;
+}
+
+function buildFlowChart() {
+  const host = document.getElementById('flow-force-chart');
+  if (!host || !window.LightweightCharts) return false;
+  const LW = window.LightweightCharts;
+  const c = getChartThemeColors();
+  flowChart = LW.createChart(host, {
+    autoSize: true,
+    layout: {
+      background: { type: 'solid', color: 'transparent' },
+      textColor: c.tickColor,
+      fontSize: 11,
+      attributionLogo: false,
+      panes: { separatorColor: c.axisLine, separatorHoverColor: c.gridLineStrong, enableResize: true }
+    },
+    grid: { vertLines: { color: c.gridLine }, horzLines: { color: c.gridLine } },
+    rightPriceScale: { borderColor: c.axisLine },
+    timeScale: { borderColor: c.axisLine, timeVisible: true, secondsVisible: false, rightOffset: 3,
+      tickMarkFormatter: (time, type) => {
+        const d = flowLocalDate(time);
+        const pad = n => String(n).padStart(2, '0');
+        if (type === 0) return `${d.getFullYear()}`;
+        if (type === 1) return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+        if (type === 2) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+    },
+    localization: { timeFormatter: time => flowTimeLabel(time) },
+    crosshair: {
+      mode: LW.CrosshairMode.Normal,
+      vertLine: { color: c.crossColor, style: LW.LineStyle.Dashed, labelBackgroundColor: c.axisPointerBg },
+      horzLine: { color: c.crossColor, style: LW.LineStyle.Dashed, labelBackgroundColor: c.axisPointerBg }
+    }
+  });
+
+  // 窗格 0: 主图 K 线 + 成交额 (TradingView 默认配色)
+  const candles = flowChart.addSeries(LW.CandlestickSeries, {
+    upColor: '#089981', downColor: '#f23645', borderVisible: false,
+    wickUpColor: '#089981', wickDownColor: '#f23645',
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
+  }, 0);
+  const volume = flowChart.addSeries(LW.HistogramSeries, {
+    priceScaleId: 'flow-vol', priceLineVisible: false, lastValueVisible: false,
+    priceFormat: { type: 'volume' }
+  }, 0);
+  volume.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+
+  // 窗格 1: 主导力量柱
+  const hist = flowChart.addSeries(LW.HistogramSeries, {
+    base: 0, priceLineVisible: false, lastValueVisible: false,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
+  }, 1);
+  hist.createPriceLine({ price: 0, color: c.gridLineStrong, lineWidth: 1, lineStyle: LW.LineStyle.Solid, axisLabelVisible: false });
+  // 窗格 2: 区域点单独一条细窄窗格，画在柱子的零轴上会被同色柱根盖住
+  const dots = flowChart.addSeries(LW.LineSeries, {
+    lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3,
+    priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    autoscaleInfoProvider: () => ({ priceRange: { minValue: -1, maxValue: 1 } }),
+    priceFormat: { type: 'custom', formatter: () => '' }
+  }, 2);
+  dots.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0.2 } });
+  // 窗格 3: Coinbase 溢价 (换汇后)
+  const prem = flowChart.addSeries(LW.LineSeries, {
+    color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
+    priceFormat: { type: 'price', precision: 1, minMove: 0.1 }
+  }, 3);
+  prem.createPriceLine({ price: 0, color: c.gridLineStrong, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: false });
+
+  const panes = flowChart.panes();
+  [5, 2, 0.22, 0.9].forEach((f, i) => { if (panes[i] && panes[i].setStretchFactor) panes[i].setStretchFactor(f); });
+  flowSeries = { candles, volume, hist, dots, prem };
+  flowChart.subscribeCrosshairMove(param => updateFlowCrosshair(param && param.time));
+  if (window.ResizeObserver) new ResizeObserver(() => positionFlowIndicatorLegend()).observe(host);
+  return true;
+}
+
+/** 指标图例贴在柱状窗格顶端 (窗格高度会随拖动分隔条 / 窗口尺寸变化) */
+function positionFlowIndicatorLegend() {
+  const host = document.getElementById('flow-force-chart');
+  const box = document.getElementById('flow-crosshair');
+  const pane = flowChart && flowChart.panes()[1];
+  const el = pane && pane.getHTMLElement && pane.getHTMLElement();
+  if (!host || !box || !el) return;
+  box.style.top = `${el.getBoundingClientRect().top - host.getBoundingClientRect().top + 2}px`;
+}
+
+function flowCandleVenueLabel() {
+  const src = (rawFlowData && rawFlowData.candleSource) || '';
+  if (/币安/.test(src)) return 'BINANCE:BTCUSDT (Coinbase 不可用时的替补)';
+  return 'COINBASE:BTCUSD';
+}
+
+function updateFlowCrosshair(time) {
+  const box = document.getElementById('flow-crosshair');
+  const ohlc = document.getElementById('flow-ohlc');
+  if (!box) return;
+  positionFlowIndicatorLegend();
+  const series = rawFlowData && rawFlowData.series;
+  const lastTime = series && series.length ? series[series.length - 1].time : undefined;
+  const t = time !== undefined ? time : lastTime;
+
+  if (ohlc) {
+    const k = flowCandlesByTime.get(t);
+    const head = `<span class="fc-sym">${flowCandleVenueLabel()} · ${FLOW_TF_LABEL[flowTf] || flowTf}</span>`;
+    if (k) {
+      const col = k.close >= k.open ? '#089981' : '#f23645';
+      const chg = k.open ? (k.close / k.open - 1) * 100 : 0;
+      const f = v => v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+      ohlc.innerHTML = head
+        + `<span>O <b style="color:${col}">${f(k.open)}</b></span>`
+        + `<span>H <b style="color:${col}">${f(k.high)}</b></span>`
+        + `<span>L <b style="color:${col}">${f(k.low)}</b></span>`
+        + `<span>C <b style="color:${col}">${f(k.close)}</b></span>`
+        + `<span style="color:${col}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`
+        + `<span>额 ${fmtFlowUsd(k.volumeUsd)}</span>`;
+    } else {
+      ohlc.innerHTML = head;
+    }
+  }
+
+  const row = flowRowsByTime.get(t);
+  if (!row) { box.innerHTML = ''; return; }
+  const tone = v => (v > 0 ? 'fq-buy' : v < 0 ? 'fq-sell' : '');
+  const h = row._hist, r = row._region;
+  box.innerHTML = `
+    <span class="fc-time">主导力量 ${flowSmooth > 1 ? `EMA${flowSmooth}` : '原始'}</span>
+    <span style="color:${h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h)} ${h > 0 ? '期货主导' : '现货主导'}</span>
+    <span style="color:${r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${fmtFlowSigned(r)} ${r > 0 ? '亚太主导' : '欧美主导'}</span>
+    <span>期·亚 <b class="${tone(row.futAsia)}">${fmtFlowSigned(row.futAsia)}</b></span>
+    <span>期·欧美 <b class="${tone(row.futWest)}">${fmtFlowSigned(row.futWest)}</b></span>
+    <span>现·亚 <b class="${tone(row.spotAsia)}">${fmtFlowSigned(row.spotAsia)}</b></span>
+    <span>现·欧美 <b class="${tone(row.spotWest)}">${fmtFlowSigned(row.spotWest)}</b></span>
+    <span>CB 溢价 ${fmtFlowSigned(flowPremium(row), 1)}bps</span>
+    <span>基差 ${fmtFlowSigned(row.basisBps, 1)}bps</span>`;
+}
+
+function renderFlowChart(resetRange = false) {
+  if (!rawFlowData || !Array.isArray(rawFlowData.series) || !rawFlowData.series.length) return;
+  if (!flowChart && !buildFlowChart()) return;
+  const series = rawFlowData.series;
+  const hs = flowEma(series.map(p => p.hist), flowSmooth);
+  const rs = flowEma(series.map(p => p.region), flowSmooth);
+  flowRowsByTime = new Map();
+  const histData = [], dotData = [], premData = [];
+  series.forEach((p, i) => {
+    const row = { ...p, _hist: hs[i], _region: rs[i] };
+    flowRowsByTime.set(p.time, row);
+    if (hs[i] !== null) histData.push({ time: p.time, value: hs[i], color: hs[i] > 0 ? FLOW_RED : FLOW_GREEN });
+    if (rs[i] !== null) dotData.push({ time: p.time, value: 0, color: rs[i] > 0 ? FLOW_RED : FLOW_GREEN });
+    const pv = flowPremium(p);
+    if (pv !== null && pv !== undefined) premData.push({ time: p.time, value: pv });
+  });
+  const candles = Array.isArray(rawFlowData.candles) ? rawFlowData.candles : [];
+  flowCandlesByTime = new Map(candles.map(k => [k.time, k]));
+  flowSeries.candles.setData(candles.map(k => ({ time: k.time, open: k.open, high: k.high, low: k.low, close: k.close })));
+  flowSeries.volume.setData(candles.map(k => ({
+    time: k.time,
+    value: k.volumeUsd,
+    color: k.close >= k.open ? 'rgba(8, 153, 129, 0.35)' : 'rgba(242, 54, 69, 0.35)'
+  })));
+  flowSeries.hist.setData(histData);
+  flowSeries.dots.setData(dotData);
+  flowSeries.prem.setData(premData);
+  if (resetRange) {
+    const n = series.length;
+    flowChart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 160), to: n + 2 });
+  }
+  updateFlowCrosshair(undefined);
+}
+
+function initFlowForceEvents() {
+  const tfSwitch = document.getElementById('flow-tf-switch');
+  if (tfSwitch) {
+    tfSwitch.querySelectorAll('.switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tf === flowTf) return;
+        tfSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        flowTf = btn.dataset.tf || '1h';
+        const st = document.getElementById('flow-status');
+        if (st) st.textContent = `切换到 ${btn.textContent} …`;
+        fetchFlowForce(false);
+      });
+    });
+  }
+  const smSwitch = document.getElementById('flow-smooth-switch');
+  if (smSwitch) {
+    smSwitch.querySelectorAll('.switch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        smSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        flowSmooth = parseInt(btn.dataset.smooth, 10) || 1;
+        renderFlowChart();
+      });
+    });
+  }
 }
 
 // ============================================================================
@@ -6042,7 +6381,7 @@ const VIEW_TITLES = {
   'view-options': '期权微观结构套件',
   'view-block-trades': '期权大宗雷达',
   'view-block-insight': '期权大宗 · 4B 资金深度研判',
-  'view-ssro': '稳定币比率震荡指标 (SSRO)',
+  'view-ssro': 'BTC 主导力量 · 稳定币比率 (SSRO)',
   'view-coinbase-liquidity': 'Coinbase 深度雷达',
   'view-gold-correlation': '金/BTC 比率与相关性',
   'view-wave-radar': '波浪引擎',
@@ -6141,6 +6480,7 @@ function switchView(viewId, updateHash = true) {
     } else if (rawSsroData && (viewId === 'view-ssro' || viewId === 'view-all')) {
       renderSsroChart();
     }
+    if (viewId === 'view-ssro' || viewId === 'view-all') activateFlowModule();
 
     if (cbDepthChartInstance) {
       cbDepthChartInstance.resize();
@@ -7082,14 +7422,23 @@ function initMcClellanEvents() {
 const WAVE_MODULE_SCRIPTS = ['/lightweight-charts.min.js', '/wave_engine.js', '/wave_ui.js'];
 let waveModulePromise = null;
 
+// Module 5 与 Module 8 共用 lightweight-charts：按 src 记忆，避免重复注入同一脚本
+const loadedScriptPromises = new Map();
 function loadScriptOnce(src) {
-  return new Promise((resolve, reject) => {
-    const el = document.createElement('script');
-    el.src = src;
-    el.onload = resolve;
-    el.onerror = () => reject(new Error(`无法加载 ${src}`));
-    document.head.appendChild(el);
-  });
+  if (!loadedScriptPromises.has(src)) {
+    const p = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = resolve;
+      el.onerror = () => {
+        loadedScriptPromises.delete(src); // 失败允许重试
+        reject(new Error(`无法加载 ${src}`));
+      };
+      document.head.appendChild(el);
+    });
+    loadedScriptPromises.set(src, p);
+  }
+  return loadedScriptPromises.get(src);
 }
 
 function ensureWaveModule() {
@@ -7119,6 +7468,7 @@ initTermPremiumEvents();
 initEtfLinkageEvents();
 initTermCurveEvents();
 initSsroEvents();
+initFlowForceEvents();
 initCoinbaseLiquidityEvents();
 initGoldCorrelationEvents();
 initMcClellanEvents();
