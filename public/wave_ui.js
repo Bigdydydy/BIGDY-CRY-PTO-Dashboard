@@ -35,6 +35,8 @@
   let sketchEval = null; // evaluateUserSketch 结果
   let selectedId = null; // 面板与价位线展示的浪
   let previewSug = null;  // 图上预览的替代计数 { id, k }
+  // 框选分析: boxMode 等待框选；boxDrag 正在拖；boxSel 选区 {t0, t1, tf}；boxResult 分析结果；boxPreview 图上预览第几个
+  let boxMode = false, boxDrag = null, boxSel = null, boxResult = null, boxPreview = null, boxToken = 0;
   let previewSeries = null;
   let evalToken = 0;
   let userPriceLines = [];
@@ -181,6 +183,7 @@
 
     waveChart = chart;
     candleSeries = candles;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => positionBox());
     setupDrawing(container);
   }
 
@@ -370,7 +373,7 @@
       const src = `importScripts(${JSON.stringify(location.origin + '/wave_engine.js?b=' + PAGE_LOADED_AT)});
 self.onmessage = function (e) {
   var d = e.data;
-  var fn = d.fn === 'evaluateUserSketch' || d.fn === 'evaluateUserCount' ? d.fn : 'analyzeWaves';
+  var fn = d.fn === 'evaluateUserSketch' || d.fn === 'evaluateUserCount' || d.fn === 'analyzeRange' ? d.fn : 'analyzeWaves';
   try { self.postMessage({ id: d.id, ok: true, result: self.LiuWaveEngine[fn](d.bars, d.symbol, d.opts) }); }
   catch (err) { self.postMessage({ id: d.id, ok: false, error: String(err && err.message || err), input: true }); }
 };`;
@@ -617,12 +620,159 @@ self.onmessage = function (e) {
   }
   function cancelDrag() { if (drag) endDrag(true); }
 
+  // ---------------------------------------------------------------------------
+  // 框选分析: 在图上拖动框选一段K线 (至少 10 根)，引擎列出最符合手稿规则的数法
+  // ---------------------------------------------------------------------------
+  const BOX_MIN_BARS = 10;
+  function setBoxMode(on, msg) {
+    boxMode = on;
+    if (on && drawTool) cancelDrawing();
+    const btn = document.getElementById('btn-box-analyze');
+    if (btn) btn.classList.toggle('active', on);
+    const container = document.getElementById('wave-chart-container');
+    if (container) container.style.cursor = on ? 'crosshair' : (drawTool ? 'crosshair' : 'default');
+    if (msg) setWaveStatus(msg);
+  }
+  /** 选区色块: 按当前周期的K线位置画，图表平移 / 缩放 / 换周期后跟着移动 */
+  function positionBox() {
+    const container = document.getElementById('wave-chart-container');
+    if (!container) return;
+    let el = document.getElementById('wave-box-overlay');
+    const sel = boxSel;
+    if (!sel || !waveChart || !currentBars.length) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'wave-box-overlay';
+      el.className = 'wave-box-overlay';
+      container.appendChild(el);
+    }
+    const ts = waveChart.timeScale();
+    const i0 = barIdxAtOrBefore(Math.min(sel.t0, sel.t1)), i1 = barIdxAtOrBefore(Math.max(sel.t0, sel.t1) + (TF_SEC[sel.tf] || 0) - 1);
+    // logicalToCoordinate 只接受整数位置 (lightweight-charts 5.x 对小数位置返回 0)：取两端K线中心，再各向外扩半根
+    const xa = ts.logicalToCoordinate(i0), xb = ts.logicalToCoordinate(i1);
+    if (xa === null || xb === null) { el.style.display = 'none'; return; }
+    const spacing = i1 > i0 ? (xb - xa) / (i1 - i0) : (ts.options().barSpacing || 6);
+    const offset = chartRect().left - container.getBoundingClientRect().left;
+    el.style.display = 'block';
+    el.style.left = `${offset + xa - spacing / 2}px`;
+    el.style.width = `${Math.max(2, xb - xa + spacing)}px`;
+    el.dataset.bars = String(i1 - i0 + 1);
+  }
+  function boxBars() {
+    if (!boxSel) return 0;
+    return barIdxAtOrBefore(Math.max(boxSel.t0, boxSel.t1)) - barIdxAtOrBefore(Math.min(boxSel.t0, boxSel.t1)) + 1;
+  }
+  function clearBox(msg) {
+    boxToken++;
+    boxSel = null; boxResult = null; boxPreview = null; boxDrag = null;
+    lockChart(false);
+    positionBox();
+    renderChart();
+    renderBoxResult();
+    if (msg) setWaveStatus(msg);
+  }
+  async function runBoxAnalysis() {
+    const t0 = Math.min(boxSel.t0, boxSel.t1), t1 = Math.max(boxSel.t0, boxSel.t1), tf = currentTf, symbol = currentSymbol;
+    const token = ++boxToken;
+    boxPreview = null;
+    boxResult = { tf, t0, t1, busy: true };
+    renderBoxResult();
+    setWaveStatus(`🔍 正在分析框选的 ${boxBars()} 根 ${tf.toUpperCase()} K线（逐个浪型做画浪评估，约需几秒）…`);
+    try {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const subs = SKETCH_SUB_TFS[tf] || [];
+      const fetched = await Promise.all(subs.map(k => {
+        const need = Math.ceil((nowSec - t0) / TF_SEC[k]) + 400;
+        return fetchAuxBars(symbol, k, need <= 1000 ? 1000 : WAVE_BARS).catch(() => null);
+      }));
+      const barsByTf = { [tf]: currentBars };
+      subs.forEach((k, i) => { if (fetched[i] && fetched[i].length) barsByTf[k] = fetched[i]; });
+      const opts = { timeframe: tf, startTime: t0, endTime: t1, maxOut: 3 };
+      let res;
+      try { res = await runInWorker('analyzeRange', barsByTf, symbol, opts); } catch (e) {
+        if (e.input) throw e;
+        if (!window.LiuWaveEngine || !window.LiuWaveEngine.analyzeRange) throw new Error('本地波浪引擎不可用');
+        res = window.LiuWaveEngine.analyzeRange(barsByTf, symbol, opts);
+      }
+      if (token !== boxToken) return;
+      boxResult = { tf, t0, t1, res };
+      const top = res.candidates[0];
+      setWaveStatus(top ? `✓ 框选分析完成：最符合手稿规则的是「${top.name}」（${top.verdictLabel}），共 ${res.total} 种成立 / 存疑的数法` : '框选分析完成：框内没有铁律都通过的数法');
+    } catch (err) {
+      if (token !== boxToken) return;
+      boxResult = { tf, t0, t1, error: err.message || String(err) };
+      setWaveStatus(`❌ 框选分析失败：${boxResult.error}`);
+    }
+    renderBoxResult();
+    renderChart();
+  }
+  function finishBox() {
+    boxDrag = null;
+    lockChart(false);
+    setBoxMode(false);
+    const n = boxBars();
+    if (n < BOX_MIN_BARS) {
+      boxSel = null;
+      positionBox();
+      setWaveStatus(`框选区间只有 ${n} 根K线，请框选至少 ${BOX_MIN_BARS} 根`);
+      return;
+    }
+    runBoxAnalysis();
+  }
+  function renderBoxResult() {
+    const el = document.getElementById('wave-box-result');
+    if (!el) return;
+    const b = boxResult;
+    if (!b) { el.innerHTML = ''; return; }
+    const head = `<div class="liu-signal-title"><span>框选分析 · ${esc(b.tf.toUpperCase())} · ${esc(fmtT(b.t0).slice(5))} ~ ${esc(fmtT(b.t1).slice(5))}</span><span><button class="chart-tool-btn" data-box-close title="关闭框选结果">关闭</button></span></div>`;
+    let body;
+    if (b.busy) body = '<div class="ue-note">正在分析：在框内的起点与终点之间，对每种浪型重新数浪并做画浪评估…</div>';
+    else if (b.error) body = `<div class="ue-note">无法分析：${esc(b.error)}</div>`;
+    else {
+      const r = b.res;
+      const dirs = r.directions.map(x => `${x.dir === 'UP' ? '上涨' : '下跌'} ${fmtP(x.start.price)} → ${fmtP(x.end.price)}`).join(' / ');
+      const cards = r.candidates.map((c, k) => {
+        const st = VERDICT_STYLE[c.verdict] || VERDICT_STYLE.DOUBT;
+        const on = boxPreview === k;
+        const meta = [k === 0 ? '最符合手稿规则' : `第 ${k + 1}`, c.guidePct != null ? `指引符合度 ${c.guidePct}%` : '', c.unusual ? '非常规浪型' : ''].filter(Boolean).join(' · ');
+        return `<div class="ue-sug${on ? ' active' : ''}">
+          <div class="liu-signal-title"><span>${esc(c.name)}</span><span class="liu-chip ${st.chip}">${esc(c.verdictLabel)}</span></div>
+          <div class="ue-note">${esc(meta)}</div>
+          <div class="ue-line">${c.points.map(p => `${esc(p.label || '')} ${fmtP(p.price)}（${esc(fmtT(p.time).slice(5, 10))}）`).join(' → ')}</div>
+          ${c.doubt ? `<div class="ue-note">存疑：${esc(c.doubt)}</div>` : ''}
+          <div class="wave-type-switch">
+            <button class="chart-tool-btn${on ? ' active' : ''}" data-box-preview="${k}" title="在图上用绿色虚线显示这个数法">${on ? '取消预览' : '预览'}</button>
+            <button class="chart-tool-btn" data-box-adopt="${k}" title="把这个数法加入画板并整体评估">采用</button>
+          </div>
+        </div>`;
+      }).join('');
+      body = `<div class="ue-note">${r.barsCount} 根K线 · ${esc(dirs)} · 共 ${r.total} 种成立 / 存疑的数法${r.total > r.candidates.length ? `，显示前 ${r.candidates.length} 种` : ''}</div>` +
+        (cards || '<div class="ue-note">框内没有铁律都通过的数法</div>') +
+        (r.notes && r.notes.length ? `<div class="ue-note">${esc(r.notes.join('；'))}</div>` : '') +
+        `<div class="ue-note">${esc(r.basis)}</div>`;
+    }
+    el.innerHTML = `<div class="liu-signal-row">${head}${body}</div>`;
+  }
+
   function setupDrawing(container) {
     let down = null;
     // 捕获阶段: 先于图表自身的平移处理，抓住端点时关掉平移
     container.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
       const x = e.clientX - chartRect().left;
+      if (boxMode) {
+        const hit = getBarFromCoordinate(x);
+        if (!hit) return;
+        e.preventDefault();
+        e.stopPropagation();
+        lockChart(true);
+        boxDrag = { i0: hit.index };
+        boxResult = null; boxPreview = null;
+        boxSel = { t0: hit.time, t1: hit.time, tf: currentTf };
+        positionBox();
+        renderBoxResult();
+        return;
+      }
       if (drawTool) { down = { x: e.clientX, y: e.clientY }; return; }
       const hp = pointNear(e);
       if (!hp) return;
@@ -632,6 +782,7 @@ self.onmessage = function (e) {
       startDrag(hp, x);
     }, true);
     window.addEventListener('mouseup', e => {
+      if (boxDrag) { finishBox(); return; }
       if (drag) { endDrag(false); return; }
       if (!down) return;
       const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
@@ -641,6 +792,12 @@ self.onmessage = function (e) {
       if (hit) addDrawPoint(hit);
     });
     container.addEventListener('mousemove', e => {
+      if (boxDrag) {
+        const hit = getBarFromCoordinate(e.clientX - chartRect().left);
+        if (hit) { boxSel.t1 = hit.time; positionBox(); setWaveStatus(`框选中：${boxBars()} 根 ${currentTf.toUpperCase()} K线（至少 ${BOX_MIN_BARS} 根），松开左键开始分析`); }
+        return;
+      }
+      if (boxMode) return;
       if (drag) { moveDrag(e); return; }
       if (!drawTool) {
         const hp = pointNear(e);
@@ -957,9 +1114,11 @@ self.onmessage = function (e) {
 
     // 1.5 预览的替代计数 (绿色长虚线)
     const pv = previewSug && nodeOf(previewSug.id);
-    const sg = pv && pv.suggestions && pv.suggestions[previewSug.k];
+    let sg = pv && pv.suggestions && pv.suggestions[previewSug.k];
+    let sgTf = pv ? pv.timeframe : null;
+    if (!sg && boxPreview !== null && boxResult && boxResult.res) { sg = boxResult.res.candidates[boxPreview]; sgTf = boxResult.tf; }
     if (previewSeries) {
-      const disp = sg ? sg.points.map(p => displayPoint(p, pv.timeframe)) : [];
+      const disp = sg ? sg.points.map(p => displayPoint(p, sgTf)) : [];
       previewSeries.setData(sg ? toLineData(disp) : []);
       if (sg && showMarkers) {
         disp.forEach((p, i) => {
@@ -1042,6 +1201,7 @@ self.onmessage = function (e) {
 
     markers.sort((a, b) => a.time - b.time);
     setChartMarkers(candleSeries, markers);
+    positionBox();
 
     removePriceLines();
     if (sel && sel.result) {
@@ -1331,6 +1491,7 @@ self.onmessage = function (e) {
         symbolBtns.forEach(b => b.classList.toggle('active', b === btn));
         // 换标的: 当前画板已保存，换成该标的上次的画板
         if (drawTool) cancelDrawing();
+        if (boxSel || boxResult) clearBox();
         currentSymbol = sym;
         restoreSketch(sym);
         invalidateEval();
@@ -1367,6 +1528,7 @@ self.onmessage = function (e) {
       btn.addEventListener('click', () => {
         const tool = btn.dataset.tool;
         if (drawTool === tool) { cancelDrawing('已取消正在画的浪'); return; }
+        if (boxMode) setBoxMode(false);
         startDrawing(tool);
       });
     });
@@ -1375,6 +1537,38 @@ self.onmessage = function (e) {
     on('btn-draw-finish', () => commitDrawing());
     on('btn-draw-evaluate', () => evaluateAll());
     on('btn-draw-clear', () => clearSketch('已清除全部画浪'));
+    on('btn-box-analyze', () => {
+      if (boxMode) { setBoxMode(false, '已取消框选'); return; }
+      setBoxMode(true, `🔍 框选分析：在图上按住左键拖动，框选至少 ${BOX_MIN_BARS} 根K线，松开后开始分析 · Esc 取消`);
+    });
+    const boxEl = document.getElementById('wave-box-result');
+    if (boxEl) {
+      boxEl.addEventListener('click', e => {
+        if (e.target.closest('[data-box-close]')) { clearBox('已关闭框选结果'); return; }
+        const pvBtn = e.target.closest('[data-box-preview]');
+        if (pvBtn) {
+          const k = +pvBtn.dataset.boxPreview;
+          boxPreview = boxPreview === k ? null : k;
+          previewSug = null;
+          renderChart();
+          renderBoxResult();
+          return;
+        }
+        const adBtn = e.target.closest('[data-box-adopt]');
+        if (adBtn && boxResult && boxResult.res) {
+          const c = boxResult.res.candidates[+adBtn.dataset.boxAdopt];
+          if (!c) return;
+          const d = { id: `d${++sketchSeq}`, tool: c.tool, timeframe: boxResult.tf, type: c.type,
+            points: c.points.map(p => ({ time: p.time, price: p.price, type: p.type, fixed: true })) };
+          sketch.push(d);
+          boxPreview = null;
+          invalidateEval();
+          renderBoxResult();
+          setWaveStatus(`✓ 已把「${c.name}」加入画板，正在整体评估…`);
+          evaluateAll().then(() => { if (nodeOf(d.id)) { selectedId = d.id; renderChart(); renderPanel(); } });
+        }
+      });
+    }
 
     const list = document.getElementById('wave-sketch-list');
     if (list) {
@@ -1469,7 +1663,8 @@ self.onmessage = function (e) {
       if (!waveViewVisible()) return;
       const tag = (e.target && e.target.tagName) || '';
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-      if (e.key === 'Escape' && drag) cancelDrag();
+      if (e.key === 'Escape' && (boxMode || boxDrag)) { boxDrag = null; lockChart(false); boxSel = null; positionBox(); setBoxMode(false, '已取消框选'); }
+      else if (e.key === 'Escape' && drag) cancelDrag();
       else if (e.key === 'Escape' && drawTool) cancelDrawing('已取消正在画的浪');
       else if (e.key === 'Enter') {
         if (drawTool && drawPoints.length >= 3) { e.preventDefault(); commitDrawing(); }

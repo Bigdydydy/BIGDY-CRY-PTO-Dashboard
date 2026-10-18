@@ -2462,6 +2462,8 @@
                   <button class="chart-tool-btn draw-tool-btn" data-tool="WXYXZ" title="三锯齿 / 三重横向整理：依次点击 0-w-x-y-xx-z">w-x-y-xx-z</button>
                   <button class="chart-tool-btn draw-tool-btn" data-tool="ABCDE" title="三角形（收缩 / 扩张）：依次点击 0-a-b-c-d-e">三角形 abcde</button>
                   <span class="wave-draw-sep"></span>
+                  <button class="chart-tool-btn" id="btn-box-analyze" title="在图上拖动框选一段K线（至少 10 根），引擎列出框内最符合手稿规则的数法">框选分析</button>
+                  <span class="wave-draw-sep"></span>
                   <button class="chart-tool-btn" id="btn-draw-undo" title="画浪中撤销上一个点；否则删除最后画的浪 (Backspace)" disabled>撤销</button>
                   <button class="chart-tool-btn" id="btn-draw-finish" title="未画满时结束当前这个浪 (双击)，末浪按运行中处理" disabled>结束本浪</button>
                   <button class="chart-tool-btn draw-eval-btn" id="btn-draw-evaluate" title="对图上所有的浪（母浪与子浪）做整体评估 (Enter)" disabled>评估全部</button>
@@ -2482,6 +2484,7 @@
                       <span class="card-badge badge-neutral" id="wave-user-eval-badge">待画浪</span>
                     </div>
                   </div>
+                  <div id="wave-box-result" class="liu-signals-body"></div>
                   <div id="wave-sketch-list" class="wave-sketch-list"></div>
                   <div id="wave-user-eval-body" class="liu-signals-body"></div>
                 </div>
@@ -2571,6 +2574,7 @@
 
         <section class="wave-guide-pane" data-guide="alt">
           <ul class="wave-guide-list">
+            <li><b>框选分析</b>：点工具栏「框选分析」，在图上按住左键拖动框选一段K线（至少 10 根）。引擎取框左端的极值为起点、其后框内反向的极值为终点（涨跌幅度相近时两个方向都分析），对每种浪型重新数浪并做完整的画浪评估，只用截至框右端的K线。列出最符合手稿规则的前 3 种（按铁律判决、指引符合度排序，不是概率），可预览、可一键采用到画板。Esc 取消。</li>
             <li>你的浪判为存疑、证伪或否决时出现。</li>
             <li><b>起点、终点不变</b>，只改中间的数法与浪型；拐点同时从所画周期与低周期中取。</li>
             <li>只给<b>判决比你更好</b>的：你是存疑，只给成立的；你是否决或证伪，给成立或存疑的。</li>
