@@ -135,6 +135,21 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.ok(Math.abs(E2.pgSlope(E2.mkGeom([1, 2, 3, 4].map(k => ({ idx: k, time: k, price: v[k] })))) - 0.275) < 1e-9);
   });
 
+  it('框选分析: 框内最符合手稿规则的数法排第一，少于 10 根K线报错', () => {
+    // 96 起的五浪 100 → 110 → 105 → 122 → 116 → 130，之后回落
+    const v = [96, 100, 110, 105, 122, 116, 130, 124];
+    const bars = build(v);
+    const r = E.analyzeRange(bars, 'TEST', { timeframe: '1h', startTime: vTime(1) - 3600, endTime: vTime(6) + 3600 });
+    assert.ok(r.candidates.length > 0, JSON.stringify(r.notes));
+    assert.strictEqual(r.candidates[0].type, 'IMPULSE', r.candidates.map(c => `${c.name} ${c.verdict}`).join(' / '));
+    assert.strictEqual(r.candidates[0].verdict, 'VALID');
+    assert.strictEqual(r.directions[0].dir, 'UP');
+    assert.ok(Math.abs(r.candidates[0].points[5].price - 130) < 0.1);
+    // 只用截至框右端的K线：框之后的走势不参与
+    assert.ok(r.endTime <= vTime(6) + 3600);
+    assert.throws(() => E.analyzeRange(bars, 'TEST', { timeframe: '1h', startTime: vTime(1), endTime: vTime(1) + 5 * 3600 }), /至少 10 根/);
+  });
+
   it('锯齿类 / 横向整理判定: 铁律都过时按外观斜度依次判定，两可时按指引并列给出，并列出区分依据', () => {
     const run = v => { const bars = build(v); return E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'WXY', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4].map(k => pt(v, k, 3600)) }); };
     // x 回撤 75%，y = 1.5w：铁律两者都过，斜度约 50% → 双锯齿

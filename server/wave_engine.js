@@ -4777,6 +4777,93 @@
   }
 
   /**
+   * 框选分析: 框内这段走势最符合手稿规则的数法。
+   * barsByTf: { '4h': [...], '1h': [...], '15m': [...] }；options: { timeframe, startTime, endTime, maxOut }
+   *   1) 起点取框左端 20% 内的极值，终点取其后框内反向的极值 (涨跌两个方向幅度相近时都分析)；
+   *   2) 起点与终点之间最大的一次逆向回撤与首尾拼成 0-a-b-c 作为起始画法 (它本身也是候选)；
+   *   3) 与「更可能的浪型」同一套重新数浪 (suggestCounts): 各级别锚定序列上的每种浪型都用画浪评估检验；
+   *   4) 只用截至框右端的K线 (框之后的走势不影响对框内的判断)。
+   * 按铁律判决、非常规与否、指引符合度排序：是「最符合手稿规则的数法」，不是概率 (回放中指引符合度没有预测力，docs 5.6)
+   */
+  function analyzeRange(barsByTf, symbol, options) {
+    options = options || {};
+    const tf = options.timeframe || '4h';
+    const all = barsByTf && barsByTf[tf];
+    if (!all || !all.length) throw new Error(`缺少 ${tf} K线`);
+    const tfSec = TF_SEC[tf] || 14400;
+    const t0 = Math.min(options.startTime, options.endTime), t1 = Math.max(options.startTime, options.endTime);
+    const box = all.filter(b => b.time >= t0 && b.time <= t1);
+    if (box.length < RANGE_MIN_BARS) throw new Error(`框选区间只有 ${box.length} 根K线，请框选至少 ${RANGE_MIN_BARS} 根`);
+    const cutT = box[box.length - 1].time;
+    const main = all.filter(b => b.time <= cutT);
+    const sub = {};
+    (SKETCH_SUB_TFS[tf] || []).forEach(k => {
+      const arr = barsByTf[k];
+      if (arr && arr.length) sub[k] = arr.filter(b => b.time < cutT + tfSec);
+    });
+
+    // 起点 / 终点
+    const head = box.slice(0, Math.max(2, Math.round(box.length * 0.2)));
+    const orient = up => {
+      const sB = head.reduce((m, b) => (up ? b.low < m.low : b.high > m.high) ? b : m, head[0]);
+      const after = box.filter(b => b.time > sB.time);
+      if (!after.length) return null;
+      const eB = after.reduce((m, b) => (up ? b.high > m.high : b.low < m.low) ? b : m, after[0]);
+      const S = { time: sB.time, price: up ? sB.low : sB.high }, E = { time: eB.time, price: up ? eB.high : eB.low };
+      const range = up ? E.price - S.price : S.price - E.price;
+      return range > 0 ? { dir: up ? 'UP' : 'DOWN', up, S, E, range } : null;
+    };
+    const os = [orient(true), orient(false)].filter(Boolean).sort((a, b) => b.range - a.range);
+    if (!os.length) throw new Error('框内没有可数的涨跌');
+    const used = os.filter((o, k) => k === 0 || o.range >= RANGE_BOTH_DIRS * os[0].range);
+
+    const out = [];
+    const seen = new Set();
+    const push = (c, o) => {
+      const key = c.type + '|' + c.points.map(p => p.time).join(',');
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(Object.assign({ direction: o.dir }, c));
+    };
+    const notes = [];
+    for (const o of used) {
+      // 起点与终点之间最大的一次逆向回撤
+      const mid = box.filter(b => b.time > o.S.time && b.time < o.E.time);
+      let best = null, run = null;
+      for (const b of mid) {
+        if (!run || (o.up ? b.high > run.high : b.low < run.low)) run = b;
+        const dd = o.up ? run.high - b.low : b.high - run.low;
+        if (run !== b && dd > 0 && (!best || dd > best.dd)) best = { dd, A: run, B: b };
+      }
+      if (!best) { notes.push(`${o.up ? '上涨' : '下跌'}方向框内为单边走势，没有可数的子浪`); continue; }
+      const A = { time: best.A.time, price: o.up ? best.A.high : best.A.low };
+      const B = { time: best.B.time, price: o.up ? best.B.low : best.B.high };
+      const d = { id: 'RANGE', tool: 'ABC', timeframe: tf, points: [o.S, A, B, o.E] };
+      let r;
+      try { r = evaluateUserCount(main, symbol, { tool: 'ABC', timeframe: tf, subBars: sub, points: d.points }); } catch (e) { notes.push(e.message); continue; }
+      if (r.verdict === 'VALID' || r.verdict === 'DOUBT') {
+        push({ source: 'SEED', tool: 'ABC', type: r.primary.type, name: r.primary.name, verdict: r.verdict, verdictLabel: r.verdictLabel,
+          points: r.points, guidePct: r.primary.guidePct, doubt: r.verdict === 'DOUBT' ? (r.doubts[0] || null) : null,
+          forecast: r.forecast ? r.forecast.text : null }, o);
+      }
+      let sg = [];
+      try { sg = suggestCounts(main, symbol, d, r, sub, 8, 'INVALID'); } catch (e) { notes.push(e.message); }
+      sg.forEach(c => push(c, o));
+    }
+    out.sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict]) || ((a.unusual ? 1 : 0) - (b.unusual ? 1 : 0)) ||
+      ((b.guidePct || 0) - (a.guidePct || 0)) || (b.points.length - a.points.length));
+    return {
+      symbol, timeframe: tf, startTime: box[0].time, endTime: cutT, barsCount: box.length,
+      directions: used.map(o => ({ dir: o.dir, start: o.S, end: o.E })),
+      candidates: out.slice(0, options.maxOut || 3),
+      total: out.length, notes,
+      basis: '按手稿铁律判决、非常规与否、指引符合度排序：是最符合手稿规则的数法，不是概率（回放检验中指引符合度对后续走势没有可证实的预测力）'
+    };
+  }
+  // 框选最少根数；涨跌两个方向都分析的幅度比例
+  const RANGE_MIN_BARS = 10, RANGE_BOTH_DIRS = 0.7;
+
+  /**
    * 多级别画浪整体评估。
    * barsByTf: { '4h': [...], '1h': [...], '15m': [...], '5m': [...] }，每个画浪按自己的周期评估，子浪判定用更低周期。
    * options.drawings: [{id, tool, timeframe, points:[{time, price}]}]
@@ -4926,6 +5013,7 @@
     analyzeWaves,
     evaluateUserCount,
     evaluateUserSketch,
+    analyzeRange,
     buildSketchTree,
     countSnapshot,
     diagonalShape,

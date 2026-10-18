@@ -6964,3 +6964,16 @@ body {
     height: 400px;
   }
 }
+
+/* 框选分析: 选区色块 */
+.wave-box-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: none;
+  background: rgba(56, 189, 248, 0.12);
+  border-left: 1px dashed rgba(56, 189, 248, 0.85);
+  border-right: 1px dashed rgba(56, 189, 248, 0.85);
+  pointer-events: none;
+  z-index: 3;
+}
