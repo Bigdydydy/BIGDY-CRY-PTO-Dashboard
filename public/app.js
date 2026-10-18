@@ -5079,6 +5079,7 @@ function initSsroEvents() {
 const FLOW_RED = '#f43f5e';
 const FLOW_GREEN = '#10b981';
 const FLOW_TF_LABEL = { '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W' };
+const FLOW_VENUE_SHORT = { bnPerp: '币安永续', okxPerp: 'OKX永续', hlPerp: 'Hyperliquid', bnSpot: '币安现货', okxSpot: 'OKX现货', usSpot: 'Coinbase' };
 let flowTf = '1h';
 let flowSmooth = 3;
 let rawFlowData = null;
@@ -5221,17 +5222,18 @@ function updateFlowKpis(data) {
 
   const st = document.getElementById('flow-status');
   if (st && data.sources) {
+    // ✕ 只表示"当前这根拿不到实时数据"；已收盘的历史来自存档 / 官方档案，不受影响
     const parts = Object.values(data.sources).map(v => {
-      if (!v.ok) return `<span class="flow-src-bad" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${v.name} ✕</span>`;
-      // 经 TradingView 拿到的仍是同一交易所的成交，只是换了通道，不算替补
-      const viaTv = v.source && /经 TradingView/.test(v.source);
-      const fallback = v.source && v.source !== v.name && !viaTv;
-      const label = viaTv ? `${v.name} · 经 TradingView` : fallback ? v.source.replace(/\s*\(.*\)$/, '') + ' (替补)' : v.name;
-      return `<span class="${fallback ? 'flow-src-warn' : ''}" title="${(v.errors || []).join(' | ').replace(/"/g, '&quot;')}">${label}</span>`;
+      const tip = [`来源: ${v.source || '无'}`, `存档 ${v.stored ?? 0} 根`].concat(v.errors || []).join(' | ').replace(/"/g, '&quot;');
+      const viaTv = v.source && /TradingView/.test(v.source);
+      return `<span class="${v.ok ? (viaTv ? 'flow-src-warn' : '') : 'flow-src-bad'}" title="${tip}">${v.name}${v.ok ? (viaTv ? ' · 经 TV' : '') : ' ✕实时'}</span>`;
     });
+    const a = data.archive || {};
     const t = new Date(data.updatedAt);
-    st.innerHTML = `${parts.join(' · ')} · ${t.toLocaleTimeString('zh-CN', { hour12: false })}${data.stale ? ' · 缓存' : ''}`;
+    st.innerHTML = `${parts.join(' · ')} · 定死 ${a.frozenRows ?? 0} 根${a.provisionalRows ? ` · <span class="flow-src-warn">暂定 ${a.provisionalRows} 根</span>` : ''} · ${t.toLocaleTimeString('zh-CN', { hour12: false })}${data.stale ? ' · 缓存' : ''}`;
   }
+  const leaderSub = document.getElementById('flow-leader-sub');
+  if (s && leaderSub && s.complete === false) leaderSub.textContent += ' · 含暂定K线';
 }
 
 function renderFlowAudit(data) {
@@ -5243,11 +5245,13 @@ function renderFlowAudit(data) {
     members.forEach((k, i) => {
       const r = data.audit.rows[k] || {};
       const cellTd = i === 0 ? `<td rowspan="${members.length}">${cellLabel[cell] || cell}</td>` : '';
+      const pct = v => (v !== undefined && v !== null ? `${(v * 100).toFixed(0)}%` : '--');
+      const weightTd = `<td>${pct(r.fixedWeight)}${r.liveDepthShare !== undefined ? ` <span class="flow-audit-live">实时 ${pct(r.liveDepthShare)}</span>` : ''}</td>`;
       if (r.error) {
-        rows.push(`<tr>${cellTd}<td>${r.name || k}</td><td colspan="4" class="flow-src-bad">不可用: ${r.error}</td></tr>`);
+        rows.push(`<tr>${cellTd}<td>${r.name || k}</td><td colspan="3" class="flow-src-bad">盘口不可用: ${r.error}</td>${weightTd}</tr>`);
         return;
       }
-      rows.push(`<tr>${cellTd}<td>${r.name}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td><td>${r.cellWeight !== undefined ? (r.cellWeight * 100).toFixed(0) + '%' : '--'}</td></tr>`);
+      rows.push(`<tr>${cellTd}<td>${r.name}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td>${weightTd}</tr>`);
     });
   }
   body.innerHTML = rows.join('');
@@ -5395,8 +5399,15 @@ function updateFlowCrosshair(time) {
   if (!row) { box.innerHTML = ''; return; }
   const tone = v => (v > 0 ? 'fq-buy' : v < 0 ? 'fq-sell' : '');
   const h = row._hist, r = row._region;
+  const missing = (row.missing || []).map(k => FLOW_VENUE_SHORT[k] || k).join('、');
+  const state = row.frozen
+    ? '<span class="fc-state fc-frozen">已定死</span>'
+    : row.live
+      ? `<span class="fc-state fc-live">进行中 ${Math.round((row.liveFrac || 0) * 100)}%·成交额已折算${missing ? ` · 缺 ${missing}` : ''}</span>`
+      : `<span class="fc-state fc-prov">暂定${missing ? ` · 缺 ${missing}` : ''}</span>`;
   box.innerHTML = `
     <span class="fc-time">主导力量 ${flowSmooth > 1 ? `EMA${flowSmooth}` : '原始'}</span>
+    ${state}
     <span style="color:${h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h)} ${h > 0 ? '期货主导' : '现货主导'}</span>
     <span style="color:${r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${fmtFlowSigned(r)} ${r > 0 ? '亚太主导' : '欧美主导'}</span>
     <span>期·亚 <b class="${tone(row.futAsia)}">${fmtFlowSigned(row.futAsia)}</b></span>
@@ -5415,11 +5426,13 @@ function renderFlowChart(resetRange = false) {
   const rs = flowEma(series.map(p => p.region), flowSmooth);
   flowRowsByTime = new Map();
   const histData = [], dotData = [], premData = [];
+  // 已定死 / 完整的K线实色；进行中半透明；缺场所的暂定K线更淡
+  const shade = (hex, p) => (p.frozen || (p.complete && !p.live) ? hex : `${hex}${p.live ? '99' : '55'}`);
   series.forEach((p, i) => {
     const row = { ...p, _hist: hs[i], _region: rs[i] };
     flowRowsByTime.set(p.time, row);
-    if (hs[i] !== null) histData.push({ time: p.time, value: hs[i], color: hs[i] > 0 ? FLOW_RED : FLOW_GREEN });
-    if (rs[i] !== null) dotData.push({ time: p.time, value: 0, color: rs[i] > 0 ? FLOW_RED : FLOW_GREEN });
+    if (hs[i] !== null) histData.push({ time: p.time, value: hs[i], color: shade(hs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
+    if (rs[i] !== null) dotData.push({ time: p.time, value: 0, color: shade(rs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
     const pv = flowPremium(p);
     if (pv !== null && pv !== undefined) premData.push({ time: p.time, value: pv });
   });

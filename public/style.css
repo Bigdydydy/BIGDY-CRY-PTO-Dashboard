@@ -3942,6 +3942,11 @@ body {
 }
 
 .flow-crosshair .fc-time { color: var(--text-primary); font-weight: 600; }
+.fc-state { border-radius: var(--radius-pill); padding: 0 6px; border: 1px solid var(--border-subtle); }
+.fc-frozen { color: var(--text-muted); }
+.fc-live { color: var(--color-info); border-color: var(--color-info-border); }
+.fc-prov { color: var(--color-warn); border-color: var(--color-warn-border); }
+.flow-audit-live { color: var(--text-muted); font-size: 0.66rem; }
 
 .flow-audit {
   margin-bottom: 4px;
