@@ -495,10 +495,11 @@
         const scale = g.l[0] / Math.max(1, g.p[3].idx - g.p[0].idx);
         return { pass: Math.abs(sA - sB) > 0.1 * scale, detail: `上轨斜率 ${sA.toFixed(4)} vs 下轨 ${sB.toFixed(4)}` };
       }),
-    // 收缩/扩散由浪3与浪1之比决定，其后各浪须同向一致 (EWI 列为楔形定义)
-    rg('D3', C_PRICE, true, 'min', 5, '通用（EWI楔形条则）', '收缩楔形浪4<浪2、扩散楔形浪4>浪2（与浪3/浪1同向一致）', 1,
+    // 收缩/扩散由浪3与浪1之比决定，其后各浪同向一致 (EWI 列为楔形定义)。手稿无此条，且 P102 举收缩终结楔形时说「它的第 3 浪也是最长的」，
+    //   手稿对楔形的硬性要求只有 4 浪与 2 浪重叠 (P37/P102) 与 3 浪不最短 (P39) → 作指引，不满足时画浪评估判存疑
+    rg('D3', C_G_RATIO, false, 'min', 5, '通用（EWI楔形条则；手稿无此条，P102 举例与之不一致）', '收缩楔形浪4<浪2、扩散楔形浪4>浪2（与浪3/浪1同向一致；指引）', 1,
       g => shapeRule(g, 3, '4/2')),
-    rg('D5', C_PRICE, true, 'min', 6, '通用（EWI楔形条则）', '收缩楔形浪5<浪3、扩散楔形浪5>浪3', 1,
+    rg('D5', C_G_RATIO, false, 'min', 6, '通用（EWI楔形条则；手稿无此条，P102 举例与之不一致）', '收缩楔形浪5<浪3、扩散楔形浪5>浪3（指引）', 1,
       g => shapeRule(g, 4, '5/3')),
     rg('D4', C_STRUCT, false, 'min', 4, '通用（EWI：引导楔形5-3-5-3-5或3-3-3-3-3；终结楔形3-3-3-3-3）', '楔形浪1/3/5结构须一致，且与所处位置相符', 2,
       (g, ev) => diagonalStructCheck(g, ev), { deferred: true })
@@ -4294,6 +4295,10 @@
     if (discrimination && /ZIGZAG/.test(primary.type) && discrimination.steps.some(x => x.decisive && /组成部分/.test(x.basis))) {
       doubts.push(`${primary.name.replace(/（.*$/, '')}的 w、y、z 须为单锯齿（P345），但组成部分不全是单锯齿，更像横向整理`);
     }
+    if (primary.type === 'DIAGONAL') {
+      (primary.drawn.ruleChecks || []).filter(c => (c.id === 'D3' || c.id === 'D5') && !c.pass && !c.pending && !c.neutral)
+        .forEach(c => doubts.push(`楔形形状（${c.id}，EWI 指引）：${c.detail}；手稿对楔形只要求浪4 与浪2 重叠、浪3 不最短`));
+    }
     if (primary.type === 'EXPANDING_TRIANGLE') doubts.push('扩张三角形：手稿 P345 注明「扩散三角形不存在」，此浪型按 EWI 主流规则补充，仅供参考');
     if (primary.guidePct < 40) doubts.push(`指引符合度仅 ${primary.guidePct}%：比率/时间与手稿常见值偏离较大`);
 
@@ -4390,7 +4395,7 @@
         price: limit, expandingByLength,
         text: head + (expandingByLength
           ? `浪3 长于浪1，按 EWI 是扩张楔形，要求浪4 ${sideTxt}此价（浪4 > 浪2）；按柳玉冬「引导楔形不能扩散」，${sideTxt}此价即否定引导楔形——两种口径在此价分歧`
-          : `收缩楔形浪4 须短于浪2（D3），${sideTxt}此价则 2-4 线与 1-3 线发散，楔形不成立`)
+          : `按 EWI 收缩楔形浪4 应短于浪2（D3，指引），${sideTxt}此价则 2-4 线与 1-3 线发散、不再是收缩楔形；手稿只要求浪4 与浪2 重叠、浪3 不最短`)
       };
     }
     // 楔形的 2-4 通道线 (柳玉冬「冲破通道上轨就破除引导楔形」): 浪5 运行中，价格越回 2-4 线另一侧

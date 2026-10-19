@@ -183,7 +183,7 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.strictEqual(pr.any5.kind, 'IMPULSE');
   });
 
-  it('楔形形态两种口径: 浪长为扩张但通道收敛 (浪2 回撤近 100%) → D3 判存疑而不否决', () => {
+  it('楔形形态两种口径: 浪长为扩张但通道收敛 (浪2 回撤近 100%) → D3 (指引) 不通过并说明口径冲突，不否决', () => {
     // 仿 BTC 2026-09-22→10-15: 1 跌 5.6%，2 回撤 97%，3 跌 8.0% (长于 1)，4 涨 4.9% (短于 2)，1-3 与 2-4 线收敛
     const pts = [100, 94.4, 99.85, 91.9, 96.4, 91.5].map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'low' : 'high' }));
     pts[5].open = true;
@@ -193,8 +193,8 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.ok(sh.conflict);
     const res = E.evaluatePattern('DIAGONAL', pts, null);
     assert.ok(!res.hardFails.some(c => c.id === 'D3'), JSON.stringify(res.hardFails.map(c => c.id)));
-    const d3 = res.nearFails.find(c => c.id === 'D3');
-    assert.ok(d3 && d3.margin == null && /两种口径相反/.test(d3.detail) && /起点位置可疑/.test(d3.detail), d3 && d3.detail);
+    const d3 = res.checks.find(c => c.id === 'D3');
+    assert.ok(d3 && !d3.hard && !d3.pass && /两种口径相反/.test(d3.detail) && /起点位置可疑/.test(d3.detail), d3 && d3.detail);
   });
 
   it('楔形推演按形态选比率: 浪3 长于浪1 → 扩张楔形 (浪4 > 浪2、浪5 > 浪3)', () => {
@@ -219,11 +219,12 @@ describe('Module 8: 楔形 (引导 / 终结) 与失败第五浪', () => {
     assert.match(ch.text, /2-4 通道线/);
   });
 
-  it('楔形规则: 收缩楔形浪4须小于浪2 (D3)、浪5须小于浪3 (D5)', () => {
+  it('楔形指引: 收缩楔形浪4应小于浪2 (D3)、浪5应小于浪3 (D5)，按 EWI 作指引不否决（手稿无此条）', () => {
     const mk = arr => arr.map((price, i) => ({ idx: i * 10, time: T0 + i * 144000, price, type: i % 2 ? 'high' : 'low' }));
     // 3<1 (收缩)，但 4(16) > 2(12)
     const bad4 = E.evaluatePattern('DIAGONAL', mk([100, 120, 108, 126, 110, 122]), null);
-    assert.ok(bad4.hardFails.some(c => c.id === 'D3'));
+    assert.ok(!bad4.hardFails.some(c => c.id === 'D3'), 'D3 不再否决');
+    assert.strictEqual(bad4.checks.find(c => c.id === 'D3').pass, false, 'D3 指引不通过');
     const good = E.evaluatePattern('DIAGONAL', mk([100, 120, 108, 126, 117, 130]), null);
     assert.ok(!good.hardFails.length, JSON.stringify(good.hardFails.map(c => c.id)));
   });
