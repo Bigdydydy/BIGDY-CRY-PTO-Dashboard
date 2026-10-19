@@ -2434,7 +2434,11 @@ const elMacroMstrVal = document.getElementById('macro-mstr-val');
 const elMacroMstrMult = document.getElementById('macro-mstr-mult');
 const elMacroMstrSub = document.getElementById('macro-mstr-sub');
 const elMacro1yVal = document.getElementById('macro-1y-val');
+const elMacro1yChip = document.getElementById('macro-1y-chip');
+const elMacro1ySub = document.getElementById('macro-1y-sub');
 const elMacro10yVal = document.getElementById('macro-10y-val');
+const elMacro10yChip = document.getElementById('macro-10y-chip');
+const elMacro10ySub = document.getElementById('macro-10y-sub');
 const elMacroSpreadVal = document.getElementById('macro-spread-val');
 const elMacroSpreadBadge = document.getElementById('macro-spread-badge');
 const elMacroSpreadSub = document.getElementById('macro-spread-sub');
@@ -2505,6 +2509,84 @@ function renderFreshness(elId, summary) {
   el.classList.toggle('is-stale', f.stale);
 }
 
+function classifyMacroCurveRegime(chg1yBp, chg10yBp) {
+  if (!Number.isFinite(chg1yBp) || !Number.isFinite(chg10yBp)) return null;
+  const c1 = Number(chg1yBp.toFixed(1));
+  const c10 = Number(chg10yBp.toFixed(1));
+  const chgSpreadBp = Number((c10 - c1).toFixed(1));
+  if ((Math.abs(c1) < 3 && Math.abs(c10) < 3) ||
+      (Math.abs(chgSpreadBp) < 2 && Math.abs(c1) < 4 && Math.abs(c10) < 4)) {
+    return {
+      code: 'flat', label: '窄幅钝化', shortLabel: '钝化', tone: 'neutral',
+      driver: '短长端变动不足3bp · 曲线横盘', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+    };
+  }
+  const steepening = chgSpreadBp > 0;
+  if (Math.abs(c1) >= 3 && Math.abs(c10) >= 3 && Math.sign(c1) !== Math.sign(c10)) {
+    return steepening
+      ? {
+          code: 'twist_steepener', label: '扭曲走陡', shortLabel: '扭陡', tone: 'warn',
+          driver: '短跌长涨 · 降息预期叠加长端期限溢价上行', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+        }
+      : {
+          code: 'twist_flattener', label: '扭曲走平', shortLabel: '扭平', tone: 'negative',
+          driver: '短涨长跌 · 短端偏鹰收紧叠加长端避险买盘', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+        };
+  }
+  const avg = (c1 + c10) / 2;
+  if (avg < 0 && steepening) {
+    return {
+      code: 'bull_steepener', label: '牛陡', shortLabel: '牛陡', tone: 'positive',
+      driver: '短端领跌 · 降息宽松定价驱动修复', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+    };
+  }
+  if (avg >= 0 && steepening) {
+    return {
+      code: 'bear_steepener', label: '熊陡', shortLabel: '熊陡', tone: 'negative',
+      driver: '长端领涨 · 期限溢价/财政供给施压久期', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+    };
+  }
+  if (avg < 0 && !steepening) {
+    return {
+      code: 'bull_flattener', label: '牛平', shortLabel: '牛平', tone: 'warn',
+      driver: '长端领跌 · 增长放缓担忧或久期避险', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+    };
+  }
+  return {
+    code: 'bear_flattener', label: '熊平', shortLabel: '熊平', tone: 'negative',
+    driver: '短端领涨 · 联储鹰派定价收紧流动性', chg1yBp: c1, chg10yBp: c10, chgSpreadBp
+  };
+}
+
+function resolveMacroCurveRegimes(summary) {
+  if (summary && summary.curveRegimes && Object.keys(summary.curveRegimes).length) {
+    return summary.curveRegimes;
+  }
+  const valid = (rawMacroData?.points || []).filter(p =>
+    p && Number.isFinite(p.us1y) && Number.isFinite(p.us10y)
+  );
+  if (valid.length < 2) return {};
+  const cur = valid[valid.length - 1];
+  const windows = [
+    ['7d', 7, '1W'],
+    ['20d', 20, '20D'],
+    ['3m', 90, '3M'],
+    ['6m', 180, '6M'],
+    ['1y', 365, '1Y'],
+    ['3y', 1095, '3Y'],
+    ['all', null, 'ALL']
+  ];
+  const out = {};
+  for (const [key, days, windowLabel] of windows) {
+    const idx = days == null ? 0 : Math.max(0, valid.length - 1 - days);
+    const base = valid[idx];
+    if (!base || base.date === cur.date) continue;
+    const reg = classifyMacroCurveRegime((cur.us1y - base.us1y) * 100, (cur.us10y - base.us10y) * 100);
+    if (reg) out[key] = { ...reg, windowKey: key, windowLabel, fromDate: base.date, toDate: cur.date };
+  }
+  return out;
+}
+
 /**
  * Render Macro Summary Top Cards
  */
@@ -2536,12 +2618,50 @@ function renderMacroSummary(summary) {
     elMacroMstrSub.textContent = `${sourceName} · 截至 ${summary.mstrCostAsOf}`;
   }
 
+  const curveRegimes = resolveMacroCurveRegimes(summary);
+  const r20 = curveRegimes['20d'] || summary.curveRegime20d || null;
+  const r7 = curveRegimes['7d'] || summary.curveRegime7d || null;
+  const tfKey = currentMacroTimeframe || '1y';
+  const tfLabel = { '3m': '3M', '6m': '6M', '1y': '1Y', '3y': '3Y', 'all': '全周期' }[tfKey] || tfKey.toUpperCase();
+  const rTf = curveRegimes[tfKey] || null;
+  const fmtBp = v => (v == null || !Number.isFinite(v) ? '--' : `${v >= 0 ? '+' : ''}${Math.round(v)}bp`);
+
   if (elMacro1yVal && summary.current1y !== null) {
     elMacro1yVal.textContent = `${summary.current1y.toFixed(2)}%`;
+  }
+  if (elMacro1yChip) {
+    if (r20 && Number.isFinite(r20.chg1yBp)) {
+      elMacro1yChip.textContent = `20D ${fmtBp(r20.chg1yBp)}`;
+      elMacro1yChip.className = `mm-chip ${r20.chg1yBp <= -3 ? 'chip-positive' : r20.chg1yBp >= 3 ? 'chip-negative' : ''}`;
+    } else {
+      elMacro1yChip.textContent = '--';
+      elMacro1yChip.className = 'mm-chip';
+    }
+  }
+  if (elMacro1ySub) {
+    const parts = ['短端政策利率锚'];
+    if (r7) parts.push(`1W ${fmtBp(r7.chg1yBp)}`);
+    if (rTf) parts.push(`${tfLabel} ${fmtBp(rTf.chg1yBp)}`);
+    elMacro1ySub.textContent = parts.join(' · ');
   }
 
   if (elMacro10yVal && summary.current10y !== null) {
     elMacro10yVal.textContent = `${summary.current10y.toFixed(2)}%`;
+  }
+  if (elMacro10yChip) {
+    if (r20 && Number.isFinite(r20.chg10yBp)) {
+      elMacro10yChip.textContent = `20D ${fmtBp(r20.chg10yBp)}`;
+      elMacro10yChip.className = `mm-chip ${r20.chg10yBp <= -3 ? 'chip-positive' : r20.chg10yBp >= 3 ? 'chip-negative' : ''}`;
+    } else {
+      elMacro10yChip.textContent = '--';
+      elMacro10yChip.className = 'mm-chip';
+    }
+  }
+  if (elMacro10ySub) {
+    const parts = ['全球久期定价锚'];
+    if (r7) parts.push(`1W ${fmtBp(r7.chg10yBp)}`);
+    if (rTf) parts.push(`${tfLabel} ${fmtBp(rTf.chg10yBp)}`);
+    elMacro10ySub.textContent = parts.join(' · ');
   }
 
   if (elMacroSpreadVal && summary.currentSpread !== null) {
@@ -2550,21 +2670,33 @@ function renderMacroSummary(summary) {
     elMacroSpreadVal.className = `mm-val ${summary.currentSpread >= 0 ? 'text-green' : 'text-rose'}`;
   }
 
+  const levelTag = summary.isCurveInverted ? '倒挂' : '正利差';
   if (elMacroSpreadBadge) {
-    if (summary.isCurveInverted) {
+    if (r20) {
+      elMacroSpreadBadge.textContent = `${levelTag} · 20D ${r20.label} (${fmtBp(r20.chgSpreadBp)})`;
+      const toneClass = r20.tone === 'positive'
+        ? 'chip-positive'
+        : (r20.tone === 'negative' || summary.isCurveInverted ? 'chip-negative' : '');
+      elMacroSpreadBadge.className = `mm-chip ${toneClass}`;
+    } else if (summary.isCurveInverted) {
       elMacroSpreadBadge.textContent = '曲线倒挂 (衰退警报)';
       elMacroSpreadBadge.className = 'mm-chip chip-negative';
     } else {
-      elMacroSpreadBadge.textContent = '正常走陡';
+      elMacroSpreadBadge.textContent = '正利差';
       elMacroSpreadBadge.className = 'mm-chip chip-positive';
     }
   }
 
   if (elMacroSpreadSub && summary.currentSpread !== null) {
-    if (summary.isCurveInverted) {
+    if (r20) {
+      const segs = [`20D ${r20.driver} (1Y ${fmtBp(r20.chg1yBp)} / 10Y ${fmtBp(r20.chg10yBp)})`];
+      if (r7) segs.push(`1W ${r7.shortLabel} ${fmtBp(r7.chgSpreadBp)}`);
+      if (rTf) segs.push(`${tfLabel}窗口: ${rTf.label} ${fmtBp(rTf.chgSpreadBp)}`);
+      elMacroSpreadSub.textContent = segs.join(' · ');
+    } else if (summary.isCurveInverted) {
       elMacroSpreadSub.textContent = `10Y-1Y 倒挂 ${Math.abs(summary.currentSpread).toFixed(2)}%（短期流动性偏紧）`;
     } else {
-      elMacroSpreadSub.textContent = `10Y-1Y 利差扩张至 +${summary.currentSpread.toFixed(2)}%（期限溢价修复）`;
+      elMacroSpreadSub.textContent = `10Y-1Y 正利差 +${summary.currentSpread.toFixed(2)}%`;
     }
   }
 
@@ -3296,6 +3428,9 @@ function initMacroChartEvents() {
       macroTimeframeSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
+      if (rawMacroData && rawMacroData.summary) {
+        renderMacroSummary(rawMacroData.summary);
+      }
       renderMacroChart();
     });
   }
@@ -4750,7 +4885,7 @@ let rawTermCurve = null;
 let termCurveChartInstance = null;
 let termCurveLastFetch = 0;
 const TERM_CURVE_REFRESH_MS = 60 * 1000;
-const tcVisible = { cmp7: true, cmp30: true, cmp90: false, forward: true };
+const tcVisible = { cmp7: true, cmp30: true, cmp90: false, forward: false };
 const TC_COMPARE_STYLE = {
   7: { key: 'cmp7', color: '#94a3b8', type: 'dashed' },
   30: { key: 'cmp30', color: '#64748b', type: 'dashed' },
@@ -4783,14 +4918,22 @@ function renderTermCurve() {
   const box = document.getElementById('tc-kpis');
   if (box) {
     const m = live.metrics || {};
+    const hurdleSpread = Number.isFinite(d.hurdleSpread) ? d.hurdleSpread : 3.5;
     const month = (d.comparisons || []).find(c => c.backDays === 30);
-    // Compare at fixed tenors (30D / 180D), interpolated on each curve — the front contract of
-    // each curve has a different maturity, so contract-to-contract changes would mix tenors
-    const aprAt = (points, days) => {
-      for (let i = 1; i < points.length; i++) {
-        const a = points[i - 1], b = points[i];
-        if (days >= a.days && days <= b.days) return a.apr + (b.apr - a.apr) * (days - a.days) / (b.days - a.days);
+    // Compare at fixed tenors (90D / 180D primary, with 5D boundary snap and 60D/30D fallback)
+    // so historical quarterly-only reconstructions never drop the front anchor to null
+    const aprAt = (points, days, tol = 5) => {
+      const pts = (points || []).filter(p => p && Number.isFinite(p.days) && Number.isFinite(p.apr));
+      if (!pts.length) return null;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        if (days >= a.days && days <= b.days) {
+          return b.days === a.days ? a.apr : a.apr + (b.apr - a.apr) * (days - a.days) / (b.days - a.days);
+        }
       }
+      if (days < pts[0].days && pts[0].days - days <= tol) return pts[0].apr;
+      const last = pts[pts.length - 1];
+      if (days > last.days && days - last.days <= tol) return last.apr;
       return null;
     };
     const chg = days => {
@@ -4798,20 +4941,51 @@ function renderTermCurve() {
       const now = aprAt(live.points, days), then = aprAt(month.points, days);
       return now != null && then != null ? now - then : null;
     };
+    const frontTenor = chg(90) != null ? 90 : (chg(60) != null ? 60 : 30);
+    const backTenor = chg(180) != null ? 180 : 240;
+    const cFront = chg(frontTenor);
+    const cBack = chg(backTenor);
     const c30 = chg(30);
-    const c180 = chg(180);
     const pp = v => (v == null || !Number.isFinite(v) ? '--' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`);
     const tile = (label, value, sub, color) => `<div class="el-kpi"><span class="el-kpi-lbl">${label}</span><span class="el-kpi-val" style="color:${color || ''}">${value}</span><span class="el-kpi-sub">${sub}</span></div>`;
-    const shape = m.slope == null ? '--' : m.slope > 0.3 ? '向上倾斜' : m.slope < -0.3 ? '前高后平 / 倒挂' : '基本平坦';
+    const perpInverted = d.funding0d != null && m.frontApr != null && d.funding0d - m.frontApr > 3;
+    const shape = m.slope == null
+      ? '--'
+      : perpInverted
+        ? '永续高于交割（短端多头拥挤）'
+        : m.slope > 0.3
+          ? '正向远期升水（杠杆/套利需求稳健）'
+          : m.slope < -0.3
+            ? '前高后平 / 倒挂（溢价集中近端）'
+            : '基本平坦';
+    const spreadNote = m.avgSpread == null
+      ? '各合约基差 − 同期限美债的均值'
+      : m.avgSpread >= hurdleSpread
+        ? `高于机构门槛 (+${hurdleSpread}pp) · 套利空间充足`
+        : m.avgSpread >= 0
+          ? `高于美债但低于机构门槛 (+${hurdleSpread}pp) · 微利观望`
+          : '跌破无风险美债 · 套利拆仓与资金外流压力';
+    let shiftSub = month ? '期限超出某条曲线的覆盖范围' : '对比曲线加载中';
+    if (cFront != null && cBack != null) {
+      if (Math.abs(cFront) < 0.3 && Math.abs(cBack) < 0.3) {
+        shiftSub = '近远端变动均 <0.3pp · 期限曲线整体横盘';
+      } else if (Math.sign(cFront) !== Math.sign(cBack) && Math.abs(cFront) >= 0.4 && Math.abs(cBack) >= 0.4) {
+        shiftSub = cFront > 0 ? '近端上行、远端回落（短期做多升温）' : '近端回落、远端上行（短期去杠杆后斜率修复）';
+      } else if (Math.abs(cFront) > 1.8 * Math.abs(cBack)) {
+        shiftSub = cFront > 0 ? '主要是近中期在涨（近期杠杆需求升温）' : '主要是近中期回落（短期多头溢价消退）';
+      } else if (Math.abs(cBack) > 1.8 * Math.abs(cFront)) {
+        shiftSub = cBack > 0 ? '主要是远端在涨（结构性套利锁仓定价抬升）' : '主要是远端回落（远期套利溢价压缩）';
+      } else {
+        shiftSub = (cFront + cBack) / 2 > 0 ? '曲线整体上移（全期限做多与套利溢价扩张）' : '曲线整体下移（全期限隐含美元利率回落）';
+      }
+      if (c30 != null && frontTenor !== 30) shiftSub += ` · 30D ${pp(c30)}pp`;
+    }
     box.innerHTML = [
-      tile('曲线斜率（远端 − 近端）', `${pp(m.slope)} pp`, `${shape} · 近端 ${pp(m.frontApr)}% → 远端 ${pp(m.backApr)}%`, m.slope < -0.3 ? '#f59e0b' : null),
-      tile('对美债平均溢价', `${pp(m.avgSpread)} pp`, `各合约基差 − 同期限美债的均值`, m.avgSpread != null && m.avgSpread < 1 ? '#f43f5e' : '#10b981'),
+      tile('曲线斜率（远端 − 近端）', `${pp(m.slope)} pp`, `${shape} · 近端 ${pp(m.frontApr)}% → 远端 ${pp(m.backApr)}%`, (m.slope < -0.3 || perpInverted) ? '#f59e0b' : null),
+      tile('对美债平均溢价', `${pp(m.avgSpread)} pp`, spreadNote, m.avgSpread == null ? null : m.avgSpread < 0 ? '#f43f5e' : m.avgSpread < hurdleSpread ? '#f59e0b' : '#10b981'),
       tile('溢价最厚的期限', m.widestSpread ? `${m.widestSpread.name.replace('BTC-', '')}` : '--', m.widestSpread ? `${Math.round(m.widestSpread.days)} 天 · 高于美债 ${pp(m.widestSpread.spread)} pp` : '--'),
       tile('0D 资金费率（OI 加权）', d.funding0d != null ? `${pp(d.funding0d)}%` : '--', '全市场永续 7 日均值，单独标注不与期货相连'),
-      tile('较 1 个月前（固定期限）', c30 != null || c180 != null ? `30D ${pp(c30)} / 180D ${pp(c180)}` : '--',
-        c30 != null && c180 != null
-          ? (Math.abs(c30) > 2 * Math.abs(c180) ? '主要是前端在动（短期杠杆或资金冲击）' : Math.abs(c180) > 2 * Math.abs(c30) ? '主要是远端在动（结构性套利资金）' : '曲线整体平移')
-          : (month ? '期限超出某条曲线的覆盖范围' : '对比曲线加载中'))
+      tile('较 1 个月前（固定期限）', cFront != null || cBack != null ? `${frontTenor}D ${pp(cFront)} / ${backTenor}D ${pp(cBack)}` : '--', shiftSub)
     ].join('');
   }
   renderTermCurveChart();
@@ -4825,6 +4999,7 @@ function renderTermCurveChart() {
   const colors = getChartThemeColors();
   const common = elAxisCommon(colors);
   const live = d.live;
+  const hurdleSpread = Number.isFinite(d.hurdleSpread) ? d.hurdleSpread : 3.5;
   const pt = p => ({ value: [p.days, p.apr], meta: p });
   const maxDays = Math.max(370, ...live.points.map(p => p.days + 10));
 
@@ -4833,16 +5008,17 @@ function renderTermCurveChart() {
     const st = TC_COMPARE_STYLE[c.backDays];
     if (!st || !tcVisible[st.key]) continue;
     series.push({
-      name: `${c.label} (${c.date.slice(5)})`, type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'circle', symbolSize: 4,
+      name: `${c.label} (${c.date.slice(5)})`, type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'circle', symbolSize: 6,
+      emphasis: { scale: 1.5 },
       data: c.points.map(p => ({ value: [p.days, p.apr], meta: { ...p, curveLabel: `${c.label} ${c.date}` } })),
-      lineStyle: { width: 1.4, color: st.color, type: st.type }, itemStyle: { color: st.color }, z: 2
+      lineStyle: { width: 1.5, color: st.color, type: st.type }, itemStyle: { color: st.color }, z: 2
     });
   }
   const ust = live.ust || {};
   const ustPts = [['DGS1MO', 30], ['DGS3MO', 91], ['DGS6MO', 182], ['DGS1', 365]]
     .filter(([id]) => Number.isFinite(ust[id])).map(([id, days]) => ({ value: [days, ust[id]], meta: { ustLabel: id.replace('DGS', '').replace('MO', 'M') } }));
   series.push({
-    name: '美债收益率', type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'rect', symbolSize: 5, data: ustPts,
+    name: '美债收益率', type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'rect', symbolSize: 6, data: ustPts,
     lineStyle: { width: 1.6, color: '#f43f5e', type: 'dashed' }, itemStyle: { color: '#f43f5e' }, z: 3
   });
   if (tcVisible.forward && live.forwards?.length) {
@@ -4852,13 +5028,15 @@ function renderTermCurveChart() {
     });
     series.push({
       name: '隐含远期', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, connectNulls: false, data: fwd,
-      lineStyle: { width: 2, color: '#a855f7', opacity: 0.75 }, itemStyle: { color: '#a855f7' }, z: 4
+      lineStyle: { width: 1.8, color: '#a855f7', type: 'dotted', opacity: 0.75 }, itemStyle: { color: '#a855f7' }, z: 4
     });
   }
   series.push({
     name: 'Deribit 当前曲线', type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'circle', symbolSize: 9, data: live.points.map(pt),
     lineStyle: { width: 2.6, color: '#f59e0b' }, itemStyle: { color: '#f59e0b', borderColor: '#fff', borderWidth: 1 },
-    label: { show: true, position: 'top', fontSize: 10, color: colors.textSecondary, formatter: p => p.data.meta.name.replace('BTC-', '') }, z: 5
+    label: { show: true, position: 'top', distance: 6, fontSize: 10, color: colors.textSecondary, formatter: p => p.data.meta.name.replace('BTC-', '') },
+    labelLayout: { hideOverlap: true },
+    z: 5
   });
   if (d.funding0d != null) {
     series.push({
@@ -4867,43 +5045,94 @@ function renderTermCurveChart() {
     });
   }
   series.push({
-    name: '期限利差（基差 − 美债）', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barWidth: 12,
-    data: live.points.map(p => ({ value: [p.days, p.spread], meta: p, itemStyle: { color: p.spread >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(244,63,94,0.75)' } }))
+    name: '期限利差（基差 − 美债）', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barWidth: 14,
+    data: live.points.map(p => ({
+      value: [p.days, p.spread],
+      meta: p,
+      itemStyle: {
+        color: p.spread < 0
+          ? 'rgba(244,63,94,0.78)'
+          : p.spread < hurdleSpread
+            ? 'rgba(245,158,11,0.78)'
+            : 'rgba(16,185,129,0.82)'
+      }
+    })),
+    markLine: {
+      silent: true,
+      symbol: ['none', 'none'],
+      data: [
+        {
+          yAxis: 0,
+          lineStyle: { color: colors.textSecondary, type: 'solid', width: 1, opacity: 0.45 },
+          label: { show: true, position: 'insideEndTop', formatter: '平美债 0pp', fontSize: 10, color: colors.textSecondary }
+        },
+        {
+          yAxis: hurdleSpread,
+          lineStyle: { color: '#ec4899', type: 'dashed', width: 1.3, opacity: 0.85 },
+          label: { show: true, position: 'insideEndTop', formatter: `机构门槛 +${hurdleSpread}pp`, fontSize: 10, color: '#ec4899' }
+        }
+      ]
+    }
   });
 
   const tooltipHtml = params => {
-    const m = params.data?.meta;
+    const item = Array.isArray(params) ? params[0] : params;
+    const m = item?.data?.meta;
     if (!m) return '';
     if (m.funding != null) return `<b>0D 资金费率（全市场 OI 加权）</b><br>7 日已实现年化 ${tpPct(m.funding)}<br><span style="color:${colors.textSecondary};">永续无到期日，单独标注</span>`;
-    if (m.ustLabel) return `<b>美债 ${m.ustLabel}</b><br>${Number(params.value[1]).toFixed(2)}%`;
+    if (m.ustLabel) return `<b>美债 ${m.ustLabel}</b><br>${Number(item.value[1]).toFixed(2)}%`;
     if (m.forward) return `<b>隐含远期 ${m.forward.from.replace('BTC-', '')} → ${m.forward.to.replace('BTC-', '')}</b><br>${Math.round(m.forward.fromDays)} 天后再持有 ${Math.round(m.forward.toDays - m.forward.fromDays)} 天的年化: ${tpPct(m.forward.apr)}`;
+    const spreadTier = m.spread == null
+      ? ''
+      : m.spread >= hurdleSpread
+        ? '（达机构门槛）'
+        : m.spread >= 0
+          ? '（高于美债，低于机构门槛）'
+          : '（低于美债）';
     return `<b>${m.name}</b>${m.curveLabel ? ` · ${m.curveLabel}` : ' · 当前'}<br>
       到期 ${m.expiry} · 剩余 ${Math.round(m.days)} 天<br>
       年化基差: <b>${tpPct(m.apr)}</b><br>
-      同期限美债: ${m.ust != null ? m.ust.toFixed(2) + '%' : '--'} · 期限利差: <b>${tpPct(m.spread)}</b>
+      同期限美债: ${m.ust != null ? m.ust.toFixed(2) + '%' : '--'} · 期限利差: <b>${tpPct(m.spread)}</b>${spreadTier}
       ${m.oiUsd != null ? `<br>持仓 ${elFmtUsd(m.oiUsd, false)} · 24h 成交 ${elFmtUsd(m.volumeUsd, false)}` : ''}`;
+  };
+
+  const axisPointerStyle = {
+    show: true,
+    type: 'line',
+    lineStyle: { color: colors.textSecondary, type: 'dashed', width: 1, opacity: 0.45 }
   };
 
   termCurveChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
     tooltip: { ...elTooltipBase(colors), trigger: 'item', formatter: tooltipHtml },
     grid: [
-      { left: 56, right: 24, top: 40, height: '56%' },
-      { left: 56, right: 24, top: '74%', bottom: 34 }
+      { left: 56, right: 24, top: 40, height: '55%' },
+      { left: 56, right: 24, top: '73%', bottom: 34 }
     ],
     xAxis: [
-      { type: 'value', gridIndex: 0, min: 0, max: Math.ceil(maxDays / 30) * 30, interval: 30, ...common, axisLabel: { show: false }, splitLine: { lineStyle: { color: colors.gridLine } } },
+      { type: 'value', gridIndex: 0, min: 0, max: Math.ceil(maxDays / 30) * 30, interval: 30, ...common, axisLabel: { show: false }, axisPointer: axisPointerStyle, splitLine: { lineStyle: { color: colors.gridLine } } },
       {
         type: 'value', gridIndex: 1, min: 0, max: Math.ceil(maxDays / 30) * 30, interval: 30, ...common,
         name: '剩余天数', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: colors.tickColor, fontSize: 10 },
+        axisPointer: axisPointerStyle,
         splitLine: { show: false }
       }
     ],
     yAxis: [
       { type: 'value', gridIndex: 0, scale: true, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}%' }, name: '年化 (%)', nameTextStyle: { color: colors.tickColor, fontSize: 10 } },
-      { type: 'value', gridIndex: 1, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}' }, name: '利差 (pp)', nameTextStyle: { color: colors.tickColor, fontSize: 10 } }
+      {
+        type: 'value',
+        gridIndex: 1,
+        min: v => Math.min(0, Math.floor((Number.isFinite(v.min) ? v.min : 0) - 0.5)),
+        max: v => Math.max(Math.ceil(hurdleSpread + 0.5), Math.ceil((Number.isFinite(v.max) ? v.max : 0) + 0.5)),
+        ...common,
+        axisLabel: { ...common.axisLabel, formatter: '{value}' },
+        name: '利差 (pp)',
+        nameTextStyle: { color: colors.tickColor, fontSize: 10 }
+      }
     ],
     series
   }, true);

@@ -34,6 +34,160 @@ function dailyIssuanceBtc(dateStr) {
   return dateStr >= '2024-04-20' ? 450 : 900;
 }
 
+const CURVE_NOISE_BP = 3;
+const CURVE_WINDOWS = Object.freeze([
+  ['7d', 7, '1W'],
+  ['20d', 20, '20D'],
+  ['3m', 90, '3M'],
+  ['6m', 180, '6M'],
+  ['1y', 365, '1Y'],
+  ['3y', 1095, '3Y'],
+  ['all', null, 'ALL']
+]);
+
+/**
+ * Classify 10Y-1Y yield curve movement over a window from bp changes in 1Y and 10Y.
+ * Handles bull/bear steepeners & flatteners, twist steepeners/flatteners (opposite
+ * moves >= 3bp each), and flat noise (< 3bp on both legs).
+ */
+function classifyYieldCurveRegime(chg1yBp, chg10yBp) {
+  if (!Number.isFinite(chg1yBp) || !Number.isFinite(chg10yBp)) return null;
+  const c1 = Number(chg1yBp.toFixed(1));
+  const c10 = Number(chg10yBp.toFixed(1));
+  const chgSpreadBp = Number((c10 - c1).toFixed(1));
+
+  if ((Math.abs(c1) < CURVE_NOISE_BP && Math.abs(c10) < CURVE_NOISE_BP) ||
+      (Math.abs(chgSpreadBp) < 2 && Math.abs(c1) < 4 && Math.abs(c10) < 4)) {
+    return {
+      code: 'flat',
+      label: '窄幅钝化',
+      shortLabel: '钝化',
+      tone: 'neutral',
+      driver: '短长端变动不足3bp · 曲线横盘',
+      chg1yBp: c1,
+      chg10yBp: c10,
+      chgSpreadBp
+    };
+  }
+
+  const steepening = chgSpreadBp > 0;
+  if (Math.abs(c1) >= CURVE_NOISE_BP && Math.abs(c10) >= CURVE_NOISE_BP && Math.sign(c1) !== Math.sign(c10)) {
+    return steepening
+      ? {
+          code: 'twist_steepener',
+          label: '扭曲走陡',
+          shortLabel: '扭陡',
+          tone: 'warn',
+          driver: '短跌长涨 · 降息预期叠加长端期限溢价上行',
+          chg1yBp: c1,
+          chg10yBp: c10,
+          chgSpreadBp
+        }
+      : {
+          code: 'twist_flattener',
+          label: '扭曲走平',
+          shortLabel: '扭平',
+          tone: 'negative',
+          driver: '短涨长跌 · 短端偏鹰收紧叠加长端避险买盘',
+          chg1yBp: c1,
+          chg10yBp: c10,
+          chgSpreadBp
+        };
+  }
+
+  const avg = (c1 + c10) / 2;
+  if (avg < 0 && steepening) {
+    return {
+      code: 'bull_steepener',
+      label: '牛陡',
+      shortLabel: '牛陡',
+      tone: 'positive',
+      driver: '短端领跌 · 降息宽松定价驱动修复',
+      chg1yBp: c1,
+      chg10yBp: c10,
+      chgSpreadBp
+    };
+  }
+  if (avg >= 0 && steepening) {
+    return {
+      code: 'bear_steepener',
+      label: '熊陡',
+      shortLabel: '熊陡',
+      tone: 'negative',
+      driver: '长端领涨 · 期限溢价/财政供给施压久期',
+      chg1yBp: c1,
+      chg10yBp: c10,
+      chgSpreadBp
+    };
+  }
+  if (avg < 0 && !steepening) {
+    return {
+      code: 'bull_flattener',
+      label: '牛平',
+      shortLabel: '牛平',
+      tone: 'warn',
+      driver: '长端领跌 · 增长放缓担忧或久期避险',
+      chg1yBp: c1,
+      chg10yBp: c10,
+      chgSpreadBp
+    };
+  }
+  return {
+    code: 'bear_flattener',
+    label: '熊平',
+    shortLabel: '熊平',
+    tone: 'negative',
+    driver: '短端领涨 · 联储鹰派定价收紧流动性',
+    chg1yBp: c1,
+    chg10yBp: c10,
+    chgSpreadBp
+  };
+}
+
+/**
+ * Compute yield-curve regime across multiple lookback windows on aligned daily points.
+ */
+function summarizeYieldCurve(points) {
+  const valid = (points || []).filter(p =>
+    p && Number.isFinite(p.us1y) && Number.isFinite(p.us10y)
+  );
+  if (valid.length < 2) return {};
+  const cur = valid[valid.length - 1];
+  const out = {};
+  for (const [key, days, windowLabel] of CURVE_WINDOWS) {
+    const idx = days == null ? 0 : Math.max(0, valid.length - 1 - days);
+    const base = valid[idx];
+    if (!base || base.date === cur.date) continue;
+    const chg1yBp = (cur.us1y - base.us1y) * 100;
+    const chg10yBp = (cur.us10y - base.us10y) * 100;
+    const reg = classifyYieldCurveRegime(chg1yBp, chg10yBp);
+    if (reg) {
+      out[key] = {
+        ...reg,
+        windowKey: key,
+        windowLabel,
+        fromDate: base.date,
+        toDate: cur.date,
+        from1y: base.us1y,
+        from10y: base.us10y,
+        fromSpread: Number((base.us10y - base.us1y).toFixed(3))
+      };
+    }
+  }
+  return out;
+}
+
+function enrichMacroSummaryCurve(payload) {
+  if (!payload || !payload.summary || !Array.isArray(payload.points)) return payload;
+  if (!payload.summary.curveRegimes) {
+    const curveRegimes = summarizeYieldCurve(payload.points);
+    payload.summary.curveRegimes = curveRegimes;
+    payload.summary.curveRegime20d = curveRegimes['20d'] || null;
+    payload.summary.curveRegime7d = curveRegimes['7d'] || null;
+  }
+  return payload;
+}
+
 /**
  * 读取 MSTR 固定债权（可转债 + 优先股面值 − 现金，单位 USD）。
  * mNAV 外推时，这部分 EV 不随股价变动；未填写则退化为纯股权口径。
@@ -646,6 +800,7 @@ async function fetchAndBuildMacroData() {
   const latest = points[points.length - 1];
   const prevPoint = points.length >= 2 ? points[points.length - 2] : null;
   const point20dAgo = points.length >= 21 ? points[points.length - 21] : null;
+  const curveRegimes = summarizeYieldCurve(points);
 
   const summary = {
     currentBtc: latest ? latest.btcPrice : null,
@@ -669,6 +824,9 @@ async function fetchAndBuildMacroData() {
     current10y: latest ? latest.us10y : null,
     currentSpread: latest ? latest.yieldSpread : null,
     isCurveInverted: latest ? (latest.yieldSpread !== null && latest.yieldSpread < 0) : false,
+    curveRegime20d: curveRegimes['20d'] || null,
+    curveRegime7d: curveRegimes['7d'] || null,
+    curveRegimes,
     mstrProfitMultiplier: (latest && latest.btcPrice && latest.mstrCost) ? Number((latest.btcPrice / latest.mstrCost).toFixed(2)) : null,
     currentFedNetLiquidity: latest ? latest.fedNetLiquidity : null,
     currentFedNetLiqSma20: latest ? latest.fedNetLiqSma20 : null,
@@ -797,7 +955,7 @@ async function getMacroChartData(forceRefresh = false) {
   if (!inMemoryCache) {
     const snapshot = await loadFreshestSnapshot();
     if (snapshot) {
-      inMemoryCache = snapshot;
+      inMemoryCache = enrichMacroSummaryCurve(snapshot);
       seedSnapshotOnce(snapshot);
       const age = Date.now() - (Date.parse(snapshot.summary?.updatedAt) || 0);
       lastFetchTime = Date.now() - Math.min(age, CACHE_TTL_MS);
@@ -810,14 +968,14 @@ async function getMacroChartData(forceRefresh = false) {
     } catch (err) {
       if (!inMemoryCache) throw err;
       console.warn('[MacroFetcher] Live rebuild failed, serving last dataset:', err.message);
-      return withDataHealth(inMemoryCache, MACRO_REQUIRED, MACRO_ANCILLARY);
+      return withDataHealth(enrichMacroSummaryCurve(inMemoryCache), MACRO_REQUIRED, MACRO_ANCILLARY);
     }
   }
 
   if (Date.now() - lastFetchTime >= CACHE_TTL_MS) {
     rebuildOnce().catch(e => console.error('[MacroFetcher] Background refresh failed:', e.message));
   }
-  return withDataHealth(inMemoryCache, MACRO_REQUIRED, MACRO_ANCILLARY);
+  return withDataHealth(enrichMacroSummaryCurve(inMemoryCache), MACRO_REQUIRED, MACRO_ANCILLARY);
 }
 
 function readMacroCacheFile() {
@@ -833,5 +991,7 @@ function readMacroCacheFile() {
 module.exports = {
   getMacroChartData,
   fetchAndBuildMacroData,
-  fetchFredSeries
+  fetchFredSeries,
+  classifyYieldCurveRegime,
+  summarizeYieldCurve
 };

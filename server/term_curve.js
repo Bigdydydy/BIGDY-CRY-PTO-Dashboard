@@ -18,7 +18,9 @@ const {
   fetchTbillLookup,
   getLastFridayOfMonth,
   deribitFutureName,
-  getHistoricalBasisData
+  parseDeribitFutureExpiry,
+  getHistoricalBasisData,
+  HURDLE_SPREAD
 } = require('./basis_fetcher');
 
 const DAY_MS = 86400000;
@@ -32,6 +34,60 @@ const UST_SERIES = [['DGS1MO', 30], ['DGS3MO', 91], ['DGS6MO', 182], ['DGS1', 36
 
 const round = (v, d = 2) => (v == null || !Number.isFinite(v) ? null : Number(v.toFixed(d)));
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
+
+/**
+ * True if an 08:00 UTC expiry timestamp falls on the last Friday of its calendar month
+ * (monthly / quarterly Deribit future, excluding weekly / daily expiries).
+ */
+function isMonthlyOrQuarterlyExpiry(expTs) {
+  if (!Number.isFinite(expTs)) return false;
+  const d = new Date(expTs);
+  return expTs === getLastFridayOfMonth(d.getUTCFullYear(), d.getUTCMonth()).getTime();
+}
+
+/**
+ * Extract monthly and quarterly BTC futures directly from a Deribit book summary array.
+ * Filters out perpetuals, weeklies/dailies, and contracts outside [MIN_DAYS, MAX_DAYS].
+ */
+function extractLiveCurvePoints(book, now, index) {
+  if (!Array.isArray(book) || !(index > 0)) return [];
+  const points = [];
+  for (const b of book) {
+    if (!b || !(b.mark_price > 0)) continue;
+    const exp = parseDeribitFutureExpiry(b.instrument_name);
+    if (!isMonthlyOrQuarterlyExpiry(exp)) continue;
+    const days = (exp - now) / DAY_MS;
+    if (days < MIN_DAYS || days > MAX_DAYS) continue;
+    points.push({
+      name: b.instrument_name,
+      expiry: isoDate(exp),
+      days,
+      apr: (b.mark_price - index) / index * 365 / days * 100,
+      oiUsd: Math.round(Number(b.open_interest) || 0),
+      volumeUsd: Math.round(Number(b.volume_usd) || 0)
+    });
+  }
+  return points.sort((a, b) => a.days - b.days);
+}
+
+/**
+ * Interpolate APR on a curve at a constant tenor (in days), with a small boundary snap
+ * tolerance (default 5 days) so a quarterly roll right around 30D/90D does not drop to null.
+ */
+function aprAtTenor(points, targetDays, edgeToleranceDays = 5) {
+  const pts = (points || []).filter(p => p && Number.isFinite(p.days) && Number.isFinite(p.apr)).sort((a, b) => a.days - b.days);
+  if (!pts.length) return null;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (targetDays >= a.days && targetDays <= b.days) {
+      return b.days === a.days ? a.apr : a.apr + (b.apr - a.apr) * (targetDays - a.days) / (b.days - a.days);
+    }
+  }
+  if (targetDays < pts[0].days && pts[0].days - targetDays <= edgeToleranceDays) return pts[0].apr;
+  const last = pts[pts.length - 1];
+  if (targetDays > last.days && targetDays - last.days <= edgeToleranceDays) return last.apr;
+  return null;
+}
 
 /**
  * Expiries that form the curve on a given day: the monthly contracts (last Friday) of the next
@@ -134,20 +190,7 @@ async function buildLiveCurve(ustLookups) {
   const byName = new Map(book.map(b => [b.instrument_name, b]));
   const index = Number(byName.get('BTC-PERPETUAL')?.estimated_delivery_price);
   if (!(index > 0)) throw new Error('Deribit index unavailable');
-  const points = [];
-  for (const exp of curveExpiries(now)) {
-    const b = byName.get(deribitFutureName(exp));
-    if (!b || !(b.mark_price > 0)) continue;
-    const days = (exp - now) / DAY_MS;
-    points.push({
-      name: b.instrument_name,
-      expiry: isoDate(exp),
-      days,
-      apr: (b.mark_price - index) / index * 365 / days * 100,
-      oiUsd: Math.round(Number(b.open_interest) || 0),
-      volumeUsd: Math.round(Number(b.volume_usd) || 0)
-    });
-  }
+  const points = extractLiveCurvePoints(book, now, index);
   const ust = ustOn(ustLookups, isoDate(now));
   liveCache = { asOf: now, date: isoDate(now), live: true, index: round(index, 1), ust, ...decorateCurve(points, ust) };
   liveCacheTime = now;
@@ -212,6 +255,7 @@ async function getTermCurve({ funding0d = null } = {}) {
       history: '对比曲线用各合约当日 08:00 UTC 日 K 收盘重建'
     },
     funding0d: round(funding0d),
+    hurdleSpread: HURDLE_SPREAD,
     live,
     comparisons
   };
@@ -220,6 +264,9 @@ async function getTermCurve({ funding0d = null } = {}) {
 module.exports = {
   getTermCurve,
   curveExpiries,
+  isMonthlyOrQuarterlyExpiry,
+  extractLiveCurvePoints,
+  aprAtTenor,
   ustAt,
   forwardRate,
   decorateCurve,

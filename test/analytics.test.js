@@ -666,8 +666,17 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
 });
 
 describe('Phase 2-C: Cross-sectional term structure curve', () => {
-  const { curveExpiries, ustAt, forwardRate, decorateCurve } = require('../server/term_curve');
+  const {
+    curveExpiries,
+    isMonthlyOrQuarterlyExpiry,
+    extractLiveCurvePoints,
+    aprAtTenor,
+    ustAt,
+    forwardRate,
+    decorateCurve
+  } = require('../server/term_curve');
   const { deribitFutureName } = require('../server/basis_fetcher');
+  const { classifyYieldCurveRegime, summarizeYieldCurve } = require('../server/macro_fetcher');
 
   test('curve uses monthly + quarterly expiries with 7 to 400 days left', () => {
     const names = curveExpiries(Date.UTC(2026, 9, 17, 8)).map(deribitFutureName);
@@ -675,6 +684,51 @@ describe('Phase 2-C: Cross-sectional term structure curve', () => {
     // A monthly inside its final week is left out
     const lastWeek = curveExpiries(Date.UTC(2026, 9, 26, 8)).map(deribitFutureName);
     assert.ok(!lastWeek.includes('BTC-30OCT26'));
+  });
+
+  test('extractLiveCurvePoints filters book for monthly/quarterly futures >=7D and drops weeklies/perps', () => {
+    const now = Date.UTC(2026, 9, 17, 8);
+    assert.equal(isMonthlyOrQuarterlyExpiry(Date.UTC(2026, 9, 30, 8)), true);
+    assert.equal(isMonthlyOrQuarterlyExpiry(Date.UTC(2026, 9, 23, 8)), false); // weekly Friday
+    const book = [
+      { instrument_name: 'BTC-PERPETUAL', mark_price: 80000 },
+      { instrument_name: 'BTC-23OCT26', mark_price: 80100 }, // weekly: excluded
+      { instrument_name: 'BTC-30OCT26', mark_price: 80300, open_interest: 12000000, volume_usd: 5000000 }, // monthly (13D)
+      { instrument_name: 'BTC-25DEC26', mark_price: 81200, open_interest: 90000000, volume_usd: 30000000 } // quarterly (69D)
+    ];
+    const pts = extractLiveCurvePoints(book, now, 80000);
+    assert.deepEqual(pts.map(p => p.name), ['BTC-30OCT26', 'BTC-25DEC26']);
+    assert.equal(Math.round(pts[0].days), 13);
+    assert.equal(Math.round(pts[1].days), 69);
+  });
+
+  test('aprAtTenor interpolates inside range and snaps within boundary tolerance', () => {
+    const pts = [{ days: 32, apr: 6 }, { days: 92, apr: 9 }, { days: 182, apr: 12 }];
+    assert.equal(aprAtTenor(pts, 30, 5), 6); // 32D is within 5D of 30D
+    assert.equal(aprAtTenor(pts, 20, 5), null); // 12D away: not extrapolated
+    assert.equal(aprAtTenor(pts, 62, 5), 7.5);
+    assert.equal(aprAtTenor(pts, 180, 5), 12 - (3 * 2 / 90));
+  });
+
+  test('Module 1 classifyYieldCurveRegime & summarizeYieldCurve handle bull/bear steep/flat, twist, flat and multi-window', () => {
+    assert.equal(classifyYieldCurveRegime(-20, -5).code, 'bull_steepener');
+    assert.equal(classifyYieldCurveRegime(4, 22).code, 'bear_steepener');
+    assert.equal(classifyYieldCurveRegime(-4, -22).code, 'bull_flattener');
+    assert.equal(classifyYieldCurveRegime(22, 5).code, 'bear_flattener');
+    assert.equal(classifyYieldCurveRegime(-10, 12).code, 'twist_steepener');
+    assert.equal(classifyYieldCurveRegime(12, -10).code, 'twist_flattener');
+    assert.equal(classifyYieldCurveRegime(1.5, -1.0).code, 'flat');
+
+    // Different timeframes can show opposite regimes (e.g. 1Y bull steepener vs 20D bear steepener)
+    const points = Array.from({ length: 400 }, (_, i) => {
+      const d = new Date(Date.UTC(2025, 8, 1) + i * 86400000).toISOString().slice(0, 10);
+      if (i < 379) return { date: d, us1y: 5.0, us10y: 4.2, yieldSpread: -0.8 };
+      if (i < 399) return { date: d, us1y: 4.0, us10y: 4.1, yieldSpread: 0.1 };
+      return { date: d, us1y: 4.02, us10y: 4.35, yieldSpread: 0.33 };
+    });
+    const regimes = summarizeYieldCurve(points);
+    assert.equal(regimes['20d'].code, 'bear_steepener');
+    assert.equal(regimes['1y'].code, 'twist_steepener');
   });
 
   test('Treasury yield is interpolated by tenor and flat outside 1M–1Y', () => {
