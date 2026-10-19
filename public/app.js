@@ -5360,14 +5360,16 @@ function updateFlowKpis(data) {
   if (s && leaderVal) {
     leaderVal.textContent = s.leaderLabel;
     leaderVal.style.color = s.leader === 'futures' ? FLOW_RED : FLOW_GREEN;
-    setFlowChip(document.getElementById('flow-leader-chip'), fmtFlowSigned(s.hist), s.leader === 'futures' ? 'red' : 'green');
+    // 与图上方向一致: 正 = 现货 (绿柱向上)，负 = 期货 (红柱向下)
+    setFlowChip(document.getElementById('flow-leader-chip'), fmtFlowSigned(s.hist === null ? null : -s.hist), s.leader === 'futures' ? 'red' : 'green');
     const sub = document.getElementById('flow-leader-sub');
     if (sub) sub.textContent = `期货${s.futDir} · 现货${s.spotDir}`;
   }
   if (s && regionVal) {
     regionVal.textContent = s.regionLabel;
     regionVal.style.color = s.regionLeader === 'asia' ? FLOW_RED : FLOW_GREEN;
-    setFlowChip(document.getElementById('flow-region-chip'), fmtFlowSigned(s.region), s.regionLeader === 'asia' ? 'red' : 'green');
+    // 正 = 欧美 (绿点上沿)，负 = 亚太 (红点下沿)
+    setFlowChip(document.getElementById('flow-region-chip'), fmtFlowSigned(s.region === null ? null : -s.region), s.regionLeader === 'asia' ? 'red' : 'green');
   }
   ['futAsia', 'futWest', 'spotAsia', 'spotWest'].forEach(k => {
     const el = document.getElementById(`fq-${k}`);
@@ -5500,23 +5502,27 @@ function buildFlowChart() {
     priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
   }, 1);
   hist.createPriceLine({ price: 0, color: c.gridLineStrong, lineWidth: 1, lineStyle: LW.LineStyle.Solid, axisLabelVisible: false });
-  // 窗格 2: 区域点单独一条细窄窗格，画在柱子的零轴上会被同色柱根盖住
+  // 柱上下各留出一条边，给区域点用
+  hist.priceScale().applyOptions({ scaleMargins: { top: 0.22, bottom: 0.12 } });
+  // 区域点与柱同一窗格，用独立的隐藏刻度固定在窗格上下边缘 (同 Pine 的 location.top / bottom)：
+  // 绿点 (欧美主导) 贴顶，红点 (亚太主导) 贴底，不随柱高移动，也不会被柱子盖住
   const dots = flowChart.addSeries(LW.LineSeries, {
+    priceScaleId: 'flow-dots',
     lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3,
     priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-    autoscaleInfoProvider: () => ({ priceRange: { minValue: -1, maxValue: 1 } }),
-    priceFormat: { type: 'custom', formatter: () => '' }
-  }, 2);
-  dots.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0.2 } });
-  // 窗格 3: Coinbase 溢价 (换汇后)
+    autoscaleInfoProvider: () => ({ priceRange: { minValue: -1, maxValue: 1 } })
+  }, 1);
+  // 上沿留出指标图例那一行的高度，绿点画在图例下方
+  dots.priceScale().applyOptions({ scaleMargins: { top: 0.13, bottom: 0.04 } });
+  // 窗格 2: Coinbase 溢价 (换汇后)
   const prem = flowChart.addSeries(LW.LineSeries, {
     color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: 'price', precision: 1, minMove: 0.1 }
-  }, 3);
+  }, 2);
   prem.createPriceLine({ price: 0, color: c.gridLineStrong, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: false });
 
   const panes = flowChart.panes();
-  [5, 2, 0.22, 0.9].forEach((f, i) => { if (panes[i] && panes[i].setStretchFactor) panes[i].setStretchFactor(f); });
+  [5, 2.4, 0.9].forEach((f, i) => { if (panes[i] && panes[i].setStretchFactor) panes[i].setStretchFactor(f); });
   flowSeries = { candles, volume, hist, dots, prem };
   flowChart.subscribeCrosshairMove(param => updateFlowCrosshair(param && param.time));
   if (window.ResizeObserver) new ResizeObserver(() => positionFlowIndicatorLegend()).observe(host);
@@ -5580,8 +5586,8 @@ function updateFlowCrosshair(time) {
   box.innerHTML = `
     <span class="fc-time">主导力量 ${flowSmooth > 1 ? `EMA${flowSmooth}` : '原始'}</span>
     ${state}
-    <span style="color:${h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h)} ${h > 0 ? '期货主导' : '现货主导'}</span>
-    <span style="color:${r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${fmtFlowSigned(r)} ${r > 0 ? '亚太主导' : '欧美主导'}</span>
+    <span style="color:${h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h === null ? null : -h)} ${h > 0 ? '期货主导 ↓' : '现货主导 ↑'}</span>
+    <span style="color:${r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${r > 0 ? '亚太主导 (下沿)' : '欧美主导 (上沿)'}</span>
     <span>期·亚 <b class="${tone(row.futAsia)}">${fmtFlowSigned(row.futAsia)}</b></span>
     <span>期·欧美 <b class="${tone(row.futWest)}">${fmtFlowSigned(row.futWest)}</b></span>
     <span>现·亚 <b class="${tone(row.spotAsia)}">${fmtFlowSigned(row.spotAsia)}</b></span>
@@ -5603,8 +5609,10 @@ function renderFlowChart(resetRange = false) {
   series.forEach((p, i) => {
     const row = { ...p, _hist: hs[i], _region: rs[i] };
     flowRowsByTime.set(p.time, row);
-    if (hs[i] !== null) histData.push({ time: p.time, value: hs[i], color: shade(hs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
-    if (rs[i] !== null) dotData.push({ time: p.time, value: 0, color: shade(rs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
+    // 显示方向: 绿柱 (现货主导) 向上、红柱 (期货主导) 向下；绿点 (欧美主导) 贴窗格上沿、红点 (亚太主导) 贴下沿。
+    // 服务端 hist / region 仍是 |期货|−|现货|、|亚太|−|欧美| (>0 = 期货 / 亚太)，这里只翻转显示
+    if (hs[i] !== null) histData.push({ time: p.time, value: -hs[i], color: shade(hs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
+    if (rs[i] !== null) dotData.push({ time: p.time, value: rs[i] > 0 ? -1 : 1, color: shade(rs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
     const pv = flowPremium(p);
     if (pv !== null && pv !== undefined) premData.push({ time: p.time, value: pv });
   });
