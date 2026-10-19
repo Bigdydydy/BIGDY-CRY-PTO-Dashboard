@@ -414,16 +414,18 @@
             <span class="mm-label">US 1Y T-Bill (1年期)</span>
             <div class="mm-val-wrap">
               <span class="mm-val text-cyan" id="macro-1y-val">--%</span>
+              <span class="mm-chip" id="macro-1y-chip">--</span>
             </div>
-            <span class="mm-sub">FRED 美联储常备到期收益率</span>
+            <span class="mm-sub" id="macro-1y-sub">FRED 美联储常备到期收益率</span>
           </div>
 
           <div class="macro-metric-card" id="card-metric-10y">
             <span class="mm-label">US 10Y T-Note (10年期)</span>
             <div class="mm-val-wrap">
               <span class="mm-val text-green" id="macro-10y-val">--%</span>
+              <span class="mm-chip" id="macro-10y-chip">--</span>
             </div>
-            <span class="mm-sub">全球无风险基准利率</span>
+            <span class="mm-sub" id="macro-10y-sub">全球无风险基准利率</span>
           </div>
 
           <div class="macro-metric-card" id="card-metric-spread">
@@ -1227,21 +1229,21 @@
             </div>
           </div>
           <div class="el-intro tc-intro">
-            <p><strong>怎么看：</strong>每个点是一个月度或季度合约，纵轴是持有到交割的年化基差，也就是"以 BTC 作抵押借美元"的隐含利率；虚线是同期限美债收益率，两者之差（下方柱子）是该期限的加密期限溢价。曲线向上倾斜说明市场预期杠杆需求持续，前高后平说明溢价集中在短期，贴近美债说明套利资金已把溢价压平。灰色曲线为 1 周 / 1 个月 / 3 个月前同口径重建，用来看曲线整体平移还是只有前端在动。</p>
+            <p><strong>怎么看：</strong>每个点是一个月度或季度合约，纵轴是持有到交割的年化基差，本质是<strong>“以 BTC 作抵押借入美元”的隐含市场利率</strong>；红色虚线是同期限美债收益率，两者之差（下方柱子）是加密期限溢价（粉色虚线 <code>+3.5pp</code> 为机构套利门槛）。<strong>注意与传统大宗商品的区别：</strong>BTC 无物理仓储成本与现货紧缺便利收益，不能套用商品“升水(Contango)看跌、贴水(Back)看涨”的库存逻辑——在 BTC 市场，<strong>高于美债的正向升水代表多头杠杆与套利资金良性运转</strong>；<strong>跌破美债或转入贴水往往对应暴跌去杠杆与套利盘拆仓抛压</strong>；仅当 <strong>0D 永续资金费率远高于远月基差（短端倒挂）</strong> 时，才构成短端多头过度拥挤的逆向警示。</p>
           </div>
           <div class="tc-kpis" id="tc-kpis"></div>
           <div class="tp-legend-strip" id="tc-legend">
             <button class="tp-legend-btn active" data-tc="cmp7"><span class="legend-color-dot" style="background-color: #94a3b8;"></span><span>1 周前</span></button>
             <button class="tp-legend-btn active" data-tc="cmp30"><span class="legend-color-dot" style="background-color: #64748b;"></span><span>1 个月前</span></button>
             <button class="tp-legend-btn" data-tc="cmp90"><span class="legend-color-dot" style="background-color: #475569;"></span><span>3 个月前</span></button>
-            <button class="tp-legend-btn active" data-tc="forward"><span class="legend-color-dot" style="background-color: #a855f7;"></span><span>隐含远期</span></button>
+            <button class="tp-legend-btn" data-tc="forward"><span class="legend-color-dot" style="background-color: #a855f7;"></span><span>隐含远期</span></button>
           </div>
           <div id="term-curve-echarts" class="tc-chart"></div>
           <div class="tp-data-audit-strip">
             <div class="tp-audit-left">
-              <span><strong class="text-cyan">合约:</strong> Deribit 月度与季度合约，剩余 ≥7 天（周 / 日合约年化噪声过大，不计入）</span>
-              <span><strong class="text-cyan">美债:</strong> FRED 1M / 3M / 6M / 1Y，按天数线性插值</span>
-              <span><strong class="text-cyan">远期:</strong> 相邻合约推出的隐含年化</span>
+              <span><strong class="text-cyan">合约:</strong> Deribit 真实挂牌月度与季度合约，剩余 ≥7 天（周 / 日合约年化噪声过大，不计入）</span>
+              <span><strong class="text-cyan">美债与门槛:</strong> FRED 1M / 3M / 6M / 1Y 线性插值；利差柱 +3.5pp 为机构套利门槛</span>
+              <span><strong class="text-cyan">远期:</strong> 相邻合约推出的隐含远期年化（按需点亮）</span>
             </div>
           </div>
         </div>
