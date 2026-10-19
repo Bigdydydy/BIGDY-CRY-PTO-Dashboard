@@ -1,0 +1,25 @@
+{
+  "id": "macro_snapshot",
+  "status": "ok",
+  "lastAttemptAt": "2026-10-19T04:56:51.661Z",
+  "lastSuccessAt": "2026-10-19T04:56:53.607Z",
+  "lastError": null,
+  "steps": {
+    "macro": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-19T04:56:53.466Z",
+      "lastSuccessAt": "2026-10-19T04:56:53.466Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-19T00:00:00.000Z",
+      "verifiedSkip": false
+    },
+    "preferreds": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-19T04:56:53.607Z",
+      "lastSuccessAt": "2026-10-19T04:56:53.607Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-16T00:00:00.000Z",
+      "verifiedSkip": false
+    }
+  }
+}
