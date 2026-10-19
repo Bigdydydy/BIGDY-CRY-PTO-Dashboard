@@ -4,8 +4,27 @@ const https = require('https');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'macro_chart.json');
+
+// Required legs of the `macro` aggregate. mstr_cost / mstr_treasury are
+// ancillary — supplementary reference legs that never gate the aggregate.
+const MACRO_REQUIRED = [
+  'macro', 'fred:DGS1', 'fred:DGS10', 'fred:WALCL', 'fred:WTREGEN', 'fred:RRPONTSYD',
+  'macro_btc', 'yahoo:MSTR'
+];
+const MACRO_ANCILLARY = ['mstr_cost', 'mstr_treasury'];
+const MAX_FUTURE_MS = 5 * 60 * 1000;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Round-trip the ISO day: Date.parse accepts nonexistent dates like Feb 30
+// by rolling them over — reject those.
+const validDateStr = d => typeof d === 'string' && DATE_RE.test(d) && !isNaN(Date.parse(d))
+  && new Date(d).toISOString().slice(0, 10) === d;
+const STRICT_NUM_RE = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+const isPosNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v)) && Number(v) > 0;
 const BT_STRATEGY_FILE = path.join(__dirname, '..', 'data', 'bitcointreasuries_strategy.json');
 const MSTR_CAPITAL_FILE = path.join(__dirname, '..', 'data', 'mstr_capital_structure.json');
 let inMemoryCache = null;
@@ -127,9 +146,16 @@ async function fetchMstrCost() {
     const key2 = ne(user, key1);
     const decryptedStr = ne(json.data, key2);
     const parsed = JSON.parse(decryptedStr);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) throw new Error('Coinglass MSTR cost: non-array payload');
+    // Verified-event source: receipt time is the clock, never the last
+    // purchase date (purchases do not update daily).
+    recordSuccess('mstr_cost', {
+      dataAsOf: new Date().toISOString(), asOfKind: 'received', source: 'coinglass/microStrategyCostV2'
+    });
+    return parsed;
   } catch (err) {
     console.error('[MacroFetcher] Error fetching Coinglass MSTR cost:', err.message);
+    recordFailure('mstr_cost', err);
     return [];
   }
 }
@@ -172,6 +198,7 @@ function fetchTextLargeHeaders(url, { timeout = 15000, redirects = 2 } = {}) {
  * 页面是内嵌的 SvelteKit 数据，只给当前值（不再有逐条 holdings_news）。
  */
 async function fetchLiveBtSnapshot() {
+  recordAttempt('mstr_treasury', { now: Date.now() });
   try {
     const text = await fetchTextLargeHeaders('https://bitcointreasuries.net/public-companies/strategy');
     const btM = text.match(/\["BTC",\{asset:\{symbol:"BTC"[^}]*\},balance:(\d+),date:"(\d{4}-\d{2}-\d{2})",cost_basis:\{value:app\.decode\('BigDecimal', "([\d.]+)"\)/);
@@ -179,6 +206,13 @@ async function fetchLiveBtSnapshot() {
     const num = (re) => { const m = text.match(re); return m ? parseFloat(m[1]) : null; };
     const balance = parseInt(btM[1], 10);
     const costBasis = parseFloat(btM[3]);
+    if (!(balance > 0) || !(costBasis > 0)) {
+      throw new Error(`implausible treasury values balance=${btM[1]} costBasis=${btM[3]}`);
+    }
+    // Event source: unchanged holdings still confirm liveness — receipt time.
+    recordSuccess('mstr_treasury', {
+      dataAsOf: new Date().toISOString(), asOfKind: 'received', source: 'bitcointreasuries.net'
+    });
     return {
       date: btM[2],
       timestamp: new Date(btM[2] + 'T00:00:00Z').getTime(),
@@ -191,6 +225,7 @@ async function fetchLiveBtSnapshot() {
     };
   } catch (err) {
     console.warn('[MacroFetcher] Live bitcointreasuries fetch failed:', err.message);
+    recordFailure('mstr_treasury', err);
     return null;
   }
 }
@@ -200,6 +235,8 @@ async function fetchLiveBtSnapshot() {
  * Fetch Treasury yield series from FRED CSV
  */
 async function fetchFredSeries(id) {
+  const hid = `fred:${id}`;
+  recordAttempt(hid, { now: Date.now() });
   try {
     const resp = await fetchWithTimeout('https://fred.stlouisfed.org/graph/fredgraph.csv?id=' + id, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
@@ -207,20 +244,37 @@ async function fetchFredSeries(id) {
     if (!resp.ok) throw new Error('FRED HTTP ' + resp.status);
     const text = await resp.text();
     const lines = text.trim().split('\n');
+    // Verify the CSV shape: a DATE/observation_date column + the series id column.
+    const headerCols = (lines[0] || '').toLowerCase().split(',').map(s => s.trim());
+    const dateCol = headerCols.findIndex(c => c === 'date' || c === 'observation_date');
+    const valCol = headerCols.findIndex(c => c === id.toLowerCase());
+    if (dateCol < 0 || valCol < 0) {
+      throw new Error(`FRED ${id}: unexpected CSV header "${lines[0]}"`);
+    }
     const map = new Map();
+    let lastDate = '';
+    const nowMs = Date.now();
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',');
-      if (parts.length >= 2) {
-        const date = parts[0].trim();
-        const valStr = parts[1].trim();
-        if (valStr !== '.' && valStr !== '' && !isNaN(parseFloat(valStr))) {
-          map.set(date, parseFloat(valStr));
-        }
-      }
+      if (parts.length <= Math.max(dateCol, valCol)) continue;
+      const date = parts[dateCol].trim();
+      const valStr = parts[valCol].trim();
+      if (valStr === '.' || valStr === '') continue; // publication gap — skippable
+      if (!validDateStr(date)) throw new Error(`FRED ${id}: invalid date "${date}"`);
+      if (Date.parse(date) > nowMs + MAX_FUTURE_MS) throw new Error(`FRED ${id}: future date ${date}`);
+      if (date <= lastDate) throw new Error(`FRED ${id}: non-ascending dates`);
+      lastDate = date;
+      // Non-numeric garbage must not be parseFloat-swallowed.
+      if (!STRICT_NUM_RE.test(valStr)) throw new Error(`FRED ${id}: non-numeric value "${valStr}"`);
+      map.set(date, parseFloat(valStr));
     }
+    if (!map.size) throw new Error(`FRED ${id}: no data rows parsed`);
+    // dataAsOf = latest REAL observation date (never a forward-filled point).
+    recordSuccess(hid, { dataAsOf: lastDate, asOfKind: 'source', source: 'fred.stlouisfed.org' });
     return map;
   } catch (err) {
     console.error('[MacroFetcher] Error fetching FRED ' + id + ':', err.message);
+    recordFailure(hid, err);
     return new Map();
   }
 }
@@ -229,28 +283,45 @@ async function fetchFredSeries(id) {
  * Fetch daily BTC close price history from Binance
  */
 async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
+  recordAttempt('macro_btc', { now: Date.now() });
   try {
     let start = new Date(startDateStr).getTime();
     const now = Date.now();
     const allKlines = [];
+    let truncated = false;
     while (start < now) {
       const resp = await fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
-      if (!resp.ok) break;
+      if (!resp.ok) { truncated = true; break; }
       const data = await resp.json();
       if (!Array.isArray(data) || data.length === 0) break;
       allKlines.push(...data);
       const lastTime = data[data.length - 1][0];
-      if (lastTime <= start) break;
+      if (lastTime <= start) { truncated = true; break; } // no forward progress
       start = lastTime + 86400000;
     }
+    if (truncated) throw new Error('BTC klines pagination truncated before latest data');
     const map = new Map();
+    // A malformed or future row must fail the whole fetch, not be skipped
+    // into a "successful" but corrupt history.
+    let prevDay = '';
     for (const k of allKlines) {
-      const dateStr = new Date(k[0]).toISOString().slice(0, 10);
-      map.set(dateStr, parseFloat(k[4]));
+      if (!Array.isArray(k) || k.length < 5 || !Number.isFinite(Number(k[0])) || !isPosNum(k[4])) {
+        throw new Error('BTC kline row malformed: ' + JSON.stringify(k && k.slice ? k.slice(0, 6) : k));
+      }
+      const ms = Number(k[0]);
+      if (ms > now + MAX_FUTURE_MS) throw new Error('BTC kline future row: ' + new Date(ms).toISOString());
+      const dateStr = new Date(ms).toISOString().slice(0, 10);
+      if (dateStr <= prevDay) throw new Error('BTC klines not strictly ascending');
+      prevDay = dateStr;
+      map.set(dateStr, Number(k[4]));
     }
+    if (!map.size) throw new Error('BTC daily price feed returned no usable rows');
+    const maxDate = Array.from(map.keys()).sort().pop();
+    recordSuccess('macro_btc', { dataAsOf: maxDate, asOfKind: 'source', source: 'binance/BTCUSDT-1d' });
     return map;
   } catch (err) {
     console.error('[MacroFetcher] Error fetching Binance BTC prices:', err.message);
+    recordFailure('macro_btc', err);
     return new Map();
   }
 }
@@ -259,6 +330,7 @@ async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
  * Fetch daily MSTR stock close history from Yahoo Finance (for post-snapshot mNAV estimation)
  */
 async function fetchMstrStockPrices() {
+  recordAttempt('yahoo:MSTR', { now: Date.now() });
   try {
     const resp = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/MSTR?range=5y&interval=1d', {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }
@@ -267,19 +339,45 @@ async function fetchMstrStockPrices() {
     const json = await resp.json();
     const res = json.chart?.result?.[0];
     const ts = res?.timestamp;
-    const closes = res?.indicators?.quote?.[0]?.close;
-    const map = new Map();
-    if (Array.isArray(ts) && Array.isArray(closes)) {
-      for (let i = 0; i < ts.length; i++) {
-        const c = closes[i];
-        if (typeof c === 'number' && c > 0) {
-          map.set(new Date(ts[i] * 1000).toISOString().slice(0, 10), c);
-        }
+    const quote = res?.indicators?.quote?.[0];
+    const closes = quote?.close;
+    if (!Array.isArray(ts) || !Array.isArray(closes) || ts.length !== closes.length || !ts.length) {
+      throw new Error('Yahoo MSTR: timestamp/close arrays missing or length mismatch');
+    }
+    // Other OHLC legs must be finite-positive whenever present; volume must
+    // be finite >= 0. Present arrays must align with timestamps.
+    for (const leg of ['open', 'high', 'low', 'volume']) {
+      const arr = quote[leg];
+      if (!Array.isArray(arr)) continue;
+      if (arr.length !== ts.length) throw new Error(`Yahoo MSTR: ${leg} length mismatch`);
+      for (const v of arr) {
+        if (v === null || v === undefined) continue; // non-trading day
+        if (leg === 'volume'
+          ? !(Number.isFinite(v) && v >= 0)
+          : !isPosNum(v)) throw new Error(`Yahoo MSTR: invalid ${leg} value ${v}`);
       }
     }
+    const map = new Map();
+    const nowMs = Date.now();
+    let prevDay = '';
+    for (let i = 0; i < ts.length; i++) {
+      if (!Number.isFinite(ts[i])) throw new Error('Yahoo MSTR: non-finite timestamp');
+      if (ts[i] * 1000 > nowMs + MAX_FUTURE_MS) throw new Error('Yahoo MSTR: future timestamp');
+      const c = closes[i];
+      if (c === null || c === undefined) continue; // non-trading day
+      const day = new Date(ts[i] * 1000).toISOString().slice(0, 10);
+      if (day <= prevDay) throw new Error('Yahoo MSTR: timestamps not strictly ascending');
+      prevDay = day;
+      if (!isPosNum(c)) throw new Error(`Yahoo MSTR: invalid close ${c}`);
+      map.set(day, c);
+    }
+    if (!map.size) throw new Error('Yahoo MSTR: no usable close rows');
+    const maxDate = Array.from(map.keys()).sort().pop();
+    recordSuccess('yahoo:MSTR', { dataAsOf: maxDate, asOfKind: 'source', source: 'yahoo.finance/MSTR' });
     return map;
   } catch (err) {
     console.error('[MacroFetcher] Error fetching Yahoo MSTR stock prices:', err.message);
+    recordFailure('yahoo:MSTR', err);
     return new Map();
   }
 }
@@ -598,18 +696,29 @@ async function fetchAndBuildMacroData() {
     rawMstr: effectiveMstrList
   };
 
+  // Aggregate health: dataset date is the latest real BTC close (allDates came
+  // solely from the fresh BTC map); degraded legs surface as issues and via the
+  // per-source health above — fallback-restored legs never advance any clock.
+  const degraded = Object.entries(sources).filter(([, s]) => s !== 'ok').map(([k, s]) => `${k}:${s}`);
+  recordSuccess('macro', {
+    dataAsOf: allDates[allDates.length - 1],
+    asOfKind: 'source', source: 'macro/build',
+    issues: degraded
+  });
+
+  const bound = withDataHealth(payload, MACRO_REQUIRED, MACRO_ANCILLARY);
   try {
     const dir = path.dirname(CACHE_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(payload, null, 2), 'utf8');
+    atomicWriteJson(CACHE_FILE, bound, 2);
     console.log('[MacroFetcher] Persisted ' + points.length + ' points to ' + CACHE_FILE);
   } catch (err) {
     console.error('[MacroFetcher] Failed to save cache:', err.message);
   }
 
-  inMemoryCache = payload;
+  inMemoryCache = bound;
   lastFetchTime = Date.now();
-  return payload;
+  return bound;
 }
 
 const FAILURE_RETRY_MS = 2 * 60 * 1000;
@@ -620,8 +729,10 @@ let rebuildInflight = null;
 /** 单飞：并发请求共用同一次重建；失败后 2 分钟内不再重试，避免每次轮询都打满外部接口 */
 function rebuildOnce() {
   if (!rebuildInflight) {
+    recordAttempt('macro', { now: Date.now() });
     rebuildInflight = fetchAndBuildMacroData()
       .catch((err) => {
+        recordFailure('macro', err);
         lastFetchTime = Date.now() - CACHE_TTL_MS + FAILURE_RETRY_MS;
         throw err;
       })
@@ -634,6 +745,35 @@ function rebuildOnce() {
  * 冷启动：Render 免费实例磁盘随部署重置，本地文件只是提交时的版本。
  * 与 GitHub 上由定时任务刷新的快照比较，取较新的一份。
  */
+/** Snapshot schema: real points + summary provenance (never filled dates). */
+function validMacroSnapshot(json) {
+  if (!json || typeof json !== 'object') return false;
+  if (!Array.isArray(json.points) || !json.points.length) return false;
+  if (!json.summary || typeof json.summary !== 'object') return false;
+  return json.points.every(p =>
+    p && validDateStr(p.date) &&
+    (p.btcPrice === null || isPosNum(p.btcPrice)) &&
+    (p.us10y === null || p.us10y === undefined || Number.isFinite(Number(p.us10y)))
+  );
+}
+
+/** Seed snapshot clocks once — persisted dataHealth wins for EVERY required
+ * and ancillary source; legacy snapshots seed only aggregate hints and keep
+ * the individual leaves UNKNOWN rather than borrowing now. */
+let snapshotSeeded = false;
+function seedSnapshotOnce(snapshot) {
+  if (snapshotSeeded || !snapshot) return;
+  snapshotSeeded = true;
+  for (const id of [...MACRO_REQUIRED, ...MACRO_ANCILLARY]) {
+    seedCachedHealth(snapshot, id, id === 'macro'
+      ? {
+          dataAsOf: snapshot.summary?.dateRange?.end || null,
+          lastSuccessAt: snapshot.summary?.updatedAt || null
+        }
+      : {});
+  }
+}
+
 async function loadFreshestSnapshot() {
   const local = readMacroCacheFile();
   let remote = null;
@@ -641,7 +781,7 @@ async function loadFreshestSnapshot() {
     const resp = await fetchWithTimeout(REMOTE_SNAPSHOT_URL, { timeout: 10000, retries: 0 });
     if (resp.ok) {
       const json = await resp.json();
-      if (json && Array.isArray(json.points) && json.points.length) remote = json;
+      if (validMacroSnapshot(json)) remote = json;
     }
   } catch (err) {
     console.warn('[MacroFetcher] Remote snapshot unavailable:', err.message);
@@ -658,6 +798,7 @@ async function getMacroChartData(forceRefresh = false) {
     const snapshot = await loadFreshestSnapshot();
     if (snapshot) {
       inMemoryCache = snapshot;
+      seedSnapshotOnce(snapshot);
       const age = Date.now() - (Date.parse(snapshot.summary?.updatedAt) || 0);
       lastFetchTime = Date.now() - Math.min(age, CACHE_TTL_MS);
     }
@@ -669,21 +810,21 @@ async function getMacroChartData(forceRefresh = false) {
     } catch (err) {
       if (!inMemoryCache) throw err;
       console.warn('[MacroFetcher] Live rebuild failed, serving last dataset:', err.message);
-      return inMemoryCache;
+      return withDataHealth(inMemoryCache, MACRO_REQUIRED, MACRO_ANCILLARY);
     }
   }
 
   if (Date.now() - lastFetchTime >= CACHE_TTL_MS) {
     rebuildOnce().catch(e => console.error('[MacroFetcher] Background refresh failed:', e.message));
   }
-  return inMemoryCache;
+  return withDataHealth(inMemoryCache, MACRO_REQUIRED, MACRO_ANCILLARY);
 }
 
 function readMacroCacheFile() {
   try {
     if (!fs.existsSync(CACHE_FILE)) return null;
     const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    return cached && Array.isArray(cached.points) && cached.points.length > 0 ? cached : null;
+    return validMacroSnapshot(cached) ? cached : null;
   } catch (e) {
     return null;
   }

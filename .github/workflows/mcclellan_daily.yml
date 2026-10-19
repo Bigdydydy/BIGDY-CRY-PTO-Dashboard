@@ -36,6 +36,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Setup Node for producer heartbeat
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       # Pipeline is stdlib-only: no dependency install step
       - name: Unit tests
         working-directory: scripts/crypto_mcclellan
@@ -46,6 +51,12 @@ jobs:
         working-directory: scripts/crypto_mcclellan
         run: python export_to_json.py ${{ inputs.force && ' ' || '--skip-if-final' }}
 
+      - name: Record producer outcome without renewing source dates
+        if: ${{ !cancelled() && steps.pipeline.outcome != 'skipped' }}
+        env:
+          PIPELINE_OUTCOME: ${{ steps.pipeline.outcome }}
+        run: node scripts/record_pipeline_result.js mcclellan_daily
+
       # Commit whatever was collected even when one source failed (the pipeline
       # step is then red and GitHub notifies the owner)
       - name: Commit and push updated dataset
@@ -53,7 +64,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/crypto_mcclellan.json \
+          git add data/crypto_mcclellan.json data/job_health_mcclellan_daily.json \
                   scripts/crypto_mcclellan/data/
           if git diff --cached --quiet; then
             echo "No data changes; skipping commit."

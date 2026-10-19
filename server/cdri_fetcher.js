@@ -3,11 +3,88 @@ const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { fetchWithTimeout } = require('./http_client');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'cdri_data.json');
 let inMemoryCache = null;
 let lastFetchTime = 0;
+let inflight = null;
+let diskSeeded = false;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+
+const MAX_FUTURE_MS = 5 * 60 * 1000;
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+const inBand = v => isNum(v) && v >= 0 && v <= 100;
+const cdriTsMs = t => (isNum(t) ? (t > 1e11 ? t : t * 1000) : null);
+
+/* CDRI schema validation: a payload failing these is a source failure and
+ * never overwrites memory or disk. */
+
+function validateCdriPerformance(p) {
+  if (!p || typeof p !== 'object') return 'performance 缺失';
+  if (!inBand(p.price)) return 'performance.price 非 [0,100] 有限数';
+  for (const k of ['yesterday', 'week', 'month', 'yearHigh', 'yearLow']) {
+    if (p[k] !== undefined && p[k] !== null && !inBand(p[k])) return `performance.${k} 越界 [0,100]`;
+  }
+  return null;
+}
+
+function validateCdriHistory(h) {
+  if (!h || typeof h !== 'object') return 'history 缺失';
+  const { timeList, valueList, priceList } = h;
+  if (!Array.isArray(timeList) || !Array.isArray(valueList) || !Array.isArray(priceList)
+      || !timeList.length || timeList.length !== valueList.length || timeList.length !== priceList.length) {
+    return 'history timeList/valueList/priceList 为空或长度不等';
+  }
+  const nowMs = Date.now();
+  let prev = -Infinity;
+  for (let i = 0; i < timeList.length; i++) {
+    const ms = cdriTsMs(timeList[i]);
+    if (ms === null) return 'timeList 含非数值';
+    if (ms <= prev) return 'timeList 非严格递增';
+    if (ms > nowMs + MAX_FUTURE_MS) return 'timeList 含未来时间';
+    prev = ms;
+    if (!inBand(valueList[i])) return 'valueList 越界 [0,100]';
+    if (!isNum(priceList[i]) || priceList[i] <= 0) return 'priceList 含非正值';
+  }
+  return null;
+}
+
+function cdriHistoryAsOf(h) {
+  const ms = cdriTsMs(h.timeList[h.timeList.length - 1]);
+  return ms === null ? null : new Date(ms).toISOString();
+}
+
+/** Same schema on persisted/in-memory payloads (missing values never back-filled). */
+function validateCdriPayload(p) {
+  if (!p || typeof p !== 'object') return 'payload 非对象';
+  return validateCdriPerformance(p.performance) || validateCdriHistory(p.history);
+}
+
+function readValidatedDisk() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return null;
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return validateCdriPayload(cached) ? null : cached;
+  } catch (e) {
+    console.warn('[CdriFetcher] Failed reading disk cache:', e.message);
+    return null;
+  }
+}
+
+/** Seed honest disk clocks once, before the first attempt is recorded. */
+function seedDiskOnce() {
+  if (diskSeeded) return;
+  diskSeeded = true;
+  const disk = readValidatedDisk();
+  if (disk) {
+    seedCachedHealth(disk, 'cdri', {
+      dataAsOf: cdriHistoryAsOf(disk.history),
+      lastSuccessAt: typeof disk.timestamp === 'number' ? disk.timestamp : null
+    });
+  }
+}
 
 // AES ECB 128 Decrypt with PKCS7
 function aesEcbDecryptToHex(cipherTextB64, keyUtf8) {
@@ -123,30 +200,35 @@ function formatUtc8DateTime(timestampMs) {
   return `${y}-${m}-${day} ${h}:${min}:${s}`;
 }
 
-async function fetchCdriData(forceRefresh = false) {
-  const now = Date.now();
+/** Single-flight: concurrent callers share one in-flight upstream round. */
+function fetchCdriData(forceRefresh = false) {
+  if (inflight) return inflight;
+  inflight = doFetchCdriData(forceRefresh).finally(() => { inflight = null; });
+  return inflight;
+}
 
-  // Return in-memory cache if valid
+async function doFetchCdriData(forceRefresh = false) {
+  const now = Date.now();
+  seedDiskOnce();
+
+  // Return in-memory cache if valid (cache hit never extends lastSuccessAt)
   if (!forceRefresh && inMemoryCache && (now - lastFetchTime < CACHE_TTL_MS)) {
-    return inMemoryCache;
+    return withDataHealth(inMemoryCache, ['cdri']);
   }
 
   // Check disk cache if valid
-  if (!forceRefresh && fs.existsSync(CACHE_FILE)) {
-    try {
-      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      const cachedAt = cached && typeof cached.timestamp === 'number' ? cached.timestamp : 0;
-      if (now - cachedAt < CACHE_TTL_MS) {
-        inMemoryCache = cached;
-        lastFetchTime = cachedAt;
-        return inMemoryCache;
-      }
-    } catch (e) {
-      console.warn('[CdriFetcher] Failed reading disk cache:', e.message);
+  if (!forceRefresh) {
+    const cached = readValidatedDisk();
+    const cachedAt = cached && typeof cached.timestamp === 'number' ? cached.timestamp : 0;
+    if (cached && now - cachedAt < CACHE_TTL_MS) {
+      inMemoryCache = cached;
+      lastFetchTime = cachedAt;
+      return withDataHealth(inMemoryCache, ['cdri']);
     }
   }
 
   console.log('[CdriFetcher] Fetching fresh CDRI data from Coinglass...');
+  recordAttempt('cdri', { now: Date.now() });
 
   try {
     const [perfRaw, historyRaw] = await Promise.all([
@@ -157,6 +239,8 @@ async function fetchCdriData(forceRefresh = false) {
     if (!perfRaw || !historyRaw) {
       throw new Error('Failed to retrieve CDRI data from Coinglass');
     }
+    const bad = validateCdriPerformance(perfRaw) || validateCdriHistory(historyRaw);
+    if (bad) throw new Error(`CDRI payload 校验失败: ${bad}`);
 
     const currentScore = perfRaw.price ?? null;
     const currentRisk = getRiskInfo(currentScore);
@@ -209,33 +293,36 @@ async function fetchCdriData(forceRefresh = false) {
       timestamp: now
     };
 
-    inMemoryCache = result;
-    lastFetchTime = now;
+    // Real HTTP completion: data-as-of is the provider's latest history bar.
+    recordSuccess('cdri', { dataAsOf: cdriHistoryAsOf(historyRaw), asOfKind: 'source', source: 'coinglass/cgri' });
+    const bound = withDataHealth(result, ['cdri']);
+    inMemoryCache = bound;
+    lastFetchTime = Date.now();
 
-    // Save to cache file
+    // Save to cache file (atomic: a failed write never corrupts the last good file)
     try {
       const dir = path.dirname(CACHE_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(result, null, 2), 'utf8');
+      atomicWriteJson(CACHE_FILE, bound, 2);
       console.log('[CdriFetcher] CDRI cache successfully updated');
     } catch (e) {
       console.warn('[CdriFetcher] Failed writing disk cache:', e.message);
     }
 
-    return result;
+    return bound;
   } catch (err) {
     console.error('[CdriFetcher] Error fetching CDRI data:', err.message);
+    recordFailure('cdri', err);
 
-    // If fetch failed, return disk cache if available even if stale
-    if (fs.existsSync(CACHE_FILE)) {
-      try {
-        const raw = fs.readFileSync(CACHE_FILE, 'utf8');
-        inMemoryCache = JSON.parse(raw);
-        return inMemoryCache;
-      } catch (e) {}
+    // Failure path: prefer a schema-valid in-memory copy, then validated disk.
+    if (inMemoryCache && !validateCdriPayload(inMemoryCache)) {
+      return withDataHealth(inMemoryCache, ['cdri']);
     }
-
-    if (inMemoryCache) return inMemoryCache;
+    const disk = readValidatedDisk();
+    if (disk) {
+      inMemoryCache = disk;
+      return withDataHealth(disk, ['cdri']);
+    }
     throw err;
   }
 }

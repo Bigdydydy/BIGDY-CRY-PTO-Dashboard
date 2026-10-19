@@ -20,6 +20,8 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { seedCachedHealth } = require('./data_health_cache');
 
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -141,6 +143,21 @@ function readHistoryFile(file) {
 /**
  * 每行一个样本，便于 git diff 只显示新增的小时
  */
+/** Atomic text write: unique same-dir temp + rename; a failed write never
+ * corrupts the existing archive. */
+function atomicWriteText(file, text) {
+  const dir = path.dirname(file);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(dir, `.${path.basename(file)}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tmp, text, 'utf8');
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch (e) { /* best effort */ }
+    throw err;
+  }
+}
+
 function writeHistoryFile(file, samples) {
   const header = {
     schema: 1,
@@ -150,8 +167,7 @@ function writeHistoryFile(file, samples) {
   };
   const body = samples.map(s => '    ' + JSON.stringify(s)).join(',\n');
   const text = JSON.stringify(header, null, 2).replace(/\n}$/, `,\n  "samples": [\n${body}\n  ]\n}\n`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text, 'utf8');
+  atomicWriteText(file, text);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +439,12 @@ function recordLiveSnapshot(result, ts = Date.now()) {
   if (!snap) return;
   if (localSamples === null) localSamples = readHistoryFile(LOCAL_FILE);
   localSamples = mergeSnapshot(localSamples, snap, ts);
+  // A live local snapshot is a real acquisition; the bucket ts is the clock,
+  // never reader-now or an artifact's last trade time.
+  recordSuccess('liquidity_history', {
+    dataAsOf: new Date(Math.floor(ts / HOUR_MS) * HOUR_MS).toISOString(),
+    asOfKind: 'received', source: 'live-snapshot'
+  });
   if (ts - lastLocalWrite >= LOCAL_WRITE_THROTTLE_MS) {
     lastLocalWrite = ts;
     try {
@@ -438,24 +460,76 @@ const REMOTE_URL = process.env.LIQUIDITY_HISTORY_URL
 const REMOTE_TTL_MS = 10 * 60 * 1000;
 let remoteCache = { samples: null, at: 0 };
 
+const strictNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
+
+/** Remote archive is fully schema-validated before it may replace
+ * remoteCache: every sample validates ts (finite, >0, not future, strictly
+ * ascending), n > 0, mid > 0, spr/depths >= 0, b10 in [0,100]; optional
+ * fields must be finite when present. */
+function validRemoteSamples(json) {
+  if (!json || !Array.isArray(json.samples) || !json.samples.length) return false;
+  const nowMs = Date.now();
+  let prevTs = -Infinity;
+  return json.samples.every(s => {
+    if (!s || !strictNum(s.ts) || s.ts <= 0 || s.ts > nowMs + 5 * 60000) return false;
+    if (s.ts <= prevTs) return false;
+    prevTs = s.ts;
+    if (!strictNum(s.n) || s.n <= 0) return false;
+    if (!strictNum(s.mid) || s.mid <= 0) return false;
+    if (!strictNum(s.spr) || s.spr < 0) return false;
+    for (const f of ['d10', 'd50', 'd100']) {
+      if (!strictNum(s[f]) || s[f] < 0) return false;
+    }
+    if (!strictNum(s.b10) || s.b10 < 0 || s.b10 > 100) return false;
+    for (const f of ['vol24', 's5', 's10', 'd10min']) {
+      if (s[f] !== null && s[f] !== undefined && !strictNum(s[f])) return false;
+    }
+    return true;
+  });
+}
+
 async function readCommittedHistory() {
   const now = Date.now();
   if (remoteCache.samples && now - remoteCache.at < REMOTE_TTL_MS) return remoteCache.samples;
+  recordAttempt('liquidity_history', { now: Date.now() });
   try {
     const resp = await fetchWithTimeout(REMOTE_URL, { headers: { Accept: 'application/json' }, timeout: 8000, retries: 0 });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
-    if (!Array.isArray(json.samples)) throw new Error('malformed history');
+    if (!validRemoteSamples(json)) throw new Error('malformed history');
+    // Artifact's own max sample ts is the data clock — never reader now.
+    // recordSuccess BEFORE the cache assignment: a throw must not leave a
+    // polluted remoteCache behind.
+    recordSuccess('liquidity_history', {
+      dataAsOf: new Date(Math.max(...json.samples.map(s => s.ts))).toISOString(),
+      asOfKind: 'source', source: 'github-archive'
+    });
     remoteCache = { samples: json.samples, at: now };
   } catch (err) {
+    recordFailure('liquidity_history', err);
     // 尚未推送或网络不可达：退回仓库里随部署带上的版本
     remoteCache = { samples: remoteCache.samples || readHistoryFile(COMMITTED_FILE), at: now };
   }
   return remoteCache.samples;
 }
 
+/** Seed honest disk clocks once — files carry no success receipt, so a pure
+ * disk dataset stays UNKNOWN until a real fetch/live write verifies. */
+let diskSeeded = false;
+function seedDiskOnce(samples) {
+  if (diskSeeded || !samples.length) return;
+  diskSeeded = true;
+  seedCachedHealth({ dataHealth: null }, 'liquidity_history', {
+    dataAsOf: new Date(samples[samples.length - 1].ts).toISOString(),
+    lastSuccessAt: null
+  });
+}
+
 async function getMergedHistory() {
   if (localSamples === null) localSamples = readHistoryFile(LOCAL_FILE);
+  // Seed BEFORE the remote attempt so a recorded failure can't block the seed.
+  seedDiskOnce(mergeSampleSets(readHistoryFile(COMMITTED_FILE), localSamples));
   const committed = await readCommittedHistory();
   return mergeSampleSets(mergeSampleSets(readHistoryFile(COMMITTED_FILE), committed), localSamples);
 }

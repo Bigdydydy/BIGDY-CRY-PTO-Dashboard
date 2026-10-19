@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchFredSeries } = require('./macro_fetcher');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 // MSTR 融资压力：STRC 平价锚定 + 优先股分层利差
 const CONFIG_FILE = path.join(__dirname, '..', 'data', 'mstr_preferreds.json');
@@ -10,6 +12,10 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const PAR = 100;
 const BREAK_LEVEL = 99;
 const SPREAD_SMOOTH_DAYS = 5;
+const REQUIRED_IDS = ['preferreds', 'yahoo:STRC', 'yahoo:STRF', 'yahoo:STRD', 'fred:DGS1MO'];
+const MAX_FUTURE_MS = 5 * 60 * 1000;
+const isPosNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v)) && Number(v) > 0;
 
 let inMemoryCache = null;
 let lastFetchTime = 0;
@@ -27,25 +33,67 @@ function loadConfig() {
  * Yahoo 日线：收盘 / 最高 / 最低 / 成交量
  */
 async function fetchYahooDaily(symbol) {
-  const resp = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?range=2y&interval=1d', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }
-  });
-  if (!resp.ok) throw new Error('Yahoo ' + symbol + ' HTTP ' + resp.status);
-  const json = await resp.json();
-  const res = json.chart?.result?.[0];
-  const q = res?.indicators?.quote?.[0];
-  if (!res?.timestamp || !q) throw new Error('Yahoo ' + symbol + ' empty payload');
-  const map = new Map();
-  res.timestamp.forEach((t, i) => {
-    if (typeof q.close[i] !== 'number' || q.close[i] <= 0) return;
-    map.set(new Date(t * 1000).toISOString().slice(0, 10), {
-      close: q.close[i],
-      high: q.high[i] ?? q.close[i],
-      low: q.low[i] ?? q.close[i],
-      volume: q.volume[i] || 0
+  const hid = `yahoo:${symbol}`;
+  recordAttempt(hid, { now: Date.now() });
+  try {
+    const resp = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?range=2y&interval=1d', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }
     });
-  });
-  return map;
+    if (!resp.ok) throw new Error('Yahoo ' + symbol + ' HTTP ' + resp.status);
+    const json = await resp.json();
+    const res = json.chart?.result?.[0];
+    const q = res?.indicators?.quote?.[0];
+    if (!Array.isArray(res?.timestamp) || !q || !Array.isArray(q.close)
+        || q.close.length !== res.timestamp.length || !res.timestamp.length) {
+      throw new Error('Yahoo ' + symbol + ' empty payload or timestamp/close mismatch');
+    }
+    // Side arrays must align with timestamps when present; a missing OHLC
+    // array must never silently substitute the close for high/low.
+    for (const leg of ['high', 'low', 'volume']) {
+      if (Array.isArray(q[leg]) && q[leg].length !== res.timestamp.length) {
+        throw new Error('Yahoo ' + symbol + ': ' + leg + ' array length mismatch');
+      }
+    }
+    const map = new Map();
+    const nowMs = Date.now();
+    let prevDay = '';
+    res.timestamp.forEach((t, i) => {
+      if (!Number.isFinite(t) || t <= 0) throw new Error('Yahoo ' + symbol + ': non-finite timestamp');
+      if (t * 1000 > nowMs + MAX_FUTURE_MS) throw new Error('Yahoo ' + symbol + ': future timestamp');
+      const c = q.close[i];
+      if (c === null || c === undefined) return; // non-trading day
+      const day = new Date(t * 1000).toISOString().slice(0, 10);
+      if (day <= prevDay) throw new Error('Yahoo ' + symbol + ': timestamps not strictly ascending');
+      prevDay = day;
+      if (!isPosNum(c)) throw new Error('Yahoo ' + symbol + ': invalid close ' + c);
+      // high/low arrays are required together with close rows; null is a
+      // missing-leg error, not a reason to clone the close.
+      for (const leg of ['high', 'low']) {
+        const arr = q[leg];
+        const v = Array.isArray(arr) ? arr[i] : null;
+        if (v === null || v === undefined || !isPosNum(v)) {
+          throw new Error('Yahoo ' + symbol + ': invalid ' + leg + ' ' + JSON.stringify(v));
+        }
+      }
+      const vol = Array.isArray(q.volume) ? q.volume[i] : null;
+      if (vol !== null && vol !== undefined && !(Number.isFinite(vol) && vol >= 0)) {
+        throw new Error('Yahoo ' + symbol + ': invalid volume ' + vol);
+      }
+      map.set(day, {
+        close: Number(c),
+        high: Number(q.high[i]),
+        low: Number(q.low[i]),
+        volume: vol === null || vol === undefined ? null : vol
+      });
+    });
+    if (!map.size) throw new Error('Yahoo ' + symbol + ': no usable close rows');
+    const maxDate = Array.from(map.keys()).sort().pop();
+    recordSuccess(hid, { dataAsOf: maxDate, asOfKind: 'source', source: 'yahoo.finance/' + symbol });
+    return map;
+  } catch (err) {
+    recordFailure(hid, err);
+    throw err;
+  }
 }
 
 function median(arr) {
@@ -70,11 +118,17 @@ async function fetchAndBuildPreferreds() {
   const thresholds = config.spreadThresholdsPct || { watch: 3.5, stress: 4.5 };
   const strcRates = config.strcMonthlyRatePct || {};
 
+  // Every required leg must succeed. A failed/malformed leg throws — the
+  // caller falls back to the COMPLETE prior payload and never lets a
+  // half-empty rebuild overwrite valid historical legs on disk.
   const [strc, strf, strd, tbill] = await Promise.all([
     fetchYahooDaily('STRC'),
-    fetchYahooDaily('STRF').catch(e => { console.warn('[Preferreds] STRF:', e.message); return new Map(); }),
-    fetchYahooDaily('STRD').catch(e => { console.warn('[Preferreds] STRD:', e.message); return new Map(); }),
-    fetchFredSeries('DGS1MO')
+    fetchYahooDaily('STRF'),
+    fetchYahooDaily('STRD'),
+    fetchFredSeries('DGS1MO').then(m => {
+      if (!(m && m.size)) throw new Error('DGS1MO series empty');
+      return m;
+    })
   ]);
 
   const sources = {
@@ -191,21 +245,49 @@ async function fetchAndBuildPreferreds() {
   };
 
   const payload = { points, monthly, summary };
+
+  const degradedLegs = Object.entries(sources).filter(([, s]) => s !== 'ok').map(([k, s]) => `${k}:${s}`);
+  recordSuccess('preferreds', {
+    dataAsOf: summary.asOf, asOfKind: 'source', source: 'preferreds/build',
+    issues: degradedLegs
+  });
+
+  const bound = withDataHealth(payload, REQUIRED_IDS);
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(payload), 'utf8');
+    atomicWriteJson(CACHE_FILE, bound, 0);
   } catch (err) {
     console.error('[Preferreds] Failed to save cache:', err.message);
   }
-  inMemoryCache = payload;
+  inMemoryCache = bound;
   lastFetchTime = Date.now();
-  return payload;
+  return bound;
+}
+
+/** Validate actual point rows (numeric values + parseable dates), not just
+ * the presence of the arrays. */
+function validatePreferredsCache(cached) {
+  if (!cached || !Array.isArray(cached.points) || !cached.points.length) return false;
+  for (const p of cached.points) {
+    if (!p || typeof p.date !== 'string' || isNaN(Date.parse(p.date))) return false;
+    if (!Number.isFinite(Number(p.strcClose))) return false;
+    for (const k of ['strcVwap20', 'strfClose', 'strdClose', 'juniorSpread']) {
+      if (p[k] !== null && p[k] !== undefined && !Number.isFinite(Number(p[k]))) return false;
+    }
+  }
+  if (Array.isArray(cached.monthly)) {
+    for (const m of cached.monthly) {
+      if (!m || typeof m.month !== 'string') return false;
+      if (!Number.isFinite(Number(m.avgPrice))) return false;
+    }
+  }
+  return true;
 }
 
 function readCacheFile() {
   try {
     if (!fs.existsSync(CACHE_FILE)) return null;
     const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    return cached && Array.isArray(cached.points) && cached.points.length ? cached : null;
+    return validatePreferredsCache(cached) ? cached : null;
   } catch (e) {
     return null;
   }
@@ -213,12 +295,28 @@ function readCacheFile() {
 
 const FAILURE_RETRY_MS = 2 * 60 * 1000;
 let rebuildInflight = null;
+let diskSeeded = false;
+
+/** Seed honest disk clocks once, before the first rebuild attempt. Restore
+ * every required source from persisted payload health when present; legacy
+ * files seed only the aggregate hint and keep the leaves UNKNOWN. */
+function seedDiskOnce(cached) {
+  if (diskSeeded || !cached) return;
+  diskSeeded = true;
+  for (const id of REQUIRED_IDS) {
+    seedCachedHealth(cached, id, id === 'preferreds'
+      ? { dataAsOf: cached.summary?.asOf || null, lastSuccessAt: cached.summary?.updatedAt || null }
+      : {});
+  }
+}
 
 // 单飞 + 失败退避，与 macro_fetcher 一致
 function rebuildOnce() {
   if (!rebuildInflight) {
+    recordAttempt('preferreds', { now: Date.now() });
     rebuildInflight = fetchAndBuildPreferreds()
       .catch((err) => {
+        recordFailure('preferreds', err);
         lastFetchTime = Date.now() - CACHE_TTL_MS + FAILURE_RETRY_MS;
         throw err;
       })
@@ -232,6 +330,7 @@ async function getPreferredsData(forceRefresh = false) {
     const cached = readCacheFile();
     if (cached) {
       inMemoryCache = cached;
+      seedDiskOnce(cached);
       const age = Date.now() - (Date.parse(cached.summary?.updatedAt) || 0);
       lastFetchTime = Date.now() - Math.min(age, CACHE_TTL_MS);
     }
@@ -242,13 +341,13 @@ async function getPreferredsData(forceRefresh = false) {
     } catch (err) {
       if (!inMemoryCache) throw err;
       console.warn('[Preferreds] Live rebuild failed, serving cached dataset:', err.message);
-      return inMemoryCache;
+      return withDataHealth(inMemoryCache, REQUIRED_IDS);
     }
   }
   if (Date.now() - lastFetchTime >= CACHE_TTL_MS) {
     rebuildOnce().catch(e => console.error('[Preferreds] Background refresh failed:', e.message));
   }
-  return inMemoryCache;
+  return withDataHealth(inMemoryCache, REQUIRED_IDS);
 }
 
 module.exports = { getPreferredsData };

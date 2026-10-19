@@ -3054,6 +3054,8 @@
   <script src="/pnl_engine.js"></script>
   <!-- atelier.js 必须先于 app.js，才能接住首次 bigdy:viewchange 事件 -->
   <script src="/atelier.js?v=20261009_1"></script>
+  <!-- DataHealthUI 必须先于 app.js/wave_ui：注册各卡片数据源健康横幅与实时结论闸门 -->
+  <script src="/data_health_ui.js"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
   <script src="/app.js?v=20261014_1"></script>
 </body>

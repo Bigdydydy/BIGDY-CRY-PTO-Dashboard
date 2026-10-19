@@ -16,6 +16,38 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// DataHealthUI bridge (public/data_health_ui.js loads before this file).
+// Every data loader reports the payload's dataHealth via dhUpdate and every
+// catch via dhFail — a failure never renews the card's last-good clock.
+let dhRetickQueued = false;
+// After synchronous renderers rebuild DOM nodes, re-apply health locks before
+// paint — the microtask runs once the current synchronous block (including
+// render calls that followed dhUpdate) finishes.
+function scheduleDhRetick() {
+  if (dhRetickQueued) return;
+  dhRetickQueued = true;
+  Promise.resolve().then(() => {
+    dhRetickQueued = false;
+    try { window.DataHealthUI && window.DataHealthUI.refresh(); } catch (e) { /* ignore */ }
+  });
+}
+function dhUpdate(moduleId, health) {
+  try {
+    if (window.DataHealthUI) {
+      window.DataHealthUI.update(moduleId, health);
+      scheduleDhRetick();
+    }
+  } catch (e) { /* UI gate must never break data flow */ }
+}
+function dhFail(moduleId, err) {
+  try {
+    if (window.DataHealthUI) {
+      window.DataHealthUI.fail(moduleId, err);
+      scheduleDhRetick();
+    }
+  } catch (e) { /* ignore */ }
+}
+
 // ============================================================================
 // Studio K95 Day/Night Dual-Theme Architecture & Controller
 // ============================================================================
@@ -456,9 +488,19 @@ async function loadMarketData(triggerRefresh = false) {
     elSyncPulseDot.classList.add('pulse');
 
     let refreshReport = null;
+    let refreshFailed = false;
     if (triggerRefresh) {
       const rResp = await fetch('/api/refresh', { method: 'POST' });
-      refreshReport = await rResp.json();
+      refreshReport = await rResp.json().catch(() => null);
+      // Non-OK HTTP, explicit failure status, or code!=0 all mean the sync did
+      // NOT succeed — the UI must warn, not claim "已是最新".
+      // 'partial' keeps ok=false by contract — it is NOT a hard failure; the
+      // partial-warning branch below handles it. Only real failure shapes set
+      // refreshFailed (non-OK HTTP, missing/error report, status 'failed').
+      if (!rResp.ok || !refreshReport || refreshReport.code !== 0 ||
+          refreshReport.status === 'failed') {
+        refreshFailed = true;
+      }
     }
 
     const threshold = thresholdSelect ? thresholdSelect.value : 30000000;
@@ -488,8 +530,27 @@ async function loadMarketData(triggerRefresh = false) {
 
     renderAll();
 
-    // Visual feedback for re-computation
-    if (isNewData) {
+    // Per-analysis health gates run AFTER the renderers so re-created DOM
+    // nodes are locked immediately — never wait for the next 10s tick.
+    const ah = json.analysisHealth || {};
+    dhUpdate('options.atmIv', ah.atmIv || json.dataHealth);
+    dhUpdate('options.ivSmile', ah.ivSmile || json.dataHealth);
+    dhUpdate('options.delta25Skew', ah.delta25Skew || json.dataHealth);
+    dhUpdate('options.gex', ah.gex || json.dataHealth);
+    dhUpdate('options.blockTrades', ah.blockTrades || json.dataHealth);
+    dhUpdate('term_premium', ah.termPremium || (json.termPremium && json.termPremium.dataHealth) || null);
+
+    // Health problems take priority over "已是最新"/recompute success: any
+    // non-OK or unverifiable dataHealth must warn first, even when rows changed.
+    const dh = json.dataHealth;
+    const healthBad = !dh || dh.state !== 'OK';
+    const failedList = json.syncStatus?.failedSources || dh?.failedSources || [];
+    if (refreshFailed) {
+      const why = refreshReport?.failures?.length ? ` (${refreshReport.failures.map(f => f.source).join('、')})` : '';
+      showToast(`⚠️ 数据同步失败，显示最近缓存${why}`);
+    } else if (healthBad || refreshReport?.status === 'partial') {
+      showToast(`⚠️ 部分数据源不可用/降级${failedList.length ? `：${failedList.join('、')}` : ''}，已沿用缓存`);
+    } else if (isNewData) {
       triggerRecomputedAnimation();
       showToast('数据已更新 · 已重新计算');
     } else if (triggerRefresh) {
@@ -497,6 +558,8 @@ async function loadMarketData(triggerRefresh = false) {
     }
   } catch (err) {
     console.error('Failed to load market data:', err);
+    ['options.atmIv', 'options.ivSmile', 'options.delta25Skew', 'options.gex', 'options.blockTrades', 'term_premium']
+      .forEach(id => dhFail(id, err));
     showToast(`❌ 同步失败: ${err.message}`);
   } finally {
     btnRefresh.classList.remove('loading');
@@ -512,23 +575,27 @@ async function loadMarketData(triggerRefresh = false) {
 function renderAll() {
   if (!currentMarketData) return;
 
-  // Header
-  elIndexPrice.textContent = `$${Math.round(currentMarketData.indexPrice || 0).toLocaleString()}`;
+  // Header — a missing real index prints '--', never a fabricated $0.
+  const _idx = Number(currentMarketData.indexPrice);
+  elIndexPrice.textContent = Number.isFinite(_idx) && _idx > 0 ? `$${Math.round(_idx).toLocaleString()}` : '--';
   
   const sync = currentMarketData.syncStatus;
   if (sync) {
-    elSyncMsg.textContent = sync.summary || '数据已校验';
-    if (sync.hasAnyUpdate) elSyncMsg.className = 'sync-msg updated';
+    const dh = currentMarketData.dataHealth;
+    const failedList = sync.failedSources || dh?.failedSources || [];
+    elSyncMsg.textContent = (sync.summary || '尚无同步记录') +
+      (failedList.length ? ` · 异常源: ${failedList.join('、')}` : '');
+    if (dh && dh.state === 'UNAVAILABLE') elSyncMsg.className = 'sync-msg error';
+    else if ((dh && (dh.state === 'DEGRADED' || dh.state === 'UNKNOWN')) || failedList.length || sync.partialFailure) {
+      elSyncMsg.className = 'sync-msg warn';
+    } else if (sync.hasAnyUpdate) elSyncMsg.className = 'sync-msg updated';
     else elSyncMsg.className = 'sync-msg';
 
-    if (sync.lastSyncCheckTime) {
-      elLastSync.textContent = formatUTC8TimeOnly(sync.lastSyncCheckTime);
-    }
-    if (sync.lastDataChangeTime) {
-      elLastChange.textContent = formatUTC8TimeOnly(sync.lastDataChangeTime);
-    } else {
-      elLastChange.textContent = elLastSync.textContent;
-    }
+    // 检查时间与上次真实成功/数据变动时间是两个概念：未知则显示 '—'，
+    // 绝不用当前时间或检查时间冒充成功时间。
+    elLastSync.textContent = sync.lastSyncCheckTime ? formatUTC8TimeOnly(sync.lastSyncCheckTime) : '—';
+    const successTs = sync.lastDataChangeTime || sync.lastSuccessfulRefreshTime || null;
+    elLastChange.textContent = successTs ? formatUTC8TimeOnly(successTs) : '—';
   }
 
   renderAtmIv(currentMarketData.atmIv);
@@ -573,6 +640,22 @@ function fmtGexMillions(v) {
 
 function renderAtmIv(data) {
   if (!data) return;
+  if (data.status === 'data_unavailable') {
+    // Blocked payload: current conclusions go blank truthfully — '--', never a
+    // fabricated 0% or a canned regime verdict.
+    elIv1m.textContent = '--%'; elIv1mSub.textContent = '--';
+    elIv3m.textContent = '--%'; elIv3mSub.textContent = '--';
+    elIv6m.textContent = '--%'; elIv6mSub.textContent = '--';
+    elIvCurveType.textContent = '--'; elIvCurveSub.textContent = '--';
+    elIvRegimeBadge.textContent = '数据不可用';
+    elIvRegimeBadge.className = 'card-badge badge-neutral';
+    elIvPercentileLabel.textContent = '数据过期或不可用，无法评估分位';
+    elIvGaugeFill.style.width = '0%';
+    setTextIfPresent('iv-expected-move', '日 ±--% | 周 ±--%');
+    setTextIfPresent('iv-straddle-sub', '--');
+    elIvNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    return;
+  }
 
   elIv1m.textContent = data.iv1m ? `${data.iv1m.toFixed(1)}%` : '--%';
   elIv1mSub.textContent = (typeof data.vrp30 === 'number' && typeof data.hv30 === 'number')
@@ -621,6 +704,14 @@ function renderAtmIv(data) {
  */
 function renderGex(data) {
   if (!data) return;
+  if (data.status === 'data_unavailable') {
+    elGexNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    ['gex-total-all', 'gex-total-near', 'gex-total-focused', 'gex-flip'].forEach(id => setTextIfPresent(id, '--'));
+    setTextIfPresent('gex-regime-sub', '--');
+    setTextIfPresent('gex-flip-sub', '--');
+    elGexCardsContainer.innerHTML = '<div class="loading-placeholder">当前 GEX 数据不可用，历史沉淀仍可浏览</div>';
+    return;
+  }
 
   elGexRuleText.textContent = data.dynamicRuleDescription || '';
   elGexNarrativeText.textContent = data.paragraph || '';
@@ -691,6 +782,18 @@ function renderIvSmile(data) {
     elSmileNarrativeText.textContent = '暂无行权价 IV 微笑曲线数据。';
     return;
   }
+  if (data.status === 'data_unavailable') {
+    elSmileShapeBadge.textContent = '数据不可用';
+    elSmileAtmIv.textContent = '--%';
+    elSmileAtmStrike.textContent = 'ATM: $--';
+    elSmilePutWing.textContent = '--'; elSmilePutSub.textContent = '--';
+    elSmileCallWing.textContent = '--'; elSmileCallSub.textContent = '--';
+    elSmileSmirkDiff.textContent = '--'; elSmileSmirkDesc.textContent = '--';
+    setTextIfPresent('smile-kurtosis-curv', '--');
+    elStrikesStripContainer.innerHTML = '<div class="loading-placeholder">实时行权价数据不可用</div>';
+    elSmileNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    return;
+  }
 
   elSmileShapeBadge.textContent = data.skewShape ? data.skewShape.split('/')[0].trim() : '标准微笑';
   elSmileAtmIv.textContent = `${Number(data.atmIv || 0).toFixed(1)}%`;
@@ -740,6 +843,15 @@ function render25DeltaSkew(data) {
     elSkewNarrativeText.textContent = '暂无 25Δ Skew 期限结构数据。';
     return;
   }
+  if (data.status === 'data_unavailable') {
+    ['skew-1d', 'skew-7d', 'skew-30d', 'skew-60d', 'skew-90d', 'skew-180d', 'skew-365d']
+      .forEach(id => setTextIfPresent(id, '--'));
+    setTextIfPresent('skew-regime-name', '--');
+    setTextIfPresent('skew-regime-sub', '--');
+    setTextIfPresent('skew-regime-badge', '数据不可用');
+    elSkewNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    return;
+  }
 
   function formatSkewVal(el, val) {
     if (typeof val !== 'number') {
@@ -782,6 +894,17 @@ function render25DeltaSkew(data) {
  */
 function renderBlockTrades(data) {
   if (!data) return;
+  if (data.status === 'data_unavailable') {
+    // Pause current conclusions only — the 30-day persistent store and the
+    // last-rendered trade tables stay browsable (do NOT wipe them).
+    elBlockNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    elWhaleTotalVol.textContent = '--';
+    setTextIfPresent('whale-total-sub', '--');
+    elWhaleSingleCount.textContent = '--';
+    elIcebergClusterCount.textContent = '--';
+    elFlowBiasLabel.textContent = '--';
+    return;
+  }
 
   elBlockNarrativeText.textContent = data.paragraph || '';
   const dedupedM = Number(data.dedupedTotalM ?? data.totalWhaleVolumeM) || 0;
@@ -1323,6 +1446,7 @@ async function loadPnLLiveMarks(state) {
     const resp = await fetch(`/api/option-marks?currency=BTC&instruments=${encodeURIComponent(names.join(','))}`);
     const json = await resp.json();
     if (!resp.ok || json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    dhUpdate('option_marks', json.dataHealth);
     if (pnlViewState !== state) return; // modal re-opened on another block meanwhile
 
     const indexNow = Number(json.indexPrice) || state.spotNow;
@@ -1338,6 +1462,7 @@ async function loadPnLLiveMarks(state) {
     if (Number(json.indexPrice) > 0) state.spotNow = Number(json.indexPrice);
     state.ivSource = { kind: matched ? 'live' : 'trade', matched, total: state.legs.length, timestamp: json.timestamp, stale: !!json.stale };
   } catch (err) {
+    dhFail('option_marks', err);
     if (pnlViewState !== state) return;
     console.warn('[PV] live option marks unavailable, using trade IV:', err.message);
     state.ivSource = { kind: 'error' };
@@ -1456,9 +1581,15 @@ window.openPnLViewModal = function(type, idx) {
   const legs = rawLegs.map(l => normalizePnLLeg(l, fallbackIv)).filter(l => l.strike > 0 && l.amount > 0);
   if (!legs.length) return;
 
-  // 2. Spot: cost basis stays at the trade, the view is anchored at the current index
+  // 2. Spot: cost basis stays at the trade, the view is anchored at the current
+  // index. No real index + no real trade-time price => no anchor — pause the
+  // simulation instead of inventing a spot.
   const entrySpot = Number(item.legs?.[0]?.indexPrice) || Number(item.indexPrice) || 0;
-  const spotNow = Number(currentMarketData?.indexPrice) || entrySpot || 85000;
+  const spotNow = Number(currentMarketData?.indexPrice) || entrySpot || null;
+  if (!Number.isFinite(spotNow) || spotNow <= 0) {
+    setPnLText('pnl-modal-meta', '缺少真实指数价格，暂停收益结构模拟');
+    return;
+  }
 
   pnlViewState = {
     legs,
@@ -1801,10 +1932,12 @@ async function loadBlockInsight(expiry = null) {
     const json = await req;
     if (blockInsightRequest !== req) return; // 更新的请求已发出
     if (json.code !== 0) throw new Error(json.error || '加载失败');
+    dhUpdate('block_insight', json.dataHealth);
     blockInsightData = json;
     blockInsightLoadedAt = Date.now();
     renderBlockInsight();
   } catch (err) {
+    dhFail('block_insight', err);
     if (blockInsightRequest === req) setTextIfPresent('insight-coverage', `4B 数据加载失败：${err.message}`);
   }
 }
@@ -2327,11 +2460,13 @@ async function loadMacroData(forceRefresh = false) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.error || 'Failed to load macro data');
+    dhUpdate('macro', json.dataHealth);
 
     rawMacroData = json;
     renderMacroSummary(json.summary);
     renderMacroChart();
   } catch (err) {
+    dhFail('macro', err);
     console.error('[MacroChart] Error loading macro data:', err);
     const el = document.getElementById('macro-freshness');
     if (el) {
@@ -2978,10 +3113,12 @@ async function loadPreferredsData(forceRefresh = false) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.error || 'Failed to load preferreds data');
+    dhUpdate('preferreds', json.dataHealth);
     rawPrefData = json;
     renderPreferredsSummary(json.summary, json.monthly);
     renderPreferredsCharts();
   } catch (err) {
+    dhFail('preferreds', err);
     console.error('[Preferreds] Error loading data:', err);
     const asof = document.getElementById('pref-asof');
     if (asof) asof.textContent = '数据源暂不可用';
@@ -3237,11 +3374,13 @@ async function loadCdriData(forceRefresh = false) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.error || 'Failed to load CDRI data');
+    dhUpdate('cdri', json.dataHealth);
 
     rawCdriData = json;
     renderCdriMetrics(json);
     renderCdriChart();
   } catch (err) {
+    dhFail('cdri', err);
     console.error('[CDRI] Error loading CDRI data:', err);
   }
 }
@@ -3672,12 +3811,19 @@ const tpTimeframeSelector = document.getElementById('tp-timeframe-selector');
 async function loadTermPremiumData() {
   try {
     const resp = await fetch('/api/term-premium');
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      dhFail('term_premium', new Error(`HTTP ${resp.status}`));
+      return;
+    }
     const json = await resp.json();
     if (json.code === 0) {
+      // data_unavailable payloads still carry dataHealth — the UI gate blocks
+      // the conclusion containers while the historical curve stays visible.
+      dhUpdate('term_premium', json.dataHealth || (json.status === 'data_unavailable' ? { state: 'UNAVAILABLE' } : null));
       renderTermPremium(json);
     }
   } catch (err) {
+    dhFail('term_premium', err);
     console.error('[Term Premium] Error loading data:', err);
   }
 }
@@ -3704,6 +3850,25 @@ function renderTermPremium(data, forceRedraw = false) {
 
   const c = data.current;
   const reg = data.regime || {};
+
+  // Blocked/historical-only payload: render the real series chart + the pause
+  // summary, and never touch the missing current.* conclusions.
+  if (data.status === 'data_unavailable') {
+    if (elTpInsightsSummary) {
+      elTpInsightsSummary.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
+    }
+    if (elTpInsightsList) elTpInsightsList.innerHTML = '';
+    if (elTpUpdateTime) {
+      const lastDate = data.series && data.series.length ? data.series[data.series.length - 1].date : null;
+      elTpUpdateTime.textContent = lastDate ? `历史数据截至 ${lastDate} · 实时研判已暂停` : '数据不可用';
+    }
+    if (elTpHeaderRegimePill) {
+      elTpHeaderRegimePill.textContent = '数据不可用';
+      elTpHeaderRegimePill.className = 'tp-regime-pill';
+    }
+    renderTermPremiumChart();
+    return;
+  }
 
   // Header pills & provenance badges
   if (elTpDataSourceBadge && data.metadata?.dataSource) {
@@ -4136,6 +4301,7 @@ async function loadEtfLinkageData(force = false) {
     const resp = await fetch(`/api/etf-linkage${force ? '?force=1' : ''}`);
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    dhUpdate('etf', json.dataHealth);
     rawEtfLinkageData = json;
     if (status) {
       status.textContent = json.stale ? '⚠ 上游数据暂不可用，显示最近一次缓存结果' : '';
@@ -4143,6 +4309,7 @@ async function loadEtfLinkageData(force = false) {
     }
     renderEtfLinkage();
   } catch (err) {
+    dhFail('etf', err);
     console.error('[ETF Linkage] Failed to load:', err);
     if (status) {
       status.textContent = `ETF 联动数据加载失败：${err.message}`;
@@ -4782,11 +4949,13 @@ async function fetchSsroData(force = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.code !== 0) throw new Error(data.error || 'Failed to load SSRO');
+    dhUpdate('ssro', data.dataHealth);
 
     rawSsroData = data;
     updateSsroKpiCards(data);
     renderSsroChart();
   } catch (err) {
+    dhFail('ssro', err);
     console.error('[SSRO] Failed to load data:', err);
   }
 }
@@ -5133,13 +5302,16 @@ async function fetchFlowForce(force = false) {
     const res = await fetch(`/api/flow-force?tf=${tf}${force ? '&force=1' : ''}`);
     const data = await res.json();
     if (!res.ok || data.code !== 0) throw new Error(data.error || `HTTP ${res.status}`);
-    if (seq !== flowFetchSeq) return; // 周期已切换，丢弃旧响应
+    if (seq !== flowFetchSeq) return; // 周期已切换，丢弃旧响应（含其健康状态）
+    dhUpdate('flow', data.dataHealth);
     const tfChanged = !rawFlowData || rawFlowData.tf !== data.tf;
     rawFlowData = data;
     updateFlowKpis(data);
     renderFlowAudit(data);
     if (window.LightweightCharts) renderFlowChart(tfChanged);
   } catch (err) {
+    // A superseded request failing must not poison the current tf's health.
+    if (seq === flowFetchSeq) dhFail('flow', err);
     console.error('[Flow] 加载失败:', err);
     if (st && seq === flowFetchSeq) st.textContent = `加载失败: ${err.message}`;
   }
@@ -5530,13 +5702,18 @@ async function fetchCoinbaseLiquidityData(forceRefresh = false) {
   try {
     const url = forceRefresh ? '/api/coinbase-liquidity?force=1' : '/api/coinbase-liquidity';
     const resp = await fetch(url);
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      dhFail('coinbase', new Error(`HTTP ${resp.status}`));
+      return;
+    }
     const json = await resp.json();
     if (json.code === 0) {
+      dhUpdate('coinbase', json.dataHealth);
       rawCoinbaseData = json;
       renderCoinbaseLiquidity(json);
     }
   } catch (err) {
+    dhFail('coinbase', err);
     console.error('[Coinbase Liquidity] Fetch error:', err);
   }
 }
@@ -5922,13 +6099,21 @@ async function fetchCbLiquidityHistory(force = false) {
   if (!force && rawCbHistory && Date.now() - cbHistoryLastFetch < CB_HISTORY_REFRESH_MS) return;
   try {
     const resp = await fetch(`/api/coinbase-liquidity-history?range=${encodeURIComponent(cbHistoryRange)}`);
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      dhFail('liquidity_history', new Error(`HTTP ${resp.status}`));
+      return;
+    }
     const json = await resp.json();
-    if (json.code !== 0) return;
+    if (json.code !== 0) {
+      dhFail('liquidity_history', new Error(json.error || 'bad code'));
+      return;
+    }
+    dhUpdate('liquidity_history', json.dataHealth);
     rawCbHistory = json;
     cbHistoryLastFetch = Date.now();
     renderCbHistory(json);
   } catch (err) {
+    dhFail('liquidity_history', err);
     console.error('[Coinbase History] Fetch error:', err);
   }
 }
@@ -6652,12 +6837,17 @@ const elGoldInsightsList = document.getElementById('gold-insights-list');
 async function loadGoldCorrelationData(force = false) {
   try {
     const resp = await fetch(`/api/gold-correlation${force ? '?refresh=true' : ''}`);
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      dhFail('gold', new Error(`HTTP ${resp.status}`));
+      return;
+    }
     const json = await resp.json();
     if (json.code === 0 && json.series) {
+      dhUpdate('gold', json.dataHealth);
       renderGoldCorrelation(json, force);
     }
   } catch (err) {
+    dhFail('gold', err);
     console.error('[GoldCorrelation] Error fetching data:', err);
   }
 }
@@ -7044,6 +7234,7 @@ async function loadMcClellanData(force = false) {
 
     if (resJson && resJson.code === 0) {
       rawMcClellanData = resJson.data || resJson;
+      dhUpdate('mcclellan', resJson.dataHealth || rawMcClellanData.dataHealth);
       renderMcClellanDashboard(rawMcClellanData);
       if (force) {
         const rStatus = resJson.refreshStatus || rawMcClellanData.refresh_status;
@@ -7061,6 +7252,7 @@ async function loadMcClellanData(force = false) {
       throw new Error(resJson?.error || '返回数据格式不符合预期');
     }
   } catch (err) {
+    dhFail('mcclellan', err);
     console.error('[CryptoMcClellan] Load data failed:', err);
     showToast(`麦克莱伦数据载入失败: ${err.message}`);
   } finally {

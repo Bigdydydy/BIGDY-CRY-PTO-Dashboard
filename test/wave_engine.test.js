@@ -13,7 +13,7 @@ const {
   PATTERNS,
   _internal
 } = require('../server/wave_engine');
-const { server } = require('../server/index');
+const { server, _internal: serverInternal } = require('../server/index');
 
 const P = (idx, price, type) => ({ idx, time: idx, price, type, confirmed: true });
 
@@ -250,7 +250,26 @@ describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
   });
 
   it('HTTP API: GET /api/wave/analysis 返回符合柳玉冬规范的波浪分析数据与候选集', async () => {
-    await new Promise((resolve) => {
+    // Offline sandbox: no upstream kline fetch is possible. Seed the served
+    // tier directly — a fresh entry bound to real bar timestamps satisfies the
+    // health gate without any network call.
+    const now = Math.floor(Date.now() / 1000), step = 4 * 3600, N = 300;
+    const pivots = [[0, 100], [60, 200], [110, 150], [190, 400], [240, 350], [299, 520]];
+    const seededBars = [];
+    for (let i = 0; i < N; i++) {
+      let seg = 0;
+      while (seg < pivots.length - 2 && i > pivots[seg + 1][0]) seg++;
+      const [i0, p0] = pivots[seg], [i1, p1] = pivots[seg + 1];
+      const price = p0 + (p1 - p0) * ((i - i0) / (i1 - i0));
+      seededBars.push({ time: now - (N - 1 - i) * step, open: price, high: price * 1.005, low: price * 0.995, close: price, volume: 10 });
+    }
+    serverInternal.waveKlineCache.set('BTCUSDT_4h_10000', {
+      timestamp: Date.now(), acquiredAt: Date.now(),
+      dataAsOf: seededBars[seededBars.length - 1].time * 1000,
+      data: seededBars, source: { name: 'test-fixture' }, issues: []
+    });
+    try {
+      await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', async () => {
         const port = server.address().port;
         try {
@@ -269,7 +288,10 @@ describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
           server.close(resolve);
         }
       });
-    });
+      });
+    } finally {
+      serverInternal.waveKlineCache.delete('BTCUSDT_4h_10000');
+    }
   });
 
   it('Wave Engine: 平台形调整浪 (Flat a-b-c) 满足 B 浪 >= 70% a 浪手稿铁律', () => {

@@ -18,6 +18,8 @@ const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { calcGreeks, parseInstrument, parseDeribitExpiry } = require('./analytics_engine');
 const { dayKey, profileFromItems } = require('./option_oi_history');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 const PnLEngine = require('../public/pnl_engine');
 
 const HOUR_MS = 3600 * 1000;
@@ -673,8 +675,10 @@ function readDailyFile(file = DAILY_FILE) {
   return decodeDaily(readJson(file));
 }
 
-function writeDailyFile(days, file = DAILY_FILE) {
-  fs.writeFileSync(file, JSON.stringify(encodeDaily(days)));
+function writeDailyFile(days, file = DAILY_FILE, producerHealth = null) {
+  const payload = encodeDaily(days);
+  if (producerHealth && typeof producerHealth === 'object') payload.producerHealth = producerHealth;
+  atomicWriteJson(file, payload, 0);
 }
 
 function readRegistryFile(file = SMART_FILE) {
@@ -682,8 +686,10 @@ function readRegistryFile(file = SMART_FILE) {
   return json && Array.isArray(json.structures) ? json.structures : [];
 }
 
-function writeRegistryFile(registry, file = SMART_FILE) {
-  fs.writeFileSync(file, JSON.stringify({ currency: 'BTC', version: 1, structures: registry }));
+function writeRegistryFile(registry, file = SMART_FILE, producerHealth = null) {
+  const payload = { currency: 'BTC', version: 1, structures: registry };
+  if (producerHealth && typeof producerHealth === 'object') payload.producerHealth = producerHealth;
+  atomicWriteJson(file, payload, 0);
 }
 
 /** Deribit 交割价：{ 'YYYY-MM-DD': price } */
@@ -692,9 +698,17 @@ async function fetchDeliveryPrices(count = 120) {
   const resp = await fetchWithTimeout(url, { timeout: 8000 });
   if (!resp.ok) throw new Error(`Deribit delivery prices HTTP ${resp.status}`);
   const json = await resp.json();
+  // Schema is contractual: a renamed/reshaped field must fail loudly rather
+  // than masquerade as "no deliveries" — every row needs a real date and a
+  // finite positive delivery_price.
+  const data = json && json.result && json.result.data;
+  if (!Array.isArray(data)) throw new Error('Deribit delivery prices schema 校验失败: result.data missing');
   const out = {};
-  for (const d of json.result?.data || []) {
-    if (d.date && d.delivery_price > 0) out[d.date] = d.delivery_price;
+  for (const d of data) {
+    if (!d || typeof d.date !== 'string' || !d.date || !Number.isFinite(Number(d.delivery_price)) || Number(d.delivery_price) <= 0) {
+      throw new Error('Deribit delivery prices schema 校验失败: bad row');
+    }
+    out[d.date] = Number(d.delivery_price);
   }
   return out;
 }
@@ -720,26 +734,158 @@ let localRegistry = null;
 let liveInflight = null;
 let lastLiveAttempt = 0;
 
+const strictNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Daily archive: expiries dict of nonempty names; each day key a valid date
+ * with a rows array of [expiryId, strike, isCall, buyQty, sellQty,
+ * netDeltaUSD, netVegaUSD, netPremiumUSD, grossUSD, count]. */
+function validDailyArchive(j) {
+  if (!j || !Array.isArray(j.expiries) || !j.days || typeof j.days !== 'object') return false;
+  if (j.expiries.some(e => typeof e !== 'string' || !e)) return false;
+  for (const [key, d] of Object.entries(j.days)) {
+    if (!DAY_RE.test(key) || isNaN(Date.parse(key))) return false;
+    if (!d || !Array.isArray(d.rows)) return false;
+    for (const r of d.rows) {
+      if (!Array.isArray(r) || r.length < 10) return false;
+      if (!Number.isInteger(r[0]) || r[0] < 0 || r[0] >= j.expiries.length) return false;
+      if (!strictNum(r[1]) || r[1] <= 0) return false;               // strike
+      if (r[2] !== 0 && r[2] !== 1) return false;                    // isCall flag
+      for (const i of [3, 4, 5, 6, 7, 8]) if (!strictNum(r[i])) return false;
+      if (r[3] < 0 || r[4] < 0 || r[8] < 0) return false;            // qty/gross non-negative
+      if (!Number.isInteger(r[9]) || r[9] <= 0) return false;        // trade count >= 1
+    }
+  }
+  return true;
+}
+
+/** Smart-money registry archive: every structure has an id, positive ts and
+ * notional, nonempty validated legs, a marks array of {ts,day,pnlBtc}, and a
+ * finite final pnl when present. Empty registries are a valid state. */
+function validRegistryArchive(j) {
+  if (!j || !Array.isArray(j.structures)) return false;
+  for (const s of j.structures) {
+    if (!s || typeof s.id !== 'string' || !s.id) return false;
+    if (!strictNum(s.ts) || s.ts <= 0) return false;
+    if (!strictNum(s.notionalUSD) || s.notionalUSD <= 0) return false;
+    if (!Array.isArray(s.legs) || !s.legs.length) return false;
+    for (const l of s.legs) {
+      if (!l || typeof l.instrument !== 'string' || !l.instrument) return false;
+      if (l.direction !== 'buy' && l.direction !== 'sell') return false;
+      if (!strictNum(l.amount) || l.amount <= 0) return false;
+      if (!strictNum(l.price) || l.price < 0) return false;
+    }
+    if (!Array.isArray(s.marks)) return false;
+    for (const m of s.marks) {
+      if (!m || !strictNum(m.ts) || !strictNum(m.pnlBtc)) return false;
+      if (m.day !== undefined && (typeof m.day !== 'string' || !DAY_RE.test(m.day))) return false;
+    }
+    if (s.final !== null && s.final !== undefined && !strictNum(s.final.pnlBtc)) return false;
+  }
+  return true;
+}
+
+/** Remote archives are schema-validated before replacing the cache slot;
+ * health id + artifact data-as-of are carried per slot. Empty archives (no
+ * trades yet) are a valid state, not a failure. */
+const REMOTE_HEALTH = {
+  daily: {
+    id: 'block_flow',
+    valid: validDailyArchive,
+    dataAsOf: d => { const ks = Object.keys(d).sort(); return ks.length ? ks[ks.length - 1] : null; }
+  },
+  registry: {
+    id: 'smart_money',
+    valid: validRegistryArchive,
+    dataAsOf: arr => {
+      let max = null;
+      for (const s of arr) if (Number.isFinite(s.ts)) max = Math.max(max || 0, s.ts);
+      return max ? new Date(max).toISOString() : null;
+    }
+  }
+};
+
+/** Producer-check receipt embedded by the daily workflow. This is the job
+ * run's own clock — never the last trade date and never the download time. */
+function producerReceiptMs(json) {
+  const ms = json && json.producerHealth ? Date.parse(json.producerHealth.lastSuccessAt) : NaN;
+  return Number.isFinite(ms) && ms > 0 && ms <= Date.now() + 5 * 60000 ? ms : null;
+}
+
 async function readRemote(slot, fileName, decode, now) {
   const r = remote[slot];
   if (r.value && now - r.at < REMOTE_TTL_MS) return r.value;
+  const meta = REMOTE_HEALTH[slot];
+  recordAttempt(meta.id, { now: Date.now() });
   try {
     const resp = await fetchWithTimeout(`${RAW_BASE}/${fileName}`, { headers: { Accept: 'application/json' }, timeout: 8000, retries: 0 });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    remote[slot] = { value: decode(await resp.json()), at: now };
+    const json = await resp.json();
+    if (!meta.valid(json)) throw new Error(`${fileName} schema 校验失败`);
+    const value = decode(json);
+    // Health clock = the producer-check receipt, not the last event date: an
+    // empty-but-verified archive is usable, while a legacy archive without a
+    // heartbeat stays UNKNOWN (the download itself proves nothing).
+    const receiptMs = producerReceiptMs(json);
+    if (receiptMs !== null) {
+      recordSuccess(meta.id, {
+        dataAsOf: new Date(receiptMs).toISOString(),
+        asOfKind: 'received',
+        source: 'github-archive/producer-check'
+      });
+    }
+    remote[slot] = { value, at: now };
   } catch (err) {
+    recordFailure(meta.id, err);
     remote[slot] = { value: r.value || decode(null), at: now };
   }
   return remote[slot].value;
 }
 
+/** Seed honest disk clocks once — a committed archive's own producerHealth
+ * receipt is honored; archives without one stay UNKNOWN (the last trade day
+ * is the DATA date, never a job-run or download time). */
+const diskSeeded = { block_flow: false, smart_money: false };
+
+function seedDailyOnce() {
+  if (diskSeeded.block_flow) return;
+  diskSeeded.block_flow = true;
+  const json = readJson(DAILY_FILE);
+  const receiptMs = producerReceiptMs(json);
+  const daily = decodeDaily(json);
+  const ks = Object.keys(daily).sort();
+  seedCachedHealth({ dataHealth: null }, 'block_flow', {
+    dataAsOf: receiptMs !== null ? new Date(receiptMs).toISOString() : (ks.length ? ks[ks.length - 1] : null),
+    lastSuccessAt: receiptMs !== null ? new Date(receiptMs).toISOString() : null,
+    asOfKind: receiptMs !== null ? 'received' : 'source'
+  });
+}
+
+function seedRegistryOnce(registry) {
+  if (diskSeeded.smart_money) return;
+  diskSeeded.smart_money = true;
+  const json = readJson(SMART_FILE);
+  const receiptMs = producerReceiptMs(json);
+  let max = null;
+  for (const s of registry || []) if (Number.isFinite(s.ts)) max = Math.max(max || 0, s.ts);
+  seedCachedHealth({ dataHealth: null }, 'smart_money', {
+    dataAsOf: receiptMs !== null ? new Date(receiptMs).toISOString() : (max ? new Date(max).toISOString() : null),
+    lastSuccessAt: receiptMs !== null ? new Date(receiptMs).toISOString() : null,
+    asOfKind: receiptMs !== null ? 'received' : 'source'
+  });
+}
+
 async function getCommittedDaily(now = Date.now()) {
+  const local = readDailyFile();
+  seedDailyOnce(local); // before the remote attempt
   const remoteDaily = await readRemote('daily', 'block_flow_daily_BTC.json', decodeDaily, now);
-  return mergeDaily(remoteDaily, readDailyFile());
+  return mergeDaily(remoteDaily, local);
 }
 
 async function getMergedRegistry(now = Date.now()) {
   if (localRegistry === null) localRegistry = readRegistryFile(SMART_LOCAL_FILE);
+  seedRegistryOnce(mergeRegistries(readRegistryFile(), localRegistry)); // before remote
   const remoteRegistry = await readRemote('registry', 'smart_money_BTC.json', j => (j && Array.isArray(j.structures) ? j.structures : []), now);
   return mergeRegistries(mergeRegistries(readRegistryFile(), remoteRegistry), localRegistry);
 }
@@ -754,6 +900,7 @@ function maybeRefreshLocalRegistry(merged, analysis, fetchRows, now = Date.now()
   const needsMark = registered.some(s => !s.final && !s.marks.some(m => m.day === key));
   if (!added && !needsMark) return null;
   lastLiveAttempt = now;
+  recordAttempt('smart_money', { now: Date.now() });
   liveInflight = (async () => {
     try {
       let next = registered;
@@ -763,9 +910,18 @@ function maybeRefreshLocalRegistry(merged, analysis, fetchRows, now = Date.now()
         next = markStructures(next, { markByInstrument, spot, deliveryByDate, nowMs: Date.now() }).registry;
       }
       localRegistry = mergeRegistries(next, localRegistry || []);
+      let max = null;
+      for (const s of localRegistry) if (Number.isFinite(s.ts)) max = Math.max(max || 0, s.ts);
+      // recordSuccess BEFORE the file write: a health-record throw must not
+      // leave unverified bytes posing as the newest valid registry.
+      recordSuccess('smart_money', {
+        dataAsOf: max ? new Date(max).toISOString() : new Date(now).toISOString(),
+        asOfKind: 'received', source: 'local-registry'
+      });
       writeRegistryFile(localRegistry, SMART_LOCAL_FILE);
       console.log(`[BlockInsight] local registry: ${localRegistry.length} structures (+${added})`);
     } catch (err) {
+      recordFailure('smart_money', err);
       console.warn('[BlockInsight] local registry refresh failed:', err.message);
     } finally {
       liveInflight = null;

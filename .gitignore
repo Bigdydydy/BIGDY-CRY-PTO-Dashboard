@@ -32,3 +32,6 @@ data/vol_surface_history_BTC.local.json
 
 # Module 5 主导力量: 服务器运行时累积的K线存档与定死行 (已收盘K线先写入者为准)
 data/flow_force/
+
+# 基差历史运行期 sidecar 健康回执 (由服务器运行时生成，不随归档提交)
+data/term_premium_history.health.json

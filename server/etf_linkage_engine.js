@@ -26,6 +26,8 @@ const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { callCoinglassEndpoint } = require('./cdri_fetcher');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'etf_linkage.json');
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -34,9 +36,19 @@ const ROLLING_WEEKS = 12;
 const LEAD_LAG_MAX = 4;
 const DAY_MS = 86400000;
 const CFTC_CONTRACTS = { '133741': 5, '133742': 0.1 }; // BTC per contract
+// Carry/basis health is ancillary: it enriches the panel but never gates the
+// required ETF/COT/OI legs.
+const REQUIRED_IDS = ['etf', 'cot', 'etf_oi'];
+const ANCILLARY_IDS = ['basis_live', 'basis_history'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isFiniteNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
+const isNonNegNum = v => isFiniteNum(v) && Number(v) >= 0;
 
 let memoryCache = null;
 let memoryCacheTime = 0;
+let inflight = null;
+let diskSeeded = false;
 
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
 const round = (v, d = 2) => (v == null || !isFinite(v) ? null : Number(Number(v).toFixed(d)));
@@ -71,6 +83,7 @@ function pearson(xs, ys) {
  */
 function ols(X, y) {
   const n = y.length;
+  if (!X.length || !n) return null; // sparse data: no regressors at all
   const k = X[0].length + 1;
   if (n <= k + 1) return null;
   const A = X.map(row => [1, ...row]);
@@ -145,95 +158,187 @@ function simpleRegression(xs, ys) {
 // ---------------------------------------------------------------------------
 
 async function fetchEtfFlows() {
-  const rows = await callCoinglassEndpoint('/api/etf/flow');
-  if (!Array.isArray(rows)) throw new Error('CoinGlass ETF flow payload malformed');
-  return rows
-    // A day is reported once at least one fund has a printed flow; trailing blank days are dropped
-    .filter(r => Array.isArray(r.list) && r.list.some(f => f.changeUsd != null))
-    .map(r => ({ date: isoDate(r.date), flowBtc: Number(r.change) || 0, flowUsd: Number(r.changeUsd) || 0 }))
-    .filter(r => r.date >= START_DATE)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  recordAttempt('etf', { now: Date.now() });
+  try {
+    const rows = await callCoinglassEndpoint('/api/etf/flow');
+    if (!Array.isArray(rows)) throw new Error('CoinGlass ETF flow payload malformed');
+    const kept = rows
+      // A day is reported once at least one fund has a printed flow; trailing blank days are dropped
+      .filter(r => Array.isArray(r.list) && r.list.some(f => f.changeUsd != null));
+    // Printed flows of 0 are legitimate, but a kept row may never have its
+    // change/changeUsd silently defaulted to 0.
+    for (const r of kept) {
+      if (!Number.isFinite(Number(r.date)) || !isFiniteNum(r.change) || !isFiniteNum(r.changeUsd)) {
+        throw new Error('ETF flow row 校验失败 (date/change/changeUsd 缺失或非有限数)');
+      }
+    }
+    const out = kept
+      .map(r => ({ date: isoDate(r.date), flowBtc: Number(r.change), flowUsd: Number(r.changeUsd) }))
+      .filter(r => r.date >= START_DATE)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!out.length) throw new Error('ETF flow payload empty after filtering');
+    recordSuccess('etf', { dataAsOf: out[out.length - 1].date, asOfKind: 'source', source: 'coinglass/etf/flow' });
+    return out;
+  } catch (err) {
+    recordFailure('etf', err);
+    throw err;
+  }
 }
 
-async function fetchCftcBitcoin() {
-  const codes = Object.keys(CFTC_CONTRACTS).map(c => `'${c}'`).join(',');
-  const params = new URLSearchParams({
-    $select: 'report_date_as_yyyy_mm_dd,cftc_contract_market_code,open_interest_all,'
-      + 'lev_money_positions_long,lev_money_positions_short,asset_mgr_positions_long,asset_mgr_positions_short,'
-      + 'dealer_positions_long_all,dealer_positions_short_all',
-    $where: `cftc_contract_market_code in(${codes}) AND report_date_as_yyyy_mm_dd >= '${START_DATE}'`,
-    $order: 'report_date_as_yyyy_mm_dd',
-    $limit: '5000'
-  });
-  const resp = await fetchWithTimeout(`https://publicreporting.cftc.gov/resource/gpe5-46if.json?${params}`, { timeout: 20000 });
-  if (!resp.ok) throw new Error(`CFTC HTTP ${resp.status}`);
-  const raw = await resp.json();
+const CFTC_REQUIRED_KEYS = [
+  'report_date_as_yyyy_mm_dd', 'cftc_contract_market_code', 'open_interest_all',
+  'lev_money_positions_long', 'lev_money_positions_short',
+  'asset_mgr_positions_long', 'asset_mgr_positions_short',
+  'dealer_positions_long_all', 'dealer_positions_short_all'
+];
 
-  const byDate = new Map();
-  for (const r of raw) {
-    const mult = CFTC_CONTRACTS[r.cftc_contract_market_code];
-    if (!mult) continue;
-    const date = String(r.report_date_as_yyyy_mm_dd).slice(0, 10);
-    const acc = byDate.get(date) || { date, oiBtc: 0, lfLongBtc: 0, lfShortBtc: 0, amLongBtc: 0, amShortBtc: 0, dealerNetBtc: 0, contracts: 0 };
-    const n = key => Number(r[key]) || 0;
-    acc.oiBtc += n('open_interest_all') * mult;
-    acc.lfLongBtc += n('lev_money_positions_long') * mult;
-    acc.lfShortBtc += n('lev_money_positions_short') * mult;
-    acc.amLongBtc += n('asset_mgr_positions_long') * mult;
-    acc.amShortBtc += n('asset_mgr_positions_short') * mult;
-    acc.dealerNetBtc += (n('dealer_positions_long_all') - n('dealer_positions_short_all')) * mult;
-    acc.contracts++;
-    byDate.set(date, acc);
+async function fetchCftcBitcoin() {
+  recordAttempt('cot', { now: Date.now() });
+  try {
+    const codes = Object.keys(CFTC_CONTRACTS).map(c => `'${c}'`).join(',');
+    const params = new URLSearchParams({
+      $select: 'report_date_as_yyyy_mm_dd,cftc_contract_market_code,open_interest_all,'
+        + 'lev_money_positions_long,lev_money_positions_short,asset_mgr_positions_long,asset_mgr_positions_short,'
+        + 'dealer_positions_long_all,dealer_positions_short_all',
+      $where: `cftc_contract_market_code in(${codes}) AND report_date_as_yyyy_mm_dd >= '${START_DATE}'`,
+      $order: 'report_date_as_yyyy_mm_dd',
+      $limit: '5000'
+    });
+    const resp = await fetchWithTimeout(`https://publicreporting.cftc.gov/resource/gpe5-46if.json?${params}`, { timeout: 20000 });
+    if (!resp.ok) throw new Error(`CFTC HTTP ${resp.status}`);
+    const raw = await resp.json();
+    if (!Array.isArray(raw) || !raw.length) throw new Error('CFTC payload empty');
+
+    // Full-row validation BEFORE mapping: every required key must exist and be
+    // a finite non-negative number; the latest report week must carry both
+    // contracts.
+    let latestDate = '';
+    const latestPerCode = new Map();
+    for (const r of raw) {
+      if (!r || typeof r !== 'object') throw new Error('CFTC row 非对象');
+      if (!CFTC_CONTRACTS[r.cftc_contract_market_code]) continue; // unrelated code
+      for (const k of CFTC_REQUIRED_KEYS) {
+        if (r[k] === null || r[k] === undefined || r[k] === '') throw new Error(`CFTC 缺字段 ${k}`);
+        if (k !== 'report_date_as_yyyy_mm_dd' && k !== 'cftc_contract_market_code' && !isNonNegNum(r[k])) {
+          throw new Error(`CFTC 字段 ${k} 非有限非负数`);
+        }
+      }
+      const d = String(r.report_date_as_yyyy_mm_dd).slice(0, 10);
+      if (!DATE_RE.test(d)) throw new Error(`CFTC 报告日期非法: ${d}`);
+      if (d > latestDate) latestDate = d;
+      const prev = latestPerCode.get(r.cftc_contract_market_code);
+      if (!prev || d > prev) latestPerCode.set(r.cftc_contract_market_code, d);
+    }
+    if (!latestDate) throw new Error('CFTC payload: 无目标合约行');
+    for (const code of Object.keys(CFTC_CONTRACTS)) {
+      if (latestPerCode.get(code) !== latestDate) {
+        throw new Error(`CFTC 最新周 ${latestDate} 缺合约 ${code}，数据不完整`);
+      }
+    }
+
+    const byDate = new Map();
+    for (const r of raw) {
+      const mult = CFTC_CONTRACTS[r.cftc_contract_market_code];
+      if (!mult) continue;
+      const date = String(r.report_date_as_yyyy_mm_dd).slice(0, 10);
+      const acc = byDate.get(date) || { date, oiBtc: 0, lfLongBtc: 0, lfShortBtc: 0, amLongBtc: 0, amShortBtc: 0, dealerNetBtc: 0, contracts: 0 };
+      const n = key => Number(r[key]) || 0;
+      acc.oiBtc += n('open_interest_all') * mult;
+      acc.lfLongBtc += n('lev_money_positions_long') * mult;
+      acc.lfShortBtc += n('lev_money_positions_short') * mult;
+      acc.amLongBtc += n('asset_mgr_positions_long') * mult;
+      acc.amShortBtc += n('asset_mgr_positions_short') * mult;
+      acc.dealerNetBtc += (n('dealer_positions_long_all') - n('dealer_positions_short_all')) * mult;
+      acc.contracts++;
+      byDate.set(date, acc);
+    }
+    const out = [...byDate.values()]
+      .filter(r => r.contracts === Object.keys(CFTC_CONTRACTS).length)
+      .map(({ contracts, ...r }) => ({
+        ...r,
+        lfNetShortBtc: r.lfShortBtc - r.lfLongBtc,
+        amNetLongBtc: r.amLongBtc - r.amShortBtc
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!out.length) throw new Error('CFTC payload: 无完整周数据');
+    recordSuccess('cot', { dataAsOf: out[out.length - 1].date, asOfKind: 'source', source: 'cftc/gpe5-46if' });
+    return out;
+  } catch (err) {
+    recordFailure('cot', err);
+    throw err;
   }
-  return [...byDate.values()]
-    .filter(r => r.contracts === Object.keys(CFTC_CONTRACTS).length)
-    .map(({ contracts, ...r }) => ({
-      ...r,
-      lfNetShortBtc: r.lfShortBtc - r.lfLongBtc,
-      amNetLongBtc: r.amLongBtc - r.amShortBtc
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** One OI payload leg: dateList and the exchange's values must be equal-length
+ * arrays of non-null finite >= 0 numbers. USD and BTC legs never substitute. */
+function validateOiPayload(payload, exchange, label) {
+  if (!payload || !Array.isArray(payload.dateList) || !payload.dateList.length) {
+    throw new Error(`OI ${label}: dateList 缺失或为空`);
+  }
+  const values = payload.dataMap?.[exchange];
+  if (!Array.isArray(values) || values.length !== payload.dateList.length) {
+    throw new Error(`OI ${label}: ${exchange} 值数组缺失或长度不等`);
+  }
+  for (const v of values) {
+    if (!isNonNegNum(v)) throw new Error(`OI ${label}: ${exchange} 含 null/非法值`);
+  }
 }
 
 /**
  * Daily OI panel: Binance futures, CME futures, Deribit options — each in USD and BTC
  */
 async function fetchOiPanel() {
-  const [futUsd, futBtc, optUsd, optBtc] = await Promise.all([
-    callCoinglassEndpoint('/api/openInterest/v3/chart?symbol=BTC&timeType=0&exchangeName=&currency=USD&type=0'),
-    callCoinglassEndpoint('/api/openInterest/v3/chart?symbol=BTC&timeType=0&exchangeName=&currency=COIN&type=0'),
-    callCoinglassEndpoint('/api/option/oi/history?symbol=BTC&timeType=0&currency=USD'),
-    callCoinglassEndpoint('/api/option/oi/history?symbol=BTC&timeType=0&currency=COIN')
-  ]);
+  recordAttempt('etf_oi', { now: Date.now() });
+  try {
+    const [futUsd, futBtc, optUsd, optBtc] = await Promise.all([
+      callCoinglassEndpoint('/api/openInterest/v3/chart?symbol=BTC&timeType=0&exchangeName=&currency=USD&type=0'),
+      callCoinglassEndpoint('/api/openInterest/v3/chart?symbol=BTC&timeType=0&exchangeName=&currency=COIN&type=0'),
+      callCoinglassEndpoint('/api/option/oi/history?symbol=BTC&timeType=0&currency=USD'),
+      callCoinglassEndpoint('/api/option/oi/history?symbol=BTC&timeType=0&currency=COIN')
+    ]);
+    // USD and BTC legs are validated independently — never interchangeable.
+    validateOiPayload(futUsd, 'Binance', 'fut/USD');
+    validateOiPayload(futBtc, 'Binance', 'fut/BTC');
+    validateOiPayload(futUsd, 'CME', 'fut/USD');
+    validateOiPayload(futBtc, 'CME', 'fut/BTC');
+    validateOiPayload(optUsd, 'Deribit', 'opt/USD');
+    validateOiPayload(optBtc, 'Deribit', 'opt/BTC');
 
-  const panel = new Map();
-  const put = (payload, exchange, field) => {
-    if (!payload || !Array.isArray(payload.dateList) || !payload.dataMap?.[exchange]) return;
-    const values = payload.dataMap[exchange];
-    payload.dateList.forEach((ts, i) => {
-      const date = isoDate(ts);
-      if (date < START_DATE) return;
-      const row = panel.get(date) || { date };
-      if (values[i] != null) row[field] = round(Number(values[i]), field.endsWith('Usd') ? 0 : 1);
-      if (payload.priceList?.[i] != null && row.price == null) row.price = round(Number(payload.priceList[i]), 1);
-      panel.set(date, row);
-    });
-  };
-  put(futUsd, 'Binance', 'binanceFutOiUsd');
-  put(futBtc, 'Binance', 'binanceFutOiBtc');
-  put(futUsd, 'CME', 'cmeFutOiUsd');
-  put(futBtc, 'CME', 'cmeFutOiBtc');
-  put(optUsd, 'Deribit', 'deribitOptOiUsd');
-  put(optBtc, 'Deribit', 'deribitOptOiBtc');
+    const panel = new Map();
+    const put = (payload, exchange, field) => {
+      if (!payload || !Array.isArray(payload.dateList) || !payload.dataMap?.[exchange]) return;
+      const values = payload.dataMap[exchange];
+      payload.dateList.forEach((ts, i) => {
+        const date = isoDate(ts);
+        if (date < START_DATE) return;
+        const row = panel.get(date) || { date };
+        if (values[i] != null) row[field] = round(Number(values[i]), field.endsWith('Usd') ? 0 : 1);
+        if (payload.priceList?.[i] != null && row.price == null) row.price = round(Number(payload.priceList[i]), 1);
+        panel.set(date, row);
+      });
+    };
+    put(futUsd, 'Binance', 'binanceFutOiUsd');
+    put(futBtc, 'Binance', 'binanceFutOiBtc');
+    put(futUsd, 'CME', 'cmeFutOiUsd');
+    put(futBtc, 'CME', 'cmeFutOiBtc');
+    put(optUsd, 'Deribit', 'deribitOptOiUsd');
+    put(optBtc, 'Deribit', 'deribitOptOiBtc');
 
-  return [...panel.values()]
-    .filter(r => r.binanceFutOiUsd != null && r.deribitOptOiUsd != null)
-    .map(r => ({
-      ...r,
-      offshoreHedgeOiUsd: round(r.binanceFutOiUsd + r.deribitOptOiUsd, 0),
-      offshoreHedgeOiBtc: r.binanceFutOiBtc != null && r.deribitOptOiBtc != null ? round(r.binanceFutOiBtc + r.deribitOptOiBtc, 1) : null
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+    const out = [...panel.values()]
+      .filter(r => r.binanceFutOiUsd != null && r.deribitOptOiUsd != null)
+      .map(r => ({
+        ...r,
+        offshoreHedgeOiUsd: round(r.binanceFutOiUsd + r.deribitOptOiUsd, 0),
+        offshoreHedgeOiBtc: r.binanceFutOiBtc != null && r.deribitOptOiBtc != null ? round(r.binanceFutOiBtc + r.deribitOptOiBtc, 1) : null
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!out.length) throw new Error('OI panel: 无完整日数据');
+    recordSuccess('etf_oi', { dataAsOf: out[out.length - 1].date, asOfKind: 'source', source: 'coinglass/oi-panel' });
+    return out;
+  } catch (err) {
+    recordFailure('etf_oi', err);
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -565,6 +670,11 @@ function pct(v) {
 
 async function buildEtfLinkage(basisSeries) {
   const [etfFlows, cot, oiPanel] = await Promise.all([fetchEtfFlows(), fetchCftcBitcoin(), fetchOiPanel()]);
+  // Missing required legs are a build failure — preserve cache, never write an
+  // empty shell.
+  if (!etfFlows.length || !cot.length || !oiPanel.length) {
+    throw new Error(`ETF linkage 必需源不完整: etf=${etfFlows.length} cot=${cot.length} oi=${oiPanel.length}`);
+  }
   const weeks = buildWeeklyPanel({ etfFlows, cot, oiPanel, basisSeries });
   const analysis = analyzeLinkage(weeks, { etfFlows, oiPanel });
   const latestCot = cot[cot.length - 1] || null;
@@ -603,38 +713,68 @@ async function buildEtfLinkage(basisSeries) {
 
 function readDiskCache() {
   try {
-    if (fs.existsSync(CACHE_FILE)) return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    if (fs.existsSync(CACHE_FILE)) {
+      const d = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      if (d && Array.isArray(d.weeks) && Number.isFinite(d.generatedAt)) return d;
+    }
   } catch (e) {
     console.warn('[EtfLinkage] Error reading cache:', e.message);
   }
   return null;
 }
 
-async function getEtfLinkageData(basisSeries, force = false) {
+/** Seed honest disk clocks once — persisted dataHealth wins; a legacy file
+ * without trustworthy source clocks seeds UNKNOWN/fallback, never "now". */
+function seedDiskOnce(disk) {
+  if (diskSeeded || !disk) return;
+  diskSeeded = true;
+  const receipt = Number.isFinite(disk.generatedAt) ? new Date(disk.generatedAt).toISOString() : null;
+  seedCachedHealth(disk, 'etf', { dataAsOf: disk.freshness?.etfFlowLatest || null, lastSuccessAt: receipt });
+  seedCachedHealth(disk, 'cot', { dataAsOf: disk.freshness?.cotLatest || null, lastSuccessAt: receipt });
+  seedCachedHealth(disk, 'etf_oi', { dataAsOf: disk.freshness?.oiLatest || null, lastSuccessAt: receipt });
+}
+
+/** Single-flight: concurrent callers share one in-flight build. */
+function getEtfLinkageData(basisSeries, force = false) {
+  if (inflight) return inflight;
+  inflight = doGetEtfLinkageData(basisSeries, force).finally(() => { inflight = null; });
+  return inflight;
+}
+
+async function doGetEtfLinkageData(basisSeries, force = false) {
   const now = Date.now();
-  if (!force && memoryCache && now - memoryCacheTime < CACHE_TTL_MS) return memoryCache;
+  if (!force && memoryCache && now - memoryCacheTime < CACHE_TTL_MS) {
+    return withDataHealth(memoryCache, REQUIRED_IDS, ANCILLARY_IDS);
+  }
   if (!force) {
     const disk = readDiskCache();
+    if (disk) seedDiskOnce(disk);
     if (disk && now - disk.generatedAt < CACHE_TTL_MS) {
       memoryCache = disk;
       memoryCacheTime = now;
-      return disk;
+      return withDataHealth(disk, REQUIRED_IDS, ANCILLARY_IDS);
     }
   }
   try {
     const data = await buildEtfLinkage(basisSeries);
-    memoryCache = data;
+    // Bind the accepted payload to its own health snapshot: a later sibling
+    // fetch must never rejuvenate this copy's per-source clocks.
+    const bound = withDataHealth(data, REQUIRED_IDS, ANCILLARY_IDS);
+    memoryCache = bound;
     memoryCacheTime = now;
     try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(data), 'utf8');
+      atomicWriteJson(CACHE_FILE, bound, 0);
     } catch (e) {
       console.warn('[EtfLinkage] Error persisting cache:', e.message);
     }
-    return data;
+    return bound;
   } catch (err) {
     console.error('[EtfLinkage] Build failed, using stale cache:', err.message);
     const disk = memoryCache || readDiskCache();
-    if (disk) return { ...disk, stale: true };
+    if (disk) {
+      seedDiskOnce(disk);
+      return withDataHealth({ ...disk, stale: true }, REQUIRED_IDS, ANCILLARY_IDS);
+    }
     throw err;
   }
 }

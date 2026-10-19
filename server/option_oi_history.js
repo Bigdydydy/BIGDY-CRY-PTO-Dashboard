@@ -18,6 +18,8 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -35,18 +37,25 @@ function dayKey(ts) {
   return new Date(ts - DAY_START_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+const isNonNegNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v)) && Number(v) >= 0;
+
 /**
  * Deribit book summary 行 -> 快照 { ts, index, oi: { name: [openInterest, volume24h] } }
- * 只保留 OI 或成交量非零的合约。
+ * 只保留 OI 或成交量非零的合约。OI 数据不能 missing silently 0：任一行的
+ * open_interest / volume 缺失或非有限值即整个快照校验失败。
  */
 function snapshotFromBookSummary(rows, ts = Date.now()) {
   const oi = {};
   let index = null;
   for (const r of rows || []) {
     const name = r && r.instrument_name;
-    const openInterest = Number(r && r.open_interest) || 0;
-    const volume = Number(r && r.volume) || 0;
-    if (!name || (openInterest <= 0 && volume <= 0)) continue;
+    if (typeof name !== 'string' || !name) throw new Error('OI snapshot: instrument_name 非法');
+    if (!isNonNegNum(r.open_interest)) throw new Error(`OI snapshot: ${name} open_interest 非法 ${JSON.stringify(r.open_interest)}`);
+    if (!isNonNegNum(r.volume)) throw new Error(`OI snapshot: ${name} volume 非法 ${JSON.stringify(r.volume)}`);
+    const openInterest = Number(r.open_interest);
+    const volume = Number(r.volume);
+    if (openInterest <= 0 && volume <= 0) continue;
     oi[name] = [Math.round(openInterest * 10) / 10, Math.round(volume * 10) / 10];
     if (index === null && Number(r.estimated_delivery_price) > 0) index = Number(r.estimated_delivery_price);
   }
@@ -114,7 +123,7 @@ function readHistoryFile(file) {
 }
 
 function writeHistoryFile(file, snapshots, currency = 'BTC') {
-  fs.writeFileSync(file, JSON.stringify(encodeHistory(snapshots, currency)));
+  atomicWriteJson(file, encodeHistory(snapshots, currency), 0);
 }
 
 /**
@@ -208,24 +217,72 @@ function readCommittedFromDisk() {
   return committedCache.snapshots;
 }
 
+/** Remote archive is fully schema-validated before it may replace
+ * remoteCache: nonempty instrument names; each snapshot ts > 0, not future;
+ * index finite-positive when present; every [id, oi, volume] row references
+ * a valid instrument with finite oi/volume >= 0. */
+function validRemoteArchive(json) {
+  if (!json || !Array.isArray(json.instruments) || !Array.isArray(json.snapshots) || !json.snapshots.length) return false;
+  if (json.instruments.some(n => typeof n !== 'string' || !n)) return false;
+  const nowMs = Date.now();
+  return json.snapshots.every(s => {
+    if (!s || !Number.isFinite(s.ts) || s.ts <= 0 || s.ts > nowMs + 5 * 60000) return false;
+    if (s.index !== null && s.index !== undefined && !(Number.isFinite(Number(s.index)) && Number(s.index) > 0)) return false;
+    if (!Array.isArray(s.rows)) return false;
+    return s.rows.every(row =>
+      Array.isArray(row) && row.length >= 3 &&
+      Number.isInteger(row[0]) && row[0] >= 0 && row[0] < json.instruments.length &&
+      isNonNegNum(row[1]) && isNonNegNum(row[2])
+    );
+  });
+}
+
 async function readRemote(now) {
   if (remoteCache.snapshots && now - remoteCache.at < REMOTE_TTL_MS) return remoteCache.snapshots;
+  recordAttempt('oi_history', { now: Date.now() });
   try {
     const resp = await fetchWithTimeout(REMOTE_URL, { headers: { Accept: 'application/json' }, timeout: 8000, retries: 0 });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    remoteCache = { snapshots: decodeHistory(await resp.json()), at: now };
+    const json = await resp.json();
+    if (!validRemoteArchive(json)) throw new Error('remote OI archive 校验失败');
+    const decoded = decodeHistory(json);
+    // Artifact's own max snapshot ts is the data clock — never reader now.
+    // recordSuccess BEFORE cache assignment: a throw must not leave a
+    // polluted remoteCache behind.
+    recordSuccess('oi_history', {
+      dataAsOf: new Date(decoded[decoded.length - 1].ts).toISOString(),
+      asOfKind: 'source', source: 'github-archive'
+    });
+    remoteCache = { snapshots: decoded, at: now };
   } catch (err) {
+    recordFailure('oi_history', err);
     // 尚未推送或网络不可达：沿用上次结果，下次再试
     remoteCache = { snapshots: remoteCache.snapshots || [], at: now };
   }
   return remoteCache.snapshots;
 }
 
+/** Seed honest disk clocks once — committed/local files carry no success
+ * receipt, so the merged archive seeds UNKNOWN until a real fetch verifies. */
+let diskSeeded = false;
+function seedDiskOnce(snapshots) {
+  if (diskSeeded || !snapshots.length) return;
+  diskSeeded = true;
+  seedCachedHealth({ dataHealth: null }, 'oi_history', {
+    dataAsOf: new Date(snapshots[snapshots.length - 1].ts).toISOString(),
+    lastSuccessAt: null
+  });
+}
+
 /** 合并后的快照序列：仓库提交版 > GitHub raw 最新版 > 本机补采 */
 async function getMergedHistory(now = Date.now()) {
   if (localSnapshots === null) localSnapshots = readHistoryFile(LOCAL_FILE);
+  const committed = readCommittedFromDisk();
+  // Seed disk clocks BEFORE the remote attempt: a failure recorded first would
+  // otherwise block the seed (seedSource never overwrites an existing record).
+  seedDiskOnce(pruneHistory(mergeSnapshotSets(committed, localSnapshots), now));
   const remote = await readRemote(now);
-  return pruneHistory(mergeSnapshotSets(mergeSnapshotSets(readCommittedFromDisk(), remote), localSnapshots), now);
+  return pruneHistory(mergeSnapshotSets(mergeSnapshotSets(committed, remote), localSnapshots), now);
 }
 
 /**
@@ -235,15 +292,23 @@ async function getMergedHistory(now = Date.now()) {
 function maybeRecordLiveSnapshot(merged, fetchRows, now = Date.now()) {
   if (hasSnapshotForDay(merged, now) || liveInflight || now - lastLiveAttempt < LIVE_RETRY_MS) return liveInflight;
   lastLiveAttempt = now;
+  recordAttempt('oi_history', { now: Date.now() });
   liveInflight = (async () => {
     try {
       const snap = snapshotFromBookSummary(await fetchRows(), Date.now());
       if (!snap) return;
+      // A live local snapshot is a real acquisition; its ts is the data
+      // clock. recordSuccess BEFORE mutating/writing — invalid data must
+      // never become fallback data.
+      recordSuccess('oi_history', {
+        dataAsOf: new Date(snap.ts).toISOString(), asOfKind: 'received', source: 'deribit/book_summary'
+      });
       if (localSnapshots === null) localSnapshots = readHistoryFile(LOCAL_FILE);
       localSnapshots = pruneHistory(mergeSnapshotSets(localSnapshots, [snap]), snap.ts);
       writeHistoryFile(LOCAL_FILE, localSnapshots);
       console.log(`[OptionOI] recorded live snapshot for ${dayKey(snap.ts)} (${Object.keys(snap.oi).length} instruments)`);
     } catch (err) {
+      recordFailure('oi_history', err);
       console.warn('[OptionOI] live snapshot failed:', err.message);
     } finally {
       liveInflight = null;

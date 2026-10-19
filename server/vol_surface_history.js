@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { atomicWriteJson } = require('./data_health_cache');
 
 const RETENTION_DAYS = 400;
 const WRITE_THROTTLE_MS = 3600 * 1000;
@@ -60,7 +61,9 @@ function getHistory() {
 
 function writeHistory(file, records) {
   try {
-    fs.writeFileSync(file, JSON.stringify({ currency: 'BTC', version: 1, records }));
+    // Atomic write: a failed temp-write/rename leaves the last good file
+    // byte-identical instead of a truncated JSON.
+    atomicWriteJson(file, { currency: 'BTC', version: 1, records });
   } catch (err) {
     console.warn('[VolSurfaceHistory] write failed:', err.message);
   }

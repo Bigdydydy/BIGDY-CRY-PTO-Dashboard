@@ -30,6 +30,8 @@ const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchTvBars } = require('./tradingview_feed');
 const binance = require('./binance_feed');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth } = require('./data_health_cache');
 
 const TF_MS = { '15m': 9e5, '1h': 3.6e6, '4h': 1.44e7, '1d': 8.64e7, '1w': 6.048e8 };
 const TF_TTL_MS = { '15m': 60e3, '1h': 120e3, '4h': 300e3, '1d': 600e3, '1w': 900e3 };
@@ -70,6 +72,29 @@ const tfOffset = tf => (tf === '1w' ? MONDAY_OFFSET_MS : 0);
 const alignT = (t, tf) => Math.floor((t - tfOffset(tf)) / TF_MS[tf]) * TF_MS[tf] + tfOffset(tf);
 /** 收盘并过了宽限期，数据可视为最终值 */
 const isFinal = (t, tf, now = Date.now()) => t + TF_MS[tf] + CLOSE_GRACE_MS <= now;
+
+/** Per-bar schema: finite t/o/h/l/c/v, positive OHLC, consistent wicks,
+ * v >= 0, strictly increasing timestamps, t > 0 and not beyond the 5-minute
+ * future-skew limit. A bad bar fails that venue source. */
+function validateFlowBars(bars, label) {
+  if (!Array.isArray(bars)) throw new Error(`${label}: 非数组`);
+  const maxT = Date.now() + 5 * 60e3;
+  let prev = -Infinity;
+  for (const b of bars) {
+    if (!b || typeof b !== 'object') throw new Error(`${label}: 非对象bar`);
+    for (const k of ['t', 'o', 'h', 'l', 'c', 'v']) {
+      if (!Number.isFinite(b[k])) throw new Error(`${label}: ${k} 非有限数`);
+    }
+    if (b.t <= 0) throw new Error(`${label}: t 非正`);
+    if (b.t > maxT) throw new Error(`${label}: t 超出未来 5min 容差`);
+    if (b.o <= 0 || b.h <= 0 || b.l <= 0 || b.c <= 0) throw new Error(`${label}: OHLC 非正值`);
+    if (b.h < Math.max(b.o, b.c, b.l)) throw new Error(`${label}: h < max(o,c,l)`);
+    if (b.l > Math.min(b.o, b.c, b.h)) throw new Error(`${label}: l > min(o,c,h)`);
+    if (b.v < 0) throw new Error(`${label}: v < 0`);
+    if (b.t <= prev) throw new Error(`${label}: 时间非严格递增`);
+    prev = b.t;
+  }
+}
 
 async function getJson(url, options = {}) {
   const res = await fetchWithTimeout(url, { timeout: 10000, retries: 1, ...options });
@@ -199,20 +224,26 @@ async function fetchBinanceVenue(key, tf, stored, now) {
       const bars = tf === '1w'
         ? aggregateBars(await binance.fetchArchiveBars(market, '1d', oldGap[0]), tfMs, MONDAY_OFFSET_MS, 7)
         : await binance.fetchArchiveBars(market, tf, oldGap[0]);
+      validateFlowBars(bars, '官方档案');
       for (const b of bars) got.set(b.t, b);
       if (bars.length) used.push('官方档案');
     } catch (e) {
       errors.push(`官方档案: ${e.message}`);
     }
   }
-  // 2. 实时流
+  // 2. 实时流：坏批次记为错误再走 REST/TV，不中断后续兜底
   binance.ensureStreams();
-  const streamBars = binance.getStreamBars(market, tf);
-  for (const b of streamBars) {
-    // 流里未标记收盘却已过收盘时间的K线可能缺最后的成交，不采用
-    if (b.closed || b.t === current) got.set(b.t, b);
+  try {
+    const streamBars = binance.getStreamBars(market, tf);
+    validateFlowBars(streamBars, '实时流');
+    for (const b of streamBars) {
+      // 流里未标记收盘却已过收盘时间的K线可能缺最后的成交，不采用
+      if (b.closed || b.t === current) got.set(b.t, b);
+    }
+    if (streamBars.length) used.push('实时流');
+  } catch (e) {
+    errors.push(`实时流: ${e.message}`);
   }
-  if (streamBars.length) used.push('实时流');
   // 3/4. 仍缺的近期K线 (服务启动前的当天K线、断流期间、昨天的档案尚未发布) → REST → TradingView
   const recentFrom = Math.min(todayStart, current) - tfMs;
   const isUsable = t => !missing(t) && !(got.get(t) && got.get(t).need && got.get(t).n < got.get(t).need && t !== current);
@@ -220,6 +251,7 @@ async function fetchBinanceVenue(key, tf, stored, now) {
   if (recentGap().length) {
     try {
       const bars = await binance.fetchRestBars(market, tf, Math.min(1000, FETCH_BARS));
+      validateFlowBars(bars, 'REST');
       for (const b of bars) if (!isUsable(b.t) || b.t === current) got.set(b.t, b);
       used.push('REST');
     } catch (e) {
@@ -229,6 +261,7 @@ async function fetchBinanceVenue(key, tf, stored, now) {
   if (recentGap().length) {
     try {
       const bars = await fetchViaTv(VENUES[key].tv, tf, VENUES[key].tvVolume);
+      validateFlowBars(bars, 'TradingView');
       for (const b of bars) if (!isUsable(b.t)) got.set(b.t, { ...b, viaTv: true });
       used.push('TradingView');
     } catch (e) {
@@ -244,6 +277,7 @@ async function fetchVenue(key, tf, stored, now) {
   const direct = DIRECT[key];
   try {
     const bars = await direct.fn(tf);
+    validateFlowBars(bars, direct.label);
     if (bars.length) return { bars, source: direct.label, errors };
     errors.push(`${direct.label}: 空数据`);
   } catch (e) {
@@ -251,6 +285,7 @@ async function fetchVenue(key, tf, stored, now) {
   }
   try {
     const bars = await fetchViaTv(VENUES[key].tv, tf, VENUES[key].tvVolume);
+    validateFlowBars(bars, 'TradingView');
     if (bars.length) return { bars: bars.map(b => ({ ...b, viaTv: true })), source: 'TradingView', errors };
   } catch (e) {
     errors.push(`TradingView: ${e.message}`);
@@ -267,6 +302,7 @@ async function fetchUsdtUsd(tf) {
   ]) {
     try {
       const bars = await src.fn();
+      validateFlowBars(bars, src.label);
       if (bars.length) return { bars, source: src.label, errors };
     } catch (e) {
       errors.push(`${src.label}: ${e.message}`);
@@ -649,100 +685,176 @@ const inflight = new Map();
 async function buildFlowForce(tf) {
   const now = Date.now();
   const st = loadStore(tf);
-  const [fetched, audit, usdt] = await Promise.all([
-    Promise.all(VENUE_KEYS.map(k => fetchVenue(k, tf, st.bars[k], now))),
-    getVenueAudit().catch(() => null),
-    fetchUsdtUsd(tf)
-  ]);
+  const aggId = `flow:${tf}`;
+  const venueId = k => `flow:${tf}:${k}`;
+  // Attempts are recorded before any fetch: a later failure preserves each
+  // source's previous success clock instead of fabricating freshness.
+  recordAttempt(aggId, { now });
+  for (const k of VENUE_KEYS) recordAttempt(venueId(k), { now });
+  recordAttempt(`flow:${tf}:fx`, { now });
+  try {
+    const [fetched, audit, usdt] = await Promise.all([
+      Promise.all(VENUE_KEYS.map(k => fetchVenue(k, tf, st.bars[k], now))),
+      getVenueAudit().catch(() => null),
+      fetchUsdtUsd(tf)
+    ]);
 
-  const venueBars = {};
-  const sources = {};
-  VENUE_KEYS.forEach((k, i) => {
-    const f = fetched[i];
-    venueBars[k] = mergeVenue(st, k, f.bars, tf, now);
-    const last = venueBars[k][venueBars[k].length - 1];
-    sources[k] = {
-      name: VENUES[k].name, type: VENUES[k].type, region: VENUES[k].region,
-      source: f.source,
-      // 本次拿到了当前这根K线才算在线；只有存档时为离线 (历史不受影响)
-      ok: !!last && last.t === alignT(now, tf),
-      stored: st.bars[k].size,
-      errors: f.errors
-    };
-    if (f.errors.length) console.warn(`[FlowForce] ${tf} ${k}: ${f.errors.join(' | ')}`);
-  });
-
-  for (const b of usdt.bars) {
-    if (isFinal(b.t, tf, now) && (!b.need || b.n >= b.need) && !st.usdt.has(b.t)) {
-      st.usdt.set(b.t, b.c);
-      st.dirty = true;
+    // FX receipt: last ACTUAL fetched FX bar time, never server time.
+    if (usdt.bars.length) {
+      recordSuccess(`flow:${tf}:fx`, {
+        dataAsOf: new Date(usdt.bars[usdt.bars.length - 1].t).toISOString(),
+        asOfKind: 'source', source: usdt.source, issues: usdt.errors
+      });
+    } else {
+      recordFailure(`flow:${tf}:fx`, new Error(usdt.errors.join(' | ') || 'USDT/USD 不可用'));
     }
+
+    const venueBars = {};
+    const sources = {};
+    const issues = [];
+    // This run's last ACTUAL fetched bar per venue — merged disk bars must
+    // never advance a leaf receipt or the aggregate clock.
+    const fetchedLastT = {};
+    VENUE_KEYS.forEach((k, i) => {
+      const f = fetched[i];
+      venueBars[k] = mergeVenue(st, k, f.bars, tf, now);
+      if (f.bars.length) {
+        fetchedLastT[k] = f.bars[f.bars.length - 1].t;
+        recordSuccess(venueId(k), {
+          dataAsOf: new Date(fetchedLastT[k]).toISOString(),
+          asOfKind: 'source', source: f.source, issues: f.errors
+        });
+        if (f.errors.length) issues.push(`${k} 经fallback源 ${f.source}`);
+      } else {
+        recordFailure(venueId(k), new Error(f.errors.join(' | ') || '无可用K线'));
+        issues.push(`${k} 不可用`);
+      }
+      const last = venueBars[k][venueBars[k].length - 1];
+      sources[k] = {
+        name: VENUES[k].name, type: VENUES[k].type, region: VENUES[k].region,
+        source: f.source,
+        // 本次拿到了当前这根K线才算在线；只有存档时为离线 (历史不受影响)
+        ok: !!last && last.t === alignT(now, tf),
+        stored: st.bars[k].size,
+        errors: f.errors
+      };
+      if (f.errors.length) console.warn(`[FlowForce] ${tf} ${k}: ${f.errors.join(' | ')}`);
+    });
+    if (usdt.errors.length) issues.push(`USDT/USD: ${usdt.errors.join(' | ')}`);
+
+    for (const b of usdt.bars) {
+      if (isFinal(b.t, tf, now) && (!b.need || b.n >= b.need) && !st.usdt.has(b.t)) {
+        st.usdt.set(b.t, b.c);
+        st.dirty = true;
+      }
+    }
+    const rates = new Map(st.usdt);
+    for (const b of usdt.bars) if (!rates.has(b.t)) rates.set(b.t, b.c);
+    if (usdt.errors.length) console.warn(`[FlowForce] ${tf} USDT/USD: ${usdt.errors.join(' | ')}`);
+
+    // 数据源正常应答、却给不满请求窗口的场所：首根有成交的K线即上线时间
+    // (Hyperliquid 会把上线前的日子补成成交量为 0 的占位K线，因此不能只看第一根)
+    const windowStart = alignT(now, tf) - (FETCH_BARS - 1) * TF_MS[tf];
+    const listedFrom = {};
+    VENUE_KEYS.forEach((k, i) => {
+      const first = venueBars[k].find(b => b.v > 0);
+      if (first && !fetched[i].errors.length && first.t > windowStart + 2 * TF_MS[tf]) listedFrom[k] = first.t;
+    });
+
+    const computed = computeFlowForce(venueBars, FIXED_WEIGHTS, rates, { tfMs: TF_MS[tf], now, listedFrom });
+    const { series, newlyFrozen } = applyFrozen(st, computed, tf, now);
+    if (!series.length) throw new Error('各场所K线均不可用');
+    saveStore(tf, st);
+
+    // 主图K线: Coinbase；欧美现货整体缺失时退到币安现货
+    const candleKey = venueBars.usSpot.length ? 'usSpot' : 'bnSpot';
+    const firstTime = series[0].time;
+    const candles = venueBars[candleKey]
+      .filter(b => b.t / 1000 >= firstTime)
+      .map(b => ({ time: Math.floor(b.t / 1000), open: b.o, high: b.h, low: b.l, close: b.c, volumeUsd: Math.round(b.v) }));
+
+    const premiumMode = series.some(p => p.usPremiumBps !== null) ? 'usd' : 'dev';
+    if (premiumMode === 'dev') issues.push('USDT/USD 不可用，溢价退回原始价差均值口径');
+
+    const payload = {
+      code: 0,
+      tf,
+      updatedAt: new Date().toISOString(),
+      lookback: LOOKBACK,
+      method: 'BVC 净主动量 / 自身 50 根均额 → 同格定死权重 → 柱 |期货|−|现货|，点 |亚太|−|欧美|',
+      cells: CELLS,
+      weights: FIXED_WEIGHTS,
+      sources,
+      streams: binance.getStreamStatus(),
+      audit,
+      archive: {
+        frozenRows: st.rows.size,
+        newlyFrozen,
+        provisionalRows: series.filter(r => !r.frozen && !r.live).length
+      },
+      summary: summarize(series),
+      latest: series[series.length - 1],
+      candleSource: sources[candleKey].source ? `${VENUES[candleKey].name} · ${sources[candleKey].source}` : VENUES[candleKey].name,
+      premiumMode,
+      usdtUsdSource: usdt.source,
+      candles,
+      series
+    };
+
+    // Aggregate receipt: only when EVERY cell supplied a fresh fetched receipt
+    // this run. cellLatest = max last-actual-fetched-bar t among cell members.
+    const cellLatest = [];
+    for (const members of Object.values(CELLS)) {
+      let maxT = null;
+      for (const k of members) {
+        if (fetchedLastT[k] != null && (maxT === null || fetchedLastT[k] > maxT)) maxT = fetchedLastT[k];
+      }
+      if (maxT === null) break;
+      cellLatest.push(maxT);
+    }
+    if (cellLatest.length === Object.keys(CELLS).length) {
+      // dataAsOf = MIN(last served series row, all four cells' latest fetched bar).
+      const aggAsOf = new Date(Math.min(series[series.length - 1].time * 1000, ...cellLatest)).toISOString();
+      recordSuccess(aggId, { dataAsOf: aggAsOf, asOfKind: 'source', source: 'flow/aggregate', issues });
+      return payload;
+    }
+    // A cell without newly fetched bars: serve the archived history — charts
+    // and frozen rows intact — but stale/history-only, never a fresh success.
+    recordFailure(aggId, new Error('部分场所未取到新K线，仅返回存档历史'));
+    return { ...payload, stale: true, historicalOnly: true };
+  } catch (err) {
+    recordFailure(aggId, err);
+    throw err;
   }
-  const rates = new Map(st.usdt);
-  for (const b of usdt.bars) if (!rates.has(b.t)) rates.set(b.t, b.c);
-  if (usdt.errors.length) console.warn(`[FlowForce] ${tf} USDT/USD: ${usdt.errors.join(' | ')}`);
-
-  // 数据源正常应答、却给不满请求窗口的场所：首根有成交的K线即上线时间
-  // (Hyperliquid 会把上线前的日子补成成交量为 0 的占位K线，因此不能只看第一根)
-  const windowStart = alignT(now, tf) - (FETCH_BARS - 1) * TF_MS[tf];
-  const listedFrom = {};
-  VENUE_KEYS.forEach((k, i) => {
-    const first = venueBars[k].find(b => b.v > 0);
-    if (first && !fetched[i].errors.length && first.t > windowStart + 2 * TF_MS[tf]) listedFrom[k] = first.t;
-  });
-
-  const computed = computeFlowForce(venueBars, FIXED_WEIGHTS, rates, { tfMs: TF_MS[tf], now, listedFrom });
-  const { series, newlyFrozen } = applyFrozen(st, computed, tf, now);
-  if (!series.length) throw new Error('各场所K线均不可用');
-  saveStore(tf, st);
-
-  // 主图K线: Coinbase；欧美现货整体缺失时退到币安现货
-  const candleKey = venueBars.usSpot.length ? 'usSpot' : 'bnSpot';
-  const firstTime = series[0].time;
-  const candles = venueBars[candleKey]
-    .filter(b => b.t / 1000 >= firstTime)
-    .map(b => ({ time: Math.floor(b.t / 1000), open: b.o, high: b.h, low: b.l, close: b.c, volumeUsd: Math.round(b.v) }));
-
-  return {
-    code: 0,
-    tf,
-    updatedAt: new Date().toISOString(),
-    lookback: LOOKBACK,
-    method: 'BVC 净主动量 / 自身 50 根均额 → 同格定死权重 → 柱 |期货|−|现货|，点 |亚太|−|欧美|',
-    cells: CELLS,
-    weights: FIXED_WEIGHTS,
-    sources,
-    streams: binance.getStreamStatus(),
-    audit,
-    archive: {
-      frozenRows: st.rows.size,
-      newlyFrozen,
-      provisionalRows: series.filter(r => !r.frozen && !r.live).length
-    },
-    summary: summarize(series),
-    latest: series[series.length - 1],
-    candleSource: sources[candleKey].source ? `${VENUES[candleKey].name} · ${sources[candleKey].source}` : VENUES[candleKey].name,
-    premiumMode: series.some(p => p.usPremiumBps !== null) ? 'usd' : 'dev',
-    usdtUsdSource: usdt.source,
-    candles,
-    series
-  };
 }
+
+const venueIdsFor = tf => Object.keys(VENUES).map(k => `flow:${tf}:${k}`).concat([`flow:${tf}:fx`]);
 
 async function getFlowForce(tf = '1h', force = false) {
   if (!TF_MS[tf]) tf = '1h';
   const hit = cache.get(tf);
-  if (!force && hit && Date.now() - hit.at < TF_TTL_MS[tf]) return hit.data;
+  // Cache health is recomputed live so expiry progresses between refreshes.
+  if (!force && hit && Date.now() - hit.at < TF_TTL_MS[tf]) {
+    return withDataHealth(hit.data, [`flow:${tf}`], venueIdsFor(tf));
+  }
   if (inflight.has(tf)) return inflight.get(tf);
   const task = buildFlowForce(tf)
     .then(data => {
-      cache.set(tf, { at: Date.now(), data });
-      return data;
+      // A history-only build (a cell had no newly fetched bars) is real data
+      // but must never replace or rejuvenate the last good payload's clocks.
+      if (data.historicalOnly && hit) {
+        return withDataHealth({ ...hit.data, stale: true, historicalOnly: true }, [`flow:${tf}`], venueIdsFor(tf));
+      }
+      // Store the health-bound snapshot so a sibling timeframe's newer fetch
+      // can never rejuvenate this payload's per-source clocks.
+      const bound = withDataHealth(data, [`flow:${tf}`], venueIdsFor(tf));
+      cache.set(tf, { at: Date.now(), data: bound });
+      return bound;
     })
     .catch(err => {
       if (hit) {
         console.warn(`[FlowForce] ${tf} 刷新失败，回退旧缓存: ${err.message}`);
-        return { ...hit.data, stale: true };
+        return withDataHealth({ ...hit.data, stale: true }, [`flow:${tf}`], venueIdsFor(tf));
       }
       throw err;
     })
