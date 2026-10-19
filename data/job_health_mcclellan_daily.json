@@ -1,0 +1,17 @@
+{
+  "id": "mcclellan_daily",
+  "status": "ok",
+  "lastAttemptAt": "2026-10-19T05:19:12.344Z",
+  "lastSuccessAt": "2026-10-19T05:19:12.349Z",
+  "lastError": null,
+  "steps": {
+    "pipeline": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-19T05:19:12.349Z",
+      "lastSuccessAt": "2026-10-19T05:19:12.349Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-18T00:00:00.000Z",
+      "verifiedSkip": false
+    }
+  }
+}
