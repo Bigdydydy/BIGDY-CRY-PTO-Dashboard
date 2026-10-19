@@ -101,7 +101,7 @@
   "address": "0x2919b42e28ba205b56712425d09d98d3bdeb7b1a",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-18",
+  "last_qualified": "2026-10-19",
   "symbol": "WBTCBR"
  },
  "bsc:0x299ad4299da5b2b93fba4c96967b040c7f611099": {
@@ -311,7 +311,7 @@
   "address": "0x6d6521283cd3fd0188fe0408e700a5790a0f6c61",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-18",
+  "last_qualified": "2026-10-19",
   "symbol": "GALABET"
  },
  "bsc:0x70b90dd365f6f10b9792f7cbc8be9daa59f67777": {
@@ -1021,6 +1021,13 @@
   "last_qualified": "2026-10-12",
   "symbol": "SI"
  },
+ "robinhood:0x6a46c518a1514126ce08b1a1b7d5424dfb4d703c": {
+  "address": "0x6a46c518a1514126ce08b1a1b7d5424dfb4d703c",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "PONS"
+ },
  "robinhood:0x6a6a57d1e94eb586c5b505a1c81434bda3d6ed97": {
   "address": "0x6a6a57d1e94eb586c5b505a1c81434bda3d6ed97",
   "chain": "robinhood",
@@ -1062,6 +1069,13 @@
   "first_qualified": "2026-10-18",
   "last_qualified": "2026-10-19",
   "symbol": "RAETO"
+ },
+ "robinhood:0x72d5bf142874d24d1565f8633621307fd2871111": {
+  "address": "0x72d5bf142874d24d1565f8633621307fd2871111",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "ANTI"
  },
  "robinhood:0x7422f86d11c2f3c8b99fdcfa1d49058323640f70": {
   "address": "0x7422f86d11c2f3c8b99fdcfa1d49058323640f70",
@@ -2407,6 +2421,13 @@
   "last_qualified": "2026-10-14",
   "symbol": "PULT"
  },
+ "solana:FGkCj28xhabWTYg9QyzACvs4NsN6LUyesP6EwiHepump": {
+  "address": "FGkCj28xhabWTYg9QyzACvs4NsN6LUyesP6EwiHepump",
+  "chain": "solana",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "UHI"
+ },
  "solana:FPTfWkiT8uxEbZsrTUzepN8GXnxt4d8BENxbxWihAcus": {
   "address": "FPTfWkiT8uxEbZsrTUzepN8GXnxt4d8BENxbxWihAcus",
   "chain": "solana",
@@ -2530,7 +2551,7 @@
   "address": "nxPqZ4F7ux8Vph5NFu25rEP6Kx9Gr1U6Fmj36Rjpump",
   "chain": "solana",
   "first_qualified": "2026-10-15",
-  "last_qualified": "2026-10-18",
+  "last_qualified": "2026-10-19",
   "symbol": "DACITY"
  },
  "solana:orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE": {
@@ -2544,7 +2565,7 @@
   "address": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
   "chain": "solana",
   "first_qualified": "2026-10-05",
-  "last_qualified": "2026-10-18",
+  "last_qualified": "2026-10-19",
   "symbol": "PUMP"
  }
 }
