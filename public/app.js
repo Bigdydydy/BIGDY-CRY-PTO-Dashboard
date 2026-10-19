@@ -729,8 +729,8 @@ function renderGex(data) {
   setTextIfPresent('gex-regime-sub', data.marketMakerRegime ? data.marketMakerRegime.split('(')[0].trim() : '--');
   setTextIfPresent('gex-flip', data.gammaFlip ? `$${Number(data.gammaFlip.strike).toLocaleString()}` : '未变号');
   setTextIfPresent('gex-flip-sub', data.gammaFlip
-    ? `累计 GEX 由${data.gammaFlip.from > 0 ? '正' : '负'}转${data.gammaFlip.to > 0 ? '正' : '负'}${data.gammaFlip.farFromSpot ? ' · 距现货 >20%' : ''}`
-    : '累计 GEX 全区间同号');
+    ? `局部净 GEX 由${data.gammaFlip.from > 0 ? '正' : '负'}转${data.gammaFlip.to > 0 ? '正' : '负'}${data.gammaFlip.farFromSpot ? ' · 距现货 >20%' : ''}`
+    : '局部净 GEX 全区间同号');
 
   const list = currentGexMode === 'focused' ? data.focusedExpiries : data.allExpiries;
   if (!list || !list.length) {
@@ -1649,23 +1649,51 @@ function renderPnLView({ resetChart = false } = {}) {
   setPnLText('pnl-days-label', daysLabel);
   setPnLText('pnl-iv-label', `${s.ivShift >= 0 ? '+' : ''}${s.ivShift}%`);
 
-  // 2. KPI cards (expiry curve, BTC with USD reference at current spot)
-  if (view.isProfitCapped) {
-    const profitUsd = view.maxPnl * spotPrice;
-    setPnLText('pnl-kpi-max-profit', `${view.maxPnl >= 0 ? '+' : ''}${view.maxPnl.toFixed(3)} BTC`);
-    setPnLText('pnl-kpi-max-profit-usd', `≈ ${profitUsd >= 0 ? '+' : '-'}$${Math.abs(Math.round(profitUsd)).toLocaleString()}`);
-  } else {
-    setPnLText('pnl-kpi-max-profit', '理论无上限');
-    setPnLText('pnl-kpi-max-profit-usd', '净买入 Put：币价趋零时 BTC 收益发散');
-  }
+  // 2. KPI cards (expiry curve). Extrema are taken in the frame of the active unit: a BTC extremum
+  // at terminal price S* is worth btc·S* USD (not btc·spot), and USD extrema / divergence differ
+  // from BTC ones (e.g. a long call is BTC-capped at 1 - P but USD-unbounded as S -> ∞).
+  const fmtAt = S => (S === Infinity ? 'S→∞' : S === 0 ? 'S→0' : `@ $${Math.round(S).toLocaleString()}`);
+  const fmtUsd = v => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
+  const fmtBtc = v => `${v >= 0 ? '+' : ''}${v.toFixed(3)} BTC`;
+  const usdOfBtcAt = (btc, S) => (S === Infinity ? (btc === 0 ? null : btc * Infinity) : btc * S);
+  const btcOfUsdAt = (usd, S) => (S > 0 && Number.isFinite(S) ? usd / S : null);
+  const kpiSub = (otherVal, otherFmt, S) => {
+    if (otherVal === null) return `${fmtAt(S)} 渐近值`;
+    if (!Number.isFinite(otherVal)) return `${fmtAt(S)} 渐近值 · 美元计${otherVal > 0 ? '无上限' : '无下限'}`;
+    return `≈ ${otherFmt(otherVal)} · ${fmtAt(S)}`;
+  };
 
-  if (view.isLossCapped) {
-    const lossUsd = view.minPnl * spotPrice;
-    setPnLText('pnl-kpi-max-loss', `${view.minPnl.toFixed(3)} BTC`);
-    setPnLText('pnl-kpi-max-loss-usd', `≈ ${lossUsd >= 0 ? '+' : '-'}$${Math.abs(Math.round(lossUsd)).toLocaleString()}`);
+  if (s.unit === 'USD') {
+    const u = view.usd;
+    if (u.isProfitCapped) {
+      setPnLText('pnl-kpi-max-profit', fmtUsd(u.maxPnl));
+      setPnLText('pnl-kpi-max-profit-usd', u.maxPnlAt === 0 ? `S→0 极限 (Σ净Put名义 $${Math.round(u.pnlAtZero).toLocaleString()})` : kpiSub(btcOfUsdAt(u.maxPnl, u.maxPnlAt), fmtBtc, u.maxPnlAt));
+    } else {
+      setPnLText('pnl-kpi-max-profit', '理论无上限');
+      setPnLText('pnl-kpi-max-profit-usd', '净多 BTC 敞口：币价→∞ 时美元收益发散');
+    }
+    if (u.isLossCapped) {
+      setPnLText('pnl-kpi-max-loss', fmtUsd(u.minPnl));
+      setPnLText('pnl-kpi-max-loss-usd', u.minPnlAt === 0 ? `S→0 极限 (Σ净Put名义 $${Math.round(u.pnlAtZero).toLocaleString()})` : kpiSub(btcOfUsdAt(u.minPnl, u.minPnlAt), fmtBtc, u.minPnlAt));
+    } else {
+      setPnLText('pnl-kpi-max-loss', '理论深度亏损');
+      setPnLText('pnl-kpi-max-loss-usd', '净空 BTC 敞口：币价→∞ 时美元亏损发散');
+    }
   } else {
-    setPnLText('pnl-kpi-max-loss', '理论深度亏损');
-    setPnLText('pnl-kpi-max-loss-usd', '净卖出 Put：币价趋零时 BTC 亏损发散');
+    if (view.isProfitCapped) {
+      setPnLText('pnl-kpi-max-profit', fmtBtc(view.maxPnl));
+      setPnLText('pnl-kpi-max-profit-usd', kpiSub(usdOfBtcAt(view.maxPnl, view.maxPnlAt), fmtUsd, view.maxPnlAt));
+    } else {
+      setPnLText('pnl-kpi-max-profit', '理论无上限');
+      setPnLText('pnl-kpi-max-profit-usd', '净 Put 名义 ΣqK > 0：币价趋零时 BTC 收益发散');
+    }
+    if (view.isLossCapped) {
+      setPnLText('pnl-kpi-max-loss', fmtBtc(view.minPnl));
+      setPnLText('pnl-kpi-max-loss-usd', kpiSub(usdOfBtcAt(view.minPnl, view.minPnlAt), fmtUsd, view.minPnlAt));
+    } else {
+      setPnLText('pnl-kpi-max-loss', '理论深度亏损');
+      setPnLText('pnl-kpi-max-loss-usd', '净 Put 名义 ΣqK < 0：币价趋零时 BTC 亏损发散');
+    }
   }
 
   if (view.breakevens.length > 0) {

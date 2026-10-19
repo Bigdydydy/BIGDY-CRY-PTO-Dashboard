@@ -145,9 +145,9 @@ describe('期权套件 · GEX：Gamma 体制按全部到期日判定', () => {
     const mixed = {
       index_price: 80000,
       by_expiry: {
-        '16OCT26': [{ strike: 80000, number: -105e6 }],
-        '30OCT26': [{ strike: 90000, number: 50e6 }],
-        '25DEC26': [{ strike: 140000, number: 57e6 }]
+        '16OCT26': [{ strike: 80000, number: -100e6 }],
+        '30OCT26': [{ strike: 90000, number: -80e6 }],
+        '25DEC26': [{ strike: 140000, number: 182e6 }]
       }
     };
     const result = analyzeDynamicGex(mixed, ref);
@@ -158,16 +158,16 @@ describe('期权套件 · GEX：Gamma 体制按全部到期日判定', () => {
     assert.ok(result.paragraph.includes('参考意义有限'));
   });
 
-  test('零 Gamma 翻转位：累计 GEX 变号处线性插值，取离现货最近的一个', () => {
+  test('零 Gamma 翻转位：局部平滑净 GEX 变号处线性插值，取离现货最近的一个', () => {
     const flip = estimateGammaFlip([
       { strike: 70000, number: -5 },
       { strike: 75000, number: -3 },
       { strike: 85000, number: 10 }
     ], 80000);
-    assert.deepEqual(flip, { strike: 83000, from: -1, to: 1 });
+    assert.deepEqual(flip, { strike: 75423, from: -1, to: 1 });
   });
 
-  test('累计 GEX 全程同号时翻转位为空，叙述如实说明', () => {
+  test('单行权价净 GEX 全程同号时翻转位为空，叙述如实说明', () => {
     assert.equal(estimateGammaFlip([{ strike: 70000, number: -5 }, { strike: 80000, number: -1 }], 75000), null);
     const result = analyzeDynamicGex({ index_price: 75000, by_expiry: { '30OCT26': [{ strike: 70000, number: -5e6 }, { strike: 80000, number: -1e6 }] } }, ref);
     assert.equal(result.gammaFlip, null);

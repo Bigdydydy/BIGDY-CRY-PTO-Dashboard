@@ -40,12 +40,14 @@ function normalPdf(x) {
  *   vega: USD change per 1% vol change per 1 contract
  *   theta: USD change per day per 1 contract
  */
-function calcGreeks(S, K, T_years, iv_pct, isCall, r = 0.04) {
+function calcGreeks(S, K, T_years, iv_pct, isCall, r = 0, F = null) {
   const sigma = Math.max(0.01, (iv_pct || 35.0) / 100.0);
   const T = Math.max(0.0005, T_years); // at least a few hours
   const sqrtT = Math.sqrt(T);
+  const forward = (F != null && F > 0) ? F : (r !== 0 ? S * Math.exp(r * T) : S);
+  const discount = Math.exp(-r * T);
 
-  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+  const d1 = (Math.log(forward / K) + 0.5 * sigma * sigma * T) / (sigma * sqrtT);
   const d2 = d1 - sigma * sqrtT;
 
   const pdfD1 = normalPdf(d1);
@@ -53,8 +55,8 @@ function calcGreeks(S, K, T_years, iv_pct, isCall, r = 0.04) {
   const cndD2 = cnd(d2);
 
   let delta, theta;
-  const gamma = pdfD1 / (S * sigma * sqrtT);
-  const vega = (S * sqrtT * pdfD1) * 0.01; // USD / 1% IV per contract
+  const gamma = (discount * pdfD1) / (forward * sigma * sqrtT);
+  const vega = (forward * discount * sqrtT * pdfD1) * 0.01; // USD / 1% IV per contract
 
   // Second-order Greeks (Bossu & Henrotte Ch 3, 6 / Natenberg Ch 6)
   // Vanna = dVega/dS = dDelta/dVol (measures how Skew position shifts into Vega exposure)
@@ -63,11 +65,11 @@ function calcGreeks(S, K, T_years, iv_pct, isCall, r = 0.04) {
   const volga = vega * 100 * (d1 * d2) / sigma;
 
   if (isCall) {
-    delta = cndD1;
-    theta = (- (S * sigma * pdfD1) / (2 * sqrtT) - r * K * Math.exp(-r * T) * cndD2) / 365.0;
+    delta = discount * cndD1;
+    theta = (- (forward * discount * sigma * pdfD1) / (2 * sqrtT) - r * K * discount * cndD2) / 365.0;
   } else {
-    delta = cndD1 - 1.0;
-    theta = (- (S * sigma * pdfD1) / (2 * sqrtT) + r * K * Math.exp(-r * T) * (1.0 - cndD2)) / 365.0;
+    delta = discount * (cndD1 - 1.0);
+    theta = (- (forward * discount * sigma * pdfD1) / (2 * sqrtT) + r * K * discount * (1.0 - cndD2)) / 365.0;
   }
 
   // Dollar Greeks (Natenberg Ch 16 / Bossu Ch 1)
@@ -464,25 +466,38 @@ const GEX_NEUTRAL_SHARE = 0.1;  // 全部到期净额不足各到期日绝对敞
 const GEX_FLIP_MAX_DIST = 0.2;  // 翻转位距现货超过 20%：对近期对冲流参考意义有限
 
 /**
- * 按行权价合计 GEX，找出累计净 GEX (由低行权价向高累加) 变号的位置，取离现货最近的一个作为零 Gamma 翻转位近似。
- * 严格的翻转位需在假想现货价下重估全部合约 Gamma；数据源只给按行权价汇总的 GEX，因此这里只是常用代理。
+ * 零 Gamma 翻转位近似：按行权价合计净 GEX，经 1-2-1 三行权价平滑后寻找【局部】变号点，取离现货最近的一个。
+ *
+ * 不再使用「由低行权价向高累加」的累计法：现货下方以 OTM Put (净 GEX < 0) 为主、上方以 OTM Call (> 0) 为主，
+ * 累计值在真正的局部正负切换处恰好处于谷底，必须等上方 Call GEX 抵消掉下方全部 Put GEX 才过零 —— 翻转位被系统性
+ * 高估，全市场净 GEX 为负时甚至永不过零。
+ *
+ * 严格的 Spot-Slide 定义 (求 S' 使 Σ_K NetOI_K·Γ(S',K) = 0) 需要逐合约 OI 与 IV；数据源只给按行权价汇总的 GEX，
+ * 由 GEX 反推 OI 会被翼部 IV 与模型 IV 的差异指数级放大，因此这里采用局部变号代理。
  */
 function estimateGammaFlip(strikeRows, spot) {
   const rows = (strikeRows || [])
     .filter(r => Number.isFinite(r?.strike) && Number.isFinite(r?.number))
     .sort((a, b) => a.strike - b.strike);
   if (rows.length < 2) return null;
+  // 1-2-1 平滑 (边界按可用权重归一)，压制单个行权价的噪声变号
+  const smoothed = rows.map((r, i) => {
+    let sum = 2 * r.number;
+    let w = 2;
+    if (i > 0) { sum += rows[i - 1].number; w += 1; }
+    if (i < rows.length - 1) { sum += rows[i + 1].number; w += 1; }
+    return sum / w;
+  });
   const crossings = [];
-  let cum = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const prev = cum;
-    cum += rows[i].number;
-    if (i > 0 && prev !== 0 && Math.sign(prev) !== Math.sign(cum) && cum !== 0) {
-      // 在相邻两个行权价之间按累计值线性插值
+  for (let i = 1; i < rows.length; i++) {
+    const prev = smoothed[i - 1];
+    const cur = smoothed[i];
+    if (prev !== 0 && cur !== 0 && Math.sign(prev) !== Math.sign(cur)) {
+      // 在相邻两个行权价之间按平滑后的净 GEX 线性插值
       const k1 = rows[i - 1].strike;
       const k2 = rows[i].strike;
-      const w = Math.abs(prev) / (Math.abs(prev) + Math.abs(cum));
-      crossings.push({ strike: Math.round(k1 + w * (k2 - k1)), from: Math.sign(prev), to: Math.sign(cum) });
+      const w = Math.abs(prev) / (Math.abs(prev) + Math.abs(cur));
+      crossings.push({ strike: Math.round(k1 + w * (k2 - k1)), from: Math.sign(prev), to: Math.sign(cur) });
     }
   }
   if (!crossings.length) return null;
@@ -658,8 +673,8 @@ function analyzeDynamicGex(gexData, referenceDate = new Date()) {
     }
 
     const flipText = gammaFlip
-      ? `累计 GEX 由${gammaFlip.from > 0 ? '正' : '负'}转${gammaFlip.to > 0 ? '正' : '负'}的翻转位约在 $${gammaFlip.strike.toLocaleString()}（按行权价累计的近似值${Number.isFinite(spotPrice) ? `，现货 ~$${Math.round(spotPrice).toLocaleString()} 位于其${spotPrice >= gammaFlip.strike ? '上方' : '下方'}` : ''}）${gammaFlip.farFromSpot ? `，距现货超过 ${GEX_FLIP_MAX_DIST * 100}%，对近期对冲流参考意义有限` : ''}。`
-      : `按行权价累计的净 GEX 在全部行权价区间内未变号（${totalAllGex >= 0 ? '全程为正' : '整体为负'}），无法用累计法近似零 Gamma 翻转位。`;
+      ? `单行权价净 GEX（三行权价平滑）由${gammaFlip.from > 0 ? '正' : '负'}转${gammaFlip.to > 0 ? '正' : '负'}的局部翻转位约在 $${gammaFlip.strike.toLocaleString()}（按行权价 GEX 的近似值，非逐合约重估的 Spot-Slide 翻转位${Number.isFinite(spotPrice) ? `，现货 ~$${Math.round(spotPrice).toLocaleString()} 位于其${spotPrice >= gammaFlip.strike ? '上方' : '下方'}` : ''}）${gammaFlip.farFromSpot ? `，距现货超过 ${GEX_FLIP_MAX_DIST * 100}%，对近期对冲流参考意义有限` : ''}。`
+      : `按行权价的净 GEX（三行权价平滑）在全部行权价区间内未变号（${totalAllGex >= 0 ? '全程为正' : '整体为负'}），无法近似零 Gamma 翻转位。`;
 
     const wallText = (aggregateWalls.callWall && aggregateWalls.putWall)
       ? `全部到期合计的最大正 GEX 行权价 $${aggregateWalls.callWall.toLocaleString()}（Call Wall），最大负 GEX 行权价 $${aggregateWalls.putWall.toLocaleString()}（Put Wall）。`
@@ -750,6 +765,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
     const isOTM = leg.isCall ? (leg.strike > S * 1.03) : (leg.strike < S * 0.97);
 
     if (leg.isCall) {
+      const callBep = leg.price < 1 ? Math.round(leg.strike / (1 - leg.price)) : Math.round(leg.strike + leg.price * S);
       if (leg.isBuy) {
         strategyType = 'LONG_CALL';
         strategyNameZh = '单腿买入看涨 (Long Call)';
@@ -758,7 +774,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         riskProfile = {
           maxProfit: 'USD 计价理论无限；BTC 本位受反向合约非线性曲率约束上限渐近逼近 1.0 BTC',
           maxLoss: `净权利金支出 (~${(leg.price * leg.amount).toFixed(2)} BTC)`,
-          breakEven: `$${Math.round(leg.strike + leg.price * S).toLocaleString()} (行权价 + 权利金)`,
+          breakEven: `$${callBep.toLocaleString()} [K / (1 - P)]`,
           inverseCurvature: 'Deribit 反向合约以 BTC 结算：到期收益 (S-K)/S = 1 - K/S，当 S 趋向无穷大时，以 BTC 计价的最大收益渐近于 1 BTC - 权利金，收益增长随币价暴涨呈递减曲线。'
         };
         theoreticalPointers = [
@@ -776,7 +792,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         riskProfile = {
           maxProfit: `收取的全部权利金 (~${(leg.price * leg.amount).toFixed(2)} BTC)`,
           maxLoss: '若裸卖为空头无限风险；若为备兑则放弃行权价以上收益',
-          breakEven: `$${Math.round(leg.strike + leg.price * S).toLocaleString()} (行权价 + 权利金)`,
+          breakEven: `$${callBep.toLocaleString()} [K / (1 - P)]`,
           inverseCurvature: '卖出虚值看涨以现货为担保，在平稳或阴跌市况下稳步获取 BTC 增量收益；但在极端暴拉行情下现货被强制交割。'
         };
         theoreticalPointers = [
@@ -788,15 +804,16 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       }
     } else {
       // Put
+      const putBep = Math.round(leg.strike / (1 + leg.price));
       if (leg.isBuy) {
         strategyType = 'LONG_PUT';
         strategyNameZh = '单腿买入看跌 (Protective Put / Tail Hedge)';
         intentBadge = '下行保护 / 尾部风险硬对冲';
         intentBadgeClass = 'badge-bear';
         riskProfile = {
-          maxProfit: `约 ${((leg.strike * leg.amount) / S).toFixed(2)} BTC (标的极端归零时)`,
+          maxProfit: `BTC 本位理论无限 (+∞ BTC，随标的归零发散)；USD 计价上限约 $${Math.round(leg.strike * leg.amount).toLocaleString()}`,
           maxLoss: `净权利金支出 (~${(leg.price * leg.amount).toFixed(2)} BTC)`,
-          breakEven: `$${Math.round(leg.strike - leg.price * S).toLocaleString()} (行权价 - 权利金)`,
+          breakEven: `$${putBep.toLocaleString()} [K / (1 + P)]`,
           inverseCurvature: '反向看跌期权以 BTC 结算：在币价崩盘时可兑现极多 BTC 数量，但需警惕 BTC 本身对法币贬值对冲折算率。'
         };
         theoreticalPointers = [
@@ -812,8 +829,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         intentBadgeClass = 'badge-bull';
         riskProfile = {
           maxProfit: `收取的全部权利金 (~${(leg.price * leg.amount).toFixed(2)} BTC)`,
-          maxLoss: `$${Math.round((leg.strike - leg.price * S) * leg.amount).toLocaleString()} (实质为折价接盘现货)`,
-          breakEven: `$${Math.round(leg.strike - leg.price * S).toLocaleString()} (行权价 - 权利金)`,
+          maxLoss: `$${Math.round((leg.strike - leg.price * S) * leg.amount).toLocaleString()} USD (折价接盘现货；BTC 本位亏损随标的归零而发散)`,
+          breakEven: `$${putBep.toLocaleString()} [K / (1 + P)]`,
           inverseCurvature: '以 BTC 计价卖出 Put：若市况剧烈下行被击穿，持仓将面临币价下跌与接盘被动放大的二阶双重压力。'
         };
         theoreticalPointers = [
@@ -832,10 +849,13 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
   else if (numLegs === 4 && sameExpiryAll) {
     const [l1, l2, l3, l4] = parsed; // Sorted by strike ascending: K1 <= K2 <= K3 <= K4
     const K1 = l1.strike, K2 = l2.strike, K3 = l3.strike, K4 = l4.strike;
+    const maxAmt = Math.max(l1.amount, l2.amount, l3.amount, l4.amount);
+    const minAmt = Math.min(l1.amount, l2.amount, l3.amount, l4.amount);
+    const isBalanced4Leg = maxAmt > 0 && minAmt >= maxAmt * 0.75;
 
     // Check for Iron Condor (Lecture 12.13):
     // Buy Put K1, Sell Put K2, Sell Call K3, Buy Call K4 where K1 < K2 < K3 < K4
-    const isIronCondor = (K1 < K2 && K2 < K3 && K3 < K4) &&
+    const isIronCondor = isBalanced4Leg && (K1 < K2 && K2 < K3 && K3 < K4) &&
       l1.isPut && l1.isBuy &&
       l2.isPut && l2.isSell &&
       l3.isCall && l3.isSell &&
@@ -843,7 +863,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
     // Check for 4-Leg Iron Butterfly (Lecture 12.14):
     // Buy Put K1, Sell Put K2, Sell Call K2, Buy Call K4 where K1 < K2 === K3 < K4
-    const isIronButterfly = (K1 < K2 && K2 === K3 && K3 < K4) &&
+    const isIronButterfly = isBalanced4Leg && (K1 < K2 && K2 === K3 && K3 < K4) &&
       l1.isPut && l1.isBuy &&
       l2.isPut && l2.isSell &&
       l3.isCall && l3.isSell &&
@@ -851,13 +871,13 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
     // Check for Call Condor (Lecture 12.13):
     // All Calls: Buy K1, Sell K2, Sell K3, Buy K4 where K1 < K2 < K3 < K4
-    const isCallCondor = (K1 < K2 && K2 < K3 && K3 < K4) &&
+    const isCallCondor = isBalanced4Leg && (K1 < K2 && K2 < K3 && K3 < K4) &&
       parsed.every(l => l.isCall) &&
       l1.isBuy && l2.isSell && l3.isSell && l4.isBuy;
 
     // Check for Put Condor (Lecture 12.13):
     // All Puts: Buy K1, Sell K2, Sell K3, Buy K4 where K1 < K2 < K3 < K4
-    const isPutCondor = (K1 < K2 && K2 < K3 && K3 < K4) &&
+    const isPutCondor = isBalanced4Leg && (K1 < K2 && K2 < K3 && K3 < K4) &&
       parsed.every(l => l.isPut) &&
       l1.isBuy && l2.isSell && l3.isSell && l4.isBuy;
 
@@ -867,6 +887,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       const wingWidth = Math.max(K2 - K1, K4 - K3);
       const maxLossUSD = Math.max(0, wingWidth - netCreditUSD);
       const maxProfitBTC = Number((netCreditBTC * l1.amount).toFixed(2));
+      const lowerBep = Math.round(K2 / (1 + Math.max(0, netCreditBTC)));
+      const upperBep = netCreditBTC < 1 ? Math.round(K3 / (1 - netCreditBTC)) : Math.round(K3 + netCreditUSD);
 
       strategyType = 'IRON_CONDOR';
       strategyNameZh = '经典铁鹰策略 (Iron Condor / 4-Leg Strangle Credit)';
@@ -875,7 +897,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       riskProfile = {
         maxProfit: `净贷方权利金收入 ~${maxProfitBTC} BTC (标的到期日在 [$${K2.toLocaleString()}, $${K3.toLocaleString()}] 通道内全额收割)`,
         maxLoss: `约 $${Math.round(maxLossUSD * l1.amount).toLocaleString()} (两翼最大行权价差扣除净权利金)`,
-        breakEven: `$${Math.round(K2 - netCreditUSD).toLocaleString()} (下边界) 及 $${Math.round(K3 + netCreditUSD).toLocaleString()} (上边界)`,
+        breakEven: `$${lowerBep.toLocaleString()} (下边界) 及 $${upperBep.toLocaleString()} (上边界)`,
         inverseCurvature: '铁鹰策略通过卖出虚值宽跨式同时在更深虚值买入保护翅膀，在 Deribit 反向合约中有效锁死双边穿仓风险，净现金流以 BTC 稳定进账。'
       };
       theoreticalPointers = [
@@ -890,6 +912,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       const wingWidth = Math.max(K2 - K1, K4 - K2);
       const maxLossUSD = Math.max(0, wingWidth - netCreditUSD);
       const maxProfitBTC = Number((netCreditBTC * l1.amount).toFixed(2));
+      const lowerBep = Math.round(K2 / (1 + Math.max(0, netCreditBTC)));
+      const upperBep = netCreditBTC < 1 ? Math.round(K2 / (1 - netCreditBTC)) : Math.round(K2 + netCreditUSD);
 
       strategyType = 'IRON_BUTTERFLY';
       strategyNameZh = '经典铁蝶策略 (Iron Butterfly / ATM Straddle Protection)';
@@ -898,7 +922,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       riskProfile = {
         maxProfit: `净收全部贷方权利金 ~${maxProfitBTC} BTC (标的精准钉盘在平值中心 $${K2.toLocaleString()})`,
         maxLoss: `约 $${Math.round(maxLossUSD * l1.amount).toLocaleString()} (单侧翅膀间距 - 净权利金)`,
-        breakEven: `$${Math.round(K2 - netCreditUSD).toLocaleString()} 及 $${Math.round(K2 + netCreditUSD).toLocaleString()}`,
+        breakEven: `$${lowerBep.toLocaleString()} 及 $${upperBep.toLocaleString()}`,
         inverseCurvature: '铁蝶由平值平价卖出跨式与外侧买入宽跨式组合而成，收取的权利金显著高于铁鹰，平值钉盘 Gamma 敏感度极高。'
       };
       theoreticalPointers = [
@@ -997,6 +1021,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       const strikeDiff = leg2.strike - leg1.strike;
       const ratio = leg2.amount / (leg1.amount || 1);
       const is1x2Ratio = ratio >= 1.5 && ratio <= 2.5;
+      const is1x1Ratio = ratio >= 0.8 && ratio <= 1.25;
 
       // ----------------------------------------------------
       // Ratio Spreads (Lecture 12.11 & 12.12)
@@ -1043,19 +1068,21 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           intentNarrative = `本笔交易为【1x2 看涨正比例价差 (Call Front Spread)】。机构买入 1 份 $${leg1.strike.toLocaleString()} Call，卖出 2 份 $${leg2.strike.toLocaleString()} Call。旨在赚取温和上涨至 $${leg2.strike.toLocaleString()} 过程中的峰值利润，需警惕后市极端暴拉的裸空敞口。`;
         }
         // Standard 1:1 Bull Call Spread
-        else if (leg1.isBuy && leg2.isSell) {
+        else if (leg1.isBuy && leg2.isSell && is1x1Ratio) {
           const netDebitBTC = leg1.price - leg2.price;
           const netDebitUSD = netDebitBTC * S;
-          const maxProfitBTC = Number(((strikeDiff / S - netDebitBTC) * leg1.amount).toFixed(2));
+          // In Deribit inverse option, max profit in BTC occurs at S = K2: (K2 - K1)/K2 - netDebitBTC
+          const maxProfitBTC = Number((((leg2.strike - leg1.strike) / leg2.strike - netDebitBTC) * leg1.amount).toFixed(2));
+          const bep = netDebitBTC < 1 ? Math.round(leg1.strike / (1 - netDebitBTC)) : Math.round(leg1.strike + netDebitUSD);
           
           strategyType = 'BULL_CALL_SPREAD';
           strategyNameZh = '牛市看涨价差 (Bull Call Spread / Debit Call Spread)';
           intentBadge = '温和看涨 / 锁定风险杠杆做多';
           intentBadgeClass = 'badge-bull';
           riskProfile = {
-            maxProfit: `约 ${maxProfitBTC.toFixed(2)} BTC (标的在到期日 >= $${leg2.strike.toLocaleString()})`,
+            maxProfit: `约 ${maxProfitBTC.toFixed(2)} BTC (标的在到期日 $${leg2.strike.toLocaleString()} 取得最大BTC收益)`,
             maxLoss: `净权利金支出 ~${(netDebitBTC * leg1.amount).toFixed(2)} BTC (标的 <= $${leg1.strike.toLocaleString()})`,
-            breakEven: `$${Math.round(leg1.strike + netDebitUSD).toLocaleString()} (低行权价 + 净支出权利金)`
+            breakEven: `$${bep.toLocaleString()} [K1 / (1 - 净权利金)]`
           };
           theoreticalPointers = [
             `权利金补贴 (Financing Leg)：通过卖出虚值 $${leg2.strike.toLocaleString()} Call 大幅降低买入 $${leg1.strike.toLocaleString()} Call 的持仓成本。`,
@@ -1065,11 +1092,12 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           intentNarrative = `本笔交易为规模达 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的经典【牛市看涨期权借方价差 (Bull Call Spread)】。机构买入 $${leg1.strike.toLocaleString()} 看涨期权的同时，卖出相同数量的 $${leg2.strike.toLocaleString()} 看涨期权进行融资。既锁定了最大亏损仅为净权利金支出，又在 $${leg1.strike.toLocaleString()} 至 $${leg2.strike.toLocaleString()} 关键价格走廊中获得了高杠杆收益。`;
         }
         // Standard 1:1 Bear Call Spread
-        else if (leg1.isSell && leg2.isBuy) {
+        else if (leg1.isSell && leg2.isBuy && is1x1Ratio) {
           const netCreditBTC = leg1.price - leg2.price;
           const netCreditUSD = netCreditBTC * S;
           const maxLossUSD = strikeDiff - netCreditUSD;
           const maxProfitBTC = Number((netCreditBTC * leg1.amount).toFixed(2));
+          const bep = netCreditBTC < 1 ? Math.round(leg1.strike / (1 - netCreditBTC)) : Math.round(leg1.strike + netCreditUSD);
 
           strategyType = 'BEAR_CALL_SPREAD';
           strategyNameZh = '熊市看涨价差 (Bear Call Spread / Credit Call Spread)';
@@ -1078,7 +1106,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           riskProfile = {
             maxProfit: `净权利金收入 ~${maxProfitBTC.toFixed(2)} BTC (标的在到期日 <= $${leg1.strike.toLocaleString()})`,
             maxLoss: `约 $${Math.round(maxLossUSD * leg1.amount).toLocaleString()} (标的 >= $${leg2.strike.toLocaleString()})`,
-            breakEven: `$${Math.round(leg1.strike + netCreditUSD).toLocaleString()} (低行权价 + 净收入权利金)`
+            breakEven: `$${bep.toLocaleString()} [K1 / (1 - 净权利金)]`
           };
           theoreticalPointers = [
             `概率优势 (Statistical Edge)：利用高行权价买腿将做空裸 Call 的无限爆仓风险降为有限风险，在阻力区赚取高胜率时间价值。`,
@@ -1091,6 +1119,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         // Put Spread or Put Ratio Spread (Lecture 12.12)
         const ratioPut = leg1.amount / (leg2.amount || 1);
         const is1x2PutRatio = ratioPut >= 1.5 && ratioPut <= 2.5;
+        const is1x1PutRatio = ratioPut >= 0.8 && ratioPut <= 1.25;
 
         // Put Ratio Backspread: Buy 2 low Puts (leg1), Sell 1 high Put (leg2)
         if (leg1.isBuy && leg2.isSell && is1x2PutRatio) {
@@ -1110,19 +1139,21 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           intentNarrative = `本笔交易为大资金构建的【1x2 看跌反比例价差 (Put Backspread)】。机构卖出 1 份高位 Put 资助买入 2 份低位 Put，旨在防范流动性骤缩导致的断崖式崩盘。`;
         }
         // Standard 1:1 Bear Put Spread
-        else if (leg1.isSell && leg2.isBuy) {
+        else if (leg1.isSell && leg2.isBuy && is1x1PutRatio) {
           const netDebitBTC = leg2.price - leg1.price;
           const netDebitUSD = netDebitBTC * S;
-          const maxProfitBTC = Number(((strikeDiff / S - netDebitBTC) * leg1.amount).toFixed(2));
+          // In Deribit inverse option, at S = K1 BTC profit is (K2-K1)/K1 - netDebitBTC; as S -> 0 BTC profit diverges
+          const maxProfitBTC = Number((((leg2.strike - leg1.strike) / leg1.strike - netDebitBTC) * leg1.amount).toFixed(2));
+          const bep = Math.round(leg2.strike / (1 + Math.max(0, netDebitBTC)));
 
           strategyType = 'BEAR_PUT_SPREAD';
           strategyNameZh = '熊市看跌价差 (Bear Put Spread / Debit Put Spread)';
           intentBadge = '看空防守 / 廉价下行对冲';
           intentBadgeClass = 'badge-bear';
           riskProfile = {
-            maxProfit: `约 ${maxProfitBTC.toFixed(2)} BTC (标的 <= $${leg1.strike.toLocaleString()})`,
+            maxProfit: `约 ${maxProfitBTC.toFixed(2)} BTC (标的在 $${leg1.strike.toLocaleString()} 处；随标的归零理论发散)；USD 计价上限约 $${Math.round((strikeDiff - netDebitUSD) * leg1.amount).toLocaleString()}`,
             maxLoss: `净权利金支出 ~${(netDebitBTC * leg1.amount).toFixed(2)} BTC (标的 >= $${leg2.strike.toLocaleString()})`,
-            breakEven: `$${Math.round(leg2.strike - netDebitUSD).toLocaleString()} (高行权价 - 净支出权利金)`
+            breakEven: `$${bep.toLocaleString()} [K2 / (1 + 净权利金)]`
           };
           theoreticalPointers = [
             `低成本下行防线：通过卖出更低行权价的 Put 补贴高行权价 Put，相比单腿 Long Put 显著减少 Theta 衰减磨损。`,
@@ -1132,11 +1163,12 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           intentNarrative = `本笔交易为总额超 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【熊市看跌借方价差 (Bear Put Spread)】。机构买入 $${leg2.strike.toLocaleString()} Put 锁定下行保护，同时卖出 $${leg1.strike.toLocaleString()} Put 降低对冲成本。为组合精准配置了梯级安全护城河。`;
         }
         // Standard 1:1 Bull Put Spread
-        else if (leg1.isBuy && leg2.isSell) {
+        else if (leg1.isBuy && leg2.isSell && is1x1PutRatio) {
           const netCreditBTC = leg2.price - leg1.price;
           const netCreditUSD = netCreditBTC * S;
           const maxLossUSD = strikeDiff - netCreditUSD;
           const maxProfitBTC = Number((netCreditBTC * leg1.amount).toFixed(2));
+          const bep = Math.round(leg2.strike / (1 + Math.max(0, netCreditBTC)));
 
           strategyType = 'BULL_PUT_SPREAD';
           strategyNameZh = '牛市看跌价差 (Bull Put Spread / Credit Put Spread)';
@@ -1144,8 +1176,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           intentBadgeClass = 'badge-bull';
           riskProfile = {
             maxProfit: `净权利金收入 ~${maxProfitBTC.toFixed(2)} BTC (标的 >= $${leg2.strike.toLocaleString()})`,
-            maxLoss: `约 $${Math.round(maxLossUSD * leg1.amount).toLocaleString()} (标的 <= $${leg1.strike.toLocaleString()})`,
-            breakEven: `$${Math.round(leg2.strike - netCreditUSD).toLocaleString()} (高行权价 - 净收入权利金)`
+            maxLoss: `约 $${Math.round(maxLossUSD * leg1.amount).toLocaleString()} USD (标的 <= $${leg1.strike.toLocaleString()}；BTC 本位亏损随标的归零而发散)`,
+            breakEven: `$${bep.toLocaleString()} [K2 / (1 + 净权利金)]`
           };
           theoreticalPointers = [
             `高安全边际：在标的下方支撑位构建，只要标的未跌破 $${leg2.strike.toLocaleString()} 即可稳收全部现金收益。`,
@@ -1160,8 +1192,10 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
     else if (sameExpiry && !sameType) {
       const callLeg = parsed.find(l => l.isCall);
       const putLeg = parsed.find(l => l.isPut);
+      const legRatio = (callLeg && putLeg) ? callLeg.amount / (putLeg.amount || 1) : 0;
+      const is1x1LegRatio = legRatio >= 0.8 && legRatio <= 1.25;
 
-      if (callLeg && putLeg) {
+      if (callLeg && putLeg && is1x1LegRatio) {
         const isSameStrike = callLeg.strike === putLeg.strike;
 
         // ----------------------------------------------------
@@ -1259,7 +1293,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
             intentBadge = '零成本硬核防守 / 锁死下行';
             intentBadgeClass = 'badge-bear';
             riskProfile = {
-              maxProfit: `约 ${((putLeg.strike * putLeg.amount) / S).toFixed(2)} BTC (由买入 Put 驱动)`,
+              maxProfit: `BTC 本位理论无限 (+∞ BTC，随标的归零发散)；USD 计价上限约 $${Math.round(putLeg.strike * putLeg.amount).toLocaleString()}`,
               maxLoss: '若裸卖 Call 则上行无限；若配合现货则收益在 Call 行权价封顶',
               breakEven: `由两腿执行价与权利金净收付综合决定`
             };
@@ -1638,11 +1672,14 @@ function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming 
 
   // 2. Standard Multi-Leg Strategy Package Entry (Opening)
   const STANDARD_STRATEGIES = [
-    'IRON_CONDOR', 'IRON_BUTTERFLY', 'RATIO_CALL_BACKSPREAD', 'RATIO_CALL_FRONT_SPREAD',
+    'IRON_CONDOR', 'IRON_BUTTERFLY', 'CALL_CONDOR', 'PUT_CONDOR',
+    'RATIO_CALL_BACKSPREAD', 'RATIO_CALL_FRONT_SPREAD',
     'RATIO_PUT_BACKSPREAD', 'BULL_CALL_SPREAD', 'BEAR_CALL_SPREAD', 'BULL_PUT_SPREAD',
     'BEAR_PUT_SPREAD', 'LONG_STRADDLE', 'SHORT_STRADDLE', 'LONG_STRANGLE', 'SHORT_STRANGLE',
     'BULLISH_RISK_REVERSAL', 'BEARISH_RISK_REVERSAL', 'SYNTHETIC_LONG_FUTURE', 'SYNTHETIC_SHORT_FUTURE',
-    'PUT_BUTTERFLY', 'BROKEN_WING_PUT_BUTTERFLY', 'LONG_CALENDAR_SPREAD', 'REVERSE_CALENDAR_SPREAD'
+    'LONG_BUTTERFLY_SPREAD', 'LONG_PUT_BUTTERFLY', 'PUT_BUTTERFLY',
+    'BROKEN_WING_BUTTERFLY', 'BROKEN_WING_PUT_BUTTERFLY',
+    'LONG_CALENDAR_SPREAD', 'REVERSE_CALENDAR_SPREAD'
   ];
   if (isMultiLeg && STANDARD_STRATEGIES.includes(strategyType)) {
     return {
@@ -2145,8 +2182,15 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   let callSellNotional = 0;
   let putBuyNotional = 0;
   let putSellNotional = 0;
+  let netBullishDeltaUSD = 0;
+  let netBearishDeltaUSD = 0;
 
   for (const b of dedupedUnits) {
+    if (b.netDeltaUSD > 0) {
+      netBullishDeltaUSD += b.netDeltaUSD;
+    } else if (b.netDeltaUSD < 0) {
+      netBearishDeltaUSD += Math.abs(b.netDeltaUSD);
+    }
     for (const l of b.legs) {
       const notional = l.notionalM * 1e6;
       const isCall = l.instrument.includes('-C');
@@ -2162,8 +2206,11 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
 
   const netBullishNotional = callBuyNotional + putSellNotional;
   const netBearishNotional = callSellNotional + putBuyNotional;
-  const totalVolume = netBullishNotional + netBearishNotional || 1;
-  const bullRatio = Math.round((netBullishNotional / totalVolume) * 100);
+  const totalDeltaVolume = netBullishDeltaUSD + netBearishDeltaUSD;
+  const totalNotionalVolume = netBullishNotional + netBearishNotional || 1;
+  const bullRatio = totalDeltaVolume > 0
+    ? Math.round((netBullishDeltaUSD / totalDeltaVolume) * 100)
+    : Math.round((netBullishNotional / totalNotionalVolume) * 100);
 
   let flowBias = '中性博弈';
   if (bullRatio >= 60) flowBias = '偏多吸筹与牛市价差构建';

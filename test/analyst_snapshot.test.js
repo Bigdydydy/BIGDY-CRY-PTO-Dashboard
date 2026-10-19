@@ -75,8 +75,9 @@ describe('methodology-specific calculations', () => {
     assert.equal(T.curveRegime(1, -2), 'flat');
   });
 
-  test('10y10y forward from 10y and 20y yields', () => {
-    assert.equal(T.round(T.forwardYield(5.17, 10, 5.6, 20), 3), 6.03);
+  test('10y10y forward from 10y and 20y yields (compounding & linear fallback)', () => {
+    assert.equal(T.round(T.forwardYield(5.17, 10, 5.6, 20), 3), 6.032);
+    assert.equal(T.round(T.forwardYield(5.17, 10, 5.6, 20, 'linear'), 3), 6.03);
   });
 
   test('Brooks oil model: +60% at elasticity 0.15 implies ~9.5 mb/d of 105', () => {
@@ -105,13 +106,55 @@ describe('methodology-specific calculations', () => {
     assert.equal(T.round(s[0].value, 4), T.round(6.743031 - 0.948674 - 0.0015, 4));
   });
 
-  test('share_of_nominal_move: real-rate share of the 10y move', () => {
+  test('share_of_nominal_move: real-rate share of the 10y move and tags', () => {
     const dates = daily('2026-06-01', Array.from({ length: 100 }, () => 0)).map(o => o.date);
     const nominal = dates.map((date, i) => ({ date, value: 4 + i * 0.01 }));
-    const real = dates.map((date, i) => ({ date, value: 1.8 + i * 0.009 }));
+    const real = dates.map((date, i) => ({ date, value: 1.8 + i * 0.007 }));
+    const bei = dates.map((date, i) => ({ date, value: 2.2 + i * 0.003 }));
+    const tp = dates.map((date, i) => ({ date, value: 1.0 + i * 0.005 }));
     const ctx = { series: new Map([['UST10Y', nominal]]), params: {} };
-    const r = crossTransform('share_of_nominal_move', { id: 'REAL10Y' }, real, ctx);
-    assert.equal(r.share_4w, 0.9);
+    const rReal = crossTransform('share_of_nominal_move', { id: 'REAL10Y' }, real, ctx);
+    const rBei = crossTransform('share_of_nominal_move', { id: 'BEI10Y' }, bei, ctx);
+    const rTp = crossTransform('share_of_nominal_move', { id: 'TERM_PREMIUM_10Y' }, tp, ctx);
+    assert.equal(rReal.share_4w, 0.7);
+    assert.equal(rReal.tag, 'realShareOf10yMove');
+    assert.equal(rBei.share_4w, 0.3);
+    assert.equal(rBei.tag, 'beiShareOf10yMove');
+    assert.equal(rTp.tag, 'tpShareOf10yMove');
+    // Real share + Breakeven share sums to 1.0
+    assert.equal(T.round(rReal.share_4w + rBei.share_4w, 2), 1.0);
+  });
+
+  test('share_of_nominal_move aligns across lagged series dates', () => {
+    // Nominal has observations up to day 100, but TP only up to day 95 (lagged by 5 days)
+    const dates = daily('2026-06-01', Array.from({ length: 100 }, () => 0)).map(o => o.date);
+    const nominal = dates.map((date, i) => ({ date, value: 4 + i * 0.01 }));
+    const tp = dates.slice(0, 95).map((date, i) => ({ date, value: 1 + i * 0.005 }));
+    const ctx = { series: new Map([['UST10Y', nominal]]), params: {} };
+    const r = crossTransform('share_of_nominal_move', { id: 'TERM_PREMIUM_10Y' }, tp, ctx);
+    assert.equal(r.date, dates[94], 'Must align on common latest date');
+    assert.equal(r.share_4w, 0.5);
+  });
+
+  test('gap_vs_core_cpi aligns on common latest month when CPI has a release lead over PCE', () => {
+    // 24 months of monthly data
+    const mDates = [];
+    for (let y = 2024; y <= 2026; y++) {
+      for (let m = 1; m <= 12; m++) {
+        if (y === 2026 && m > 9) break;
+        mDates.push(`${y}-${String(m).padStart(2, '0')}-01`);
+      }
+    }
+    // CPI has Sep 2026 (index 320, 2% yoy)
+    const cpi = mDates.map((date, i) => ({ date, value: 100 * Math.pow(1.025, i / 12) }));
+    // PCE only has up to Aug 2026 (lagged by 1 month, 3% yoy)
+    const pce = mDates.slice(0, -1).map((date, i) => ({ date, value: 100 * Math.pow(1.03, i / 12) }));
+    const ctx = { series: new Map([['CPI_CORE', cpi]]), params: {} };
+    const r = crossTransform('gap_vs_core_cpi', { id: 'PCE_CORE' }, pce, ctx);
+    assert.equal(r.date, mDates[mDates.length - 2], 'Must align on latest common month (Aug 2026)');
+    assert.ok(Math.abs(r.core_pce_yoy - 3.0) < 0.1);
+    assert.ok(Math.abs(r.core_cpi_yoy - 2.5) < 0.1);
+    assert.ok(Math.abs(r.value - 0.5) < 0.1);
   });
 
   test('VIX divergence: SPX 20-day low without a VIX 20-day high', () => {
@@ -152,3 +195,38 @@ describe('key level distance', () => {
     assert.deepEqual(crossTransform('distance_to_key_level_bp', { id: 'UST10Y', unit: '%' }, [{ date: '2026-10-15', value: 5.19 }], ctx).value, [{ level: 5.35, distance_bp: -16 }]);
   });
 });
+
+describe('multi-source synthesis & frequency-aware transforms', () => {
+  test('alignMean computes equal-weighted average across regional surveys without dropping sources', () => {
+    const philly = [
+      { date: '2026-01-01', value: 10.0 },
+      { date: '2026-02-01', value: -5.0 },
+      { date: '2026-03-01', value: 12.0 }
+    ];
+    const ny = [
+      { date: '2026-01-01', value: 6.0 },
+      { date: '2026-02-01', value: -3.0 },
+      { date: '2026-03-01', value: 8.0 }
+    ];
+    const mean = T.alignMean([philly, ny], 'month');
+    assert.equal(mean.length, 3);
+    assert.equal(mean[0].value, 8.0);
+    assert.equal(mean[1].value, -4.0);
+    assert.equal(mean[2].value, 10.0);
+  });
+
+  test('slope_4w takes 4 points for weekly series vs slope_20d taking 20 points', () => {
+    const weeklySeries = [
+      { date: '2026-01-05', value: 1.0 },
+      { date: '2026-01-12', value: 1.5 },
+      { date: '2026-01-19', value: 2.0 },
+      { date: '2026-01-26', value: 2.5 }
+    ];
+    const sl4 = T.applySeriesTransform('slope_4w', weeklySeries);
+    assert.ok(sl4);
+    assert.equal(sl4.value, 0.5);
+    // slope_20d would throw error on 4-observation series because it requires 20 points
+    assert.throws(() => T.applySeriesTransform('slope_20d', weeklySeries));
+  });
+});
+

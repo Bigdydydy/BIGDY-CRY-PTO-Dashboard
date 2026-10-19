@@ -204,6 +204,35 @@ function align(a, b) {
   return a.filter(o => mb.has(o.date)).map(o => ({ date: o.date, a: o.value, b: mb.get(o.date) }));
 }
 
+/** Multi-series alignment taking equal-weighted mean across available observations. */
+function alignMean(seriesList, mode = 'date') {
+  if (!seriesList || !seriesList.length) return [];
+  if (seriesList.length === 1) return seriesList[0];
+  const keyFn = mode === 'month' ? (d => d.slice(0, 7)) : (d => d);
+  const byKey = new Map();
+  for (const s of seriesList) {
+    if (!Array.isArray(s)) continue;
+    for (const o of s) {
+      if (!o || o.value == null || isNaN(o.value)) continue;
+      const k = keyFn(o.date);
+      if (!byKey.has(k)) byKey.set(k, { dates: [], values: [] });
+      const b = byKey.get(k);
+      b.dates.push(o.date);
+      b.values.push(o.value);
+    }
+  }
+  const out = [];
+  const sortedKeys = [...byKey.keys()].sort();
+  for (const k of sortedKeys) {
+    const { dates, values } = byKey.get(k);
+    if (!values.length) continue;
+    dates.sort();
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    out.push({ date: dates[dates.length - 1], value: round(avg, 4) });
+  }
+  return out;
+}
+
 function ratioSeries(a, b) {
   return align(a, b).map(o => ({ date: o.date, value: o.a / o.b }));
 }
@@ -259,9 +288,25 @@ function curveRegime(chg2y, chg10y) {
   return steepening ? 'bull_steepener' : 'bull_flattener';
 }
 
-/** Implied forward yield between maturities m1 < m2 (years), from par yields as a zero-curve approximation. */
-function forwardYield(y1, m1, y2, m2) {
-  return (y2 * m2 - y1 * m1) / (m2 - m1);
+/**
+ * Implied forward yield between maturities m1 < m2 (years).
+ * Uses discrete compounding:
+ *   ( (1 + y2/100)^m2 / (1 + y1/100)^m1 )^(1 / (m2 - m1)) - 1
+ * When method === 'linear' or if yields are extreme, falls back to linear approximation.
+ */
+function forwardYield(y1, m1, y2, m2, method = 'compound') {
+  if (method === 'linear') {
+    return (y2 * m2 - y1 * m1) / (m2 - m1);
+  }
+  const r1 = y1 / 100;
+  const r2 = y2 / 100;
+  if (r1 <= -1 || r2 <= -1) {
+    return (y2 * m2 - y1 * m1) / (m2 - m1);
+  }
+  const ratio = Math.pow(1 + r2, m2) / Math.pow(1 + r1, m1);
+  if (ratio <= 0) return (y2 * m2 - y1 * m1) / (m2 - m1);
+  const f = Math.pow(ratio, 1 / (m2 - m1)) - 1;
+  return round(f * 100, 4);
 }
 
 /**
@@ -276,6 +321,7 @@ function impliedOilDisruption(price, baseline, elasticity, globalSupplyMbd) {
 
 const PARAM_RE = /^chg_(\d+)([dwmy])(?:_(bp|pct))?$/;
 const SMA_RE = /^vs_sma(\d+)$/;
+const SLOPE_RE = /^slope_(\d+)([dwmy])?$/;
 
 /**
  * Single-series transforms keyed by name. Cross-series transforms (curve_regime, rel_to_spx, ...) live in
@@ -287,6 +333,8 @@ function applySeriesTransform(name, series) {
   if (name === 'vs_sma50w') return vsSma(weekly(series), 50);
   const sm = name.match(SMA_RE);
   if (sm) return vsSma(series, parseInt(sm[1], 10));
+  const sl = name.match(SLOPE_RE);
+  if (sl) return slope(series, parseInt(sl[1], 10));
   switch (name) {
     case 'level': {
       const o = last(series);
@@ -303,6 +351,7 @@ function applySeriesTransform(name, series) {
     case 'mom_annualized_3m': return momAnnualized3m(series);
     case 'avg_3m_change': return avgChange(series, 3);
     case 'avg_4w': return avgLast(series, 4);
+    case 'slope_4w': return slope(series, 4);
     case 'slope_20d': return slope(series, 20);
     case 'sahm': return sahm(series);
     default: return undefined;
@@ -325,6 +374,7 @@ module.exports = {
   sahm,
   slope,
   align,
+  alignMean,
   ratioSeries,
   rollingChangeCorrelation,
   curveRegime,

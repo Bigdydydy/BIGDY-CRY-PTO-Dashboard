@@ -63,7 +63,7 @@ function extractLiveCurvePoints(book, now, index) {
       expiry: isoDate(exp),
       days,
       apr: (b.mark_price - index) / index * 365 / days * 100,
-      oiUsd: Math.round(Number(b.open_interest) || 0),
+      oiUsd: Math.round((Number(b.open_interest) || 0) * index),
       volumeUsd: Math.round(Number(b.volume_usd) || 0)
     });
   }

@@ -578,7 +578,7 @@
       "transforms": [
         "level",
         "chg_4w",
-        "slope_20d"
+        "slope_4w"
       ],
       "rules": [],
       "notes": "bold-euclid 的 server/macro_fetcher.js 已经实现了同一口径（fedNetLiquidity），可以复用",
@@ -645,7 +645,11 @@
         }
       ],
       "transforms": [
-        "bid_to_cover_vs_avg6"
+        "bid_to_cover_vs_avg6",
+        "dealer_share",
+        "indirect_share",
+        "dealer_share_vs_avg6",
+        "indirect_share_vs_avg6"
       ],
       "rules": [
         {

@@ -59,7 +59,12 @@ async function fetchAll(registry, opts) {
     if (src && (src.provider === 'fred' || src.provider === 'yahoo')) wanted.set(sourceKey(src), src);
   };
   for (const ind of registry.indicators) {
-    if (ind.composite) Object.values(ind.composite.inputs).forEach(add);
+    if (ind.composite) {
+      const inputs = Array.isArray(ind.composite.inputs)
+        ? ind.composite.inputs
+        : (ind.composite.inputs ? Object.values(ind.composite.inputs) : (ind.sources ? ind.sources.filter(s => s.role === 'primary') : []));
+      inputs.forEach(add);
+    }
     else ind.sources.filter(s => s.role !== 'realtime').forEach(add);
   }
   const fetched = new Map();
@@ -107,6 +112,15 @@ function buildComposite(ind, getRaw) {
       return T.align(input('short'), input('long')).map(o => ({ date: o.date, value: T.forwardYield(o.a, c.m1, o.b, c.m2) }));
     case 'rolling_corr':
       return T.rollingChangeCorrelation(input('a'), input('b'), c.window, c.a_mode, c.b_mode);
+    case 'mean': {
+      const inputs = Array.isArray(c.inputs)
+        ? c.inputs
+        : (c.inputs ? Object.values(c.inputs) : (ind.sources ? ind.sources.filter(s => s.role === 'primary') : []));
+      const rawSeriesList = inputs.map(src => getRaw(src)).filter(s => s && s.length);
+      if (!rawSeriesList.length) throw new Error('no available inputs for mean composite');
+      const mode = ind.frequency === 'monthly' ? 'month' : 'date';
+      return T.alignMean(rawSeriesList, mode);
+    }
     default:
       throw new Error('unknown composite type ' + c.type);
   }
@@ -127,9 +141,24 @@ function crossTransform(name, ind, series, ctx) {
     }
     case 'share_of_nominal_move': {
       const out = {};
+      const tagMap = {
+        REAL10Y: 'realShareOf10yMove',
+        BEI10Y: 'beiShareOf10yMove',
+        TERM_PREMIUM_10Y: 'tpShareOf10yMove'
+      };
+      out.tag = tagMap[ind?.id] || 'shareOf10yMove';
+      const joined = T.align(series, other('UST10Y'));
+      if (joined.length < 2) throw new Error('needs aligned series with UST10Y');
+      const cur = joined[joined.length - 1];
+      out.date = cur.date;
       for (const [label, n, unit] of [['4w', 4, 'w'], ['13w', 13, 'w']]) {
-        const own = T.change(series, n, unit, 'bp').value;
-        const nominal = T.change(other('UST10Y'), n, unit, 'bp').value;
+        const base = T.valueAtOrBefore(joined, T.shiftDate(cur.date, n, unit));
+        if (!base) {
+          out['share_' + label] = null;
+          continue;
+        }
+        const own = T.round((cur.a - base.a) * 100, 1);
+        const nominal = T.round((cur.b - base.b) * 100, 1);
         out['own_chg_' + label + '_bp'] = own;
         out['nominal_chg_' + label + '_bp'] = nominal;
         out['share_' + label] = Math.abs(nominal) < 5 ? null : T.round(own / nominal, 2);
@@ -171,9 +200,14 @@ function crossTransform(name, ind, series, ctx) {
       return { value: T.round(cur.a * 42 - cur.b, 2), unit: 'USD/bbl', date: cur.date };
     }
     case 'gap_vs_core_cpi': {
-      const pce = T.yoy(series).value;
-      const cpi = T.yoy(other('CPI_CORE')).value;
-      return { value: T.round(pce - cpi, 2), core_pce_yoy: pce, core_cpi_yoy: cpi };
+      const joined = T.align(series, other('CPI_CORE'));
+      if (joined.length < 13) throw new Error('need at least 13 aligned monthly observations for Core PCE vs Core CPI');
+      const cur = joined[joined.length - 1];
+      const base = T.valueAtOrBefore(joined, T.shiftDate(cur.date, 12, 'm'));
+      if (!base) throw new Error('no aligned observation 12m before ' + cur.date);
+      const pce = T.round((cur.a / base.a - 1) * 100, 4);
+      const cpi = T.round((cur.b / base.b - 1) * 100, 4);
+      return { value: T.round(pce - cpi, 2), core_pce_yoy: pce, core_cpi_yoy: cpi, date: cur.date };
     }
     case 'distance_to_key_level_bp': {
       const levels = (ctx.params.key_levels || {})[ind.id];
@@ -260,12 +294,30 @@ async function buildSnapshot(opts = {}) {
       }
     } else {
       const candidates = ind.sources.filter(s => s.provider === 'fred' || s.provider === 'yahoo');
-      for (const src of candidates.filter(s => s.role !== 'realtime')) {
-        const s = getRaw(src);
-        if (s && s.length) {
-          series.set(ind.id, s);
-          r.source = sourceKey(src) + (src.role === 'primary' ? '' : ' (' + src.role + ')');
-          break;
+      const primaries = candidates.filter(s => s.role === 'primary');
+      if (primaries.length > 1) {
+        // Multi-source primary indicator (e.g. REGIONAL_SURVEYS: Philly Fed + NY Empire State)
+        const validSeries = primaries.map(src => ({ src, s: getRaw(src) })).filter(item => item.s && item.s.length);
+        if (validSeries.length > 1) {
+          const mode = ind.frequency === 'monthly' ? 'month' : 'date';
+          const combined = T.alignMean(validSeries.map(v => v.s), mode);
+          if (combined && combined.length) {
+            series.set(ind.id, combined);
+            r.source = 'mean(' + validSeries.map(v => sourceKey(v.src)).join(', ') + ')';
+          }
+        } else if (validSeries.length === 1) {
+          series.set(ind.id, validSeries[0].s);
+          r.source = sourceKey(validSeries[0].src);
+        }
+      }
+      if (!series.has(ind.id)) {
+        for (const src of candidates.filter(s => s.role !== 'realtime')) {
+          const s = getRaw(src);
+          if (s && s.length) {
+            series.set(ind.id, s);
+            r.source = sourceKey(src) + (src.role === 'primary' ? '' : ' (' + src.role + ')');
+            break;
+          }
         }
       }
       if (!r.source) {
