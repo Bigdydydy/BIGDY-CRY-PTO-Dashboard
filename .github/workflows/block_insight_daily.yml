@@ -33,16 +33,22 @@ jobs:
 
       # 只用 Node 内置模块，无需 npm install
       - name: Snapshot Deribit option open interest
+        id: option_oi
         run: node scripts/option_oi_snapshot.js --skip-if-done
 
       - name: Block flow daily aggregates and smart-money marks
+        id: block_flow
+        if: ${{ !cancelled() }}
+        env:
+          OPTION_OI_STEP_OUTCOME: ${{ steps.option_oi.outcome }}
         run: node scripts/block_insight_daily.js
 
       - name: Commit and push
+        if: ${{ !cancelled() && steps.block_flow.outcome != 'skipped' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json
+          git add data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json data/job_health_block_insight_daily.json
           if git diff --cached --quiet; then
             echo "No changes; skipping commit."
             exit 0

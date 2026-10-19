@@ -5,6 +5,11 @@ const url = require('url');
 const zlib = require('zlib');
 const crypto = require('crypto');
 const { refreshAllMarketData, getCachedData } = require('./data_fetcher');
+const {
+  summarizeHealth, deriveSourceHealth, getSourceHealth,
+  recordAttempt, recordSuccess, recordFailure, seedSource
+} = require('./data_health');
+const { fetchWithTimeout } = require('./http_client');
 const { filterTradesByWindow } = require('./trade_store');
 const {
   analyzeAtmIv,
@@ -64,6 +69,68 @@ function parseJsonBody(req) {
 // Rate limiting & Single-flight locks
 const refreshRateLimitMap = new Map();
 let activeRefreshPromise = null;
+
+// ---------------------------------------------------------------------------
+// Phase 3A — truthful per-analysis health gates
+// ---------------------------------------------------------------------------
+
+/** Required upstream sources per market-data analysis section. */
+const ANALYSIS_REQUIREMENTS = {
+  atmIv: ['greeks_atm', 'greeks_iv_history', 'deribit_dvol'],
+  gex: ['greeks_gex'],
+  blockTrades: ['greeks_trades', 'greeks_gex'],
+  ivSmile: ['greeks_smile', 'greeks_gex'],
+  delta25Skew: ['greeks_skew', 'greeks_atm', 'greeks_iv_history', 'deribit_dvol'],
+  termPremium: ['basis_live', 'basis_history', 'fred:DGS3MO']
+};
+
+// The vol-surface daily archive is built from every input the analyses consume.
+const VOL_SURFACE_REQUIRED = [
+  'greeks_atm', 'greeks_iv_history', 'deribit_dvol',
+  'greeks_smile', 'greeks_gex', 'greeks_skew'
+];
+
+const DATA_UNAVAILABLE_TEXT = '数据过期或不可用，暂停当前研判';
+
+/**
+ * Truthful replacement for a blocked analysis: the analyzer is never called,
+ * conclusions are never emitted, and the raw historical input (if any) is kept
+ * for browsing — explicitly marked historicalOnly.
+ */
+function unavailableAnalysis(health, historical) {
+  const out = {
+    status: 'data_unavailable',
+    summaryText: DATA_UNAVAILABLE_TEXT,
+    dataHealth: health,
+    historicalOnly: true
+  };
+  if (historical !== undefined && historical !== null) out.historical = historical;
+  return out;
+}
+
+/**
+ * Attach/repair health on a module payload before it goes over the wire:
+ * keeps the payload's own dataHealth when present, falls back to a live
+ * registry summary for `requiredIds`, and flags the response historicalOnly
+ * whenever current-conclusion inputs are not usable.
+ */
+function withApiHealth(payload, requiredIds = []) {
+  const out = payload && typeof payload === 'object' ? { ...payload } : {};
+  if (!out.dataHealth && requiredIds.length) {
+    out.dataHealth = summarizeHealth(requiredIds);
+  }
+  out.historicalOnly = out.historicalOnly === true ||
+    !!(out.dataHealth && out.dataHealth.analysisAllowed === false);
+  // An explicit history-only payload must not be revived as a live conclusion
+  // even when the bound health is still usable: demote the wire health on a
+  // shallow clone — the caller's dataHealth object is never mutated.
+  if (out.historicalOnly && out.dataHealth && out.dataHealth.analysisAllowed !== false) {
+    const demoted = { ...out.dataHealth, analysisAllowed: false };
+    if (demoted.state === 'OK') demoted.state = 'DEGRADED';
+    out.dataHealth = demoted;
+  }
+  return out;
+}
 
 // 按需刷新: 记录最近一次 API 访问；无人访问时暂停定时拉取外部行情
 const IDLE_PAUSE_MS = 5 * 60 * 1000;
@@ -157,7 +224,13 @@ function binanceSource(name, base, pageMax) {
     name, pageMax,
     async page(symbol, interval, limit, endTimeMs) {
       const url = `${base}?symbol=${symbol}&interval=${interval}&limit=${limit}${endTimeMs ? `&endTime=${endTimeMs}` : ''}`;
-      const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }, signal: AbortSignal.timeout(8000) });
+      // One 8s budget per source page, no retries: 5 fallback sources must all
+      // fit inside the browser's 45s fetch timeout.
+      const response = await fetchWithTimeout(url, {
+        timeout: 8000,
+        retries: 0,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const rows = await response.json();
       if (!Array.isArray(rows)) throw new Error('非数组响应');
@@ -174,10 +247,11 @@ const bybitSource = {
     const iv = BYBIT_INTERVAL[interval];
     if (!iv) throw new Error(`不支持 ${interval}`);
     const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=${iv}&limit=${limit}${endTimeMs ? `&end=${endTimeMs}` : ''}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const response = await fetchWithTimeout(url, { timeout: 8000, retries: 0 });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     if (!json || json.retCode !== 0 || !json.result || !Array.isArray(json.result.list)) throw new Error(`retCode ${json && json.retCode}`);
+    // Bybit returns newest-first: reverse BEFORE validation so timestamps ascend.
     return json.result.list.map(r => [+r[0], r[1], r[2], r[3], r[4], r[5]]).reverse();
   }
 };
@@ -190,10 +264,11 @@ const okxSource = {
     const instId = symbol.replace(/USDT$/, '-USDT-SWAP');
     // after = 返回早于该时间戳的K线 (向前分页)
     const url = `https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=${bar}&limit=${limit}${endTimeMs ? `&after=${endTimeMs + 1}` : ''}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const response = await fetchWithTimeout(url, { timeout: 8000, retries: 0 });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     if (!json || json.code !== '0' || !Array.isArray(json.data)) throw new Error(`code ${json && json.code}`);
+    // OKX returns newest-first: reverse BEFORE validation so timestamps ascend.
     return json.data.map(r => [+r[0], r[1], r[2], r[3], r[4], r[5]]).reverse();
   }
 };
@@ -206,6 +281,40 @@ const KLINE_SOURCES = [
   okxSource
 ];
 
+/**
+ * Strict raw kline row validation, run BEFORE any row enters memory or cache.
+ * Rows are `[[t, o, h, l, c, v, ...], ...]` in ascending time order (Bybit/OKX
+ * pages are already reversed by their source adapters). Any bad row fails the
+ * whole source — NaN/malformed data is never silently filtered into a cache.
+ */
+function validateKlineRows(rows) {
+  if (!Array.isArray(rows)) return '非数组K线';
+  const maxFuture = Date.now() + 5 * 60000;
+  let prevT = null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!Array.isArray(r) || r.length < 6) return `第${i}行格式非法`;
+    // Strict numeric read: null / '' / booleans must not coerce to a fake 0/1.
+    const strictNum = x => (x === null || x === undefined || typeof x === 'boolean' ||
+      (typeof x === 'string' && x.trim() === '')) ? NaN : Number(x);
+    const t = strictNum(r[0]);
+    const o = strictNum(r[1]);
+    const h = strictNum(r[2]);
+    const l = strictNum(r[3]);
+    const c = strictNum(r[4]);
+    const v = strictNum(r[5]);
+    if (![t, o, h, l, c, v].every(Number.isFinite)) return `第${i}行含非有限值`;
+    if (t <= 0) return `第${i}行时间戳非法`;
+    if (o <= 0 || h <= 0 || l <= 0 || c <= 0) return `第${i}行OHLC非正`;
+    if (h < Math.max(o, c, l) || l > Math.min(o, c, h)) return `第${i}行OHLC不自洽`;
+    if (v < 0) return `第${i}行volume为负`;
+    if (t > maxFuture) return `第${i}行是未来K线`;
+    if (prevT !== null && t <= prevT) return `第${i}行时间戳非升序`;
+    prevT = t;
+  }
+  return null;
+}
+
 /** 从一个源按 endTime 向前分页拼接最新的 limit 根 (备用源有页数上限，可能少于 limit) */
 async function fetchKlinePages(source, symbol, interval, limit) {
   const rows = [];
@@ -217,8 +326,12 @@ async function fetchKlinePages(source, symbol, interval, limit) {
       page = await source.page(symbol, interval, pageLimit, endTime);
     } catch (e) {
       if (!rows.length) throw e;
-      break; // 已拿到的较新数据仍可用
+      break; // 网络类失败且已拿到较新数据: 已收集部分仍可用
     }
+    // A malformed page makes the WHOLE source untrustworthy — try the next
+    // source rather than splicing bad rows into the cache.
+    const bad = validateKlineRows(page);
+    if (bad) throw new Error(`${source.name} K线校验失败: ${bad}`);
     pages++;
     if (!page.length) break;
     rows.unshift(...page);
@@ -250,14 +363,16 @@ async function fetchBinanceKlines(symbol, interval = '4h', limit = 1000) {
   return bars.length > limit ? bars.slice(bars.length - limit) : bars;
 }
 
-/** 依次尝试各个源；全部失败时错误信息列出每个源的失败原因 */
+/** 依次尝试各个源；全部失败时错误信息列出每个源的失败原因。命中备用源时带回此前各源的错误作 issues。 */
 async function fetchFromSources(symbol, interval, limit, preferred) {
   const order = preferred ? [preferred].concat(KLINE_SOURCES.filter(s => s !== preferred)) : KLINE_SOURCES;
   const errors = [];
   for (const source of order) {
     try {
       const rows = await fetchKlinePages(source, symbol, interval, limit);
-      if (rows.length) return { rows, source };
+      // issues carry the failures of every source skipped before this winner —
+      // a Bybit/OKX fallback must read as 备用源, not green-OK primary data.
+      if (rows.length) return { rows, source, issues: errors.slice() };
       errors.push(`${source.name}: 空数据`);
     } catch (e) {
       errors.push(`${source.name}: ${e.message}`);
@@ -267,11 +382,30 @@ async function fetchFromSources(symbol, interval, limit, preferred) {
   throw new Error(`未能拉取到 ${interval} K 线（${errors.join('；')}）`);
 }
 
+/** Health source id carried by every kline cache tier entry. */
+function waveSourceId(symbol, interval, tier) {
+  return `wave:${symbol}:${interval}:${tier}`;
+}
+
+/** New cache entry: stamps its own receipt + data clock, never "now" for data. */
+function klineCacheEntry(data, source, issues = []) {
+  const acquiredAt = Date.now();
+  const lastBar = data && data.length ? data[data.length - 1] : null;
+  return {
+    timestamp: acquiredAt,
+    acquiredAt,
+    dataAsOf: lastBar ? lastBar.time * 1000 : null, // last bar open time, ms
+    data,
+    source,
+    issues
+  };
+}
+
 /**
  * 档位缓存 + 增量更新 + 出错回退旧缓存:
  * - 2 分钟内直接返回缓存；更大档位的新鲜缓存可直接切片；
  * - 过期后只补拉最新一页并与缓存拼接 (请求量从 7 页降到 1 页，减少被限流)；
- * - 拉取全部失败时返回旧缓存，而不是报错。
+ * - 拉取全部失败时返回旧缓存，而不是报错 — 旧缓存自己的 acquire/data 时钟不续期。
  */
 async function fetchKlineTier(symbol, interval, limit) {
   const cacheKey = `${symbol}_${interval}_${limit}`;
@@ -281,37 +415,71 @@ async function fetchKlineTier(symbol, interval, limit) {
   // 同一标的/周期/根数的并发请求合并为一次 (图表与研判接口常同时触发)
   if (waveKlineInflight.has(cacheKey)) return waveKlineInflight.get(cacheKey);
 
+  const healthId = waveSourceId(symbol, interval, limit);
+
   const task = (async () => {
     for (const t of KLINE_TIERS) {
       const big = t > limit && waveKlineCache.get(`${symbol}_${interval}_${t}`);
       if (big && now - big.timestamp < KLINE_FRESH_MS && big.data.length >= limit) {
         const data = big.data.slice(-limit);
-        waveKlineCache.set(cacheKey, { timestamp: big.timestamp, data, source: big.source });
+        // The slice inherits the LARGER tier's receipt + data clock — a slice is
+        // not a new acquisition and must not claim one.
+        waveKlineCache.set(cacheKey, {
+          timestamp: big.timestamp,
+          acquiredAt: big.acquiredAt,
+          dataAsOf: big.dataAsOf,
+          data,
+          source: big.source,
+          issues: big.issues || []
+        });
+        // Seed the sliced tier's registry record with the ORIGINAL receipt so
+        // audits see the same clocks — never a fabricated fresh acquire.
+        seedSource(waveSourceId(symbol, interval, limit), {
+          dataAsOf: big.dataAsOf != null ? new Date(big.dataAsOf).toISOString() : null,
+          lastSuccessAt: big.acquiredAt ? new Date(big.acquiredAt).toISOString() : null,
+          asOfKind: 'source',
+          source: big.source && big.source.name ? big.source.name : null,
+          issues: big.issues || []
+        });
         return data;
       }
     }
+    // A real upstream fetch is about to happen (slice-from-tier above is not one).
+    recordAttempt(healthId);
     if (cached && cached.data.length) {
       const sec = KLINE_SEC[interval] || 3600;
       const last = cached.data[cached.data.length - 1].time;
       const need = Math.ceil((now / 1000 - last) / sec) + 2;
       if (need <= 1000) {
         try {
-          const { rows, source } = await fetchFromSources(symbol, interval, need, cached.source);
+          const { rows, source, issues } = await fetchFromSources(symbol, interval, need, cached.source);
           const fresh = rowsToBars(rows);
           const data = cached.data.filter(b => b.time < fresh[0].time).concat(fresh).slice(-limit);
-          waveKlineCache.set(cacheKey, { timestamp: Date.now(), data, source });
+          const entry = klineCacheEntry(data, source, issues);
+          waveKlineCache.set(cacheKey, entry);
+          recordSuccess(healthId, {
+            dataAsOf: entry.dataAsOf, asOfKind: 'source',
+            source: source.name, issues
+          });
           return data;
         } catch (e) {
+          recordFailure(healthId, e); // old entry's clocks stay untouched
           return cached.data; // 增量也失败: 先用旧缓存
         }
       }
     }
     try {
-      const { rows, source } = await fetchFromSources(symbol, interval, limit);
+      const { rows, source, issues } = await fetchFromSources(symbol, interval, limit);
       const data = rowsToBars(rows);
-      waveKlineCache.set(cacheKey, { timestamp: Date.now(), data, source });
+      const entry = klineCacheEntry(data, source, issues);
+      waveKlineCache.set(cacheKey, entry);
+      recordSuccess(healthId, {
+        dataAsOf: entry.dataAsOf, asOfKind: 'source',
+        source: source.name, issues
+      });
       return data;
     } catch (e) {
+      recordFailure(healthId, e);
       if (cached && cached.data.length) return cached.data;
       throw e;
     }
@@ -331,6 +499,70 @@ function klineSourceName(symbol, interval, limit) {
   return c && c.source ? c.source.name : null;
 }
 
+/**
+ * Entry-bound source health for the kline cache tier serving `limit` bars.
+ * Clocks come from the served cache entry itself (never borrowed from the
+ * registry's possibly-newer sibling record); the latest registry error is
+ * overlaid so a failed refresh shows through. Sliced tiers inherit the larger
+ * tier's receipt; tiers with no entry fall back to the registry record.
+ */
+function waveKlineSourceHealth(symbol, interval, limit) {
+  const tier = KLINE_TIERS.find(t => t >= limit) || WAVE_MAX_BARS;
+  const id = waveSourceId(symbol, interval, tier);
+  const entry = waveKlineCache.get(`${symbol}_${interval}_${tier}`);
+  const reg = getSourceHealth(id);
+  let record = null;
+  if (entry) {
+    record = {
+      lastAttemptAt: reg.lastAttemptAt || null,
+      lastSuccessAt: entry.acquiredAt ? new Date(entry.acquiredAt).toISOString() : null,
+      dataAsOf: entry.dataAsOf != null ? new Date(entry.dataAsOf).toISOString() : null,
+      asOfKind: 'source',
+      source: entry.source && entry.source.name ? entry.source.name : null,
+      lastError: reg.lastError || null,
+      consecutiveFailures: reg.consecutiveFailures || 0,
+      // Fallback-source issues live on the entry; the registry may also carry
+      // them (slices seed them from the big tier).
+      issues: (entry.issues && entry.issues.length ? entry.issues : (reg.issues || [])),
+      available: true
+    };
+  } else if (reg.observed) {
+    record = reg; // health object is record-compatible
+  }
+  return deriveSourceHealth(id, record);
+}
+
+/**
+ * summarizeHealth-shaped aggregate built from per-id entry-bound healths.
+ * Entries carry `required`: only required sources gate `analysisAllowed`
+ * (main/drawing timeframes). Auxiliary timeframes (sub-wave falsification,
+ * higher-tf background) land in `ancillarySources` — an expired aux may
+ * degrade the verdict to DEGRADED but never blocks it, and is never fed to
+ * the engine as current input by the callers.
+ */
+function waveHealthSummary(entries) {
+  const sources = {};
+  const ancillary = {};
+  for (const { id, health, required = true } of entries) (required ? sources : ancillary)[id] = health;
+  const required = Object.values(sources);
+  const aux = Object.values(ancillary);
+  const analysisAllowed = required.length > 0 && required.every(h => h.usable);
+  let state;
+  if (!required.length || required.every(h => h.state === 'UNKNOWN')) state = 'UNKNOWN';
+  else if (!required.some(h => h.usable)) state = 'UNAVAILABLE';
+  else if (required.every(h => h.state === 'OK') && aux.every(h => h.state === 'OK')) state = 'OK';
+  else state = 'DEGRADED';
+  return {
+    state,
+    analysisAllowed,
+    stale: [...required, ...aux].some(h => h.stale),
+    sources,
+    ancillarySources: Object.keys(ancillary).length ? ancillary : undefined,
+    failedSources: required.filter(h => h.state !== 'OK').map(h => h.id),
+    blockedSources: required.filter(h => !h.usable).map(h => h.id)
+  };
+}
+
 // MIME types for static serving
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -348,7 +580,20 @@ const MIME_TYPES = {
  * Send JSON response with ETag negotiation (304), Gzip/Deflate compression, and CORS headers
  */
 function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
-  const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  // Per-call derived ages on SOURCE-HEALTH objects (recognized by their own
+  // policy/lastSuccessAt keys) are recomputed from lastSuccessAt/dataAsOf on
+  // every request; keeping them off the wire lets byte-identical responses
+  // keep a stable strong ETag (304). Business payloads that legitimately
+  // carry an `ageMs`/`dataAgeMs` field are untouched — only objects that
+  // also carry health shape are stripped.
+  const isHealthObject = (o) => o && typeof o === 'object' && 'lastSuccessAt' in o &&
+    ('policy' in o || 'usable' in o || 'state' in o);
+  const jsonStr = typeof payload === 'string'
+    ? payload
+    : JSON.stringify(payload, function (key, value) {
+        if ((key === 'ageMs' || key === 'dataAgeMs') && isHealthObject(this)) return undefined;
+        return value;
+      });
   const bodyBuffer = Buffer.from(jsonStr, 'utf8');
 
   // Compute strong MD5 ETag
@@ -408,7 +653,16 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
  */
 async function handleApiRequest(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
-  noteApiActivity();
+
+  // Read-only self-checks and CORS preflights must not mark the instance
+  // "active": a probe of the audit/health endpoints must never wake the idle
+  // background refresher into external calls.
+  if (req.method !== 'OPTIONS' &&
+    pathname !== '/api/system/audit' &&
+    pathname !== '/api/audit' &&
+    pathname !== '/api/system/health') {
+    noteApiActivity();
+  }
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -430,14 +684,33 @@ async function handleApiRequest(req, res, parsedUrl) {
       const data = getCachedData();
       const thresholdParam = parseInt(parsedUrl.query?.threshold, 10) || 30000000;
       const timeRangeParam = parsedUrl.query?.timeRange || 'all'; // '24h' | '3d' | '7d' | '30d' | 'all'
-      const spotPrice = data.gex?.index_price || 77250;
+      // No fabricated spot: a missing real index price stays null and every
+      // analysis that needs it is gated on source health below.
+      const spotPrice = (data.gex && Number.isFinite(data.gex.index_price) && data.gex.index_price > 0)
+        ? data.gex.index_price
+        : null;
+
+      // Per-analysis health gates — a required source that is expired,
+      // unavailable, or unverified blocks ONLY that analysis; healthy sibling
+      // sections keep their real conclusions.
+      const analysisHealth = {};
+      for (const [key, ids] of Object.entries(ANALYSIS_REQUIREMENTS)) {
+        analysisHealth[key] = summarizeHealth(ids);
+      }
+      const allowed = key => analysisHealth[key].analysisAllowed;
 
       // Filter trades from persistent 30-day store based on user-selected window
       const activeTrades = filterTradesByWindow(data.blockTrades, timeRangeParam);
 
-      // Always re-run analysis dynamically on current data (enhanced with real-time atmData)
-      const atmAnalysis = analyzeAtmIv(data.ivHistory, data.dvolStats, data.atmData);
-      const gexAnalysis = analyzeDynamicGex(data.gex, new Date());
+      // Analyzers run only when every required source is usable — never on
+      // cached/expired/unverified inputs presented as current.
+      const atmAnalysis = allowed('atmIv')
+        ? analyzeAtmIv(data.ivHistory, data.dvolStats, data.atmData)
+        : unavailableAnalysis(analysisHealth.atmIv, data.ivHistory);
+      const gexAnalysis = allowed('gex')
+        ? analyzeDynamicGex(data.gex, new Date())
+        : unavailableAnalysis(analysisHealth.gex, data.gex);
+
       // Deribit OI 日快照：验证大宗成交是开仓还是平仓；当天缺快照时后台补采，不阻塞本次请求
       let oiSnapshots = [];
       try {
@@ -446,7 +719,16 @@ async function handleApiRequest(req, res, parsedUrl) {
       } catch (err) {
         console.warn('[API] option OI history unavailable:', err.message);
       }
-      const blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots);
+
+      let blockAnalysis;
+      if (allowed('blockTrades') && spotPrice !== null) {
+        blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots);
+      } else {
+        blockAnalysis = unavailableAnalysis(analysisHealth.blockTrades, activeTrades);
+        if (spotPrice === null && analysisHealth.blockTrades.analysisAllowed) {
+          blockAnalysis.summaryText = '无可用实时现货价，暂停当前研判';
+        }
+      }
       blockAnalysis.oiHistory = {
         days: oiSnapshots.length,
         latestTs: oiSnapshots.length ? oiSnapshots[oiSnapshots.length - 1].ts : null
@@ -454,13 +736,49 @@ async function handleApiRequest(req, res, parsedUrl) {
       blockAnalysis.timeRange = timeRangeParam;
       blockAnalysis.activeTradesCount = activeTrades.length;
       blockAnalysis.tradeStoreStats = data.tradeStoreStats || null;
-      const smileAnalysis = analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date());
-      const skewAnalysis = analyze25DeltaSkew(data.skewChart, {
-        atm: atmAnalysis,
-        dvolStats: data.dvolStats,
-        history: volSurfaceHistory.getHistory()
-      });
-      volSurfaceHistory.recordSnapshot({ atm: atmAnalysis, smile: smileAnalysis, skew: skewAnalysis, spot: spotPrice });
+
+      const smileAnalysis = (allowed('ivSmile') && spotPrice !== null)
+        ? analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date())
+        : unavailableAnalysis(analysisHealth.ivSmile, data.ivSkewMonth);
+      const skewAnalysis = allowed('delta25Skew')
+        ? analyze25DeltaSkew(data.skewChart, {
+          // Never feed an unavailable-shaped placeholder into a live analyzer.
+          atm: atmAnalysis.status === 'data_unavailable' ? null : atmAnalysis,
+          dvolStats: data.dvolStats,
+          history: volSurfaceHistory.getHistory()
+        })
+        : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
+
+      // The daily vol-surface record is written ONLY from genuinely usable
+      // inputs: every required source must be live-OK (not FALLBACK/STALE/
+      // UNKNOWN, no lastError) AND its receipt must be from today (UTC) — a
+      // yesterday-23:55 cache must not become today's 00:01 snapshot. The
+      // source's own receipt is the collection clock, never the GET time.
+      const todayUtc = new Date().toISOString().slice(0, 10);
+      const volSurfaceHealth = summarizeHealth(VOL_SURFACE_REQUIRED);
+      const volSurfaceOk = volSurfaceHealth.analysisAllowed && spotPrice !== null &&
+        Object.values(volSurfaceHealth.sources).every(h =>
+          h.state === 'OK' && !h.lastError &&
+          h.lastSuccessAt && String(h.lastSuccessAt).slice(0, 10) === todayUtc &&
+          h.dataAsOf && String(h.dataAsOf).slice(0, 10) === todayUtc);
+      if (volSurfaceOk) {
+        volSurfaceHistory.recordSnapshot({ atm: atmAnalysis, smile: smileAnalysis, skew: skewAnalysis, spot: spotPrice });
+      }
+
+      const termPremium = data.termPremium || null;
+      const termPremiumOut = !termPremium
+        ? null
+        : (analysisHealth.termPremium.analysisAllowed
+          ? termPremium
+          : {
+            status: 'data_unavailable',
+            summaryText: DATA_UNAVAILABLE_TEXT,
+            dataHealth: analysisHealth.termPremium,
+            historicalOnly: true,
+            // Historical series stays browsable; current conclusions are withheld.
+            series: termPremium.series ?? null,
+            metadata: termPremium.metadata ?? null
+          });
 
       const payload = {
         code: 0,
@@ -468,11 +786,22 @@ async function handleApiRequest(req, res, parsedUrl) {
         syncStatus: {
           hasAnyUpdate: data.lastChanges?.hasAnyUpdate || false,
           dataVersion: data.dataVersion,
-          summary: data.lastChanges?.summary || '数据已校验',
+          summary: data.lastChanges?.summary || '尚未执行过同步检查',
           changes: data.lastChanges || {},
           lastSyncCheckTime: data.lastSyncCheckTime,
-          lastDataChangeTime: data.lastDataChangeTime
+          lastDataChangeTime: data.lastDataChangeTime,
+          // Advances ONLY on a batch where every required Greeks source truly succeeded
+          lastSuccessAt: data.lastSuccessAt || null,
+          lastSuccessfulRefreshTime: data.lastSuccessAt || null,
+          state: data.sourceHealth?.state || 'UNKNOWN',
+          partialFailure: (data.sourceHealth?.failedSources?.length || 0) > 0,
+          failedSources: data.sourceHealth?.failedSources || [],
+          sourceStatus: Object.fromEntries(
+            Object.entries(data.sourceHealth?.sources || {}).map(([id, h]) => [id, h.state])
+          )
         },
+        dataHealth: data.sourceHealth || null,
+        analysisHealth,
         lastUpdated: data.lastDataChangeTime || data.lastSyncCheckTime,
         indexPrice: spotPrice,
         atmIv: atmAnalysis,
@@ -480,7 +809,7 @@ async function handleApiRequest(req, res, parsedUrl) {
         blockTrades: blockAnalysis,
         ivSmile: smileAnalysis,
         delta25Skew: skewAnalysis,
-        termPremium: data.termPremium || null
+        termPremium: termPremiumOut
       };
 
       sendJsonResponse(req, res, 200, payload);
@@ -506,7 +835,10 @@ async function handleApiRequest(req, res, parsedUrl) {
         .filter(Boolean)
         .slice(0, 200);
       const snapshot = await getOptionMarks(currency);
-      sendJsonResponse(req, res, 200, { code: 0, ...pickInstruments(snapshot, instruments) });
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...withApiHealth(pickInstruments(snapshot, instruments), ['option_marks'])
+      });
     } catch (err) {
       console.error('[API Error] option-marks:', err.message);
       sendJsonResponse(req, res, 502, { code: -1, error: err.message });
@@ -535,7 +867,10 @@ async function handleApiRequest(req, res, parsedUrl) {
         oiSnapshots,
         fetchRows: () => fetchBookSummaryRows('BTC')
       });
-      sendJsonResponse(req, res, 200, { code: 0, ...insight });
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...withApiHealth(insight, ['block_flow', 'smart_money'])
+      });
     } catch (err) {
       console.error('[API Error] block-insight:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -564,10 +899,21 @@ async function handleApiRequest(req, res, parsedUrl) {
         await refreshAllMarketData('BTC');
       }
       const data = getCachedData();
-      sendJsonResponse(req, res, 200, {
-        code: 0,
-        ...data.termPremium
-      });
+      const tpHealth = summarizeHealth(ANALYSIS_REQUIREMENTS.termPremium);
+      const tp = data.termPremium;
+      sendJsonResponse(req, res, 200, tp && tpHealth.analysisAllowed
+        ? { code: 0, ...tp, dataHealth: tp.dataHealth || tpHealth }
+        : {
+          code: 0,
+          status: 'data_unavailable',
+          summaryText: DATA_UNAVAILABLE_TEXT,
+          dataHealth: tpHealth,
+          historicalOnly: true,
+          // The payload's daily rows are `series` (not `curve`): keep them
+          // browsable while current conclusions are withheld.
+          series: tp?.series ?? null,
+          metadata: tp?.metadata ?? null
+        });
     } catch (err) {
       console.error('[API Error] term-premium:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -581,7 +927,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const force = parsedUrl.query?.force === '1';
       const basisSeries = await getHistoricalBasisData().catch(() => []);
       const data = await getEtfLinkageData(basisSeries, force);
-      sendJsonResponse(req, res, 200, { code: 0, ...data });
+      sendJsonResponse(req, res, 200, { code: 0, ...withApiHealth(data, ['etf', 'cot', 'etf_oi']) });
     } catch (err) {
       console.error('[API Error] etf-linkage:', err.message);
       sendJsonResponse(req, res, 502, { code: -1, error: err.message });
@@ -594,7 +940,10 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
       const data = await getPreferredsData(forceParam);
-      sendJsonResponse(req, res, 200, { code: 0, ...data });
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        ...withApiHealth(data, ['preferreds', 'yahoo:STRC', 'yahoo:STRF', 'yahoo:STRD', 'fred:DGS1MO'])
+      });
     } catch (err) {
       console.error('[API Error] mstr-preferreds:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -636,7 +985,10 @@ async function handleApiRequest(req, res, parsedUrl) {
 
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...finalMacroData
+        ...withApiHealth(finalMacroData, [
+          'macro', 'fred:DGS1', 'fred:DGS10', 'fred:WALCL', 'fred:WTREGEN',
+          'fred:RRPONTSYD', 'macro_btc', 'yahoo:MSTR'
+        ])
       });
     } catch (err) {
       console.error('[API Error] macro-chart:', err);
@@ -652,7 +1004,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const cdriData = await fetchCdriData(forceParam);
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...cdriData
+        ...withApiHealth(cdriData, ['cdri'])
       });
     } catch (err) {
       console.error('[API Error] cdri:', err);
@@ -666,7 +1018,7 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       const forceParam = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
       const ssroData = await getSsroData(forceParam);
-      sendJsonResponse(req, res, 200, ssroData);
+      sendJsonResponse(req, res, 200, withApiHealth(ssroData, ['ssro', 'ssro_stable']));
     } catch (err) {
       console.error('[API Error] ssro:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -679,7 +1031,8 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       const tf = String(parsedUrl.query?.tf || '1h');
       const forceParam = parsedUrl.query?.force === '1';
-      sendJsonResponse(req, res, 200, await getFlowForce(tf, forceParam));
+      const ffData = await getFlowForce(tf, forceParam);
+      sendJsonResponse(req, res, 200, withApiHealth(ffData, [`flow:${tf}`]));
     } catch (err) {
       console.error('[API Error] flow-force:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -694,7 +1047,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const cbData = await getCoinbaseLiquidityData(forceParam);
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...cbData
+        ...withApiHealth(cbData, ['coinbase', 'coinbase_candles'])
       });
     } catch (err) {
       console.error('[API Error] coinbase-liquidity:', err);
@@ -711,7 +1064,11 @@ async function handleApiRequest(req, res, parsedUrl) {
       const view = liquidityHistory.buildHistoryView(await liquidityHistory.getMergedHistory(), {
         rangeDays: Number.isFinite(days) && days > 0 ? days : null
       });
-      sendJsonResponse(req, res, 200, { code: 0, range: rangeParam, ...view });
+      sendJsonResponse(req, res, 200, {
+        code: 0,
+        range: rangeParam,
+        ...withApiHealth(view, ['liquidity_history'])
+      });
     } catch (err) {
       console.error('[API Error] coinbase-liquidity-history:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
@@ -726,7 +1083,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const goldData = await getGoldCorrelationData(forceParam);
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...goldData
+        ...withApiHealth(goldData, ['gold'])
       });
     } catch (err) {
       console.error('[API Error] gold-correlation:', err);
@@ -741,11 +1098,12 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       const forceRefresh = parsedUrl.query?.refresh === 'true' || parsedUrl.query?.force === '1';
       const data = await getMcClellanData(forceRefresh);
+      const healthy = withApiHealth(data, ['mcclellan_core', 'mcclellan_frontier']);
       sendJsonResponse(req, res, 200, {
         code: 0,
         refreshStatus: data.refresh_status,
-        data,
-        ...data
+        data: healthy,
+        ...healthy
       });
     } catch (err) {
       console.error('[API Error] crypto-mcclellan:', err);
@@ -763,6 +1121,24 @@ async function handleApiRequest(req, res, parsedUrl) {
     } catch (err) {
       console.error('[API Error] system-audit:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/system/health — read-only liveness of observed sources. No
+  // probe, no refresh, no activity wakeup: it reports the last observed
+  // per-module health (scope 'live-source-observations'). Modules that were
+  // never collected show UNKNOWN. UNKNOWN or CRITICAL => 503 so uptime
+  // probes do not treat an unverified/offline instance as serving live data;
+  // DEGRADED stays 200 but the body is never 'HEALTHY'.
+  if (pathname === '/api/system/health' && req.method === 'GET') {
+    try {
+      const auditPayload = await getSystemAuditData(false);
+      const status = auditPayload.overallHealth === 'UNKNOWN' || auditPayload.overallHealth === 'CRITICAL' ? 503 : 200;
+      sendJsonResponse(req, res, status, { ...auditPayload, scope: 'live-source-observations' });
+    } catch (err) {
+      console.error('[API Error] system-health:', err);
+      sendJsonResponse(req, res, 500, { code: -1, error: err.message, scope: 'live-source-observations' });
     }
     return;
   }
@@ -795,38 +1171,108 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       console.log(`[API] Live sync refresh requested by client (${clientIp})`);
 
-      // Single-flight lock: deduplicate concurrent background refresh calls
+      // Single-flight lock: deduplicate concurrent background refresh calls.
+      // allSettled so an auxiliary failure is reported, never swallowed.
       if (!activeRefreshPromise) {
-        activeRefreshPromise = (async () => {
-          const [syncResult] = await Promise.all([
-            refreshAllMarketData('BTC'),
-            getMacroChartData(true).catch(e => console.error('[MacroFetcher] Sync refresh error:', e.message)),
-            getPreferredsData(true).catch(e => console.error('[Preferreds] Sync refresh error:', e.message)),
-            fetchCdriData(true).catch(e => console.error('[CdriFetcher] Sync refresh error:', e.message)),
-            getSsroData(true).catch(e => console.error('[SsroFetcher] Sync refresh error:', e.message)),
-            getCoinbaseLiquidityData(true).catch(e => console.error('[CoinbaseFetcher] Sync refresh error:', e.message)),
-            getGoldCorrelationData(true).catch(e => console.error('[GoldFetcher] Sync refresh error:', e.message)),
-            getMcClellanData(true).catch(e => console.error('[McClellanFetcher] Sync refresh error:', e.message))
-          ]);
-          return syncResult;
-        })().finally(() => {
+        activeRefreshPromise = (async () => Promise.allSettled([
+          refreshAllMarketData('BTC'),
+          getMacroChartData(true),
+          getPreferredsData(true),
+          fetchCdriData(true),
+          getSsroData(true),
+          getCoinbaseLiquidityData(true),
+          getGoldCorrelationData(true),
+          getMcClellanData(true)
+        ]))().finally(() => {
           activeRefreshPromise = null;
         });
       }
 
-      const syncResult = await activeRefreshPromise;
-      sendJsonResponse(req, res, 200, {
-        code: 0,
-        msg: syncResult?.summary || '数据已刷新',
-        hasAnyUpdate: syncResult?.hasAnyUpdate || false,
-        dataVersion: syncResult?.dataVersion || null,
-        changes: syncResult?.changes || {},
-        lastSyncCheckTime: syncResult?.lastSyncCheckTime || new Date().toISOString(),
-        lastDataChangeTime: syncResult?.lastDataChangeTime || null
+      const settled = await activeRefreshPromise;
+      const auxNames = ['macro', 'preferreds', 'cdri', 'ssro', 'coinbase', 'gold', 'mcclellan'];
+      const core = settled[0];
+
+      // A fulfilled fetcher that returned a stale/cached/failed result is NOT
+      // a fresh success. Where no reliable health flag exists -> 'unknown'.
+      function auxOutcome(v) {
+        if (v === null || v === undefined) return { status: 'failed', error: 'empty result' };
+        if (v.error) return { status: 'failed', error: String(v.error) };
+        const st = String(v.refresh_status?.status || v.refreshStatus?.status || '').toLowerCase();
+        if (['failed', 'error'].includes(st)) return { status: 'failed', error: `status=${st}` };
+        if (['stale', 'cached', 'degraded', 'fallback', 'pipelineunavailable'].includes(st)) {
+          return { status: 'degraded', error: `status=${st}` };
+        }
+        if (v.dataHealth) {
+          // A live computed health map is authoritative in both directions.
+          if (v.dataHealth.state === 'OK') return { status: 'ok' };
+          if (v.dataHealth.state === 'UNAVAILABLE') return { status: 'failed', error: 'dataHealth unavailable' };
+          if (v.dataHealth.state === 'UNKNOWN') return { status: 'unknown', error: 'dataHealth unknown' };
+          return { status: 'degraded', error: `dataHealth=${v.dataHealth.state}` };
+        }
+        if (v.metadata?.feed && v.metadata.feed.liveOk === false) {
+          return { status: 'degraded', error: v.metadata.feed.liveError ? String(v.metadata.feed.liveError) : 'live feed not ok' };
+        }
+        if (st === 'refreshed' || st === 'ok' || st === 'success') return { status: 'ok' };
+        if (v.stale === true) return { status: 'degraded', error: 'stale flag' };
+        return { status: 'unknown' }; // no reliable health flag: do not guess success
+      }
+
+      const outcomes = [];
+      const failures = [];
+      let syncReport = null;
+
+      if (core.status === 'fulfilled') {
+        syncReport = core.value;
+        const dh = syncReport?.dataHealth;
+        const st = dh
+          ? (dh.state === 'OK' ? 'ok' : dh.state === 'UNAVAILABLE' ? 'failed' : dh.state === 'UNKNOWN' ? 'unknown' : 'degraded')
+          : 'unknown';
+        outcomes.push({ module: 'market_data', status: st, failedSources: dh?.failedSources || [] });
+        for (const id of (dh?.failedSources || [])) failures.push({ source: id, error: dh.sources?.[id]?.lastError || 'not healthy' });
+      } else {
+        outcomes.push({ module: 'market_data', status: 'failed', error: core.reason?.message || String(core.reason) });
+        failures.push({ source: 'market_data', error: core.reason?.message || String(core.reason) });
+      }
+
+      settled.slice(1).forEach((r, i) => {
+        const name = auxNames[i];
+        let o;
+        if (r.status === 'rejected') {
+          o = { module: name, status: 'failed', error: r.reason?.message || String(r.reason) };
+          console.error(`[Refresh] ${name} refresh failed:`, o.error);
+        } else {
+          o = { module: name, ...auxOutcome(r.value) };
+          if (o.status !== 'ok') console.warn(`[Refresh] ${name} outcome: ${o.status}${o.error ? ` (${o.error})` : ''}`);
+        }
+        outcomes.push(o);
+        // unknown is surfaced too: the client must see "we could not verify"
+        // rather than silence — but the message never claims usable cache is empty.
+        if (o.status !== 'ok') failures.push({ source: name, error: o.error || o.status });
+      });
+
+      const okCount = outcomes.filter(o => o.status === 'ok').length;
+      const status = okCount === 0 ? 'failed' : (outcomes.every(o => o.status === 'ok') ? 'ok' : 'partial');
+      const httpStatus = status === 'failed' ? 503 : 200;
+
+      sendJsonResponse(req, res, httpStatus, {
+        code: status === 'failed' ? -1 : 0,
+        ok: status === 'ok',
+        status,
+        partialFailure: status === 'partial',
+        msg: syncReport?.summary || (status === 'failed' ? '数据同步失败' : status === 'partial' ? '部分数据源同步失败' : '数据已刷新'),
+        hasAnyUpdate: syncReport?.hasAnyUpdate || false,
+        dataVersion: syncReport?.dataVersion || null,
+        changes: syncReport?.changes || {},
+        lastSyncCheckTime: syncReport?.lastSyncCheckTime || null,
+        lastDataChangeTime: syncReport?.lastDataChangeTime || null,
+        lastSuccessfulRefreshTime: syncReport?.lastSuccessAt || null,
+        dataHealth: syncReport?.dataHealth || null,
+        outcomes,
+        failures
       });
     } catch (err) {
       console.error('[API Error] refresh:', err);
-      sendJsonResponse(req, res, 500, { code: -1, error: err.message });
+      sendJsonResponse(req, res, 500, { code: -1, ok: false, status: 'failed', error: err.message });
     }
     return;
   }
@@ -857,17 +1303,34 @@ async function handleApiRequest(req, res, parsedUrl) {
 
     try {
       const bars = await fetchBinanceKlines(rawSymbol, interval, limit);
+      const src = waveKlineSourceHealth(rawSymbol, interval, limit);
+      const tier = KLINE_TIERS.find(t => t >= limit) || WAVE_MAX_BARS;
       sendJsonResponse(req, res, 200, {
         code: 0,
         symbol: rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT',
         interval,
         count: bars.length,
         source: klineSourceName(rawSymbol, interval, limit),
-        bars
+        bars,
+        // Historical bars stay browsable even when unusable for live judging —
+        // historicalOnly tells the client not to present them as current.
+        dataHealth: waveHealthSummary([{ id: waveSourceId(rawSymbol, interval, tier), health: src }]),
+        stale: src.stale,
+        usable: src.usable,
+        lastSuccessAt: src.lastSuccessAt,
+        dataAsOf: src.dataAsOf,
+        historicalOnly: !src.usable
       });
     } catch (err) {
       console.error('[API Error] wave-klines:', err);
-      sendJsonResponse(req, res, 502, { code: 502, error: err.message });
+      const tier = KLINE_TIERS.find(t => t >= limit) || WAVE_MAX_BARS;
+      const src = waveKlineSourceHealth(rawSymbol, interval, limit);
+      sendJsonResponse(req, res, 503, {
+        code: 503,
+        status: 'data_unavailable',
+        error: err.message,
+        dataHealth: waveHealthSummary([{ id: waveSourceId(rawSymbol, interval, tier), health: src }])
+      });
     }
     return;
   }
@@ -908,18 +1371,50 @@ async function handleApiRequest(req, res, parsedUrl) {
       const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
       const subTfs = (WAVE_SUB_INTERVALS[interval] || []).slice(0, 2);
       const htfTfs = (WAVE_HTF_INTERVALS[interval] || []).slice(0, 2);
+      const SUB_LIMIT = 1000;
+      const HTF_LIMIT = 200;
 
       // 并发并行抓取主周期 + 子周期 + 宏观高周期 K 线，防止串行请求导致延迟累加
       const [mainBars, subResults, htfResults] = await Promise.all([
         fetchBinanceKlines(rawSymbol, interval, WAVE_MAX_BARS),
-        Promise.all(subTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 1000).catch(() => null))),
-        Promise.all(htfTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, 200).catch(() => null)))
+        Promise.all(subTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, SUB_LIMIT).catch(() => null))),
+        Promise.all(htfTfs.map(tf => fetchBinanceKlines(rawSymbol, tf, HTF_LIMIT).catch(() => null)))
       ]);
 
+      // Health is judged on the ACTUAL timeframes this request consumes.
+      // The main timeframe is required; expired/unknown/unavailable -> 503.
+      const healthEntries = [];
+      const warnings = [];
+      const mainHealth = waveKlineSourceHealth(rawSymbol, interval, WAVE_MAX_BARS);
+      const mainTier = KLINE_TIERS.find(t => t >= WAVE_MAX_BARS) || WAVE_MAX_BARS;
+      healthEntries.push({ id: waveSourceId(rawSymbol, interval, mainTier), health: mainHealth });
+
       const subBars = {};
-      subTfs.forEach((tf, i) => { if (subResults[i]) subBars[tf] = subResults[i]; });
+      subTfs.forEach((tf, i) => {
+        const h = waveKlineSourceHealth(rawSymbol, tf, SUB_LIMIT);
+        healthEntries.push({ id: h.id, health: h, required: false });
+        if (subResults[i] && h.usable) subBars[tf] = subResults[i];
+        else warnings.push(`子周期 ${tf} K线${subResults[i] ? '已过期或不可用' : '获取失败'}，子浪判定降级`);
+      });
       const htfBars = {};
-      htfTfs.forEach((tf, i) => { if (htfResults[i]) htfBars[tf] = htfResults[i]; });
+      htfTfs.forEach((tf, i) => {
+        const h = waveKlineSourceHealth(rawSymbol, tf, HTF_LIMIT);
+        healthEntries.push({ id: h.id, health: h, required: false });
+        if (htfResults[i] && h.usable) htfBars[tf] = htfResults[i];
+        else warnings.push(`高周期 ${tf} K线${htfResults[i] ? '已过期或不可用' : '获取失败'}，宏观背景降级`);
+      });
+
+      const dataHealth = waveHealthSummary(healthEntries);
+      if (!mainHealth.usable) {
+        sendJsonResponse(req, res, 503, {
+          code: 503,
+          status: 'data_unavailable',
+          error: `主周期 ${interval} K线数据不可用或已过期`,
+          dataHealth,
+          warnings
+        });
+        return;
+      }
 
       const analysis = analyzeWaves(mainBars, displaySymbol, {
         startTime,
@@ -931,11 +1426,21 @@ async function handleApiRequest(req, res, parsedUrl) {
 
       sendJsonResponse(req, res, 200, {
         code: 0,
-        ...analysis
+        ...analysis,
+        dataHealth,
+        dataWarnings: warnings
       });
     } catch (err) {
       console.error('[API Error] wave-analysis:', err);
-      sendJsonResponse(req, res, 502, { code: 502, error: err.message });
+      sendJsonResponse(req, res, 503, {
+        code: 503,
+        status: 'data_unavailable',
+        error: err.message,
+        dataHealth: waveHealthSummary([{
+          id: waveSourceId(rawSymbol, interval, KLINE_TIERS.find(t => t >= WAVE_MAX_BARS) || WAVE_MAX_BARS),
+          health: waveKlineSourceHealth(rawSymbol, interval, WAVE_MAX_BARS)
+        }])
+      });
     }
     return;
   }
@@ -975,15 +1480,49 @@ async function handleApiRequest(req, res, parsedUrl) {
         const nowSec = Math.floor(Date.now() / 1000);
         const firstTime = Math.min(...drawings.map(d => Math.min(...d.points.map(p => +p.time))));
         const tfs = new Set();
-        drawings.forEach(d => { tfs.add(d.timeframe); (WAVE_USER_SUB_INTERVALS[d.timeframe] || []).forEach(t => tfs.add(t)); });
+        const requiredTfs = new Set();
+        drawings.forEach(d => {
+          tfs.add(d.timeframe);
+          requiredTfs.add(d.timeframe); // every drawing's own timeframe is required
+          (WAVE_USER_SUB_INTERVALS[d.timeframe] || []).forEach(t => tfs.add(t));
+        });
         const list = Array.from(tfs);
+        const limitOf = tf => Math.min(WAVE_MAX_BARS, Math.ceil((nowSec - firstTime) / WAVE_TF_SEC[tf]) + 300);
         const fetched = await Promise.all(list.map(tf =>
-          fetchBinanceKlines(rawSymbol, tf, Math.min(WAVE_MAX_BARS, Math.ceil((nowSec - firstTime) / WAVE_TF_SEC[tf]) + 300)).catch(() => null)));
+          fetchBinanceKlines(rawSymbol, tf, limitOf(tf)).catch(() => null)));
+        // Gate on every timeframe actually consumed: a required drawing tf that
+        // is expired/unknown/failed blocks the evaluation with 503; auxiliary
+        // sub-tfs that are unusable are dropped (never fed as current input).
+        const healthEntries = [];
+        const warnings = [];
+        const blockedRequired = [];
         const barsByTf = {};
-        list.forEach((tf, i) => { if (fetched[i]) barsByTf[tf] = fetched[i]; });
+        list.forEach((tf, i) => {
+          const h = waveKlineSourceHealth(rawSymbol, tf, limitOf(tf));
+          healthEntries.push({ id: h.id, health: h, required: requiredTfs.has(tf) });
+          const ok = fetched[i] && h.usable;
+          if (ok) {
+            barsByTf[tf] = fetched[i];
+          } else if (requiredTfs.has(tf)) {
+            blockedRequired.push(`${tf}(${fetched[i] ? '数据过期或不可用' : '获取失败'})`);
+          } else {
+            warnings.push(`子浪判定周期 ${tf} K线${fetched[i] ? '已过期或不可用' : '获取失败'}，该级别证伪降级`);
+          }
+        });
+        const dataHealth = waveHealthSummary(healthEntries);
+        if (blockedRequired.length) {
+          sendJsonResponse(req, res, 503, {
+            code: 503,
+            status: 'data_unavailable',
+            error: `画浪所需周期K线不可用: ${blockedRequired.join(', ')}`,
+            dataHealth,
+            warnings
+          });
+          return;
+        }
         const displaySymbol = rawSymbol === 'BTCUSDT' ? 'BTC/USDT' : 'ETH/USDT';
         const result = evaluateUserSketch(barsByTf, displaySymbol, { drawings });
-        sendJsonResponse(req, res, 200, { code: 0, ...result });
+        sendJsonResponse(req, res, 200, { code: 0, ...result, dataHealth, dataWarnings: warnings });
       } catch (err) {
         console.error('[API Error] wave-evaluate sketch:', err);
         sendJsonResponse(req, res, 422, { code: 422, error: err.message });
@@ -1024,13 +1563,49 @@ async function handleApiRequest(req, res, parsedUrl) {
         ]);
       } catch (fetchErr) {
         console.error('[API Error] wave-evaluate klines:', fetchErr);
-        sendJsonResponse(req, res, 502, { code: 502, error: fetchErr.message });
+        sendJsonResponse(req, res, 503, {
+          code: 503,
+          status: 'data_unavailable',
+          error: fetchErr.message,
+          dataHealth: waveHealthSummary([{
+            id: waveSourceId(rawSymbol, interval, WAVE_MAX_BARS),
+            health: waveKlineSourceHealth(rawSymbol, interval, WAVE_MAX_BARS)
+          }])
+        });
         return;
       }
+
+      // Health over the actual timeframes consumed: main tf required, sub/htf
+      // auxiliary (unusable aux is dropped, never presented as current input).
+      const healthEntries = [];
+      const warnings = [];
+      const mainHealth = waveKlineSourceHealth(rawSymbol, interval, WAVE_MAX_BARS);
+      healthEntries.push({ id: waveSourceId(rawSymbol, interval, WAVE_MAX_BARS), health: mainHealth });
       const subBars = {};
-      subTfs.forEach((tf, i) => { if (subResults[i]) subBars[tf] = subResults[i]; });
+      subTfs.forEach((tf, i) => {
+        const h = waveKlineSourceHealth(rawSymbol, tf, subLimit(tf));
+        healthEntries.push({ id: h.id, health: h, required: false });
+        if (subResults[i] && h.usable) subBars[tf] = subResults[i];
+        else warnings.push(`子浪判定周期 ${tf} K线${subResults[i] ? '已过期或不可用' : '获取失败'}，证伪降级`);
+      });
       const htfBars = {};
-      htfTfs.forEach((tf, i) => { if (htfResults[i]) htfBars[tf] = htfResults[i]; });
+      htfTfs.forEach((tf, i) => {
+        const h = waveKlineSourceHealth(rawSymbol, tf, 200);
+        healthEntries.push({ id: h.id, health: h, required: false });
+        if (htfResults[i] && h.usable) htfBars[tf] = htfResults[i];
+        else warnings.push(`高周期 ${tf} K线${htfResults[i] ? '已过期或不可用' : '获取失败'}，背景降级`);
+      });
+      const dataHealth = waveHealthSummary(healthEntries);
+      if (!mainHealth.usable) {
+        sendJsonResponse(req, res, 503, {
+          code: 503,
+          status: 'data_unavailable',
+          error: `主周期 ${interval} K线数据不可用或已过期`,
+          dataHealth,
+          warnings
+        });
+        return;
+      }
 
       const result = evaluateUserCount(mainBars, displaySymbol, {
         tool: payload.tool,
@@ -1041,7 +1616,7 @@ async function handleApiRequest(req, res, parsedUrl) {
         compare: payload.compare !== false,
         forceType: payload.type || null
       });
-      sendJsonResponse(req, res, 200, { code: 0, ...result });
+      sendJsonResponse(req, res, 200, { code: 0, ...result, dataHealth, dataWarnings: warnings });
     } catch (err) {
       console.error('[API Error] wave-evaluate:', err);
       // 输入类错误 (点序/方向/点数) 直接回给用户
@@ -1226,5 +1801,11 @@ module.exports = {
   server,
   startServer,
   sendJsonResponse,
-  _internal: { fetchBinanceKlines, fetchKlinePages, KLINE_SOURCES, waveKlineCache, KLINE_TIERS, noteApiActivity, isServerIdle }
+  _internal: {
+    fetchBinanceKlines, fetchKlinePages, fetchKlineTier,
+    waveKlineSourceHealth, waveHealthSummary, waveSourceId, klineCacheEntry,
+    KLINE_SOURCES, waveKlineCache, KLINE_TIERS, KLINE_SEC, noteApiActivity, isServerIdle,
+    setBackgroundRefreshEnabled: v => { backgroundRefreshEnabled = !!v; },
+    lastApiActivity: () => lastApiActivity
+  }
 };

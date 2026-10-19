@@ -10,6 +10,11 @@
  * --skip-if-filled N：当前小时桶已有 ≥ N 个快照时直接退出、不改文件，
  * 这样同一小时只有第一次成功的运行会产生提交。
  *
+ * Producer heartbeat (data/job_health_liquidity_hourly.json): the 'samples'
+ * step is ok only when every shot succeeded or the current hour already
+ * holds >= SHOTS samples; a verified skip counts as a successful CHECK.
+ * Zero-success runs write the failure heartbeat but never touch the archive.
+ *
  * 用法: node scripts/liquidity_snapshot.js [--shots 3] [--gap 15] [--skip-if-filled 3]
  */
 
@@ -19,6 +24,9 @@ const {
   processCoinbaseData
 } = require('../server/coinbase_fetcher');
 const history = require('../server/liquidity_history');
+const { beginJob, recordStep, finishJob } = require('../server/pipeline_health');
+
+const JOB = 'liquidity_hourly';
 
 function argValue(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -41,14 +49,25 @@ async function takeSnapshot() {
   return history.snapshotFromLiquidity(result);
 }
 
+function done() {
+  // A missing/non-ok heartbeat record (including a failed atomic write that
+  // returns null) must never leave the process green.
+  const rec = finishJob(JOB);
+  if (!rec || rec.status !== 'ok') process.exitCode = 1;
+  return rec;
+}
+
 async function main() {
+  beginJob(JOB);
   let samples = history.readHistoryFile(history.COMMITTED_FILE);
   let ok = 0;
 
   if (SKIP_IF_FILLED) {
     const have = history.hourSampleCount(samples, Date.now());
     if (have >= SKIP_IF_FILLED) {
-      console.log(`[liquidity] current hour already has ${have} snapshots; skipping`);
+      console.log(`[liquidity] current hour already has ${have} snapshots; verified skip`);
+      recordStep(JOB, 'samples', { ok: true, verifiedSkip: true });
+      done();
       return;
     }
   }
@@ -67,15 +86,39 @@ async function main() {
   }
 
   if (!ok) {
+    recordStep(JOB, 'samples', { ok: false, error: new Error(`all ${SHOTS} snapshots failed`) });
+    done();
     console.error('[liquidity] all snapshots failed; history unchanged');
     process.exit(1);
   }
 
+  // Partial shot failures still persist the valid samples, but the step is
+  // only 'ok' when all shots succeeded or the hour is now fully sampled.
+  const have = history.hourSampleCount(samples, Date.now());
+  const fullCoverage = ok === SHOTS || have >= SHOTS;
+  const latest = samples.length ? samples[samples.length - 1].ts : null;
+  recordStep(JOB, 'samples', {
+    ok: fullCoverage,
+    error: fullCoverage ? null : new Error(`hour coverage ${have}/${SHOTS} after ${ok}/${SHOTS} successful shots`),
+    dataAsOf: latest
+  });
+
   history.writeHistoryFile(history.COMMITTED_FILE, samples);
   console.log(`[liquidity] saved ${samples.length} hourly samples`);
+
+  done();
+  if (!fullCoverage) process.exitCode = 1;
 }
 
-main().catch(err => {
-  console.error('[liquidity] fatal:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('[liquidity] fatal:', err);
+    try {
+      recordStep(JOB, 'samples', { ok: false, error: err });
+    } catch (e) { /* heartbeat best effort */ }
+    done();
+    process.exit(1);
+  });
+}
+
+module.exports = { main, done };

@@ -491,6 +491,16 @@ body {
   font-weight: 500;
 }
 
+.sync-msg.warn {
+  color: var(--color-warn, #f59e0b);
+  font-weight: 500;
+}
+
+.sync-msg.error {
+  color: var(--color-danger, #ef4444);
+  font-weight: 500;
+}
+
 .sync-right {
   display: flex;
   gap: 14px;
@@ -7142,4 +7152,96 @@ body {
   border-right: 1px dashed rgba(56, 189, 248, 0.85);
   pointer-events: none;
   z-index: 3;
+}
+
+/* ==========================================================================
+   DataHealthUI — per-card health banners + live-conclusion gating
+   ========================================================================== */
+.dh-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 8px 18px 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  color: var(--text-muted);
+}
+.dh-banner .dh-banner-state {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.dh-banner .dh-banner-detail {
+  min-width: 0;
+  word-break: break-all;
+}
+.dh-banner.dh-ok {
+  border-color: transparent;
+  color: var(--text-muted);
+  padding: 4px 10px;
+}
+.dh-banner.dh-ok .dh-banner-state { color: #34d399; }
+.dh-banner.dh-fallback .dh-banner-state,
+.dh-banner.dh-degraded .dh-banner-state { color: var(--color-warn, #f59e0b); }
+.dh-banner.dh-fallback,
+.dh-banner.dh-degraded {
+  background: var(--accent-primary-bg);
+  border-color: var(--accent-primary-border);
+}
+.dh-banner.dh-stale .dh-banner-state { color: var(--color-warn, #f59e0b); }
+.dh-banner.dh-stale {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.dh-banner.dh-blocked .dh-banner-state { color: var(--color-danger, #ef4444); }
+.dh-banner.dh-blocked {
+  background: rgba(239, 68, 68, 0.09);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.dh-banner.dh-unknown .dh-banner-state { color: var(--text-muted); }
+.dh-banner.dh-unknown { border-style: dashed; }
+
+/* Live-conclusion containers locked by the UI gate — hidden until recovery. */
+[data-health-blocked] { display: none !important; }
+
+/* A card whose required sources are unusable keeps only history visible. */
+.dh-pause-note {
+  margin: 10px 18px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px dashed rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.07);
+  color: var(--color-danger, #ef4444);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* Blocked cards must not retain stale green badges or live pulse dots. */
+[data-health-state="blocked"] .card-badge,
+[data-health-state="blocked"] .tp-regime-pill,
+[data-health-state="blocked"] .tp-score-pill,
+[data-health-state="blocked"] .tp-excess-pill,
+[data-health-state="blocked"] .el-verdict-pill,
+[data-health-state="blocked"] .tp-source-badge {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+[data-health-state="blocked"] .sync-pulse-dot,
+[data-health-state="blocked"] .pulse-status-dot,
+[data-health-state="blocked"] .range-pulse-dot,
+[data-health-state="blocked"] .x-pulse-header {
+  animation: none !important;
+  background: var(--text-muted) !important;
+  box-shadow: none !important;
+}
+[data-health-state="blocked"]::after { content: none; }
+
+@media (max-width: 640px) {
+  .dh-banner { margin: 6px 10px 0; font-size: 0.68rem; }
+  .dh-pause-note { margin: 8px 10px; font-size: 0.74rem; }
 }

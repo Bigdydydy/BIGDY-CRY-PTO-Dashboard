@@ -14,13 +14,73 @@ const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const liquidityHistory = require('./liquidity_history');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity.json');
 const CACHE_TTL_MS = 15000; // 15 seconds memory cache
+const REQUIRED_IDS = ['coinbase', 'coinbase_candles'];
+const MAX_FUTURE_MS = 5 * 60 * 1000;
 
 let inMemoryCache = null;
 let lastFetchTime = 0;
-let isFetching = false;
+let inflight = null;
+let diskSeeded = false;
+
+const isFiniteNum = v =>
+  v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
+const isPosNum = v => isFiniteNum(v) && Number(v) > 0;
+
+/** L2 book: nonempty bids/asks, valid levels, sorted, no crossed book. */
+function validateOrderBook(book) {
+  if (!book || typeof book !== 'object') return 'order book 非对象';
+  const { bids, asks } = book;
+  if (!Array.isArray(bids) || !bids.length || !Array.isArray(asks) || !asks.length) return 'bids/asks 为空';
+  const sideOk = (side, desc) => {
+    let prev = desc ? Infinity : -Infinity;
+    for (const lv of side) {
+      if (!Array.isArray(lv) || !isPosNum(lv[0]) || !isFiniteNum(lv[1]) || Number(lv[1]) < 0) return false;
+      const p = Number(lv[0]);
+      if (desc ? p > prev : p < prev) return false;
+      prev = p;
+    }
+    return true;
+  };
+  if (!sideOk(bids, true)) return 'bids 非降序或字段非法';
+  if (!sideOk(asks, false)) return 'asks 非升序或字段非法';
+  if (!(Number(bids[0][0]) < Number(asks[0][0]))) return 'bestBid >= bestAsk';
+  return null;
+}
+
+/** Daily candles [time(sec), low, high, open, close, volume]: valid OHLC,
+ * volume >= 0. Raw fields are checked — Number(null)===0 must never pass. */
+function validateDailyCandles(rows) {
+  if (!Array.isArray(rows) || !rows.length) return 'candles 为空或非数组';
+  const nowMs = Date.now();
+  for (const c of rows) {
+    if (!Array.isArray(c) || c.length < 6) return 'candle 行字段不足';
+    if (!isPosNum(c[0])) return 'candle 时间非法';
+    if (Number(c[0]) * 1000 > nowMs + MAX_FUTURE_MS) return 'candle 时间在未来';
+    if (![c[1], c[2], c[3], c[4]].every(isPosNum)) return 'OHLC 非正数';
+    const [t, l, h, o, cl] = c.map(Number);
+    if (h < Math.max(o, cl, l) || l > Math.min(o, cl, h)) return 'OHLC 不自洽';
+    if (!isFiniteNum(c[5]) || Number(c[5]) < 0) return 'volume 非法';
+  }
+  return null;
+}
+
+/** Ticker/stats are required fields, never coerced to {}. */
+function validateTickerStats(ticker, stats) {
+  if (!ticker || !isPosNum(ticker.price)) return 'ticker.price 非正数';
+  if (ticker.time !== undefined && ticker.time !== null) {
+    const ms = Date.parse(ticker.time);
+    if (!Number.isFinite(ms) || ms > Date.now() + MAX_FUTURE_MS) return 'ticker.time 非法/未来';
+  }
+  if (!stats || !isPosNum(stats.last)) return 'stats.last 非正数';
+  if (!isFiniteNum(stats.volume) || Number(stats.volume) < 0) return 'stats.volume 非法';
+  return null;
+}
 
 /**
  * Fetch raw Level 2 order book from Coinbase Exchange
@@ -36,7 +96,10 @@ async function fetchCoinbaseOrderBook() {
   if (!resp.ok) {
     throw new Error(`Coinbase OrderBook HTTP ${resp.status}: ${resp.statusText}`);
   }
-  return await resp.json();
+  const book = await resp.json();
+  const bad = validateOrderBook(book);
+  if (bad) throw new Error(`Coinbase order book 校验失败: ${bad}`);
+  return book;
 }
 
 /**
@@ -54,11 +117,15 @@ async function fetchCoinbaseDailyCandles() {
   if (!resp.ok) {
     throw new Error(`Coinbase Candles HTTP ${resp.status}: ${resp.statusText}`);
   }
-  return await resp.json();
+  const rows = await resp.json();
+  const bad = validateDailyCandles(rows);
+  if (bad) throw new Error(`Coinbase candles 校验失败: ${bad}`);
+  return rows;
 }
 
 /**
- * Fetch 24h stats and ticker from Coinbase Exchange
+ * Fetch 24h stats and ticker from Coinbase Exchange. Any non-OK response or
+ * missing price/volume/last is a source failure, never coerced to {}.
  */
 async function fetchCoinbaseTickerAndStats() {
   const [tickerResp, statsResp] = await Promise.all([
@@ -70,8 +137,12 @@ async function fetchCoinbaseTickerAndStats() {
     })
   ]);
 
-  const ticker = tickerResp.ok ? await tickerResp.json() : {};
-  const stats = statsResp.ok ? await statsResp.json() : {};
+  if (!tickerResp.ok) throw new Error(`Coinbase Ticker HTTP ${tickerResp.status}`);
+  if (!statsResp.ok) throw new Error(`Coinbase Stats HTTP ${statsResp.status}`);
+  const ticker = await tickerResp.json();
+  const stats = await statsResp.json();
+  const bad = validateTickerStats(ticker, stats);
+  if (bad) throw new Error(`Coinbase ticker/stats 校验失败: ${bad}`);
   return { ticker, stats };
 }
 
@@ -378,66 +449,113 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   };
 }
 
+function readValidatedDisk() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return null;
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    // Same schema the live path produces: a book-derived result must carry
+    // the depth profile and a sane mid price.
+    if (!cached || typeof cached !== 'object' || !isPosNum(cached.midPrice) || !cached.depthProfile) return null;
+    return cached;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Seed honest disk clocks once, before the first attempt is recorded. */
+function seedDiskOnce() {
+  if (diskSeeded) return;
+  diskSeeded = true;
+  const disk = readValidatedDisk();
+  if (disk) {
+    const asOf = disk.updatedAt || (Number.isFinite(disk.timestamp) ? new Date(disk.timestamp).toISOString() : null);
+    seedCachedHealth(disk, 'coinbase', { dataAsOf: asOf, lastSuccessAt: asOf, asOfKind: 'received' });
+    // Legacy files carry no real candle data date — updatedAt must not pose
+    // as the candles' dataAsOf. Persisted health wins; otherwise UNKNOWN.
+    seedCachedHealth(disk, 'coinbase_candles', {});
+  }
+}
+
 /**
- * Main public getter for Coinbase liquidity dataset
+ * Main public getter for Coinbase liquidity dataset (single-flight).
  */
-async function getCoinbaseLiquidityData(forceRefresh = false) {
+function getCoinbaseLiquidityData(forceRefresh = false) {
+  if (inflight) return inflight;
+  inflight = doGetCoinbaseLiquidityData(forceRefresh).finally(() => { inflight = null; });
+  return inflight;
+}
+
+async function doGetCoinbaseLiquidityData(forceRefresh = false) {
   const now = Date.now();
+  seedDiskOnce();
 
-  // Return in-memory cache if valid
+  // Return in-memory cache if valid (cache hits never extend lastSuccessAt)
   if (!forceRefresh && inMemoryCache && (now - lastFetchTime) < CACHE_TTL_MS) {
-    return inMemoryCache;
+    return withDataHealth(inMemoryCache, REQUIRED_IDS);
   }
 
-  // Prevent overlapping concurrent fetches
-  if (isFetching && inMemoryCache) {
-    return inMemoryCache;
-  }
-
-  isFetching = true;
   try {
     console.log('[CoinbaseFetcher] Fetching real-time BTC-USD orderbook, candles, and ticker...');
-    const [bookData, candleData, tickerStats] = await Promise.all([
+    const attemptMs = Date.now();
+    recordAttempt('coinbase', { now: attemptMs });
+    recordAttempt('coinbase_candles', { now: attemptMs });
+    const [bookRes, candleRes, tickRes] = await Promise.allSettled([
       fetchCoinbaseOrderBook(),
       fetchCoinbaseDailyCandles(),
       fetchCoinbaseTickerAndStats()
     ]);
 
-    const result = processCoinbaseData(bookData, candleData, tickerStats);
+    const receiptIso = new Date().toISOString();
+    // 'coinbase' covers the live book + ticker/stats leg.
+    if (bookRes.status === 'rejected') recordFailure('coinbase', bookRes.reason);
+    if (tickRes.status === 'rejected') recordFailure('coinbase', tickRes.reason);
+    if (candleRes.status === 'rejected') recordFailure('coinbase_candles', candleRes.reason);
+    const anyFailed = [bookRes, candleRes, tickRes].some(r => r.status === 'rejected');
+    if (anyFailed) {
+      const err = bookRes.reason || tickRes.reason || candleRes.reason;
+      throw err instanceof Error ? err : new Error(String(err));
+    }
 
-    inMemoryCache = result;
+    // A live getter never substitutes missing candles for the 50% defaults:
+    // all three legs must be present and validated (validation inside fetchers).
+    recordSuccess('coinbase', {
+      dataAsOf: receiptIso, asOfKind: 'received', source: 'coinbase.exchange/book+ticker'
+    });
+    const maxCandleSec = Math.max(...candleRes.value.map(c => Number(c[0])));
+    recordSuccess('coinbase_candles', {
+      dataAsOf: new Date(maxCandleSec * 1000).toISOString(), asOfKind: 'source', source: 'coinbase.exchange/candles'
+    });
+
+    const result = processCoinbaseData(bookRes.value, candleRes.value, tickRes.value);
+
+    const bound = withDataHealth(result, REQUIRED_IDS);
+    inMemoryCache = bound;
     lastFetchTime = now;
     liquidityHistory.recordLiveSnapshot(result, now);
 
-    // Persist to local JSON cache
+    // Persist to local JSON cache (atomic)
     try {
       const dataDir = path.dirname(CACHE_FILE);
       if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(result, null, 2), 'utf8');
+      atomicWriteJson(CACHE_FILE, bound, 2);
       console.log(`[CoinbaseFetcher] Successfully updated Coinbase liquidity cache at ${new Date().toISOString()}`);
     } catch (writeErr) {
       console.warn('[CoinbaseFetcher] Warning: Failed to write cache file:', writeErr.message);
     }
 
-    return result;
+    return bound;
   } catch (err) {
     console.error('[CoinbaseFetcher] Error fetching from Coinbase:', err.message);
 
-    // Fallback to disk cache if available
-    if (fs.existsSync(CACHE_FILE)) {
-      try {
-        const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-        console.log('[CoinbaseFetcher] Returning disk fallback cache');
-        inMemoryCache = cached;
-        return cached;
-      } catch (readErr) {
-        console.error('[CoinbaseFetcher] Failed to parse disk cache:', readErr.message);
-      }
+    // Failures never record live snapshots nor touch the persisted file.
+    if (inMemoryCache) return withDataHealth(inMemoryCache, REQUIRED_IDS);
+    const cached = readValidatedDisk();
+    if (cached) {
+      console.log('[CoinbaseFetcher] Returning disk fallback cache');
+      inMemoryCache = cached;
+      return withDataHealth(cached, REQUIRED_IDS);
     }
-
     throw err;
-  } finally {
-    isFetching = false;
   }
 }
 

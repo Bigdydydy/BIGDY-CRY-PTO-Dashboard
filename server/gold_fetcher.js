@@ -1,17 +1,48 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchSpotDailyCloses } = require('./spot_daily');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'gold_correlation.json');
 const HISTORY_DAYS = 1000;
 const DAY_MS = 86400000;
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
 
+const strictNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
+  !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
+
+/**
+ * Same schema the live path produces: nonempty daily series with valid
+ * strictly-ascending dates, finite positive prices and finite positive
+ * timestamps (null must never coerce to 0). rollingCorr may be null in
+ * warmup. `current`, when present, must correspond to the last series row.
+ */
+function validateGoldPayload(c) {
+  if (!c || typeof c !== 'object' || !Array.isArray(c.series) || !c.series.length) return false;
+  const nowMs = Date.now();
+  let prevTs = -Infinity;
+  for (const r of c.series) {
+    if (!r || typeof r.date !== 'string' || isNaN(Date.parse(r.date))) return false;
+    if (!strictNum(r.timestamp) || Number(r.timestamp) <= 0 || Number(r.timestamp) > nowMs + 5 * 60000) return false;
+    if (Number(r.timestamp) <= prevTs) return false; // dates must ascend
+    prevTs = Number(r.timestamp);
+    if (!strictNum(r.btcPrice) || !(Number(r.btcPrice) > 0)) return false;
+    if (!strictNum(r.goldPrice) || !(Number(r.goldPrice) > 0)) return false;
+    if (r.rollingCorr30d !== null && r.rollingCorr30d !== undefined && !Number.isFinite(Number(r.rollingCorr30d))) return false;
+  }
+  if (c.current && typeof c.current === 'object') {
+    const last = c.series[c.series.length - 1];
+    if (c.current.date !== last.date || Number(c.current.timestamp) !== Number(last.timestamp)) return false;
+  }
+  return true;
+}
+
 function readCachedSeries() {
   try {
     if (!fs.existsSync(CACHE_FILE)) return null;
     const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    return Array.isArray(cached?.series) ? cached : null;
+    return validateGoldPayload(cached) ? cached : null;
   } catch (e) {
     return null;
   }
@@ -22,7 +53,21 @@ const BTC_CIRCULATING_SUPPLY = 19.8e6;     // Approx 19.8M circulating BTC in 20
 let inMemoryCache = null;
 let lastFetchTime = 0;
 let currentFetchPromise = null;
+let diskSeeded = false;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+
+/** Seed honest disk clocks once, before the first upstream attempt. */
+function seedDiskOnce() {
+  if (diskSeeded) return;
+  diskSeeded = true;
+  const cached = readCachedSeries();
+  if (cached) {
+    seedCachedHealth(cached, 'gold', {
+      dataAsOf: cached.current?.timestamp || cached.current?.date,
+      lastSuccessAt: cached.updatedAt || null
+    });
+  }
+}
 
 /**
  * Calculates Pearson correlation coefficient between two equal-length numerical arrays
@@ -259,44 +304,59 @@ async function fetchGoldCorrelationFromSource() {
  */
 async function getGoldCorrelationData(forceRefresh = false) {
   const now = Date.now();
+  seedDiskOnce();
   if (!forceRefresh && inMemoryCache && (now - lastFetchTime < CACHE_TTL_MS)) {
-    return inMemoryCache;
+    return withDataHealth(inMemoryCache, ['gold']);
   }
 
   if (currentFetchPromise) {
     return currentFetchPromise;
   }
 
+  recordAttempt('gold', { now: Date.now() });
   currentFetchPromise = (async () => {
     try {
       console.log('[GoldFetcher] Fetching real-time PAXG and BTC klines from Binance...');
       const result = await fetchGoldCorrelationFromSource();
-      inMemoryCache = result;
+
+      // Real fetch completed: data-as-of is the latest series point's own
+      // timestamp, never the receipt time.
+      const issues = [
+        ...(result.metadata?.venueFallbackErrors || []).map(String),
+        ...(result.metadata?.partial ? ['venue history partial — spliced cached prefix'] : [])
+      ];
+      recordSuccess('gold', {
+        dataAsOf: result.current.timestamp || result.current.date,
+        asOfKind: 'source',
+        source: result.metadata?.venue || 'spot_daily',
+        issues
+      });
+      const bound = withDataHealth(result, ['gold']);
+      inMemoryCache = bound;
       lastFetchTime = Date.now();
 
-      // Persist to disk
+      // Persist to disk (atomic)
       try {
-        fs.writeFileSync(CACHE_FILE, JSON.stringify(result, null, 2), 'utf8');
+        atomicWriteJson(CACHE_FILE, bound, 2);
         console.log(`[GoldFetcher] Successfully persisted ${result.series.length} days of Gold/BTC data to ${CACHE_FILE}`);
       } catch (writeErr) {
         console.warn('[GoldFetcher] Warning: failed to write cache to disk:', writeErr.message);
       }
 
-      return result;
+      return bound;
     } catch (err) {
       console.warn('[GoldFetcher] Live fetch failed:', err.message);
+      recordFailure('gold', err);
 
-      // Fallback to disk cache if available
-      if (fs.existsSync(CACHE_FILE)) {
-        try {
-          const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-          console.log('[GoldFetcher] Returning persisted disk cache fallback');
-          inMemoryCache = cached;
-          lastFetchTime = Date.now();
-          return cached;
-        } catch (readErr) {
-          console.warn('[GoldFetcher] Error reading disk fallback:', readErr.message);
-        }
+      // Fallback: valid in-memory copy first, then validated disk.
+      if (inMemoryCache && validateGoldPayload(inMemoryCache)) {
+        return withDataHealth(inMemoryCache, ['gold']);
+      }
+      const cached = readCachedSeries();
+      if (cached) {
+        console.log('[GoldFetcher] Returning persisted disk cache fallback');
+        inMemoryCache = cached;
+        return withDataHealth(cached, ['gold']);
       }
 
       throw err;

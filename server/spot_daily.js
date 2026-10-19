@@ -101,7 +101,17 @@ async function fetchSpotDailyCloses(symbols, startMs, venues = VENUES) {
       symbols.forEach((sym, i) => {
         const byDate = new Map();
         for (const r of results[i]) {
-          if (r.close > 0) byDate.set(isoDate(r.openTime), { date: isoDate(r.openTime), openTime: r.openTime, close: r.close });
+          // Malformed / NaN / future rows fail THIS venue outright — never
+          // silently filter a bad row into a successful history.
+          const t = Number(r && r.openTime);
+          const c = Number(r && r.close);
+          if (!Number.isFinite(t) || t > Date.now() + 5 * 60000) {
+            throw new Error(`${sym}: invalid candle timestamp ${r && r.openTime}`);
+          }
+          if (!Number.isFinite(c) || !(c > 0)) {
+            throw new Error(`${sym}: invalid close ${r && r.close}`);
+          }
+          byDate.set(isoDate(t), { date: isoDate(t), openTime: t, close: c });
         }
         series[sym] = [...byDate.values()].sort((a, b) => a.openTime - b.openTime);
       });

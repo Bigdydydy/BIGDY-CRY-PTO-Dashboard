@@ -2,11 +2,65 @@ const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchSpotDailyCloses } = require('./spot_daily');
+const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'ssro_chart.json');
 let inMemoryCache = null;
 let lastFetchTime = 0;
+let inflight = null;
+let diskSeeded = false;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+const REQUIRED_IDS = ['ssro', 'ssro_stable'];
+const ANCILLARY_IDS = ['ssro_quote'];
+
+/** Built payload schema: nonempty points with finite positive price/cap/ssr,
+ * strictly ascending non-future dates; ssro200/ssro50 may be null in warmup. */
+function validateSsroPayload(p) {
+  if (!p || typeof p !== 'object' || !Array.isArray(p.points) || !p.points.length) return 'ssro points 为空';
+  const nowMs = Date.now();
+  let prev = '';
+  for (const pt of p.points) {
+    if (!pt || typeof pt.date !== 'string' || isNaN(Date.parse(pt.date))) return 'point date 非法';
+    if (Date.parse(pt.date) > nowMs + 5 * 60000) return 'point date 在未来';
+    if (pt.date <= prev) return 'point dates 非严格递增';
+    prev = pt.date;
+    for (const k of ['btcPrice', 'stableCap', 'ssr']) {
+      if (!Number.isFinite(Number(pt[k])) || Number(pt[k]) <= 0 || typeof pt[k] === 'boolean') return `point.${k} 非正值`;
+    }
+    for (const k of ['ssro200', 'ssro50']) {
+      if (pt[k] !== null && pt[k] !== undefined && !Number.isFinite(pt[k])) return `point.${k} 非法`;
+    }
+  }
+  return null;
+}
+
+function readValidatedDisk() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return null;
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return validateSsroPayload(cached) ? null : cached;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Seed honest disk clocks once for every required + ancillary source —
+ * persisted per-source health wins; legacy files keep only aggregate hints. */
+function seedDiskOnce() {
+  if (diskSeeded) return;
+  diskSeeded = true;
+  const disk = readValidatedDisk();
+  if (disk) {
+    const hints = {
+      ssro: { dataAsOf: disk.latest?.date || disk.summary?.endDate || null, lastSuccessAt: disk.updatedAt || null },
+      ssro_stable: { dataAsOf: disk.summary?.endDate || null, lastSuccessAt: disk.updatedAt || null }
+    };
+    for (const id of [...REQUIRED_IDS, ...ANCILLARY_IDS]) {
+      seedCachedHealth(disk, id, hints[id] || {});
+    }
+  }
+}
 
 /**
  * Fetch JSON with resilient timeout, retries, and headers
@@ -89,22 +143,41 @@ async function fetchTradingViewQuote() {
  * Fetch historical stablecoin circulating market caps from DefiLlama
  */
 async function fetchDefiLlamaStablecoins() {
+  recordAttempt('ssro_stable', { now: Date.now() });
   try {
     const data = await fetchJson('https://stablecoins.llama.fi/stablecoincharts/all');
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid DefiLlama payload');
     }
+    // Validate EVERY row first — a malformed/future/non-finite row must not be
+    // silently skipped into a "successful" history.
     const map = new Map();
+    const nowMs = Date.now();
     for (const item of data) {
-      const d = new Date(parseInt(item.date, 10) * 1000).toISOString().slice(0, 10);
-      const cap = item.totalCirculatingUSD?.peggedUSD || item.totalCirculating?.peggedUSD || 0;
-      if (cap > 0) {
-        map.set(d, cap);
+      const rawDate = item && item.date;
+      const sec = Number(rawDate);
+      if (rawDate === null || rawDate === undefined || typeof rawDate === 'boolean'
+          || (typeof rawDate === 'string' && !/^\d+$/.test(rawDate.trim()))
+          || !Number.isFinite(sec) || sec <= 0) {
+        throw new Error(`DefiLlama row: invalid date ${JSON.stringify(rawDate)}`);
       }
+      if (sec * 1000 > nowMs + 5 * 60000) {
+        throw new Error(`DefiLlama row: future date ${new Date(sec * 1000).toISOString()}`);
+      }
+      const d = new Date(sec * 1000).toISOString().slice(0, 10);
+      const cap = item.totalCirculatingUSD?.peggedUSD ?? item.totalCirculating?.peggedUSD;
+      if (typeof cap === 'boolean' || !Number.isFinite(Number(cap)) || !(Number(cap) > 0)) {
+        throw new Error(`DefiLlama row ${d}: invalid cap ${JSON.stringify(cap)}`);
+      }
+      map.set(d, Number(cap));
     }
+    if (!map.size) throw new Error('DefiLlama payload: 无有效 date/cap 行');
+    const maxDate = Array.from(map.keys()).sort().pop();
+    recordSuccess('ssro_stable', { dataAsOf: maxDate, asOfKind: 'source', source: 'defillama/stablecoincharts' });
     return map;
   } catch (err) {
     console.error('[SSRO] DefiLlama historical fetch error:', err.message);
+    recordFailure('ssro_stable', err);
     return new Map();
   }
 }
@@ -196,20 +269,23 @@ async function fetchAndBuildSsroData() {
 
   console.log(`[SSRO] Ingestion stats: TV STABLE.C=$${tvQuote.stableCap ? (tvQuote.stableCap / 1e9).toFixed(2) + 'B' : 'N/A'}, DefiLlama=${stableHistoryMap.size} days, BTC=${btcDailyMap.size} days`);
 
+  // TradingView 实时报价：两腿都取得有限正值才算一次成功报价，
+  // 缺任一腿绝不拿历史值生成"今天"
+  const quoteValid = Number.isFinite(Number(tvQuote.stableCap)) && Number(tvQuote.stableCap) > 0
+    && Number.isFinite(Number(tvQuote.btcPrice)) && Number(tvQuote.btcPrice) > 0;
+  if (quoteValid) {
+    recordSuccess('ssro_quote', { dataAsOf: new Date().toISOString(), asOfKind: 'received', source: 'tradingview/scan' });
+  } else {
+    recordFailure('ssro_quote', new Error('TradingView 报价缺 stableCap 或 btcPrice'));
+  }
+
   // Intersect dates
   const dates = Array.from(btcDailyMap.keys())
     .filter(d => stableHistoryMap.has(d))
     .sort();
 
   if (dates.length === 0) {
-    if (fs.existsSync(CACHE_FILE)) {
-      console.warn('[SSRO] Live fetch returned empty, using disk cache');
-      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-      // Hold the stale copy for one TTL instead of re-fetching on every request
-      inMemoryCache = cached;
-      lastFetchTime = Date.now();
-      return cached;
-    }
+    // 历史交集为空 = 构建失败；由 getter 负责磁盘兜底
     throw new Error('Failed to retrieve history for SSRO calculation');
   }
 
@@ -229,28 +305,31 @@ async function fetchAndBuildSsroData() {
     });
   }
 
-  // Update or append the latest day with live TradingView quote if available
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const livePrice = tvQuote.btcPrice || (rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].btcPrice : 77000);
-  const liveStableCap = tvQuote.stableCap || (rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].stableCap : 309e9);
-  const liveSupply = getBtcSupply(todayStr);
-  const liveBtcCap = livePrice * liveSupply;
-  const liveSsr = liveBtcCap / liveStableCap;
+  // 仅在实时报价双腿都有效时，用它更新/追加"今天"；否则保留最后一个真实历史日期，
+  // 绝不拿历史腿的价格冒充今天的报价
+  if (quoteValid) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const livePrice = tvQuote.btcPrice;
+    const liveStableCap = tvQuote.stableCap;
+    const liveSupply = getBtcSupply(todayStr);
+    const liveBtcCap = livePrice * liveSupply;
+    const liveSsr = liveBtcCap / liveStableCap;
 
-  const lastRecord = rawRecords[rawRecords.length - 1];
-  if (lastRecord && lastRecord.date === todayStr) {
-    lastRecord.btcPrice = livePrice;
-    lastRecord.btcCap = liveBtcCap;
-    lastRecord.stableCap = liveStableCap;
-    lastRecord.ssr = liveSsr;
-  } else {
-    rawRecords.push({
-      date: todayStr,
-      btcPrice: livePrice,
-      btcCap: liveBtcCap,
-      stableCap: liveStableCap,
-      ssr: liveSsr
-    });
+    const lastRecord = rawRecords[rawRecords.length - 1];
+    if (lastRecord && lastRecord.date === todayStr) {
+      lastRecord.btcPrice = livePrice;
+      lastRecord.btcCap = liveBtcCap;
+      lastRecord.stableCap = liveStableCap;
+      lastRecord.ssr = liveSsr;
+    } else {
+      rawRecords.push({
+        date: todayStr,
+        btcPrice: livePrice,
+        btcCap: liveBtcCap,
+        stableCap: liveStableCap,
+        ssr: liveSsr
+      });
+    }
   }
 
   // Compute PineScript SSRO for len = 200 (Macro default) and len = 50 (tactical)
@@ -349,48 +428,78 @@ async function fetchAndBuildSsroData() {
     points
   };
 
-  // Cache to disk
+  const invalid = validateSsroPayload(payload);
+  if (invalid) {
+    recordFailure('ssro', new Error(`SSRO payload 校验失败: ${invalid}`));
+    if (inMemoryCache) return withDataHealth(inMemoryCache, REQUIRED_IDS, ANCILLARY_IDS);
+    throw new Error(`SSRO payload 校验失败: ${invalid}`);
+  }
+
+  recordSuccess('ssro', {
+    dataAsOf: latestPoint.date, asOfKind: 'source', source: 'ssro/build',
+    issues: quoteValid ? [] : ['TradingView 实时报价缺失，未注入今日报价']
+  });
+
+  // Persist AFTER the success is recorded, with required+ancillary health
+  // bound in so the next cold start can restore honest clocks (atomic write —
+  // a failed write never corrupts the last good file).
+  const bound = withDataHealth(payload, REQUIRED_IDS, ANCILLARY_IDS);
   try {
-    const dataDir = path.dirname(CACHE_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(payload, null, 2), 'utf8');
+    atomicWriteJson(CACHE_FILE, bound, 2);
     console.log('[SSRO] Successfully updated cache at:', CACHE_FILE);
   } catch (e) {
     console.warn('[SSRO] Failed to write disk cache:', e.message);
   }
 
-  inMemoryCache = payload;
+  inMemoryCache = bound;
   lastFetchTime = Date.now();
-  return payload;
+  return bound;
 }
 
 /**
- * Get SSRO data with memory & disk caching
+ * Get SSRO data with memory & disk caching (single-flight)
  */
 async function getSsroData(force = false) {
   const now = Date.now();
+  // Seed disk clocks BEFORE any return path — a warm-disk hit must not skip it.
+  seedDiskOnce();
   if (!force && inMemoryCache && (now - lastFetchTime < CACHE_TTL_MS)) {
-    return inMemoryCache;
+    return withDataHealth(inMemoryCache, REQUIRED_IDS, ANCILLARY_IDS);
   }
 
   if (!force && !inMemoryCache && fs.existsSync(CACHE_FILE)) {
     try {
-      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      const cached = readValidatedDisk();
       const cachedAt = cached && cached.updatedAt ? new Date(cached.updatedAt).getTime() : 0;
-      if (now - cachedAt < CACHE_TTL_MS) {
+      if (cached && now - cachedAt < CACHE_TTL_MS) {
         inMemoryCache = cached;
         lastFetchTime = cachedAt;
         console.log('[SSRO] Served from warm disk cache');
-        return inMemoryCache;
+        return withDataHealth(inMemoryCache, REQUIRED_IDS, ANCILLARY_IDS);
       }
     } catch (e) {
       console.warn('[SSRO] Error reading disk cache:', e.message);
     }
   }
 
-  return await fetchAndBuildSsroData();
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      return await fetchAndBuildSsroData();
+    } catch (err) {
+      recordFailure('ssro', err);
+      // 失败兜底：内存有效数据优先，其次验证过的磁盘缓存（标记 fallback，不推进时钟）
+      const cached = inMemoryCache || readValidatedDisk();
+      if (cached) {
+        if (!inMemoryCache) { inMemoryCache = cached; lastFetchTime = Date.now(); }
+        return withDataHealth(cached, REQUIRED_IDS, ANCILLARY_IDS);
+      }
+      throw err;
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
 }
 
 module.exports = {

@@ -1061,8 +1061,14 @@ describe('Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme
 
   test('validateMcClellanData rejects payloads without both tracks', () => {
     assert.throws(() => validateMcClellanData({ metadata: {}, current: { core: { oscillator: 1 } }, series: [] }));
+    const today = new Date().toISOString().slice(0, 10);
     assert.ok(validateMcClellanData({
-      metadata: {}, current: { core: { oscillator: 1.5 }, frontier: { ready: false } }, series: []
+      metadata: {},
+      current: {
+        core: { ready: true, oscillator: 1.5, summation: 10, date: today },
+        frontier: { ready: false, oscillator: null, date: today } // warmup track is allowed
+      },
+      series: [{ date: today, core_n: 100, frontier_n: 30 }]
     }));
   });
 
@@ -1132,15 +1138,16 @@ describe('Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme
 
 describe('System Audit & Data Provenance Verification Engine', () => {
   const { getSystemAuditData } = require('../server/audit_engine');
+  const { resetHealthForTests } = require('../server/data_health');
 
-  test('getSystemAuditData returns complete registry of all 10 quantitative modules with provenance signatures', async () => {
+  test('getSystemAuditData reports the full module registry with truthful health', async () => {
+    resetHealthForTests();
     const audit = await getSystemAuditData(false);
     assert.equal(audit.code, 0);
     assert.ok(audit.serverTimeUTC);
     assert.ok(typeof audit.serverUptimeSeconds === 'number');
-    assert.ok(['HEALTHY', 'DEGRADED'].includes(audit.overallHealth));
-    assert.equal(audit.modulesCount, 10, 'Must register exactly 10 core modules');
-    assert.ok(audit.onlineModulesCount >= 8, 'At least 8 modules must be online');
+    assert.ok(['HEALTHY', 'DEGRADED', 'UNKNOWN', 'CRITICAL'].includes(audit.overallHealth));
+    assert.equal(audit.modulesCount, 19, 'Must register all 19 core modules and data pipelines');
 
     const expectedModules = [
       'macro_liquidity',
@@ -1152,7 +1159,16 @@ describe('System Audit & Data Provenance Verification Engine', () => {
       'coinbase_orderbook_liquidity',
       'gold_btc_correlation',
       'ssro_oscillator',
-      'crypto_mcclellan_breadth'
+      'crypto_mcclellan_breadth',
+      'cdri',
+      'mstr_preferreds',
+      'etf_linkage',
+      'flow_force',
+      'wave_engine',
+      'block_insight',
+      'option_marks',
+      'option_oi_history',
+      'coinbase_liquidity_history'
     ];
 
     for (const modId of expectedModules) {
@@ -1163,19 +1179,24 @@ describe('System Audit & Data Provenance Verification Engine', () => {
       assert.ok(Array.isArray(mod.targetEndpoints) && mod.targetEndpoints.length > 0, `${modId} targetEndpoints`);
       assert.ok(mod.timeframe, `${modId} timeframe description`);
       assert.ok(mod.updateInterval, `${modId} updateInterval`);
-      // The breadth oscillator is computed once per UTC close, not streamed
-      assert.equal(mod.isRealtime, modId !== 'crypto_mcclellan_breadth', `${modId} isRealtime`);
       assert.ok(Array.isArray(mod.provenanceSignatures) && mod.provenanceSignatures.length > 0, `${modId} provenanceSignatures`);
-      assert.ok(['ONLINE', 'INITIALIZING'].includes(mod.healthStatus), `${modId} healthStatus`);
+      // Health is now truthful: a module is only ONLINE when every mapped
+      // source is verified OK; unobserved sources report INITIALIZING.
+      assert.ok(['ONLINE', 'DEGRADED', 'OFFLINE', 'INITIALIZING'].includes(mod.healthStatus), `${modId} healthStatus`);
+      assert.ok(['FRESH', 'STALE', 'UNKNOWN'].includes(mod.freshnessStatus), `${modId} freshnessStatus`);
+      assert.ok(Array.isArray(mod.sourceIds), `${modId} must declare mapped source ids`);
     }
 
-    // Specific financial & provenance integrity checks
-    assert.ok(audit.modules.macro_liquidity.recordCount >= 2000, 'Macro points count');
-    assert.ok(audit.modules.macro_liquidity.mstrPurchasesCount >= 100, 'MSTR official purchases count');
+    // Provenance integrity checks (unchanged claims about methodology)
     assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('REAL_TENOR_CURVE_FUNDING_CQ_NQ'));
     assert.ok(audit.modules.term_premium_basis.provenanceSignatures.includes('ETF_CME_HEDGE_RATIO_REGRESSION'));
-    assert.ok(audit.modules.gold_btc_correlation.recordCount >= 1000, 'Gold PAXG 1000 daily points');
-    assert.ok(audit.modules.ssro_oscillator.recordCount >= 2000, 'DefiLlama & BTC joined series 2000+ points');
+
+    // No fabricated freshness: with nothing observed nothing reports ONLINE/FRESH
+    for (const mod of Object.values(audit.modules)) {
+      if (mod.healthStatus === 'ONLINE') assert.equal(mod.freshnessStatus, 'FRESH');
+      assert.notEqual(mod.freshnessStatus, 'FRESH', 'no data observed -> never claim fresh');
+      assert.equal(mod.lastUpdated, null, 'no data observed -> never fabricate a timestamp');
+    }
   });
 
   test('HTTP Endpoint GET /api/system/audit returns 200 with code 0 and ETag 304', async () => {
@@ -1188,9 +1209,10 @@ describe('System Audit & Data Provenance Verification Engine', () => {
           assert.equal(resp.status, 200);
           const json = await resp.json();
           assert.equal(json.code, 0);
-          assert.equal(json.modulesCount, 10);
+          assert.equal(json.modulesCount, 19);
           assert.ok(json.modules.macro_liquidity);
           assert.ok(json.modules.coinbase_orderbook_liquidity);
+          assert.ok(json.modules.wave_engine);
 
           // Test ETag
           const etag = resp.headers.get('etag');

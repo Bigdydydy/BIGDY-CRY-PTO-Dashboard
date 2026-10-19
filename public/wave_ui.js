@@ -17,6 +17,9 @@
   let currentBars = [];
   let initialLoadPromise = null;
   let mainKlineSource = null; // 服务端返回的主图行情源 (币安被拒时为 Bybit / OKX)
+  // 主图K线对应的数据健康: { symbol, tf, entry: {bars, health, t} }。
+  // entry.bars 与 currentBars 一致；加载失败时 entry.bars=null，防止拿上一个标的/周期的旧柱做当前评价。
+  let mainBarsMeta = null;
 
   let showMarkers = true;
   let showSubwaves = false;
@@ -270,8 +273,89 @@
   // ---------------------------------------------------------------------------
   // 行情与计算
   // ---------------------------------------------------------------------------
+  const FUTURE_SKEW_MS = 5 * 60 * 1000; // 与服务端 validateKlineRows 的 5 分钟未来容忍一致
+  // 与服务端波浪K线策略窗口一致的本地可用性判定：接收侧15分钟、数据侧2*周期+15分钟。
+  const WAVE_FETCH_BLOCK_MS = 15 * 60 * 1000;
+  const WAVE_DATA_SLACK_MS = 15 * 60 * 1000;
+  const WAVE_FETCH_WARN_MS = 3 * 60 * 1000; // 与服务端 wave policy warn 一致
+
+  /** 直连返回的原始K线逐行校验: 有限正OHLC、volume>=0、时间升序、无未来；坏行直接抛错，绝不进缓存/评估 */
+  function validateRawKlineRows(rows) {
+    const nowMs = Date.now() + FUTURE_SKEW_MS;
+    // null / '' / 布尔值不许被 Number() 静默变成 0/1
+    const strictNum = x => (x === null || x === undefined || typeof x === 'boolean' ||
+      (typeof x === 'string' && x.trim() === '')) ? NaN : Number(x);
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!Array.isArray(r) || r.length < 6) throw new Error('直连K线格式不完整');
+      const t = strictNum(r[0]), o = strictNum(r[1]), h = strictNum(r[2]), l = strictNum(r[3]), c = strictNum(r[4]), v = strictNum(r[5]);
+      const bad = [t, o, h, l, c, v].some(n => !Number.isFinite(n));
+      if (bad || t <= 0 || o <= 0 || h <= 0 || l <= 0 || c <= 0 || v < 0) throw new Error('直连K线包含非法数值');
+      if (h < Math.max(o, c, l) || l > Math.min(o, c, h)) throw new Error('直连K线OHLC关系非法');
+      if (t > nowMs) throw new Error('直连K线含未来时间');
+      if (i && t <= Number(rows[i - 1][0])) throw new Error('直连K线时间顺序异常');
+    }
+  }
+
   function parseRawKlines(rows) {
+    validateRawKlineRows(rows);
     return rows.map(b => ({ time: Math.floor(b[0] / 1000), open: parseFloat(b[1]), high: parseFloat(b[2]), low: parseFloat(b[3]), close: parseFloat(b[4]), volume: parseFloat(b[5]) }));
+  }
+
+  /** 服务端 /api/wave/klines 响应 → 缓存条目健康快照（沿用其策略窗口做本地到期判定） */
+  function serverEntryHealth(json) {
+    const summary = json && json.dataHealth && typeof json.dataHealth === 'object' ? json.dataHealth : null;
+    const src = summary && summary.sources ? Object.values(summary.sources)[0] : null;
+    return {
+      state: (src && src.state) || (summary && summary.state) || 'UNKNOWN',
+      usable: src ? src.usable !== false : json.usable !== false,
+      lastSuccessAt: json.lastSuccessAt || (src && src.lastSuccessAt) || null,
+      dataAsOf: json.dataAsOf || (src && src.dataAsOf) || null,
+      policy: (src && src.policy) || null,
+      source: json.source || null,
+      stale: json.stale || null
+    };
+  }
+
+  /** 与服务端 getSourcePolicy('wave:*') 一致的本地策略窗口 */
+  function waveLocalPolicy(tfSec) {
+    return {
+      fetchWarnMs: WAVE_FETCH_WARN_MS,
+      fetchBlockMs: WAVE_FETCH_BLOCK_MS,
+      dataWarnMs: tfSec * 1000 + WAVE_FETCH_WARN_MS,
+      dataBlockMs: 2 * tfSec * 1000 + WAVE_DATA_SLACK_MS
+    };
+  }
+
+  /** 浏览器直连取得的真实新K线: receipt=收到时刻，dataAsOf=最后一根开盘时间，附完整策略窗口 */
+  function clientBarsHealth(bars, source, tfSec) {
+    return {
+      state: 'OK',
+      usable: true,
+      lastSuccessAt: new Date().toISOString(),
+      dataAsOf: new Date(bars[bars.length - 1].time * 1000).toISOString(),
+      policy: waveLocalPolicy(tfSec),
+      source: source || '浏览器直连币安',
+      stale: null
+    };
+  }
+
+  /** 缓存条目此刻是否仍可用于当前研判 (接收/数据两个时钟都未过期；服务端已标不可用则直接 false) */
+  function waveEntryUsable(entry, tfSec, nowMs) {
+    if (!entry || !Array.isArray(entry.bars) || !entry.bars.length) return false;
+    const h = entry.health;
+    // 缺 health / 可用性未知 / 缺接收或数据时钟 → 一律 fail closed；
+    // 缓存命中时间 (entry.t) 只是读取时刻，不能充当真实回执。
+    if (!h || typeof h !== 'object') return false;
+    if (h.usable !== true || h.available === false) return false;
+    const recv = Date.parse(h.lastSuccessAt);
+    const asof = Date.parse(h.dataAsOf);
+    if (!Number.isFinite(recv) || !Number.isFinite(asof)) return false;
+    const p = h.policy && typeof h.policy === 'object' ? h.policy : null;
+    if (!p || (!Number.isFinite(p.fetchBlockMs) && !Number.isFinite(p.dataBlockMs))) return false;
+    const fetchBlock = Number.isFinite(p.fetchBlockMs) ? p.fetchBlockMs : WAVE_FETCH_BLOCK_MS;
+    const dataBlock = Number.isFinite(p.dataBlockMs) ? p.dataBlockMs : (2 * tfSec * 1000 + WAVE_DATA_SLACK_MS);
+    return (nowMs - recv <= fetchBlock) && (nowMs - asof <= dataBlock);
   }
 
   /** 直连币安兜底: 按 endTime 向前分页 */
@@ -304,8 +388,9 @@
         if (resp.ok) {
           const json = await resp.json();
           if (json && Array.isArray(json.bars) && json.bars.length) {
-            if (tf === currentTf) mainKlineSource = json.source || null;
-            return json.bars;
+            // Return the source in-band: assigning mainKlineSource here would
+            // race a symbol/tf switch that already superseded this request.
+            return { bars: json.bars, health: serverEntryHealth(json), source: json.source || null };
           }
           lastError = new Error('服务端未返回K线');
         } else {
@@ -317,7 +402,7 @@
     throw lastError || new Error('服务端未返回K线');
   }
 
-  /** 主图K线 (最多 WAVE_BARS 根；服务端缓存优先，失败直连币安合约/现货) */
+  /** 主图K线 (最多 WAVE_BARS 根；服务端缓存优先，失败直连币安合约/现货)。返回 {bars, health} */
   async function fetchKlines(symbol, tf) {
     const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
     let lastError = null;
@@ -326,14 +411,17 @@
     } catch (err) { lastError = err; }
     const serverError = lastError;
     const direct = [
-      ['https://fapi.binance.com/fapi/v1/klines', 1500],
-      ['https://data-api.binance.vision/api/v3/klines', 1000],
-      ['https://api.binance.com/api/v3/klines', 1000]
+      ['https://fapi.binance.com/fapi/v1/klines', 1500, '浏览器直连币安合约'],
+      ['https://data-api.binance.vision/api/v3/klines', 1000, '浏览器直连币安现货'],
+      ['https://api.binance.com/api/v3/klines', 1000, '浏览器直连币安现货']
     ];
-    for (const [base, pageMax] of direct) {
+    for (const [base, pageMax, label] of direct) {
       try {
         const rows = await fetchDirectPaged(base, pageMax, clean, tf, WAVE_BARS);
-        if (rows.length) return parseRawKlines(rows);
+        if (rows.length) {
+          const bars = parseRawKlines(rows); // 内部先严格校验原始schema与时间
+          return { bars, health: clientBarsHealth(bars, label, TF_SEC[tf]) };
+        }
       } catch (err) { lastError = err; }
     }
     throw new Error(`服务端行情不可用（${(serverError && serverError.message) || '超时'}），浏览器直连币安也失败`);
@@ -342,22 +430,25 @@
   const AUX_TTL_MS = 120000;
   const auxKlineCache = new Map();
 
-  /** 其它周期K线 (服务端缓存优先，失败直连币安)，浏览器内缓存2分钟 */
+  /** 其它周期K线 (服务端缓存优先，失败直连币安)，浏览器内缓存2分钟；返回 {bars, health} 携带对应健康 */
   async function fetchAuxBars(symbol, tf, limit) {
     const clean = symbol.replace(/[\/\-_]/g, '').toUpperCase();
     const key = `${clean}_${tf}_${limit}`;
     const hit = auxKlineCache.get(key);
-    if (hit && Date.now() - hit.t < AUX_TTL_MS) return hit.bars;
-    let bars = null;
-    try { bars = await fetchServerBars(clean, tf, limit); } catch (e) { /* 降级直连 */ }
-    if (!bars) {
+    if (hit && Date.now() - hit.t < AUX_TTL_MS) return hit;
+    let entry = null;
+    try { entry = await fetchServerBars(clean, tf, limit); } catch (e) { /* 降级直连 */ }
+    if (!entry) {
       try {
         const rows = await fetchDirectPaged('https://fapi.binance.com/fapi/v1/klines', 1500, clean, tf, limit);
-        if (rows.length) bars = parseRawKlines(rows);
-      } catch (e) { bars = null; }
+        if (rows.length) {
+          const bars = parseRawKlines(rows);
+          entry = { bars, health: clientBarsHealth(bars, '浏览器直连币安合约', TF_SEC[tf]) };
+        }
+      } catch (e) { entry = null; }
     }
-    if (bars) auxKlineCache.set(key, { t: Date.now(), bars });
-    return bars;
+    if (entry) { entry.t = Date.now(); auxKlineCache.set(key, entry); }
+    return entry;
   }
 
   const PAGE_LOADED_AT = Date.now();
@@ -421,14 +512,36 @@ self.onmessage = function (e) {
     drawings.forEach(d => { tfs.add(d.timeframe); (SKETCH_SUB_TFS[d.timeframe] || []).forEach(t => tfs.add(t)); });
     const nowSec = Math.floor(Date.now() / 1000);
     const list = Array.from(tfs);
-    const fetched = await Promise.all(list.map(tf => {
-      if (tf === currentTf && currentBars.length) return currentBars;
+    const requiredTfs = new Set(drawings.map(d => d.timeframe));
+    const fetched = await Promise.all(list.map(async tf => {
+      if (tf === currentTf && mainBarsMeta && mainBarsMeta.symbol === symbol && mainBarsMeta.tf === currentTf) {
+        return { tf, entry: mainBarsMeta.entry };
+      }
       // 须覆盖最早的画浪点之前约 300 根 (前序检验)，按 1000 / 10000 两档取整以复用缓存
       const need = Math.ceil((nowSec - firstTime) / TF_SEC[tf]) + 400;
-      return fetchAuxBars(symbol, tf, need <= 1000 ? 1000 : WAVE_BARS);
+      return { tf, entry: await fetchAuxBars(symbol, tf, need <= 1000 ? 1000 : WAVE_BARS) };
     }));
+    // 健康门禁：必需周期数据过期/不可用 → 暂停当前研判；过期辅助周期不传给引擎
     const barsByTf = {};
-    list.forEach((tf, i) => { if (fetched[i] && fetched[i].length) barsByTf[tf] = fetched[i]; });
+    const staleAux = [];
+    const nowMs = Date.now();
+    for (const { tf, entry } of fetched) {
+      const usable = entry && waveEntryUsable(entry, TF_SEC[tf], nowMs);
+      if (requiredTfs.has(tf)) {
+        if (!usable) {
+          const src = entry && entry.health && entry.health.source ? `（行情源：${entry.health.source}）` : '';
+          const e = new Error(`${tf.toUpperCase()} K线数据过期或不可用，暂停当前研判${src}`);
+          e.dataUnavailable = true;
+          throw e;
+        }
+        barsByTf[tf] = entry.bars;
+      } else if (usable) {
+        barsByTf[tf] = entry.bars;
+      } else if (entry) {
+        staleAux.push(tf.toUpperCase());
+      }
+    }
+    if (staleAux.length) setWaveStatus(`⚠ ${staleAux.join('/')} 辅助周期K线已过期，子浪证伪仅按可用周期`);
     const opts = { drawings };
     try {
       return await runInWorker('evaluateUserSketch', barsByTf, symbol, opts);
@@ -454,9 +567,13 @@ self.onmessage = function (e) {
     el.textContent = `${bars.length.toLocaleString()} 根 ${tf.toUpperCase()} K线 (${span})`;
   }
 
+  let loadSeq = 0; // 标的/周期切换令牌：只有最新一次加载允许落地状态
+
   async function loadChartCandles(symbol = currentSymbol) {
+    const seq = ++loadSeq;
+    const tf = currentTf;
     currentSymbol = symbol;
-    const tfLabel = currentTf.toUpperCase();
+    const tfLabel = tf.toUpperCase();
     const hudSym = document.getElementById('hud-sym');
     const title = document.getElementById('wave-chart-title');
     if (hudSym) hudSym.textContent = `${symbol} ${tfLabel}`;
@@ -464,19 +581,45 @@ self.onmessage = function (e) {
     setWaveStatus(`正在拉取 ${symbol} ${tfLabel} K 线…`);
     try {
       mainKlineSource = null;
-      const bars = await fetchKlines(symbol, currentTf);
+      const entry = await fetchKlines(symbol, tf);
+      if (seq !== loadSeq) return; // 已切换标的/周期：旧响应不得覆盖新状态与健康
+      const bars = entry.bars;
+      entry.t = Date.now();
+      mainBarsMeta = { symbol, tf, entry };
       currentBars = bars;
-      updateSampleLabel(bars, currentTf);
+      mainKlineSource = entry.source || (entry.health && entry.health.source) || null;
+      const usable = waveEntryUsable(entry, TF_SEC[tf], Date.now());
+      if (window.DataHealthUI) {
+        const h = entry.health || {};
+        window.DataHealthUI.update('wave', {
+          state: usable ? (h.state || 'OK') : 'STALE',
+          usable,
+          lastSuccessAt: h.lastSuccessAt,
+          dataAsOf: h.dataAsOf,
+          sources: { kline: h }
+        });
+      }
+      updateSampleLabel(bars, tf);
       if (!waveChart) initChart();
       candleSeries.setData(bars.map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
       focusChart();
       renderChart();
       const srcNote = mainKlineSource && !/币安/.test(mainKlineSource) ? ` · 行情源：${mainKlineSource}（币安暂不可用）` : '';
-      setWaveStatus((sketch.length
-        ? `● [${symbol} ${tfLabel}] K线就绪 · 已画 ${sketch.length} 个浪（其它周期画的浪按本周期K线显示），可继续画子浪`
-        : `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 选择上方画浪工具，在图上从起点开始依次点击各浪端点`) + srcNote);
+      const staleNote = entry.health && entry.health.stale && entry.health.stale.staleReason ? ` · ${entry.health.stale.staleReason}` : '';
+      if (!usable) {
+        // 历史曲线仍可浏览/画浪，但不能产出当前研判
+        setWaveStatus(`⏸ [${symbol} ${tfLabel}] 历史K线 (${bars.length} 根)，暂停当前研判${srcNote}${staleNote}`);
+      } else {
+        setWaveStatus((sketch.length
+          ? `● [${symbol} ${tfLabel}] K线就绪 · 已画 ${sketch.length} 个浪（其它周期画的浪按本周期K线显示），可继续画子浪`
+          : `● [${symbol} ${tfLabel}] K线就绪 (${bars.length} 根) · 选择上方画浪工具，在图上从起点开始依次点击各浪端点`) + srcNote + staleNote);
+      }
     } catch (err) {
+      if (seq !== loadSeq) return; // 已被新加载取代，旧的失败不得污染当前状态
       console.error('[Wave Load Error]:', err);
+      // 失败不沿用其它标的/周期的旧柱做评价；图上旧K线仅作历史展示
+      mainBarsMeta = { symbol, tf, entry: { bars: null, health: { usable: false, state: 'UNAVAILABLE', lastError: err && err.message }, t: Date.now() } };
+      if (window.DataHealthUI) window.DataHealthUI.fail('wave', err);
       setWaveStatus(`❌ 行情加载失败: ${err.message || '网络连接超时'}`);
     }
   }
@@ -991,13 +1134,14 @@ self.onmessage = function (e) {
     const badge = document.getElementById('wave-user-eval-badge');
     if (badge) { badge.className = 'card-badge badge-neutral'; badge.textContent = '评估中…'; }
 
-    let res = null, err = null, tried = false;
+    let res = null, err = null, tried = false, dataBlocked = false;
     try {
       res = await evaluateSketchClientSide(currentSymbol, drawings);
       tried = !!res;
     } catch (e) {
       tried = true;
       err = e.message;
+      dataBlocked = !!e.dataUnavailable;
     }
     if (!tried) {
       try {
@@ -1007,12 +1151,22 @@ self.onmessage = function (e) {
           signal: AbortSignal.timeout(60000)
         });
         const j = await r.json();
-        if (j && j.code === 0) res = j; else err = (j && j.error) || `HTTP ${r.status}`;
+        if (j && j.code === 0) res = j;
+        else {
+          dataBlocked = j && j.status === 'data_unavailable';
+          err = dataBlocked ? '数据过期或不可用，暂停当前研判' : ((j && j.error) || `HTTP ${r.status}`);
+        }
       } catch (e) { err = e.message || '网络连接超时'; }
     }
     if (token !== evalToken) return; // 评估期间画板已变化
     if (!res) {
+      // 评估失败/被健康门禁：先清掉旧结论——上一次的目标位/置信度不得
+      // 以当前结论继续显示，renderChart 也不得复活旧 prediction。
+      sketchEval = null;
+      selectedId = null;
+      renderChart();
       renderPanel(err);
+      if (dataBlocked && window.DataHealthUI) window.DataHealthUI.fail('wave', new Error(err));
       setWaveStatus(`❌ 评估失败：${err}`);
       return;
     }

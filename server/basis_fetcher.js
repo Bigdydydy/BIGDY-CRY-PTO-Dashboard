@@ -25,8 +25,14 @@ const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchFredSeries } = require('./macro_fetcher');
 const { callCoinglassEndpoint } = require('./cdri_fetcher');
+const { recordAttempt, recordSuccess, recordFailure, getSourceHealth } = require('./data_health');
+const { seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
+// Sidecar receipt file: the bare-array artifact itself carries no health
+// record, so a verified build persists its producer receipt alongside and a
+// cold start can restore an honest clock ONLY when it matches the array tail.
+const HEALTH_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.health.json');
 const SCHEMA_VERSION = 5;
 const HISTORY_START_TS = Date.UTC(2024, 0, 1, 8); // Spot ETF launch era (ETFs listed 2024-01-11)
 const SNAPSHOT_HOUR_UTC = 8;
@@ -366,6 +372,10 @@ async function fetchDeribitFundingHistory(startTs, endTs = Date.now()) {
   }
   const byTime = new Map();
   for (const r of rows) {
+    if (!r || !Number.isFinite(r.timestamp) || !Number.isFinite(r.interest_1h)
+        || !Number.isFinite(r.index_price) || r.index_price <= 0) {
+      throw new Error('Deribit funding row 校验失败 (timestamp/interest_1h/index_price 非法)');
+    }
     byTime.set(r.timestamp, { fundingTime: r.timestamp, fundingRate: r.interest_1h, indexPrice: r.index_price });
   }
   return [...byTime.values()].sort((a, b) => a.fundingTime - b.fundingTime);
@@ -491,10 +501,39 @@ async function fetchAndBuildHistoricalBasis(cachedSeries = null) {
   applyCarryMetrics(merged);
 
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    atomicWriteJson(CACHE_FILE, merged, 2);
     console.log(`[BasisFetcher] Archived ${merged.length} daily term-structure records (${resultSeries.length} re-derived) to ${CACHE_FILE}`);
   } catch (err) {
     console.warn('[BasisFetcher] Error persisting historical basis:', err.message);
+  }
+
+  // Real build completed: data-as-of is the LAST ACTUAL 08:00 UTC snapshot ts.
+  // A defaulted T-Bill lookup is an honest fallback issue, not "normal".
+  const issues = [];
+  if (tbillLookup.latest == null) issues.push('fred:DGS3MO 不可用，使用默认 T-Bill ' + DEFAULT_TBILL + '%');
+  recordSuccess('basis_history', {
+    dataAsOf: new Date(merged[merged.length - 1].timestamp).toISOString(),
+    asOfKind: 'source', source: 'deribit/basis-history', issues
+  });
+  // Persist the producer receipt in a sidecar file so a cold start can
+  // restore this build's honest clock (kept separate: the data file stays a
+  // bare array for backward compatibility).
+  try {
+    atomicWriteJson(HEALTH_FILE, {
+      dataHealth: {
+        sources: {
+          basis_history: {
+            dataAsOf: new Date(merged[merged.length - 1].timestamp).toISOString(),
+            lastSuccessAt: new Date().toISOString(),
+            asOfKind: 'source',
+            source: 'deribit/basis-history',
+            issues
+          }
+        }
+      }
+    }, 0);
+  } catch (e) {
+    console.warn('[BasisFetcher] failed to persist health sidecar:', e.message);
   }
 
   inMemoryCache = merged;
@@ -511,54 +550,74 @@ const LIVE_TTL_MS = 60 * 1000;
 
 async function fetchLiveCurve(tbill) {
   const now = Date.now();
+  // A TTL cache hit must not advance basis_live — no attempt, no success.
   if (liveCache && now - liveCacheTime < LIVE_TTL_MS) {
     return { ...liveCache, tbill: round(tbill), ...rebaseOnTbill(liveCache, tbill) };
   }
-  const [book, funding, cgFunding] = await Promise.all([
-    deribitGet('get_book_summary_by_currency', { currency: 'BTC', kind: 'future' }),
-    fetchDeribitFundingHistory(now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, now),
-    fetchCoinglassOiFundingSafe()
-  ]);
+  recordAttempt('basis_live', { now: Date.now() });
+  try {
+    const [book, funding, cgFunding] = await Promise.all([
+      deribitGet('get_book_summary_by_currency', { currency: 'BTC', kind: 'future' }),
+      fetchDeribitFundingHistory(now - (FUNDING_WINDOW_DAYS + 1) * DAY_MS, now),
+      fetchCoinglassOiFundingSafe()
+    ]);
 
-  const [q1Expiry, q2Expiry] = getQuarterExpiries(new Date(now));
-  const byName = new Map(book.map(b => [b.instrument_name, b]));
-  const cq = byName.get(deribitFutureName(q1Expiry.getTime()));
-  const nq = byName.get(deribitFutureName(q2Expiry.getTime()));
-  const perp = byName.get('BTC-PERPETUAL');
-  const indexPrice = Number(perp?.estimated_delivery_price || cq?.estimated_delivery_price);
-  if (!cq || !nq || !(indexPrice > 0)) throw new Error('Deribit live curve incomplete');
+    const [q1Expiry, q2Expiry] = getQuarterExpiries(new Date(now));
+    const byName = new Map(book.map(b => [b.instrument_name, b]));
+    const cq = byName.get(deribitFutureName(q1Expiry.getTime()));
+    const nq = byName.get(deribitFutureName(q2Expiry.getTime()));
+    const perp = byName.get('BTC-PERPETUAL');
+    const indexPrice = Number(perp?.estimated_delivery_price || cq?.estimated_delivery_price);
+    // Future/Infinity mark/index values are invalid — finite positive only.
+    if (!cq || !nq || !Number.isFinite(indexPrice) || !(indexPrice > 0)) {
+      throw new Error('Deribit live curve incomplete');
+    }
+    if (![cq.mark_price, nq.mark_price].every(v => Number.isFinite(Number(v)) && Number(v) > 0)) {
+      throw new Error('Deribit live curve: cq/nq mark_price 非法');
+    }
+    if (perp && perp.funding_8h != null && !Number.isFinite(Number(perp.funding_8h))) {
+      throw new Error('Deribit live curve: funding_8h 非有限数');
+    }
 
-  const point = buildCurvePoint({
-    timestamp: now,
-    indexPrice,
-    cqPrice: Number(cq.mark_price),
-    nqPrice: Number(nq.mark_price),
-    cqExpiryTs: q1Expiry.getTime(),
-    nqExpiryTs: q2Expiry.getTime(),
-    ...resolveFunding(now, cgFunding, funding),
-    tbill
-  });
-  // Rate accruing in the current, not yet settled 8h period (market-wide when available)
-  const openBar = cgFunding && cgFunding[cgFunding.length - 1];
-  if (point.fundingSource === 'coinglass_oi' && openBar && openBar.fundingTime > now) {
-    point.predictedFundingApr = round(openBar.fundingRate * 3 * 365 * 100);
-  } else if (perp?.funding_8h != null) {
-    point.predictedFundingApr = round(Number(perp.funding_8h) * 3 * 365 * 100);
+    const point = buildCurvePoint({
+      timestamp: now,
+      indexPrice,
+      cqPrice: Number(cq.mark_price),
+      nqPrice: Number(nq.mark_price),
+      cqExpiryTs: q1Expiry.getTime(),
+      nqExpiryTs: q2Expiry.getTime(),
+      ...resolveFunding(now, cgFunding, funding),
+      tbill
+    });
+    // Rate accruing in the current, not yet settled 8h period (market-wide when available)
+    const openBar = cgFunding && cgFunding[cgFunding.length - 1];
+    if (point.fundingSource === 'coinglass_oi' && openBar && openBar.fundingTime > now) {
+      point.predictedFundingApr = round(openBar.fundingRate * 3 * 365 * 100);
+    } else if (perp?.funding_8h != null) {
+      point.predictedFundingApr = round(Number(perp.funding_8h) * 3 * 365 * 100);
+    }
+    point.contracts = [[cq, q1Expiry], [nq, q2Expiry]].map(([b, exp]) => {
+      const days = (exp.getTime() - now) / DAY_MS;
+      return {
+        instrument: b.instrument_name,
+        expiryDate: exp.toISOString().slice(0, 10),
+        daysToExpiry: round(days, 2),
+        markPrice: Number(b.mark_price),
+        basisAPR: round((b.mark_price - indexPrice) / indexPrice * 365 / days * 100)
+      };
+    });
+    point.isLive = true;
+    liveCache = point;
+    liveCacheTime = now;
+    // Real upstream completion; the live snapshot's data-as-of is the receipt.
+    recordSuccess('basis_live', {
+      dataAsOf: new Date(now).toISOString(), asOfKind: 'received', source: 'deribit/basis-live'
+    });
+    return point;
+  } catch (err) {
+    recordFailure('basis_live', err);
+    throw err;
   }
-  point.contracts = [[cq, q1Expiry], [nq, q2Expiry]].map(([b, exp]) => {
-    const days = (exp.getTime() - now) / DAY_MS;
-    return {
-      instrument: b.instrument_name,
-      expiryDate: exp.toISOString().slice(0, 10),
-      daysToExpiry: round(days, 2),
-      markPrice: Number(b.mark_price),
-      basisAPR: round((b.mark_price - indexPrice) / indexPrice * 365 / days * 100)
-    };
-  });
-  point.isLive = true;
-  liveCache = point;
-  liveCacheTime = now;
-  return point;
 }
 
 function rebaseOnTbill(point, tbill) {
@@ -624,16 +683,72 @@ function getBasisFetchStatus(series = inMemoryCache) {
  * published daily snapshot; once a new 08:00 UTC snapshot is due, Deribit is queried again
  * (throttled to one attempt per RETRY_INTERVAL_MS while it keeps failing).
  */
+/** Read + validate the sidecar receipt: it only counts when its dataAsOf
+ * exactly matches the array's latest snapshot timestamp — a stale sidecar
+ * must never rejuvenate a rolled-back artifact. */
+function readHealthSidecar(latestTs) {
+  try {
+    if (!fs.existsSync(HEALTH_FILE)) return null;
+    const json = JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8'));
+    const rec = json && json.dataHealth && json.dataHealth.sources
+      ? json.dataHealth.sources.basis_history : null;
+    if (!rec || !rec.dataAsOf || !rec.lastSuccessAt) return null;
+    if (Date.parse(rec.dataAsOf) !== latestTs) return null;
+    return json;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Seed honest disk clocks once: last REAL snapshot ts as data-as-of; a
+ * matching sidecar receipt restores the producer clock, otherwise the record
+ * stays UNKNOWN (legacy bare arrays have no trustworthy receipt). */
+let diskSeeded = false;
+function seedDiskOnce(series) {
+  if (diskSeeded || !Array.isArray(series) || !series.length) return;
+  diskSeeded = true;
+  const latestTs = series[series.length - 1].timestamp;
+  const sidecar = readHealthSidecar(latestTs);
+  if (sidecar) {
+    seedCachedHealth(sidecar, 'basis_history', {});
+  } else {
+    seedCachedHealth({ dataHealth: null }, 'basis_history', {
+      dataAsOf: new Date(latestTs).toISOString(),
+      lastSuccessAt: fetchStatus.lastSuccessAt ? new Date(fetchStatus.lastSuccessAt).toISOString() : null
+    });
+  }
+}
+
 async function getHistoricalBasisData(forceRefresh = false) {
   const now = Date.now();
 
   if (!forceRefresh) {
     if (!inMemoryCache) inMemoryCache = readDiskCache();
-    if (inMemoryCache && hasLatestSnapshot(inMemoryCache, now)) return inMemoryCache;
+    if (inMemoryCache) seedDiskOnce(inMemoryCache);
+    if (inMemoryCache && hasLatestSnapshot(inMemoryCache, now)) {
+      // The artifact is current but its receipt is unverified (e.g. a bare
+      // legacy array with no sidecar). Schedule ONE throttled real
+      // verification through the normal incremental-build path — it goes
+      // through the existing Deribit queue and records an honest receipt on
+      // success. The data stays servable meanwhile.
+      const h = getSourceHealth('basis_history', now);
+      if (!h.lastSuccessAt && now - fetchStatus.lastAttemptAt >= RETRY_INTERVAL_MS) {
+        fetchStatus.lastAttemptAt = now;
+        recordAttempt('basis_history', { now });
+        fetchAndBuildHistoricalBasis(inMemoryCache)
+          .then(() => { fetchStatus.lastSuccessAt = Date.now(); fetchStatus.lastError = null; })
+          .catch(e => {
+            fetchStatus.lastError = e.message;
+            recordFailure('basis_history', e);
+          });
+      }
+      return inMemoryCache;
+    }
     if (inMemoryCache && now - fetchStatus.lastAttemptAt < RETRY_INTERVAL_MS) return inMemoryCache;
   }
 
   fetchStatus.lastAttemptAt = now;
+  recordAttempt('basis_history', { now: Date.now() });
   try {
     const series = await fetchAndBuildHistoricalBasis(forceRefresh ? null : (inMemoryCache || readDiskCache()));
     fetchStatus.lastSuccessAt = Date.now();
@@ -641,6 +756,7 @@ async function getHistoricalBasisData(forceRefresh = false) {
     return series;
   } catch (err) {
     fetchStatus.lastError = err.message;
+    recordFailure('basis_history', err);
     console.error('[BasisFetcher] Network fetch failed, serving cached history:', err.message);
     const fallback = inMemoryCache || readDiskCache();
     if (fallback) {
