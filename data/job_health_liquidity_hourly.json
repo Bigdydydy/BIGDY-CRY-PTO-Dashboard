@@ -1,0 +1,17 @@
+{
+  "id": "liquidity_hourly",
+  "status": "ok",
+  "lastAttemptAt": "2026-10-19T05:00:47.780Z",
+  "lastSuccessAt": "2026-10-19T05:01:18.518Z",
+  "lastError": null,
+  "steps": {
+    "samples": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-19T05:01:18.516Z",
+      "lastSuccessAt": "2026-10-19T05:01:18.516Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-19T05:00:00.000Z",
+      "verifiedSkip": false
+    }
+  }
+}
