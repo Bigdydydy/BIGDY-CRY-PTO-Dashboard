@@ -7,8 +7,8 @@
 //   2. 除以该场所自身前 n 根平均成交量 → 相对压力。持续刷量只抬高基线、不制造信号；
 //      各场所成交量单位 (币 / 张 / 美元) 不同也不影响，因为只和自己比
 //   3. 同格两个场所按"盘口深度占比"加权 (Pine 读不到订单簿，用输入值；仪表盘里是实时 ±10bps 深度)
-//   柱 = |期货| − |现货|  (红 = 期货主导，绿 = 现货主导)
-//   点 = |亚太| − |欧美|  (红 = 亚太主导，绿 = 欧美主导)
+//   柱 = |现货| − |期货|  (绿柱向上 = 现货主导，红柱向下 = 期货主导)
+//   点 = |欧美| vs |亚太| (绿点画在上方 = 欧美主导，红点画在下方 = 亚太主导)
 //
 // 用法: TradingView → Pine 编辑器 → 新建 → 粘贴本文件 → 添加到图表 (建议在 COINBASE:BTCUSD 上使用)
 
@@ -95,9 +95,11 @@ float premRawMa = ta.sma(premRaw, len)[1]   // 每根都计算，避免在条件
 float premDev = na(premUsd) ? premRaw - premRawMa : premUsd
 
 // ── 绘图 ────────────────────────────────────────────────────────────────────
-plot(hist, "柱: |期货| − |现货|", style = plot.style_columns, color = hist > 0 ? colFut : colSpot)
+// hist / region 内部仍是 |期货|−|现货|、|亚太|−|欧美| (警报口径不变)，画图时翻转方向
+plot(-hist, "柱: |现货| − |期货|", style = plot.style_columns, color = hist > 0 ? colFut : colSpot)
 hline(0, "零轴", color = color.new(color.gray, 50), linestyle = hline.style_solid)
-plotshape(not na(region), "点: |亚太| − |欧美|", style = shape.circle, location = location.bottom, size = size.tiny, color = region > 0 ? colAsia : colWest)
+plotshape(region < 0, "点: 欧美主导 (上)", style = shape.circle, location = location.top, size = size.tiny, color = colWest)
+plotshape(region > 0, "点: 亚太主导 (下)", style = shape.circle, location = location.bottom, size = size.tiny, color = colAsia)
 plot(showPrem ? premDev / 10 : na, "Coinbase 溢价 (bps ÷ 10)", color = #38bdf8, linewidth = 1)
 
 // 数据窗口里显示四象限原值
