@@ -597,18 +597,38 @@ describe('Module 8: 柳玉冬波浪理论智能研判引擎 (Liu Yudong Wave The
     assert.strictEqual(res.decisiveness.level, 'HIGH', '单一方案决断度应为HIGH');
   });
 
-  it('同级别比例硬规则: 第4段用时不得少于第3段的8% (L4)', () => {
+  it('同级别比例 (L4，非手稿规则): 评估时只作指引不否决；自动计数搜索仍据此剪枝', () => {
     const bad = evaluatePattern('IMPULSE', [
       P(0, 100, 'low'), P(50, 200, 'high'), P(60, 160, 'low'),
       P(160, 400, 'high'), P(161, 350, 'low'), P(200, 500, 'high')
     ], null);
-    assert.ok(bad.hardFails.some(f => f.id === 'L4'), '浪4仅1根vs浪3共100根应触发L4否决');
+    assert.ok(!bad.hardFails.some(f => f.id === 'L4'), 'L4 不再作为铁律否决');
+    const c = bad.checks.find(x => x.id === 'L4');
+    assert.ok(c && c.pass === false && !c.hard, '浪4仅1根vs浪3共100根：L4 指引不通过');
+    assert.ok(PATTERNS.IMPULSE.rules.find(r => r.id === 'L4').prune, '自动计数搜索按 L4 剪枝');
 
     const ok = evaluatePattern('IMPULSE', [
       P(0, 100, 'low'), P(50, 200, 'high'), P(60, 160, 'low'),
       P(160, 400, 'high'), P(180, 350, 'low'), P(200, 500, 'high')
     ], null);
-    assert.ok(!ok.hardFails.some(f => f.id === 'L4'), '浪4共20根(20%)不应触发L4');
+    assert.ok(ok.checks.find(x => x.id === 'L4').pass, '浪4共20根(20%)通过L4');
+  });
+
+  it('手稿规则核对: W8 / X4 / T2 / T14 按原文（P348-349 / P263 / P264）', () => {
+    const hard = (type, pts) => evaluatePattern(type, pts, null).hardFails.map(f => f.id);
+    // W8: y 价格、时间都超过 x，但不到 5 倍 → 合规 (原先误判)；都超过 5 倍才违规
+    assert.ok(!hard('DOUBLE_ZIGZAG', [P(0, 100, 'high'), P(10, 80, 'low'), P(20, 96, 'high'), P(35, 65, 'low')]).includes('W8'));
+    assert.ok(hard('DOUBLE_ZIGZAG', [P(0, 100, 'high'), P(10, 80, 'low'), P(12, 84, 'high'), P(25, 60, 'low')]).includes('W8'));
+    // W9: y 价格必须大于 x
+    assert.ok(hard('DOUBLE_ZIGZAG', [P(0, 100, 'high'), P(10, 80, 'low'), P(20, 98, 'high'), P(30, 81, 'low')]).includes('W9'));
+    // X4: z 价格必须 ≥ xx
+    assert.ok(hard('TRIPLE_ZIGZAG', [P(0, 100, 'high'), P(10, 80, 'low'), P(15, 90, 'high'), P(25, 70, 'low'), P(30, 78, 'high'), P(35, 74, 'low')]).includes('X4'));
+    // T2: 三角形 b = 1.8a 合规 (上限是 2 倍，原先误写 1.5 倍)
+    const tri = [P(0, 100, 'high'), P(10, 80, 'low'), P(20, 116, 'high'), P(30, 90, 'low'), P(40, 110, 'high'), P(50, 98, 'low')];
+    assert.deepStrictEqual(hard('TRIANGLE', tri), []);
+    // T14: e 浪时间上限是 c 浪的 4 倍 (原先误写为 d 浪)
+    const triT = [P(0, 100, 'high'), P(10, 80, 'low'), P(20, 116, 'high'), P(22, 90, 'low'), P(32, 110, 'high'), P(41, 98, 'low')];
+    assert.ok(hard('TRIANGLE', triT).includes('T14'));
   });
 
   it('未评估指引按中性计分: 发展中计数 guide.weight 覆盖全部软规则', () => {
