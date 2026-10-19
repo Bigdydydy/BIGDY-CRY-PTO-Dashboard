@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateLegPnLBTC, calculatePortfolioPnLBTC, generatePnLCurve, parseInstrument, legTheo, evaluatePortfolio, generatePnLView, impliedCarry, MS_PER_DAY } = require('../public/pnl_engine.js');
+const { calculateLegPnLBTC, calculatePortfolioPnLBTC, generatePnLCurve, parseInstrument, legTheo, tailProfile, evaluatePortfolio, generatePnLView, impliedCarry, MS_PER_DAY } = require('../public/pnl_engine.js');
 
 test('Single Long Call PnL in BTC standard', () => {
   const leg = { instrument: 'BTC-26DEC26-80000-C', strike: 80000, price: 0.05, amount: 10, direction: 'buy', isCall: true };
@@ -43,7 +43,7 @@ test('Bull Call Spread PnL Curve & Breakeven Point', () => {
   assert.ok(res.breakevens[0] > 80000 && res.breakevens[0] < 90000);
 });
 
-test('Iron Condor 4-leg bounded payoff profile', () => {
+test('Iron Condor 4-leg payoff profile (USD capped, BTC put tail unbounded as S -> 0)', () => {
   const legs = [
     { instrument: 'BTC-26DEC26-70000-P', strike: 70000, price: 0.01, amount: 20, direction: 'buy', isCall: false },
     { instrument: 'BTC-26DEC26-75000-P', strike: 75000, price: 0.03, amount: 20, direction: 'sell', isCall: false },
@@ -53,10 +53,42 @@ test('Iron Condor 4-leg bounded payoff profile', () => {
   const res = generatePnLCurve(legs, 82000);
   assert.ok(res.initialCashFlowBTC > 0); // Net credit collector (+0.8 BTC)
   assert.equal(res.isProfitCapped, true);
-  assert.equal(res.isLossCapped, true);
+  // In BTC standard, 1:1 put spread has net negative strike notional (20*70k - 20*75k = -$100k):
+  // as S -> 0, -$100k / S -> -∞ BTC, so BTC loss is unbounded.
+  assert.equal(res.isLossCapped, false);
+  // In USD standard, loss is capped:
+  assert.equal(res.usd.isLossCapped, true);
+  assert.equal(res.usd.isProfitCapped, false, 'Net credit in BTC means USD profit diverges as S -> inf');
   // Breakevens detected
   assert.ok(res.breakevens.length >= 2);
   assert.ok(res.breakevens.includes(72116) || res.breakevens.some(b => Math.abs(b - 72116) < 100));
+});
+
+test('Bull Put Spread (Counterexample 1): netPutContracts = 0 but BTC loss diverges as S -> 0', () => {
+  const legs = [
+    { instrument: 'BTC-26DEC26-80000-P', strike: 80000, price: 0.03, amount: 1, direction: 'buy', isCall: false },
+    { instrument: 'BTC-26DEC26-100000-P', strike: 100000, price: 0.08, amount: 1, direction: 'sell', isCall: false }
+  ];
+  const res = generatePnLCurve(legs, 90000);
+  // Net contract count is 0 (+1 - 1 = 0), but strike-weighted USD is -20k
+  assert.equal(res.netPutContracts, 0);
+  assert.equal(res.netPutStrikeUsd, -20000);
+  assert.equal(res.isLossCapped, false, 'BTC loss diverges as S -> 0+');
+  assert.equal(res.usd.isLossCapped, true, 'USD loss is capped');
+});
+
+test('Notional-balanced 1x2 Put Ratio (Counterexample 2): sum(q*K) = 0 caps BTC payoff as S -> 0', () => {
+  const legs = [
+    { instrument: 'BTC-26DEC26-50000-P', strike: 50000, price: 0.01, amount: 2, direction: 'buy', isCall: false },
+    { instrument: 'BTC-26DEC26-100000-P', strike: 100000, price: 0.04, amount: 1, direction: 'sell', isCall: false }
+  ];
+  const res = generatePnLCurve(legs, 80000);
+  // 2 * 50k - 1 * 100k = 0
+  assert.equal(res.netPutStrikeUsd, 0);
+  assert.equal(res.isProfitCapped, true, 'BTC profit is capped because 1/S term cancels');
+  assert.equal(res.isLossCapped, true, 'BTC loss is capped');
+  // Exact S -> 0 limit: -sum(q) - sum(q*P) = -(2 - 1) - (2*0.01 - 1*0.04) = -1 - (-0.02) = -0.98 BTC
+  assert.equal(Math.round(res.pnlAtZero * 100) / 100, -0.98);
 });
 
 test('Bear Put Spread Payoff (BTC Standard)', () => {
@@ -207,3 +239,32 @@ test('PnL HTML Modal Decoupling & Structure Integrity', () => {
   assert.ok(tradeModalIdx > 0 && tradeModalCloseIdx > tradeModalIdx);
   assert.ok(pnlModalIdx > tradeModalCloseIdx, 'pnl-modal-backdrop must be strictly separated and declared outside trade-modal-backdrop');
 });
+
+test('legTheo: theta incorporates basis convergence carry decay (-carry * F * delta / 365)', () => {
+  const now = Date.UTC(2026, 0, 1, 8);
+  const expiryMs = now + 180 * MS_PER_DAY;
+  // With 0 carry (F = S)
+  const theoFlat = legTheo({ strike: 100000, isCall: true, iv: 50, expiryMs, carry: 0 }, 100000, now);
+  // With positive contango carry = 10% annual
+  const theoContango = legTheo({ strike: 100000, isCall: true, iv: 50, expiryMs, carry: 0.10 }, 100000, now);
+  assert.ok(theoContango.thetaUsd !== theoFlat.thetaUsd, 'Contango carry basis convergence should adjust total theta');
+  // For long call with positive delta and positive carry, carry drift adds negative theta decay
+  assert.ok(theoContango.thetaUsd < theoFlat.thetaUsd, 'Long call in contango suffers negative basis convergence drag');
+});
+
+test('tailProfile: calendar spread applies forward discount to unexpired distant puts at evalMs', () => {
+  const now = Date.UTC(2026, 0, 1, 8);
+  const nearExpiryMs = now + 30 * MS_PER_DAY;
+  const farExpiryMs = now + 90 * MS_PER_DAY;
+  const legs = [
+    { instrument: 'BTC-31JAN26-80000-P', strike: 80000, isCall: false, price: 0.05, amount: 1, direction: 'sell', expiryMs: nearExpiryMs, carry: 0.10 },
+    { instrument: 'BTC-31MAR26-80000-P', strike: 80000, isCall: false, price: 0.08, amount: 1, direction: 'buy', expiryMs: farExpiryMs, carry: 0.10 }
+  ];
+  // Evaluated at near expiry
+  const tailAtNear = tailProfile(legs, nearExpiryMs);
+  assert.ok(tailAtNear);
+  // Distant put has remaining 60 days of carry discount, so effective strike < 80000
+  // Hence netPutStrikeUsd < 0 at S -> 0
+  assert.ok(tailAtNear.netPutStrikeUsd < 0, 'Distant put effective strike discounted by basis carry');
+});
+

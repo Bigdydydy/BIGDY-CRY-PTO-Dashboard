@@ -693,13 +693,15 @@ describe('Phase 2-C: Cross-sectional term structure curve', () => {
     const book = [
       { instrument_name: 'BTC-PERPETUAL', mark_price: 80000 },
       { instrument_name: 'BTC-23OCT26', mark_price: 80100 }, // weekly: excluded
-      { instrument_name: 'BTC-30OCT26', mark_price: 80300, open_interest: 12000000, volume_usd: 5000000 }, // monthly (13D)
-      { instrument_name: 'BTC-25DEC26', mark_price: 81200, open_interest: 90000000, volume_usd: 30000000 } // quarterly (69D)
+      { instrument_name: 'BTC-30OCT26', mark_price: 80300, open_interest: 150, volume_usd: 5000000 }, // monthly (13D), 150 BTC * $80,000 = $12,000,000
+      { instrument_name: 'BTC-25DEC26', mark_price: 81200, open_interest: 1125, volume_usd: 30000000 } // quarterly (69D), 1125 BTC * $80,000 = $90,000,000
     ];
     const pts = extractLiveCurvePoints(book, now, 80000);
     assert.deepEqual(pts.map(p => p.name), ['BTC-30OCT26', 'BTC-25DEC26']);
     assert.equal(Math.round(pts[0].days), 13);
     assert.equal(Math.round(pts[1].days), 69);
+    assert.equal(pts[0].oiUsd, 12000000, 'open_interest in BTC must be multiplied by index price to get oiUsd');
+    assert.equal(pts[1].oiUsd, 90000000);
   });
 
   test('aprAtTenor interpolates inside range and snaps within boundary tolerance', () => {
@@ -1671,4 +1673,90 @@ describe('Module 4: 大宗交易开平仓推断与末日 0DTE 行为分类引擎
     });
   });
 });
+
+describe('Module 9: Derivative Strategy Identification & Pricing Calibration (Medium-Priority Fixes)', () => {
+  test('calcGreeks defaults to Black-76 (r=0) and supports custom forward F and rate r', () => {
+    // Spot 100k, Strike 100k, 1 year, 50% IV, Call
+    const greeksB76 = calcGreeks(100000, 100000, 1.0, 50, true);
+    assert.ok(greeksB76.delta > 0.5 && greeksB76.delta < 0.7);
+    assert.ok(greeksB76.gamma > 0);
+    assert.ok(greeksB76.vega > 0);
+    assert.ok(greeksB76.theta < 0);
+
+    // Forward premium F = 105k (contango)
+    const greeksFwd = calcGreeks(100000, 100000, 1.0, 50, true, 0, 105000);
+    assert.ok(greeksFwd.delta > greeksB76.delta, 'Higher forward gives higher Call delta');
+  });
+
+  test('identifyInstitutionalStrategy: 1-leg inverse breakeven & extreme payoff divergence', () => {
+    // 1-leg Call: Buy 1 BTC-100000-C at 0.05 BTC
+    const callTrade = [{
+      instrument: 'BTC-25DEC26-100000-C',
+      amount: 1,
+      price: 0.05,
+      direction: 'buy',
+      strike: 100000,
+      expiryStr: '25DEC26',
+      indexPrice: 100000
+    }];
+    const callStrat = identifyInstitutionalStrategy(callTrade, 0, 0, 0, 100000);
+    assert.equal(callStrat.strategyType, 'LONG_CALL');
+    // Deribit inverse Call breakeven: K / (1 - P) = 100000 / (1 - 0.05) = 105,263.16
+    assert.ok(callStrat.riskProfile.breakEven.includes('105,263'));
+
+    // 1-leg Put: Buy 1 BTC-80000-P at 0.04 BTC
+    const putTrade = [{
+      instrument: 'BTC-25DEC26-80000-P',
+      amount: 1,
+      price: 0.04,
+      direction: 'buy',
+      strike: 80000,
+      expiryStr: '25DEC26',
+      indexPrice: 85000
+    }];
+    const putStrat = identifyInstitutionalStrategy(putTrade, 0, 0, 0, 85000);
+    assert.equal(putStrat.strategyType, 'LONG_PUT');
+    // Deribit inverse Put breakeven: K / (1 + P) = 80000 / (1 + 0.04) = 76,923.08
+    assert.ok(putStrat.riskProfile.breakEven.includes('76,923'));
+    // Maximum payoff in BTC diverges as S -> 0
+    assert.ok(putStrat.riskProfile.maxProfit.includes('+∞ BTC'));
+    assert.ok(putStrat.riskProfile.maxProfit.includes('$80,000'));
+  });
+
+  test('identifyInstitutionalStrategy: 2-leg ratio validation & inverse vertical spread payoff', () => {
+    // Bull Call Spread 1:1: Buy 80k Call (0.15 BTC), Sell 100k Call (0.05 BTC)
+    const bcsTrades = [
+      { instrument: 'BTC-25DEC26-80000-C', amount: 10, price: 0.15, direction: 'buy', strike: 80000, expiryStr: '25DEC26', indexPrice: 85000 },
+      { instrument: 'BTC-25DEC26-100000-C', amount: 10, price: 0.05, direction: 'sell', strike: 100000, expiryStr: '25DEC26', indexPrice: 85000 }
+    ];
+    const bcsStrat = identifyInstitutionalStrategy(bcsTrades, 0, 0, 0, 850000);
+    assert.equal(bcsStrat.strategyType, 'BULL_CALL_SPREAD');
+    // Net debit BTC = 0.15 - 0.05 = 0.10 BTC per contract
+    // Exact BTC max profit at K2 (100k): ((100k - 80k)/100k - 0.10) * 10 = (0.20 - 0.10) * 10 = 1.00 BTC
+    assert.ok(bcsStrat.riskProfile.maxProfit.includes('1.00 BTC'));
+    // Inverse breakeven: K1 / (1 - netDebitBTC) = 80000 / (1 - 0.10) = 88,888.89 -> 88,889
+    assert.ok(bcsStrat.riskProfile.breakEven.includes('88,889'));
+
+    // Non-symmetric 1x3 trade should NOT be misclassified as standard 1:1 Bull Call Spread
+    const asymmetricTrades = [
+      { instrument: 'BTC-25DEC26-80000-C', amount: 10, price: 0.15, direction: 'buy', strike: 80000, expiryStr: '25DEC26', indexPrice: 85000 },
+      { instrument: 'BTC-25DEC26-100000-C', amount: 30, price: 0.05, direction: 'sell', strike: 100000, expiryStr: '25DEC26', indexPrice: 85000 }
+    ];
+    const asymStrat = identifyInstitutionalStrategy(asymmetricTrades, 0, 0, 0, 850000);
+    assert.notEqual(asymStrat.strategyType, 'BULL_CALL_SPREAD');
+  });
+
+  test('analyzeBlockTrades: sentiment weighting uses net Delta USD instead of raw gross notionals', () => {
+    // Bull Call Spread: Buy 80k Call (higher Delta), Sell 100k Call (lower Delta)
+    const now = Date.now();
+    const trades = [
+      { block_trade_id: 'block1', trade_id: 101, instrument_name: 'BTC-25DEC26-80000-C', amount: 10, price: 0.15, direction: 'buy', index_price: 85000, timestamp: now },
+      { block_trade_id: 'block1', trade_id: 102, instrument_name: 'BTC-25DEC26-100000-C', amount: 10, price: 0.05, direction: 'sell', index_price: 85000, timestamp: now }
+    ];
+    const res = analyzeBlockTrades(trades, 1000, 'all', 85000);
+    // Because low-strike long call has larger delta than high-strike short call, net delta is positive (bullish)
+    assert.ok(res.bullRatio > 50, 'Bull call spread should reflect net bullish delta sentiment (>50%)');
+  });
+});
+
 

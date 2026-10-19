@@ -398,6 +398,13 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
     const A = mean([cell.futAsia, cell.spotAsia]);
     const W = mean([cell.futWest, cell.spotWest]);
 
+    // Absolute activity intensities for dominance comparisons (avoids cancellation of hedging/arbitrage flows)
+    const absVal = x => (x !== null && !isNaN(x) ? Math.abs(x) : null);
+    const futStrength = mean([absVal(cell.futAsia), absVal(cell.futWest)]);
+    const spotStrength = mean([absVal(cell.spotAsia), absVal(cell.spotWest)]);
+    const asiaStrength = mean([absVal(cell.futAsia), absVal(cell.spotAsia)]);
+    const westStrength = mean([absVal(cell.futWest), absVal(cell.spotWest)]);
+
     const px = k => (pressures[k] && pressures[k].get(t) ? pressures[k].get(t).c : null);
     const bnS = px('bnSpot') || px('okxSpot');
     const us = px('usSpot');
@@ -415,8 +422,8 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
       futAsia: round(cell.futAsia), futWest: round(cell.futWest),
       spotAsia: round(cell.spotAsia), spotWest: round(cell.spotWest),
       fut: round(F), spot: round(S), asia: round(A), west: round(W),
-      hist: round(Math.abs(F) - Math.abs(S)),
-      region: A !== null && W !== null ? round(Math.abs(A) - Math.abs(W)) : null,
+      hist: futStrength !== null && spotStrength !== null ? round(futStrength - spotStrength) : null,
+      region: asiaStrength !== null && westStrength !== null ? round(asiaStrength - westStrength) : null,
       // Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1，两边都换成美元后再比
       usPremiumBps,
       // 未换汇的原始价差 = 真实溢价 + USDT 相对美元的折溢价

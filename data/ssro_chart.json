@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-10-17T11:16:35.913Z",
+  "updatedAt": "2026-10-19T11:33:16.750Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
-    "date": "2026-10-17",
-    "btcPrice": 81652.38,
-    "stableCap": 309943903773,
-    "stableCapBillions": "309.94",
-    "ssr": 5.29,
-    "ssro200": 1.104,
-    "ssro50": -0.351,
+    "date": "2026-10-19",
+    "btcPrice": 82154.64,
+    "stableCap": 310014869655,
+    "stableCapBillions": "310.01",
+    "ssr": 5.322,
+    "ssro200": 1.139,
+    "ssro50": -0.236,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.004178366696837817,
-      "priceUsd": 309943903773
+      "change24h": 0.00891352660245441,
+      "priceUsd": 310014869655
     },
     "quantEvaluation": {
-      "zScore": 1.104,
+      "zScore": 1.139,
       "zone": "moderately_overbought",
       "label": "偏热警戒 (买力消耗)",
       "colorClass": "text-amber",
@@ -25,9 +25,9 @@
     }
   },
   "summary": {
-    "totalDays": 2116,
+    "totalDays": 2118,
     "startDate": "2021-01-01",
-    "endDate": "2026-10-17",
+    "endDate": "2026-10-19",
     "minSsro200": -3.193,
     "maxSsro200": 4.112
   },
@@ -29644,17 +29644,137 @@
     },
     {
       "date": "2026-10-17",
-      "btcPrice": 81652.38,
-      "stableCap": 309943903773,
-      "ssr": 5.29,
-      "ssro200": 1.104,
-      "sma200": 4.734,
+      "btcPrice": 81491.04,
+      "stableCap": 304867336372,
+      "ssr": 5.368,
+      "ssro200": 1.256,
+      "sma200": 4.735,
       "stdev200": 0.504,
-      "upper2_200": 5.741,
-      "lower2_200": 3.727,
-      "ssro50": -0.351,
-      "sma50": 5.356,
+      "upper2_200": 5.743,
+      "lower2_200": 3.726,
+      "ssro50": 0.055,
+      "sma50": 5.357,
       "stdev50": 0.187
+    },
+    {
+      "date": "2026-10-18",
+      "btcPrice": 82116,
+      "stableCap": 304652950740,
+      "ssr": 5.413,
+      "ssro200": 1.331,
+      "sma200": 4.74,
+      "stdev200": 0.506,
+      "upper2_200": 5.751,
+      "lower2_200": 3.728,
+      "ssro50": 0.275,
+      "sma50": 5.362,
+      "stdev50": 0.185
+    },
+    {
+      "date": "2026-10-19",
+      "btcPrice": 82154.64,
+      "stableCap": 310014869655,
+      "ssr": 5.322,
+      "ssro200": 1.139,
+      "sma200": 4.745,
+      "stdev200": 0.507,
+      "upper2_200": 5.758,
+      "lower2_200": 3.731,
+      "ssro50": -0.236,
+      "sma50": 5.365,
+      "stdev50": 0.183
     }
-  ]
+  ],
+  "dataHealth": {
+    "state": "OK",
+    "analysisAllowed": true,
+    "stale": false,
+    "sources": {
+      "ssro": {
+        "id": "ssro",
+        "observed": true,
+        "state": "OK",
+        "freshnessStatus": "FRESH",
+        "usable": true,
+        "stale": false,
+        "expired": false,
+        "ageMs": 0,
+        "dataAgeMs": 41596751,
+        "warnings": [],
+        "policy": {
+          "fetchWarnMs": 1800000,
+          "fetchBlockMs": 21600000,
+          "dataWarnMs": 259200000,
+          "dataBlockMs": 604800000
+        },
+        "lastAttemptAt": "2026-10-19T11:33:16.751Z",
+        "lastSuccessAt": "2026-10-19T11:33:16.751Z",
+        "dataAsOf": "2026-10-19T00:00:00.000Z",
+        "asOfKind": "source",
+        "source": "ssro/build",
+        "lastError": null,
+        "consecutiveFailures": 0,
+        "issues": [],
+        "available": true
+      },
+      "ssro_stable": {
+        "id": "ssro_stable",
+        "observed": true,
+        "state": "OK",
+        "freshnessStatus": "FRESH",
+        "usable": true,
+        "stale": false,
+        "expired": false,
+        "ageMs": 128,
+        "dataAgeMs": 41596751,
+        "warnings": [],
+        "policy": {
+          "fetchWarnMs": 1800000,
+          "fetchBlockMs": 21600000,
+          "dataWarnMs": 259200000,
+          "dataBlockMs": 604800000
+        },
+        "lastAttemptAt": "2026-10-19T11:33:16.623Z",
+        "lastSuccessAt": "2026-10-19T11:33:16.623Z",
+        "dataAsOf": "2026-10-19T00:00:00.000Z",
+        "asOfKind": "source",
+        "source": "defillama/stablecoincharts",
+        "lastError": null,
+        "consecutiveFailures": 0,
+        "issues": [],
+        "available": true
+      }
+    },
+    "failedSources": [],
+    "blockedSources": []
+  },
+  "ancillarySources": {
+    "ssro_quote": {
+      "id": "ssro_quote",
+      "observed": true,
+      "state": "OK",
+      "freshnessStatus": "FRESH",
+      "usable": true,
+      "stale": false,
+      "expired": false,
+      "ageMs": 5,
+      "dataAgeMs": 5,
+      "warnings": [],
+      "policy": {
+        "fetchWarnMs": 180000,
+        "fetchBlockMs": 900000,
+        "dataWarnMs": 180000,
+        "dataBlockMs": 900000
+      },
+      "lastAttemptAt": "2026-10-19T11:33:16.746Z",
+      "lastSuccessAt": "2026-10-19T11:33:16.746Z",
+      "dataAsOf": "2026-10-19T11:33:16.746Z",
+      "asOfKind": "received",
+      "source": "tradingview/scan",
+      "lastError": null,
+      "consecutiveFailures": 0,
+      "issues": [],
+      "available": true
+    }
+  }
 }

@@ -109,12 +109,23 @@
       ? F * normCdf(d1) - K * normCdf(d2)
       : K * normCdf(-d2) - F * normCdf(-d1);
     const pdf = normPdf(d1);
+    const delta = isCall ? normCdf(d1) : normCdf(d1) - 1;
+    const carry = Number(leg.carry) || 0;
+    // Pure Black-76 variance/time decay (holding forward F constant)
+    const varianceThetaUsd = -F * pdf * sigma / (2 * sqrtT) / 365;
+    // Basis convergence / cost-of-carry drift: F(t) = S * exp(carry * (T - t)) -> dF/dt = -carry * F
+    // Total derivative wrt calendar day: dV/dt = dV/dt|_F + (dV/dF) * (dF/dt)
+    const carryThetaUsd = -carry * F * delta / 365;
+    const thetaUsd = varianceThetaUsd + carryThetaUsd;
+
     return {
       valueBtc: Math.max(usd, 0) / F,
-      delta: isCall ? normCdf(d1) : normCdf(d1) - 1,
+      delta,
       gamma: pdf / (F * sigma * sqrtT),
       vegaUsd: F * pdf * sqrtT / 100,
-      thetaUsd: -F * pdf * sigma / (2 * sqrtT) / 365,
+      thetaUsd,
+      varianceThetaUsd,
+      carryThetaUsd,
       sigma,
       expired: false
     };
@@ -220,22 +231,89 @@
 
   // Tail behaviour in BTC terms (inverse payoffs):
   //   S -> infinity: call value -> 1 BTC, put value -> 0, so PnL converges to a finite limit.
-  //   S -> 0:        put value ~ K/S - 1 diverges, so net long puts = unbounded profit,
-  //                  net short puts = unbounded loss; calls contribute only their premium.
-  // This holds both at expiry and before it, since BS values share these limits.
-  function tailProfile(legs) {
+  //   S -> 0 (S < min K): PnL = (Σ_puts q·K) / S - Σ_puts q - Σ q·P, so divergence is decided by
+  //                  the strike-weighted net put notional Σ q·K (USD), NOT by the contract count Σ q:
+  //                  a 1:1 bull put spread (Σq = 0, ΣqK < 0) still loses ~$ΔK/S BTC without bound,
+  //                  while a notional-balanced 1x2 put ratio (ΣqK = 0) has a finite S -> 0 limit.
+  // In USD terms (PnL_usd = PnL_btc · S):
+  //   S -> 0:        PnL_usd -> Σ_puts q·K (always finite).
+  //   S -> infinity: PnL_usd = S·pnlAtInfinity - Σ_calls q·K, so it diverges with the sign of
+  //                  pnlAtInfinity and only converges (to -Σ_calls q·K) when pnlAtInfinity = 0.
+  // This holds both at expiry and before it (BS values share these limits up to the forward basis).
+  function tailProfile(legs, evalMs = null) {
+    let netPutStrikeUsd = 0;
+    let netCallStrikeUsd = 0;
     let netPutContracts = 0;
+    let premiumBtc = 0;
     let pnlAtInfinity = 0;
+    let grossStrikeUsd = 0;
+    let grossAmt = 0;
     legs.forEach(l => {
       const isCall = isCallLeg(l);
       const signedAmt = legSign(l) * Number(l.amount || 0);
+      const K = Number(l.strike) || 0;
+      premiumBtc += signedAmt * Number(l.price || 0);
       pnlAtInfinity += signedAmt * ((isCall ? 1 : 0) - Number(l.price || 0));
-      if (!isCall) netPutContracts += signedAmt;
+      grossStrikeUsd += Math.abs(signedAmt * K);
+      grossAmt += Math.abs(signedAmt);
+      if (isCall) {
+        netCallStrikeUsd += signedAmt * K;
+      } else {
+        netPutContracts += signedAmt;
+        // In calendar/diagonal spreads, at nearest expiry T1, an unexpired put (T2 > T1)
+        // has forward F = S * exp(carry * T_rem). As S -> 0+, V_btc -> (K * exp(-carry * T_rem)) / S.
+        let effectiveK = K;
+        if (evalMs != null && l.expiryMs && l.expiryMs > evalMs) {
+          const T_rem = (l.expiryMs - evalMs) / MS_PER_YEAR;
+          const carry = Number(l.carry) || 0;
+          effectiveK = K * Math.exp(-carry * T_rem);
+        }
+        netPutStrikeUsd += signedAmt * effectiveK;
+      }
     });
+    const epsUsd = 1e-9 * grossStrikeUsd + 1e-9;
+    const epsBtc = 1e-9 * grossAmt + 1e-12;
+    const putSign = netPutStrikeUsd > epsUsd ? 1 : (netPutStrikeUsd < -epsUsd ? -1 : 0);
+    const infSign = pnlAtInfinity > epsBtc ? 1 : (pnlAtInfinity < -epsBtc ? -1 : 0);
     return {
       pnlAtInfinity,
-      isProfitCapped: netPutContracts <= 0.01, // net long puts -> profit diverges as S -> 0
-      isLossCapped: netPutContracts >= -0.01   // net short puts -> loss diverges as S -> 0
+      // Exact S -> 0+ BTC limit; finite only when the 1/S term cancels (Σ q·K = 0)
+      pnlAtZero: putSign === 0 ? -netPutContracts - premiumBtc : putSign * Infinity,
+      netPutStrikeUsd,
+      netPutContracts,
+      isProfitCapped: putSign <= 0, // Σ q·K > 0 -> BTC profit diverges as S -> 0
+      isLossCapped: putSign >= 0,   // Σ q·K < 0 -> BTC loss diverges as S -> 0
+      usd: {
+        pnlAtZero: netPutStrikeUsd,
+        pnlAtInfinity: infSign === 0 ? -netCallStrikeUsd : infSign * Infinity,
+        isProfitCapped: infSign <= 0, // net long BTC-equivalent at S -> inf: USD profit unbounded
+        isLossCapped: infSign >= 0
+      }
+    };
+  }
+
+  // Max / min over sampled points plus the analytic S -> 0 / S -> infinity limits, keeping the
+  // terminal price S* at which each extremum is attained (0 / Infinity for the limits).
+  // Divergent (±Infinity) limits are excluded here and reported via the capped flags instead.
+  function extremaWithTails(points, zeroLimit, infLimit) {
+    const all = points.slice();
+    if (Number.isFinite(zeroLimit)) all.unshift({ S: 0, v: zeroLimit });
+    if (Number.isFinite(infLimit)) all.push({ S: Infinity, v: infLimit });
+    let max = { v: -Infinity, S: null };
+    let min = { v: Infinity, S: null };
+    all.forEach(p => {
+      if (p.v > max.v) max = p;
+      if (p.v < min.v) min = p;
+    });
+    return { maxPnl: max.v, maxPnlAt: max.S, minPnl: min.v, minPnlAt: min.S };
+  }
+
+  function buildExtrema(series, key, tail) {
+    const btc = extremaWithTails(series.map(p => ({ S: p.S, v: p[key] })), tail.pnlAtZero, tail.pnlAtInfinity);
+    const usd = extremaWithTails(series.map(p => ({ S: p.S, v: p[key] * p.S })), tail.usd.pnlAtZero, tail.usd.pnlAtInfinity);
+    return {
+      ...btc,
+      usd: { ...tail.usd, ...usd }
     };
   }
 
@@ -255,18 +333,17 @@
       return { S, pnlBtc, pnlUsd: pnlBtc * S };
     });
 
-    // The sampled range stops at ~1.35x the top strike, so fold the S -> infinity limit into min/max.
+    // The sampled range stops at ~0.65x / 1.35x the outer strikes, so fold the analytic S -> 0 and
+    // S -> infinity limits into min/max (BTC and USD frames separately, with the S* of each extremum).
     const tail = tailProfile(legs);
-    const pnlValues = series.map(d => d.pnlBtc);
 
     return {
       series,
       breakevens: findBreakevens(series, 'pnlBtc'),
       initialCashFlowBTC: initialCashFlow(legs),
       currentSpotPnLBTC: calculatePortfolioPnLBTC(legs, S0),
-      minPnl: Math.min(...pnlValues, tail.pnlAtInfinity),
-      maxPnl: Math.max(...pnlValues, tail.pnlAtInfinity),
       ...tail,
+      ...buildExtrema(series, 'pnlBtc', tail),
       spotPrice: S0,
       minS,
       maxS
@@ -297,17 +374,15 @@
       expBtc: evaluatePortfolio(legs, S, expiryEvalMs, ivShiftPct).pnlBtc
     }));
 
-    const tail = tailProfile(legs);
-    const expValues = series.map(d => d.expBtc);
+    const tail = tailProfile(legs, expiryEvalMs);
 
     return {
       series,
       breakevens: findBreakevens(series, 'expBtc'),
       simBreakevens: findBreakevens(series, 'simBtc'),
       initialCashFlowBTC: initialCashFlow(legs),
-      minPnl: Math.min(...expValues, tail.pnlAtInfinity),
-      maxPnl: Math.max(...expValues, tail.pnlAtInfinity),
       ...tail,
+      ...buildExtrema(series, 'expBtc', tail),
       nowMs,
       evalMs,
       nearestExpiryMs,
@@ -324,6 +399,7 @@
     impliedCarry,
     normCdf,
     legTheo,
+    tailProfile,
     calculateLegPnLBTC,
     calculatePortfolioPnLBTC,
     evaluatePortfolio,

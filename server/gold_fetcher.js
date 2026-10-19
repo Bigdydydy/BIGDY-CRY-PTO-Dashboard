@@ -47,8 +47,9 @@ function readCachedSeries() {
     return null;
   }
 }
-const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Approx $18.5T for ~212,500 tonnes of global above-ground gold
-const BTC_CIRCULATING_SUPPLY = 19.8e6;     // Approx 19.8M circulating BTC in 2026
+const GOLD_ABOVE_GROUND_OZ = 6.832e9; // Approx 6.832B troy oz for ~212,500 tonnes of global above-ground gold
+const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Static reference benchmark (~$18.5T)
+const BTC_CIRCULATING_SUPPLY = 19.8e6; // Approx 19.8M circulating BTC in 2026
 
 let inMemoryCache = null;
 let lastFetchTime = 0;
@@ -247,7 +248,8 @@ async function fetchGoldCorrelationFromSource() {
     const btcGoldRatio = Number((btc / gold).toFixed(2)); // oz of gold per 1 BTC
     const goldBtcRatio = Number((gold / btc).toFixed(5)); // BTC per 1 oz of gold
     const btcMcap = btc * BTC_CIRCULATING_SUPPLY;
-    const marketCapShare = Number(((btcMcap / GOLD_GLOBAL_MARKET_CAP_USD) * 100).toFixed(2));
+    const goldMcap = gold * GOLD_ABOVE_GROUND_OZ;
+    const marketCapShare = Number(((btcMcap / goldMcap) * 100).toFixed(2));
     const r = rollingCorrs[i];
 
     series.push({
@@ -279,7 +281,7 @@ async function fetchGoldCorrelationFromSource() {
       timeRange: `${series[0].date} 至 ${latest.date}`,
       totalDays: series.length,
       correlationWindowDays: 30,
-      goldBenchmarkMarketCap: '$18.50T (全球存量地上黄金估算)',
+      goldBenchmarkMarketCap: `$${(latest.goldPrice * GOLD_ABOVE_GROUND_OZ / 1e12).toFixed(2)}T (全球地上黄金存量动态估算)`,
       isRealHistorical: true
     },
     current: {
@@ -374,5 +376,6 @@ module.exports = {
   calculateRollingPearsonCorrelation,
   classifyCorrelationRegime,
   GOLD_GLOBAL_MARKET_CAP_USD,
+  GOLD_ABOVE_GROUND_OZ,
   BTC_CIRCULATING_SUPPLY
 };

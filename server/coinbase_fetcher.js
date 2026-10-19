@@ -169,7 +169,10 @@ function calcPercentile(arr, val) {
 
 
 /**
- * Simulate walking the order book for an institutional market order of targetUsd
+ * Simulate walking the order book for an institutional market order of targetUsd.
+ * If the visible levels run out before targetUsd is reached the result is flagged
+ * `complete: false` (fillRatio < 1): avgPrice / worstPrice then only describe the filled part
+ * and must not be read as the execution price of the full order.
  */
 function walkOrderBook(book, targetUsd) {
   let filledUsd = 0;
@@ -196,7 +199,29 @@ function walkOrderBook(book, targetUsd) {
   }
 
   const avgPrice = filledQty > 0 ? filledUsd / filledQty : worstPrice;
-  return { filledUsd, filledQty, avgPrice, worstPrice };
+  const complete = filledUsd >= targetUsd * 0.999;
+  const fillRatio = targetUsd > 0 ? Math.min(1, filledUsd / targetUsd) : 1;
+  return { filledUsd, filledQty, avgPrice, worstPrice, complete, fillRatio };
+}
+
+// Coinbase L2 snapshots have historically been capped at the top 50 aggregated levels per side.
+// A side returning >= this many levels may be truncated, so depth beyond its last level is unknown.
+const L2_TRUNCATION_LEVELS = 50;
+
+/** Distance (bps from mid) the visible levels of one side reach; Infinity if the side is not truncated. */
+function sideCoverageBps(levels, midPrice) {
+  if (!Array.isArray(levels) || levels.length < L2_TRUNCATION_LEVELS) return Infinity;
+  const last = parseFloat(levels[levels.length - 1][0]);
+  return Math.abs(last - midPrice) / midPrice * 10000;
+}
+
+/**
+ * Average-price slippage of an order the book could not fill, extrapolated from the filled part
+ * with the square-root impact law (impact ∝ √size). Returns observed bps when complete.
+ */
+function extrapolateSlippageBps(observedBps, result, targetUsd) {
+  if (result.complete || !(result.filledUsd > 0)) return observedBps;
+  return observedBps * Math.sqrt(targetUsd / result.filledUsd);
 }
 
 /**
@@ -215,6 +240,12 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   const midPrice = (bestBid + bestAsk) / 2;
   const spreadUsd = bestAsk - bestBid;
   const spreadBps = parseFloat(((spreadUsd / midPrice) * 10000).toFixed(3));
+
+  // 0. Book coverage: a truncated L2 snapshot only describes depth out to its last visible level,
+  // so tiers / order sizes beyond that reach cannot be measured from this snapshot.
+  const bidReachBps = sideCoverageBps(bids, midPrice);
+  const askReachBps = sideCoverageBps(asks, midPrice);
+  const bookTruncated = Number.isFinite(bidReachBps) || Number.isFinite(askReachBps);
 
   // 1. Multi-Tier Symmetrical Depth Profile
   const tierBpsList = [5, 10, 20, 50, 100, 200];
@@ -263,56 +294,58 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
       totalBtc: parseFloat(totalBtc.toFixed(2)),
       bidPct,
       askPct,
-      imbalanceDelta: parseFloat((bidPct - 50.0).toFixed(1)) // >0 is bid dominant, <0 is ask dominant
+      imbalanceDelta: parseFloat((bidPct - 50.0).toFixed(1)), // >0 is bid dominant, <0 is ask dominant
+      // false: the tier extends past the last visible level, so its depth is a lower bound
+      covered: bp <= bidReachBps && bp <= askReachBps
     };
   }
 
-  // 2. Pyramid Ratios (Gold Standard ~3.1x for 100bps/10bps)
-  const d10 = depthProfile[10].totalUsd || 1;
-  const d50 = depthProfile[50].totalUsd || 1;
-  const d100 = depthProfile[100].totalUsd || 1;
-  const d200 = depthProfile[200].totalUsd || 1;
+  // 2. Pyramid Ratios (Gold Standard ~3.1x for 100bps/10bps); null when either tier is not covered,
+  // since a truncated far tier would collapse the ratio towards 1.0x.
+  const pyramidRatio = (far, near) => (depthProfile[far].covered && depthProfile[near].covered
+    ? parseFloat(((depthProfile[far].totalUsd || 1) / (depthProfile[near].totalUsd || 1)).toFixed(2))
+    : null);
 
-  const pyramidRatio100_10 = parseFloat((d100 / d10).toFixed(2));
-  const pyramidRatio50_10 = parseFloat((d50 / d10).toFixed(2));
-  const pyramidRatio200_100 = parseFloat((d200 / d100).toFixed(2));
+  const pyramidRatio100_10 = pyramidRatio(100, 10);
+  const pyramidRatio50_10 = pyramidRatio(50, 10);
+  const pyramidRatio200_100 = pyramidRatio(200, 100);
+  const hasPyr = pyramidRatio100_10 !== null;
 
   // 3. Simulated Institutional Market Order Walking & Slippage
   const testSizes = [250000, 500000, 1000000, 2000000, 5000000, 10000000, 20000000];
   const slippageSimulation = [];
 
-  for (const sizeUsd of testSizes) {
-    // Market Sell (hitting bids)
-    const sellResult = walkOrderBook(bids, sizeUsd);
-    const sellSlippageBps = parseFloat((Math.abs((sellResult.avgPrice - midPrice) / midPrice) * 10000).toFixed(2));
-    const sellMaxImpactBps = parseFloat((Math.abs((sellResult.worstPrice - midPrice) / midPrice) * 10000).toFixed(2));
+  const sideImpact = (result, sizeUsd) => {
+    const observedBps = Math.abs((result.avgPrice - midPrice) / midPrice) * 10000;
+    return {
+      avgPrice: parseFloat(result.avgPrice.toFixed(2)),
+      worstPrice: parseFloat(result.worstPrice.toFixed(2)),
+      // Unfilled orders: √-law extrapolation from the filled part (flagged), not the partial average
+      slippageBps: parseFloat(extrapolateSlippageBps(observedBps, result, sizeUsd).toFixed(2)),
+      // Unfilled orders: the last visible level is only a lower bound for the true worst price
+      maxImpactBps: parseFloat((Math.abs((result.worstPrice - midPrice) / midPrice) * 10000).toFixed(2)),
+      complete: result.complete,
+      fillRatio: parseFloat(result.fillRatio.toFixed(4)),
+      extrapolated: !result.complete
+    };
+  };
 
-    // Market Buy (lifting asks)
-    const buyResult = walkOrderBook(asks, sizeUsd);
-    const buySlippageBps = parseFloat((Math.abs((buyResult.avgPrice - midPrice) / midPrice) * 10000).toFixed(2));
-    const buyMaxImpactBps = parseFloat((Math.abs((buyResult.worstPrice - midPrice) / midPrice) * 10000).toFixed(2));
+  for (const sizeUsd of testSizes) {
+    // Market Sell (hitting bids) / Market Buy (lifting asks)
+    const sell = sideImpact(walkOrderBook(bids, sizeUsd), sizeUsd);
+    const buy = sideImpact(walkOrderBook(asks, sizeUsd), sizeUsd);
 
     // Asymmetry penalty (>1 means selling suffers worse slippage than buying)
-    const asymmetryRatio = buySlippageBps > 0 ? parseFloat((sellSlippageBps / buySlippageBps).toFixed(2)) : 1.0;
+    const asymmetryRatio = buy.slippageBps > 0 ? parseFloat((sell.slippageBps / buy.slippageBps).toFixed(2)) : 1.0;
 
     slippageSimulation.push({
       sizeUsd,
       sizeUsdM: parseFloat((sizeUsd / 1e6).toFixed(2)),
       sizeLabel: sizeUsd >= 1000000 ? `$${sizeUsd / 1000000}M` : `$${sizeUsd / 1000}K`,
-      sell: {
-        avgPrice: parseFloat(sellResult.avgPrice.toFixed(2)),
-        worstPrice: parseFloat(sellResult.worstPrice.toFixed(2)),
-        slippageBps: sellSlippageBps,
-        maxImpactBps: sellMaxImpactBps
-      },
-      buy: {
-        avgPrice: parseFloat(buyResult.avgPrice.toFixed(2)),
-        worstPrice: parseFloat(buyResult.worstPrice.toFixed(2)),
-        slippageBps: buySlippageBps,
-        maxImpactBps: buyMaxImpactBps
-      },
+      sell,
+      buy,
       asymmetryRatio,
-      penaltyBps: parseFloat((sellSlippageBps - buySlippageBps).toFixed(2))
+      penaltyBps: parseFloat((sell.slippageBps - buy.slippageBps).toFixed(2))
     });
   }
 
@@ -364,12 +397,12 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   let regimeSeverity = 'neutral';
   let regimeColor = '#a1a1aa';
 
-  if (pctlPrice >= 75 && (pctlVol24h <= 25 || pctlVol7d <= 30) && bid10Pct < 48.5 && pyramidRatio100_10 > 5.0) {
+  if (pctlPrice >= 75 && (pctlVol24h <= 25 || pctlVol7d <= 30) && bid10Pct < 48.5 && hasPyr && pyramidRatio100_10 > 5.0) {
     regimeCode = 'FALSE_PROSPERITY';
     regimeLabel = '🚨 虚假繁荣 / 贫瘠逼空';
     regimeSeverity = 'critical';
     regimeColor = '#f43f5e';
-  } else if (pctlPrice >= 70 && (pctlVol24h >= 55 || pctlVol7d >= 60) && bid10Pct >= 51.0 && pyramidRatio100_10 <= 5.5) {
+  } else if (pctlPrice >= 70 && (pctlVol24h >= 55 || pctlVol7d >= 60) && bid10Pct >= 51.0 && hasPyr && pyramidRatio100_10 <= 5.5) {
     regimeCode = 'HEALTHY_EXPANSION';
     regimeLabel = '🟢 充盈共振 / 稳健主升';
     regimeSeverity = 'success';
@@ -379,7 +412,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     regimeLabel = '⚠️ 顶部分发 / 卖墙重压';
     regimeSeverity = 'warning';
     regimeColor = '#f59e0b';
-  } else if (pctlPrice <= 30 && pctlVol24h <= 35 && bid10Pct >= 51.5 && pyramidRatio100_10 <= 4.5) {
+  } else if (pctlPrice <= 30 && pctlVol24h <= 35 && bid10Pct >= 51.5 && hasPyr && pyramidRatio100_10 <= 4.5) {
     regimeCode = 'ACCUMULATION_BOTTOM';
     regimeLabel = '💎 机构吸筹 / 缩量筑底';
     regimeSeverity = 'success';
@@ -389,7 +422,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     regimeLabel = '🔴 恐慌踩踏 / 流动性击穿';
     regimeSeverity = 'critical';
     regimeColor = '#ef4444';
-  } else if (pyramidRatio100_10 > 6.0) {
+  } else if (hasPyr && pyramidRatio100_10 > 6.0) {
     regimeCode = 'HOLLOW_NEAR_END';
     regimeLabel = '⚡ 金字塔形变 / 防线下移';
     regimeSeverity = 'warning';
@@ -397,11 +430,18 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   }
 
   // Key institutional diagnostic insights
+  const sim5m = slippageSimulation[4];
+  const fmtReach = v => (Number.isFinite(v) ? `约 ${v.toFixed(0)} bps` : '完整');
+  const coverageNote = bookTruncated
+    ? `（L2 快照可能仅含前 ${L2_TRUNCATION_LEVELS} 档，可见深度买盘${fmtReach(bidReachBps)} / 卖盘${fmtReach(askReachBps)}）`
+    : '';
   const insights = [
     `【阶梯买盘占比】±5 bps 与 ±10 bps 买单占比分别为 ${bid5Pct}% 与 ${bid10Pct}%（卖方主导 ${depthProfile[5].askPct}% / ${depthProfile[10].askPct}%），${bid10Pct < 48 ? '盘口上方堆积限价卖单，越靠近现价承接越单薄。' : '买卖双向挂单相对均衡。'}`,
     `【90天滚动量价分位】Coinbase 现货价格处于 90 天第 ${pctlPrice}% 分位（${pctlPrice >= 75 ? '高位偏热' : (pctlPrice <= 25 ? '低位低估' : '常态中枢')}），真·24h 滚动成交量居第 ${pctlVol24h}% 分位（${pctlVol24h <= 25 ? '极度低迷' : (pctlVol24h >= 70 ? '放量活跃' : '中性温和')}，约 ${cur24hVolBtc.toFixed(0)} ₿），7D 均量居第 ${pctlVol7d}% 分位。`,
-    `【大单执行冲击】实测 $5M 市价抛售执行滑点为 ${slippageSimulation[4].sell.slippageBps} bps（底价 $${slippageSimulation[4].sell.worstPrice.toLocaleString()}），比同规模买入滑点${slippageSimulation[4].penaltyBps >= 0 ? `高出 ${slippageSimulation[4].penaltyBps} bps` : `低 ${Math.abs(slippageSimulation[4].penaltyBps)} bps`}，${slippageSimulation[4].penaltyBps > 0 ? '下行缓冲具备非对称脆弱性。' : '买卖盘滑点结构对称。'}`,
-    `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），${pyramidRatio100_10 > 5.5 ? '表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。' : '做市商阶梯深度逐级递增，具备良好吸震能力。'}`
+    `【大单执行冲击】${sim5m.sell.complete ? '实测' : `可见盘口仅能成交 ${(sim5m.sell.fillRatio * 100).toFixed(0)}%，按平方根冲击模型外推的`} $5M 市价抛售执行滑点为 ${sim5m.sell.slippageBps} bps（${sim5m.sell.complete ? '底价' : '可见最低档'} $${sim5m.sell.worstPrice.toLocaleString()}），比同规模买入滑点${sim5m.penaltyBps >= 0 ? `高出 ${sim5m.penaltyBps} bps` : `低 ${Math.abs(sim5m.penaltyBps)} bps`}，${sim5m.penaltyBps > 0 ? '下行缓冲具备非对称脆弱性。' : '买卖盘滑点结构对称。'}${coverageNote}`,
+    hasPyr
+      ? `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），${pyramidRatio100_10 > 5.5 ? '表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。' : '做市商阶梯深度逐级递增，具备良好吸震能力。'}`
+      : `【金字塔倍数】L2 快照可见深度未覆盖 ±100 bps${coverageNote}，100/10 bps 深度比无法可靠计算，暂不参与体制判定。`
   ];
 
   // Rolling 24h volume straight from /stats, independent of the candle history,
@@ -419,6 +459,13 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     spreadUsd: parseFloat(spreadUsd.toFixed(2)),
     spreadBps,
     depthProfile,
+    bookCoverage: {
+      bidLevels: bids.length,
+      askLevels: asks.length,
+      truncated: bookTruncated,
+      bidReachBps: Number.isFinite(bidReachBps) ? parseFloat(bidReachBps.toFixed(1)) : null,
+      askReachBps: Number.isFinite(askReachBps) ? parseFloat(askReachBps.toFixed(1)) : null
+    },
     pyramidRatios: {
       ratio100_10: pyramidRatio100_10,
       ratio50_10: pyramidRatio50_10,

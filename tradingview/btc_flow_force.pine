@@ -81,8 +81,14 @@ float spot = avg2(spotAsia, spotWest)
 float asia = avg2(futAsia, spotAsia)
 float west = avg2(futWest, spotWest)
 
-float histRaw   = math.abs(fut) - math.abs(spot)
-float regionRaw = math.abs(asia) - math.abs(west)
+// 强弱对比基于无符号强度均值，避免对冲/跨区套利流相消退化为0；净流向保留带符号均值
+float futStrength  = avg2(math.abs(futAsia), math.abs(futWest))
+float spotStrength = avg2(math.abs(spotAsia), math.abs(spotWest))
+float asiaStrength = avg2(math.abs(futAsia), math.abs(spotAsia))
+float westStrength = avg2(math.abs(futWest), math.abs(spotWest))
+
+float histRaw   = futStrength - spotStrength
+float regionRaw = asiaStrength - westStrength
 float hist   = ta.ema(histRaw, smooth)    // smooth = 1 时等于原始值
 float region = ta.ema(regionRaw, smooth)
 

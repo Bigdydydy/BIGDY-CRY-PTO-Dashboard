@@ -14,8 +14,8 @@ const path = require('path');
 const { buildSnapshot } = require('./lib/snapshot');
 
 const KEY_TRANSFORMS = [
-  'chg_1d_bp', 'chg_1w_bp', 'chg_4w_bp', 'chg_1w_pct', 'chg_4w_pct', 'chg_4w', 'chg_3m', 'chg_3m_bp', 'chg_12m_pct',
-  'yoy', 'mom_annualized_3m', 'mom_change', 'avg_3m_change', 'avg_4w', 'zscore_1y', 'chg_12m_bp', 'vs_sma200', 'vs_sma50', 'vs_sma50w', 'days_below_sma200', 'drawdown_from_high', 'percentile_1y', 'percentile_10y',
+  'chg_1d', 'chg_1d_pct', 'chg_1d_bp', 'chg_2d_pct', 'chg_2d_bp', 'chg_1w', 'chg_1w_bp', 'chg_1w_pct', 'chg_1m', 'chg_4w', 'chg_4w_bp', 'chg_4w_pct', 'chg_3m', 'chg_3m_bp', 'chg_12m', 'chg_12m_bp', 'chg_12m_pct',
+  'yoy', 'mom', 'mom_annualized_3m', 'mom_change', 'avg_3m_change', 'avg_4w', 'slope_4w', 'slope_20d', 'sahm', 'zscore_1y', 'vs_sma200', 'vs_sma50', 'vs_sma50w', 'days_below_sma200', 'drawdown_from_high', 'percentile_1y', 'percentile_10y',
   'curve_regime', 'share_of_nominal_move', 'divergence_vs_spx', 'rel_to_spx', 'gap_vs_core_cpi', 'crack_vs_wti',
   'implied_oil_disruption', 'distance_to_key_level_bp', 'chg_since_event_bp', 'chg_since_spx_high_bp'
 ];
@@ -39,10 +39,13 @@ function parseArgs(argv) {
   return out;
 }
 
-function fmtTransform(name, t) {
+function fmtTransform(name, t, id) {
   if (!t || t.error) return null;
   // Multi-field transforms carry no single `value`.
-  if (name === 'share_of_nominal_move') return 'realShareOf10yMove 4w=' + t.share_4w + ' 13w=' + t.share_13w;
+  if (name === 'share_of_nominal_move') {
+    const tag = t.tag || (id === 'BEI10Y' ? 'beiShareOf10yMove' : (id === 'TERM_PREMIUM_10Y' ? 'tpShareOf10yMove' : 'realShareOf10yMove'));
+    return tag + ' 4w=' + t.share_4w + ' 13w=' + t.share_13w;
+  }
   if (name === 'rel_to_spx') return 'relSPX 4w=' + t.chg_4w_pct + '% 13w=' + t.chg_13w_pct + '%';
   if (name === 'implied_oil_disruption') return t.implied_mbd == null ? null : 'impliedDisruption=' + t.implied_mbd + 'mb/d (+' + t.price_rise_pct + '% vs baseline)';
   if (t.value === null || t.value === undefined) return null;
@@ -77,12 +80,18 @@ function toMarkdown(snap) {
       if (r.status === 'manual_input_required') note = '待人工补充';
       if (r.error) note = '❌ ' + r.error.slice(0, 80);
       if (r.latest_by_term) {
-        latest = Object.entries(r.latest_by_term).map(([term, a]) => term + ' ' + a.high_yield + '% btc' + a.bid_to_cover).join('; ');
+        latest = Object.entries(r.latest_by_term).map(([term, a]) => {
+          let s = term + ' ' + a.high_yield + '% btc=' + a.bid_to_cover;
+          if (a.bid_to_cover_vs_avg6 != null) s += '(' + (a.bid_to_cover_vs_avg6 >= 0 ? '+' : '') + a.bid_to_cover_vs_avg6 + ')';
+          if (a.dealer_share != null) s += ' dealer=' + (a.dealer_share * 100).toFixed(1) + '%' + (a.dealer_share_vs_avg6 != null ? '(' + (a.dealer_share_vs_avg6 >= 0 ? '+' : '') + (a.dealer_share_vs_avg6 * 100).toFixed(1) + '%)' : '');
+          if (a.indirect_share != null) s += ' indirect=' + (a.indirect_share * 100).toFixed(1) + '%' + (a.indirect_share_vs_avg6 != null ? '(' + (a.indirect_share_vs_avg6 >= 0 ? '+' : '') + (a.indirect_share_vs_avg6 * 100).toFixed(1) + '%)' : '');
+          return s;
+        }).join('; ');
         date = Object.values(r.latest_by_term).map(a => a.date).sort().pop();
       }
       const tf = Object.entries(r.transforms || {})
         .filter(([n]) => KEY_TRANSFORMS.includes(n))
-        .map(([n, t]) => fmtTransform(n, t))
+        .map(([n, t]) => fmtTransform(n, t, id))
         .filter(Boolean)
         .join('; ');
       lines.push('| ' + [id, r.name, latest, date, tf, note].map(x => String(x).replace(/\|/g, '/')).join(' | ') + ' |');
