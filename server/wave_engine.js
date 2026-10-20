@@ -302,10 +302,13 @@
         if (((j - i) & 1) === 0) continue;
         const a = pivs[i], b = pivs[j];
         if (a.type === b.type) continue;
+        // 一浪的两端都须是该区间的极值: 中间拐点不能越过终点，也不能越过起点
+        //   (原先只查终点: BTC 2026-09-22→10-15 的 a 浪内，(ii) 取 09-25 的 85,224，其后 10-02 的 87,250 更高，(iii) 的起点不是极值)
         let good = true;
         for (let k = i + 1; k < j; k++) {
           const q = pivs[k].price;
           if (b.type === 'high' ? q >= b.price - EPS : q <= b.price + EPS) { good = false; break; }
+          if (a.type === 'high' ? q > a.price + EPS : q < a.price - EPS) { good = false; break; }
         }
         ok[i][j] = good;
       }
@@ -1081,18 +1084,37 @@
     const last = len - 1;
     const path = [0];
     let budget = 2000;
-    let found = null;
     // 跳点时每一段的两端须是该区间的极值 (与 matchCorrectiveOn 同一「一浪」定义)，
     // 否则会挑出「低点高于前一个高点」这类同向的段，把三浪误数成五浪
     const legOk = buildLegTable(arr);
 
+    // 同级别显著性 (EWI right look，与指引 G8 同一标准): 浪1/3/5 内部最大的逆向回撤不应大于浪2、浪4。
+    //   惩罚 = 驱动段内部最大逆向回撤 / min(浪2, 浪4)，越小越好；相同时取浪2、浪4 较显著 (占全段比例大) 者
+    const found = [];
+    const span = Math.abs(arr[last].price - arr[0].price) || 1;
+    const scoreOf = idxs => {
+      const P = idxs.map(i => arr[i]);
+      const corr = Math.min(Math.abs(P[2].price - P[1].price), Math.abs(P[4].price - P[3].price)) || 1e-9;
+      let inner = 0;
+      for (const k of [0, 2, 4]) {
+        const up = P[k + 1].price > P[k].price;
+        let ext = arr[idxs[k]].price;
+        for (let m = idxs[k] + 1; m < idxs[k + 1]; m++) {
+          const q = arr[m].price;
+          if (up ? q > ext : q < ext) ext = q;
+          else inner = Math.max(inner, Math.abs(ext - q));
+        }
+      }
+      return { penalty: inner / corr, sig: corr / span };
+    };
     function rec(cur) {
       if (--budget <= 0) return false;
       if (path.length === 5) {
         if (((last - cur) & 1) === 0 || !legOk[cur][last]) return false;
-        const pts = path.concat([last]).map(i => arr[i]);
-        if (ok(pts)) { found = pts; return true; }
-        return false;
+        const idxs = path.concat([last]);
+        const pts = idxs.map(i => arr[i]);
+        if (ok(pts)) found.push(Object.assign({ pts }, scoreOf(idxs)));
+        return found.length >= MOTIVE_PICK_MAX;
       }
       for (let j = cur + 1; j < last; j++) {
         if (((j - cur) & 1) === 0 || !legOk[cur][j]) continue;
@@ -1106,9 +1128,14 @@
       }
       return false;
     }
-    // 返回找到的五浪拐点 (真值) 或 false
-    return rec(0) ? found : false;
+    // 返回同级别显著性最好的五浪拐点 (真值) 或 false
+    rec(0);
+    if (!found.length) return false;
+    found.sort((a, b) => (a.penalty - b.penalty) || (b.sig - a.sig));
+    return found[0].pts;
   }
+  // 五浪搜索最多比较这么多种合规数法 (仍受 2000 节点预算约束)
+  const MOTIVE_PICK_MAX = 60;
 
   /**
    * 判定腿 p[i]->p[i+1] 的内部结构: '5'(可数为驱动五浪) / '3'(非五浪, 调整浪) / 'unknown'
@@ -5157,6 +5184,6 @@
     RANKING,
     PATTERNS,
     buildLiuSignals,
-    _internal: { structVotes, calibratedOf, pgSlope, diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
+    _internal: { buildLegTable, findMotiveCount, structVotes, calibratedOf, pgSlope, diagonalRole, findMotiveTyped, truncatedFifth, probeLegStructure, snapUserPoints, projectLive, refineSubTime, buildTimeWindows, classifyCorrectiveLeg, alternationFor, combinationComponents, matchCorrectiveOn, buildLevels, maxCounterMove, buildDegreeLadder, collectCandidates, mkGeom, buildLegTable, legStructure, computeLegStructure, findMotiveCount, zigzagPivots, identifyRangeExtrema, analyzePrecedingContext, buildDualScenario, counterRolesForR }
   };
 });
