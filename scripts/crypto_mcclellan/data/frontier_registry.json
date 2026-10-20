@@ -517,6 +517,13 @@
   "last_qualified": "2026-10-11",
   "symbol": "GBT"
  },
+ "bsc:0xbe82f76637dba2c114c41df856c2c51e522e2cb8": {
+  "address": "0xbe82f76637dba2c114c41df856c2c51e522e2cb8",
+  "chain": "bsc",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "EWYB"
+ },
  "bsc:0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1": {
   "address": "0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1",
   "chain": "bsc",
@@ -993,6 +1000,13 @@
   "last_qualified": "2026-10-17",
   "symbol": "FOLIO"
  },
+ "robinhood:0x6232e67421cc378d1f72b200d049db5997f49202": {
+  "address": "0x6232e67421cc378d1f72b200d049db5997f49202",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "MIMI"
+ },
  "robinhood:0x6589c3039083e2bb3154c65108a15af0aaf11a93": {
   "address": "0x6589c3039083e2bb3154c65108a15af0aaf11a93",
   "chain": "robinhood",
@@ -1034,6 +1048,13 @@
   "first_qualified": "2026-10-05",
   "last_qualified": "2026-10-05",
   "symbol": "BABY"
+ },
+ "robinhood:0x6b5545173177848e58b85ad66fefdee62cf1578e": {
+  "address": "0x6b5545173177848e58b85ad66fefdee62cf1578e",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "W4WORK"
  },
  "robinhood:0x6ff4b3065c59dee75404c59af4ded1a74a88f50e": {
   "address": "0x6ff4b3065c59dee75404c59af4ded1a74a88f50e",
@@ -1658,6 +1679,13 @@
   "last_qualified": "2026-10-09",
   "symbol": "HARMONIC"
  },
+ "robinhood:0xe01ada02fb4d1951cdb8cbb761d509db2ff02c94": {
+  "address": "0xe01ada02fb4d1951cdb8cbb761d509db2ff02c94",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "UHI"
+ },
  "robinhood:0xe1838f0dff03a9327dea87b2a2285850791297ec": {
   "address": "0xe1838f0dff03a9327dea87b2a2285850791297ec",
   "chain": "robinhood",
@@ -2264,7 +2292,7 @@
   "address": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
   "chain": "solana",
   "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-16",
+  "last_qualified": "2026-10-19",
   "symbol": "CARDS"
  },
  "solana:CFrEEKrVtJ8xkpBTuA6n6x3C4cJiheRSU1Zu2wXwoaLd": {
@@ -2420,6 +2448,13 @@
   "first_qualified": "2026-10-12",
   "last_qualified": "2026-10-14",
   "symbol": "PULT"
+ },
+ "solana:F8uhkRngMAX9omXcvQpqcW5AiscdHjH4o6jm77gE4pNU": {
+  "address": "F8uhkRngMAX9omXcvQpqcW5AiscdHjH4o6jm77gE4pNU",
+  "chain": "solana",
+  "first_qualified": "2026-10-19",
+  "last_qualified": "2026-10-19",
+  "symbol": "SO"
  },
  "solana:FGkCj28xhabWTYg9QyzACvs4NsN6LUyesP6EwiHepump": {
   "address": "FGkCj28xhabWTYg9QyzACvs4NsN6LUyesP6EwiHepump",
