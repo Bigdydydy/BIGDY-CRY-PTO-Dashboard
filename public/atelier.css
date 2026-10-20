@@ -2450,3 +2450,159 @@ html.atl-entering .atl-caption {
   .atl-shot img,
   .atl-shot-spinner { animation: none; }
 }
+
+/* ===========================================================================
+   侧栏二级目录：module 分组标题（+/−）与其下的单独指标
+   =========================================================================== */
+.sidebar-nav-item.has-subnav .nav-fold {
+  position: relative;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: 6px;
+  color: #6f6a62;
+  transition: color 0.2s ease, background-color 0.2s ease, opacity 0.25s ease;
+}
+
+.sidebar-nav-item.has-subnav .nav-fold::before,
+.sidebar-nav-item.has-subnav .nav-fold::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  transition: transform 0.35s var(--atl-ease), opacity 0.25s ease;
+}
+
+.sidebar-nav-item.has-subnav .nav-fold::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.sidebar-nav-item.has-subnav[aria-expanded="true"] .nav-fold::after {
+  transform: translate(-50%, -50%) rotate(0deg);
+  opacity: 0;
+}
+
+.sidebar-nav-item.has-subnav .nav-fold:hover {
+  color: #f3f0ea;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-nav-item.has-subnav.active .nav-fold {
+  color: #c9c3b8;
+}
+
+.nav-sublist {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s var(--atl-ease);
+}
+
+.nav-sublist.open {
+  grid-template-rows: 1fr;
+}
+
+.nav-sublist-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow: hidden;
+  padding-left: 45px;
+}
+
+.nav-sublist.open .nav-sublist-inner {
+  padding-top: 2px;
+  padding-bottom: 6px;
+}
+
+/* 从图标中心垂下的细线，把指标串在所属 module 之下 */
+.nav-sublist-inner::before {
+  content: '';
+  position: absolute;
+  left: 23px;
+  top: 0;
+  bottom: 8px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-sub-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #8f897f;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 450;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.sidebar-sub-item::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transform: translate(-1px, -50%);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.sidebar-sub-item:hover {
+  color: #f3f0ea;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-sub-item.active {
+  color: #fbf8f2;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-sub-item.active::before {
+  width: 5px;
+  height: 5px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+  transform: translate(-2px, -50%);
+}
+
+.sidebar-sub-item:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.3);
+  outline-offset: -1px;
+}
+
+/* 收起为图标轨时不显示二级目录 */
+@media (min-width: 1025px) {
+  html.atl-rail-collapsed .nav-sublist {
+    grid-template-rows: 0fr;
+  }
+
+  html.atl-rail-collapsed .nav-sublist.open .nav-sublist-inner {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  html.atl-rail-collapsed .sidebar-nav-item.has-subnav .nav-fold {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

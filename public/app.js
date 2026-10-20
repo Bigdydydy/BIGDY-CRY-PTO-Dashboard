@@ -7160,15 +7160,67 @@ const VIEW_TITLES = {
 };
 
 let currentActiveView = 'view-overview';
+let currentFocusModule = null;
+
+// 侧栏二级目录：每个 module 下的单独指标（顺序即侧栏顺序）
+const NAV_TREE = {
+  'view-overview': [
+    { id: 'module-macro-chart', label: '美债曲线 × MSTR 成本' },
+    { id: 'module-crypto-mcclellan', label: '加密麦克莱伦宽度' },
+    { id: 'module-cdri', label: '衍生品风险指数 CDRI' }
+  ],
+  'view-term-premium': [
+    { id: 'module-term-premium', label: '基差期限结构与溢价' },
+    { id: 'module-etf-linkage', label: 'ETF × 套利资金联动' }
+  ],
+  'view-options': [
+    { id: 'module-atm-iv', label: 'ATM IV 期限结构' },
+    { id: 'module-iv-smile', label: 'IV 微笑偏度' },
+    { id: 'module-25d-skew', label: '25Δ Skew 偏度情绪' },
+    { id: 'module-gex', label: 'GEX 交割期分布' },
+    { id: 'module-dealer-exposure', label: '做市商敞口' }
+  ],
+  'view-block-trades': [
+    { id: 'module-block-trades', label: '巨鲸大单与冰山拆单' },
+    { id: 'module-insight-flow', label: '4B · 期限资金流向', view: 'view-block-insight' },
+    { id: 'module-insight-strikes', label: '4B · 行权价热力图', view: 'view-block-insight' },
+    { id: 'module-insight-smart', label: '4B · 聪明钱命中率', view: 'view-block-insight' }
+  ],
+  'view-ssro': [
+    { id: 'module-flow-force', label: 'BTC 主导力量雷达' },
+    { id: 'module-ssro-chart', label: '稳定币供应比率 SSRO' }
+  ]
+};
+
+function findNavLeaf(moduleId) {
+  for (const parent of Object.keys(NAV_TREE)) {
+    const leaf = NAV_TREE[parent].find(l => l.id === moduleId);
+    if (leaf) return { parent, view: leaf.view || parent, label: leaf.label };
+  }
+  return null;
+}
+
+/** 只显示 viewId 面板内的 moduleId 卡片；moduleId 为空时显示整个面板 */
+function applyModuleFocus(viewId, moduleId) {
+  document.querySelectorAll('.view-panel .bento-card').forEach(card => {
+    if (card.parentElement && card.parentElement.closest('.bento-card')) return; // 只处理顶层卡片
+    const panel = card.closest('.view-panel');
+    const hide = viewId !== 'view-all' && !!moduleId && !!panel && panel.id === viewId && card.id !== moduleId;
+    card.classList.toggle('module-focus-hidden', hide);
+  });
+}
 
 /**
  * Switch active view panel and synchronize desktop sidebar and mobile navigation
  */
-function switchView(viewId, updateHash = true) {
+function switchView(viewId, updateHash = true, moduleId = null) {
   if (!VIEW_TITLES[viewId]) {
     viewId = 'view-overview';
   }
+  const leaf = moduleId ? findNavLeaf(moduleId) : null;
+  if (!leaf || leaf.view !== viewId) moduleId = null;
   currentActiveView = viewId;
+  currentFocusModule = moduleId;
 
   const mainViewport = document.getElementById('main-viewport');
   const viewPanels = document.querySelectorAll('.view-panel');
@@ -7188,6 +7240,7 @@ function switchView(viewId, updateHash = true) {
       p.classList.toggle('active', p.id === viewId);
     });
   }
+  applyModuleFocus(viewId, moduleId);
 
   // 2. Update sidebar navigation items (4B 从属于 Module 4，侧栏仍高亮 04)
   const navViewId = viewId === 'view-block-insight' ? 'view-block-trades' : viewId;
@@ -7200,9 +7253,16 @@ function switchView(viewId, updateHash = true) {
     item.classList.toggle('active', item.dataset.view === navViewId);
   });
 
+  // 3b. 侧栏二级指标高亮；只展开所属分组，其余收起
+  document.querySelectorAll('.sidebar-sub-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.module === moduleId);
+  });
+  Object.keys(NAV_TREE).forEach(view => setNavGroupExpanded(view, view === navViewId));
+
   // 4. Update header view title
   if (activeViewName) {
-    activeViewName.textContent = VIEW_TITLES[viewId] || '宏观与风控总览';
+    const baseTitle = VIEW_TITLES[viewId] || '宏观与风控总览';
+    activeViewName.textContent = moduleId ? `${baseTitle} · ${leaf.label}` : baseTitle;
   }
 
   // 5. Close mobile drawer and backdrop if open
@@ -7211,7 +7271,8 @@ function switchView(viewId, updateHash = true) {
 
   // 6. Update URL hash
   if (updateHash) {
-    const hashTag = viewId.replace('view-', '');
+    const viewTag = viewId.replace('view-', '');
+    const hashTag = moduleId ? `${viewTag}/${moduleId.replace('module-', '')}` : viewTag;
     if (window.location.hash !== `#${hashTag}`) {
       window.history.replaceState(null, '', `#${hashTag}`);
     }
@@ -7221,7 +7282,7 @@ function switchView(viewId, updateHash = true) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   // 7b. 通知 Atelier 设计层（头图、侧栏高亮、入场编排）
-  document.dispatchEvent(new CustomEvent('bigdy:viewchange', { detail: { viewId } }));
+  document.dispatchEvent(new CustomEvent('bigdy:viewchange', { detail: { viewId, moduleId } }));
 
   // 8. Trigger chart resizes for freshly displayed views
   setTimeout(() => {
@@ -7307,11 +7368,19 @@ function initNavigation() {
   const btnMobileMenu = document.getElementById('btn-mobile-menu');
   const btnCloseSidebar = document.getElementById('btn-close-sidebar');
 
-  // Sidebar item click handlers
+  buildNavTree();
+
+  // Sidebar item click handlers：有二级目录的分组标题 → 从别处进入时跳到第一个指标，已在本组内则折叠/展开
   document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
       const view = btn.dataset.view;
-      if (view) switchView(view);
+      if (!view) return;
+      const leaves = NAV_TREE[view];
+      if (!leaves) { switchView(view); return; }
+      if (e.target.closest('.nav-fold')) { toggleNavGroup(view); return; }
+      const navActive = currentActiveView === 'view-block-insight' ? 'view-block-trades' : currentActiveView;
+      if (navActive === view) { toggleNavGroup(view); return; }
+      switchView(leaves[0].view || view, true, leaves[0].id);
     });
   });
 
@@ -7348,23 +7417,78 @@ function initNavigation() {
   }
 
   // Hash change routing
+  // 哈希格式：#view 或 #view/module（如 #options/gex）
+  const parseHash = () => {
+    const [viewTag, moduleTag] = window.location.hash.replace('#', '').split('/');
+    const viewId = `view-${viewTag}`;
+    if (!viewTag || !VIEW_TITLES[viewId]) return null;
+    return { viewId, moduleId: moduleTag ? `module-${moduleTag}` : null };
+  };
+
   window.addEventListener('hashchange', () => {
-    const hash = window.location.hash.replace('#', '');
-    if (hash) {
-      const viewId = `view-${hash}`;
-      if (VIEW_TITLES[viewId] && currentActiveView !== viewId) {
-        switchView(viewId, false);
-      }
+    const target = parseHash();
+    if (target && (currentActiveView !== target.viewId || currentFocusModule !== target.moduleId)) {
+      switchView(target.viewId, false, target.moduleId);
     }
   });
 
   // Initial load from URL hash
-  const initialHash = window.location.hash.replace('#', '');
-  if (initialHash && VIEW_TITLES[`view-${initialHash}`]) {
-    switchView(`view-${initialHash}`, false);
+  const initial = parseHash();
+  if (initial) {
+    switchView(initial.viewId, false, initial.moduleId);
   } else {
-    switchView('view-overview', false);
+    switchView('view-overview', false, NAV_TREE['view-overview'][0].id);
   }
+}
+
+/** 在每个有二级目录的侧栏分组标题后插入可折叠的指标列表 */
+function buildNavTree() {
+  Object.keys(NAV_TREE).forEach(view => {
+    const header = document.querySelector(`#sidebar-nav .sidebar-nav-item[data-view="${view}"]`);
+    if (!header || header.dataset.navTree) return;
+    header.dataset.navTree = '1';
+    header.classList.add('has-subnav');
+    header.setAttribute('aria-expanded', 'false');
+
+    const fold = document.createElement('span');
+    fold.className = 'nav-fold';
+    fold.setAttribute('aria-hidden', 'true');
+    header.appendChild(fold);
+
+    const sub = document.createElement('div');
+    sub.className = 'nav-sublist';
+    sub.dataset.parent = view;
+    const inner = document.createElement('div');
+    inner.className = 'nav-sublist-inner';
+    NAV_TREE[view].forEach(leaf => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'sidebar-sub-item';
+      item.dataset.module = leaf.id;
+      item.dataset.view = leaf.view || view;
+      item.textContent = leaf.label;
+      item.addEventListener('click', () => switchView(item.dataset.view, true, leaf.id));
+      inner.appendChild(item);
+    });
+    sub.appendChild(inner);
+    header.insertAdjacentElement('afterend', sub);
+    sub.addEventListener('transitionend', (e) => {
+      if (e.target === sub && window.Atelier && window.Atelier.moveNavIndicator) window.Atelier.moveNavIndicator();
+    });
+  });
+}
+
+function setNavGroupExpanded(view, expanded) {
+  const header = document.querySelector(`#sidebar-nav .sidebar-nav-item.has-subnav[data-view="${view}"]`);
+  const sub = document.querySelector(`#sidebar-nav .nav-sublist[data-parent="${view}"]`);
+  if (!header || !sub) return;
+  header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  sub.classList.toggle('open', expanded);
+}
+
+function toggleNavGroup(view) {
+  const header = document.querySelector(`#sidebar-nav .sidebar-nav-item.has-subnav[data-view="${view}"]`);
+  if (header) setNavGroupExpanded(view, header.getAttribute('aria-expanded') !== 'true');
 }
 
 // ============================================================================
