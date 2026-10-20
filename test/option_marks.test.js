@@ -11,7 +11,7 @@ const ROWS = [
 test('compactBookSummary keeps mark IV / price / forward and the index, drops rows without IV', () => {
   const snap = compactBookSummary(ROWS);
   assert.equal(snap.indexPrice, 84553.93);
-  assert.deepEqual(snap.marks['BTC-30OCT26-100000-C'], { markIv: 37.76, markPrice: 0.0026601, underlyingPrice: 84910.52 });
+  assert.deepEqual(snap.marks['BTC-30OCT26-100000-C'], { markIv: 37.76, markPrice: 0.0026601, underlyingPrice: 84910.52, openInterest: 0 });
   assert.equal(snap.marks['BTC-4OCT26-70000-P'], undefined);
   assert.equal(Object.keys(snap.marks).length, 2);
 });

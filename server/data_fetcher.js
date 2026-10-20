@@ -256,18 +256,63 @@ function alignHourlyToDvolDays(ticks, close) {
 }
 
 async function fetchPerpetualDailyCloses(currency, startTs, endTs) {
-  const out = new Map();
+  const empty = { daily: new Map(), hourly: [] };
   try {
     const from = Math.max(startTs, endTs - SPOT_ALIGN_DAYS * 86400000);
     const url = `https://www.deribit.com/api/v2/public/get_tradingview_chart_data?instrument_name=${currency}-PERPETUAL&start_timestamp=${from}&end_timestamp=${endTs}&resolution=60`;
     const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
-    if (!resp.ok) return out;
+    if (!resp.ok) return empty;
     const json = await resp.json();
-    return alignHourlyToDvolDays(json.result?.ticks || [], json.result?.close || []);
+    const ticks = json.result?.ticks || [];
+    const close = json.result?.close || [];
+    const hourly = ticks.map((ts, i) => ({ ts, close: close[i] })).filter(p => isPosNum(p.close));
+    return { daily: alignHourlyToDvolDays(ticks, close), hourly };
   } catch (err) {
     console.warn('Failed to fetch perpetual daily closes:', err.message);
   }
-  return out;
+  return empty;
+}
+
+/** DVOL 小时线 (最近 30 小时)，用于过去 24 小时的波动率变化；失败时返回空数组 */
+async function fetchDvolHourly(currency, endTs) {
+  try {
+    const url = `https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=${currency}&start_timestamp=${endTs - 30 * 3600000}&end_timestamp=${endTs}&resolution=3600`;
+    const resp = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return (json.result?.data || [])
+      .filter(d => Array.isArray(d) && Number.isFinite(d[0]) && isPosNum(d[4]))
+      .map(d => ({ ts: d[0], close: d[4] }));
+  } catch (err) {
+    console.warn('Failed to fetch hourly DVOL:', err.message);
+    return [];
+  }
+}
+
+/**
+ * 过去 hours 小时的现货与 DVOL 变化：两者各取最新一根小时收盘，与距其 hours 小时最近的一根比较。
+ * 任一侧缺少足够样本时返回 null。供做市商"已触发对冲流"估计。
+ */
+function recentChange(perpHourly, dvolHourly, hours = 24) {
+  const pick = series => {
+    if (!Array.isArray(series) || series.length < 2) return null;
+    const last = series[series.length - 1];
+    const target = last.ts - hours * 3600000;
+    const then = series.reduce((best, p) => (Math.abs(p.ts - target) < Math.abs(best.ts - target) ? p : best));
+    if (Math.abs(then.ts - target) > 2 * 3600000 || then.ts >= last.ts) return null;
+    return { now: last.close, then: then.close, nowTs: last.ts, thenTs: then.ts };
+  };
+  const spot = pick(perpHourly);
+  const dvol = pick(dvolHourly);
+  if (!spot || !dvol) return null;
+  return {
+    hours,
+    spotNow: spot.now,
+    spotThen: spot.then,
+    dvolNow: dvol.now,
+    dvolThen: dvol.then,
+    asOf: new Date(Math.min(spot.nowTs, dvol.nowTs)).toISOString()
+  };
 }
 
 /**
@@ -293,10 +338,15 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
 
     // 时间序列 (日线收盘)：最后一根为当日实时值。DVOL 与自身历史比较，避免拿 ATM 去比 VIX 式方差口径
     const chrono = data.map(d => ({ ts: d[0], dvol: d[4] }));
-    const spotByTs = await fetchPerpetualDailyCloses(currency, startTs, endTs);
+    const [perp, dvolHourly] = await Promise.all([
+      fetchPerpetualDailyCloses(currency, startTs, endTs),
+      fetchDvolHourly(currency, endTs)
+    ]);
     for (const p of chrono) {
-      if (spotByTs.has(p.ts)) p.spot = spotByTs.get(p.ts);
+      if (perp.daily.has(p.ts)) p.spot = perp.daily.get(p.ts);
     }
+    // 过去 24 小时现货与 DVOL 变化 (做市商已触发对冲流)
+    const recent24h = recentChange(perp.hourly, dvolHourly, 24);
 
     const closes = chrono.map(p => p.dvol);
     closes.sort((a, b) => a - b);
@@ -304,6 +354,7 @@ async function fetchDvolHistoricalStats(currency = 'BTC') {
     return {
       latest: chrono.length ? chrono[chrono.length - 1].dvol : null,
       chrono,
+      recent24h,
       count: closes.length,
       min: closes[0],
       max: closes[closes.length - 1],
@@ -756,6 +807,7 @@ module.exports = {
   refreshAllMarketData,
   fetchDvolHistoricalStats,
   alignHourlyToDvolDays,
+  recentChange,
   getCachedData,
   fetchBlockTrades,
   MARKET_SOURCE_IDS

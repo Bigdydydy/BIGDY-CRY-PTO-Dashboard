@@ -1,0 +1,1 @@
+{"currency":"BTC","version":1,"records":[{"day":"2026-10-20","ts":1792480376831,"spot":81661,"conv":{"gexUsd":100232819,"dexUsd":6864475885,"flip":80447},"flow":{"gexUsd":73088055,"dexUsd":3963659926,"flip":80356},"vexUsd":37105249,"cexUsd":-74111568,"realized24hUsd":208408555,"state":"buffer_fragile_down","robust":true,"nextMajor":{"expiry":"30OCT26","oiShare":38}}]}
