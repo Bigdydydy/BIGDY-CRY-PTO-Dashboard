@@ -36,3 +36,6 @@ data/flow_force/
 
 # 基差历史运行期 sidecar 健康回执 (由服务器运行时生成，不随归档提交)
 data/term_premium_history.health.json
+
+# 本地服务的线上兜底网址 (server/upstream_mirror.js)，每台机器各自配置
+upstream.local.json

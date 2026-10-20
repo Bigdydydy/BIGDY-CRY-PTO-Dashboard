@@ -5952,7 +5952,10 @@ function updateFlowKpis(data) {
     const parts = Object.values(data.sources).map(v => {
       const tip = [`来源: ${v.source || '无'}`, `存档 ${v.stored ?? 0} 根`].concat(v.errors || []).join(' | ').replace(/"/g, '&quot;');
       const viaTv = v.source && /TradingView/.test(v.source);
-      return `<span class="${v.ok ? (viaTv ? 'flow-src-warn' : '') : 'flow-src-bad'}" title="${tip}">${v.name}${v.ok ? (viaTv ? ' · 经 TV' : '') : ' ✕实时'}</span>`;
+      // 线上转发 = 线上部署直连该交易所的同一份数据，本机只是拿不到，不算降级
+      const viaUp = v.source && /线上转发/.test(v.source);
+      const via = viaUp ? ' · 经线上' : viaTv ? ' · 经 TV' : '';
+      return `<span class="${v.ok ? (viaTv ? 'flow-src-warn' : '') : 'flow-src-bad'}" title="${tip}">${v.name}${v.ok ? via : ' ✕实时'}</span>`;
     });
     const a = data.archive || {};
     const t = new Date(data.updatedAt);
@@ -5977,7 +5980,7 @@ function renderFlowAudit(data) {
         rows.push(`<tr>${cellTd}<td>${r.name || k}</td><td colspan="3" class="flow-src-bad">盘口不可用: ${r.error}</td>${weightTd}</tr>`);
         return;
       }
-      rows.push(`<tr>${cellTd}<td>${r.name}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td>${weightTd}</tr>`);
+      rows.push(`<tr>${cellTd}<td>${r.name}${r.via ? ` <span class="flow-audit-live">(${r.via})</span>` : ''}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td>${weightTd}</tr>`);
     });
   }
   body.innerHTML = rows.join('');
@@ -6306,7 +6309,8 @@ function renderCoinbaseLiquidity(data) {
 
   if (elCbUpdateTime && data.updatedAt) {
     const timeStr = new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false });
-    elCbUpdateTime.textContent = `${timeStr} (UTC+8)`;
+    // 本机连不上 Coinbase 时数据由线上部署转发，时间仍是线上采样时间
+    elCbUpdateTime.textContent = `${timeStr} (UTC+8)${data.mirroredFrom === 'upstream' ? ' · 经线上转发' : ''}`;
   }
 
   // 1. Percentile Heatmap
