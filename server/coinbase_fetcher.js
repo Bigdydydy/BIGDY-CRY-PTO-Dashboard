@@ -16,6 +16,7 @@ const { fetchWithTimeout } = require('./http_client');
 const liquidityHistory = require('./liquidity_history');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { fetchUpstreamJson } = require('./upstream_mirror');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity.json');
 const CACHE_TTL_MS = 15000; // 15 seconds memory cache
@@ -524,6 +525,30 @@ function seedDiskOnce() {
 }
 
 /**
+ * 线上兜底: 取线上 /api/coinbase-liquidity 的结果。去掉线上的 code / dataHealth，
+ * 按线上原始时间在本地重新登记来源 (source = upstream-mirror)，不冒充本地直连、也不刷新"新鲜度"。
+ * 结构不合格 (与磁盘缓存同一标准) 或未配置线上网址时返回 null。
+ * 不写入本地深度历史，也不覆盖磁盘缓存——它们只记录本机直连采到的数据。
+ */
+async function fetchMirroredLiquidity() {
+  let data;
+  try {
+    data = await fetchUpstreamJson('/api/coinbase-liquidity');
+  } catch (e) {
+    return null;
+  }
+  const { code, dataHealth, ...payload } = data;
+  if (!isPosNum(payload.midPrice) || !payload.depthProfile) return null;
+  const sources = (dataHealth && dataHealth.sources) || {};
+  const asOf = (sources.coinbase && sources.coinbase.dataAsOf) || payload.updatedAt || null;
+  recordSuccess('coinbase', { dataAsOf: asOf, asOfKind: 'received', source: 'upstream-mirror' });
+  const candleAsOf = sources.coinbase_candles && sources.coinbase_candles.dataAsOf;
+  if (candleAsOf) recordSuccess('coinbase_candles', { dataAsOf: candleAsOf, asOfKind: 'source', source: 'upstream-mirror' });
+  console.log(`[CoinbaseFetcher] 使用线上转发的 Coinbase 深度数据 (线上采样时间 ${asOf})`);
+  return { ...payload, mirroredFrom: 'upstream', mirroredAt: new Date().toISOString() };
+}
+
+/**
  * Main public getter for Coinbase liquidity dataset (single-flight).
  */
 function getCoinbaseLiquidityData(forceRefresh = false) {
@@ -593,6 +618,15 @@ async function doGetCoinbaseLiquidityData(forceRefresh = false) {
     return bound;
   } catch (err) {
     console.error('[CoinbaseFetcher] Error fetching from Coinbase:', err.message);
+
+    // 本机直连被拦截时，读线上部署直连 Coinbase 得到的同一份结果
+    const mirrored = await fetchMirroredLiquidity();
+    if (mirrored) {
+      const bound = withDataHealth(mirrored, REQUIRED_IDS);
+      inMemoryCache = bound;
+      lastFetchTime = now;
+      return bound;
+    }
 
     // Failures never record live snapshots nor touch the persisted file.
     if (inMemoryCache) return withDataHealth(inMemoryCache, REQUIRED_IDS);

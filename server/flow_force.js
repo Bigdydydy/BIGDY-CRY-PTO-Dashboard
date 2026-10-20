@@ -30,6 +30,7 @@ const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
 const { fetchTvBars } = require('./tradingview_feed');
 const binance = require('./binance_feed');
+const { fetchUpstreamJson, getUpstreamOrigin } = require('./upstream_mirror');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth } = require('./data_health_cache');
 
@@ -271,6 +272,24 @@ async function fetchBinanceVenue(key, tf, stored, now) {
   return { bars: [...got.values()].sort((a, b) => a.t - b.t), source: used.join(' + ') || null, errors };
 }
 
+/**
+ * 线上兜底: 本机连不上 Coinbase 时，读线上部署 /api/flow-force 里线上直连 Coinbase 得到的K线与 USDT/USD，
+ * 与线上页面完全同源 (TradingView 通道的成交量与 Coinbase API 略有出入)。
+ */
+async function fetchUpstreamFlow(tf) {
+  const d = await fetchUpstreamJson(`/api/flow-force?tf=${tf}`);
+  if (!Array.isArray(d.candles) || !/Coinbase/.test(d.candleSource || '')) throw new Error('线上主图K线不是 Coinbase');
+  return d;
+}
+
+const MIRROR = {
+  usSpot: {
+    label: '线上转发',
+    fn: async tf => (await fetchUpstreamFlow(tf)).candles
+      .map(k => ({ t: k.time * 1000, o: k.open, h: k.high, l: k.low, c: k.close, v: k.volumeUsd }))
+  }
+};
+
 async function fetchVenue(key, tf, stored, now) {
   if (key === 'bnPerp' || key === 'bnSpot') return fetchBinanceVenue(key, tf, stored, now);
   const errors = [];
@@ -282,6 +301,17 @@ async function fetchVenue(key, tf, stored, now) {
     errors.push(`${direct.label}: 空数据`);
   } catch (e) {
     errors.push(`${direct.label}: ${e.message}`);
+  }
+  const mirror = MIRROR[key];
+  if (mirror && getUpstreamOrigin()) {
+    try {
+      const bars = await mirror.fn(tf);
+      validateFlowBars(bars, mirror.label);
+      if (bars.length) return { bars, source: mirror.label, errors };
+      errors.push(`${mirror.label}: 空数据`);
+    } catch (e) {
+      errors.push(`${mirror.label}: ${e.message}`);
+    }
   }
   try {
     const bars = await fetchViaTv(VENUES[key].tv, tf, VENUES[key].tvVolume);
@@ -298,8 +328,18 @@ async function fetchUsdtUsd(tf) {
   const errors = [];
   for (const src of [
     { label: 'Coinbase API', fn: () => fetchCoinbase(tf, 'USDT-USD') },
+    {
+      label: '线上转发',
+      skip: !getUpstreamOrigin(),
+      fn: async () => {
+        const d = await fetchUpstreamFlow(tf);
+        if (!Array.isArray(d.usdtUsd) || !d.usdtUsd.length) throw new Error('线上未提供 USDT/USD (旧版本部署)');
+        return d.usdtUsd.filter(r => r[1] > 0).map(([time, c]) => ({ t: time * 1000, o: c, h: c, l: c, c, v: 0 }));
+      }
+    },
     { label: 'TradingView', fn: () => fetchViaTv('COINBASE:USDTUSD', tf) }
   ]) {
+    if (src.skip) continue;
     try {
       const bars = await src.fn();
       validateFlowBars(bars, src.label);
@@ -639,6 +679,15 @@ const AUDIT_TASKS = {
         getJson('https://api.exchange.coinbase.com/products/BTC-USD/stats', h)
       ]);
     } catch (e) {
+      // 线上兜底: 用线上直连 Coinbase 测得的盘口深度
+      if (getUpstreamOrigin()) {
+        try {
+          const row = (await fetchUpstreamJson('/api/flow-force?tf=1h')).audit.rows.usSpot;
+          if (row && row.depthUsd > 0) return { depth: row.depthUsd, vol24h: row.vol24hUsd, via: '线上转发' };
+        } catch (upErr) {
+          throw new Error(`本机网络无法直连 Coinbase 盘口，线上兜底也失败: ${upErr.message}`);
+        }
+      }
       throw new Error(`本机网络无法直连 Coinbase 盘口: ${e.message}`);
     }
     return { depth: bandDepth(book.bids, book.asks), vol24h: +st.volume * +st.last };
@@ -664,7 +713,8 @@ async function getVenueAudit() {
           ...base,
           depthUsd: Math.round(r.value.depth),
           vol24hUsd: Math.round(r.value.vol24h),
-          turnoverToDepth: round(r.value.vol24h / r.value.depth, 1)
+          turnoverToDepth: round(r.value.vol24h / r.value.depth, 1),
+          ...(r.value.via ? { via: r.value.via } : {})
         };
       } else {
         rows[k] = { ...base, error: r.status === 'rejected' ? r.reason.message : '深度为空' };
@@ -805,6 +855,8 @@ async function buildFlowForce(tf) {
       premiumMode,
       usdtUsdSource: usdt.source,
       candles,
+      // 与主图K线同一时间轴的 USDT/USD，供本地服务在连不上 Coinbase 时转发同一口径的汇率
+      usdtUsd: candles.map(k => [k.time, rates.has(k.time * 1000) ? rates.get(k.time * 1000) : null]),
       series
     };
 
@@ -881,5 +933,8 @@ module.exports = {
   normCdf,
   summarize,
   FIXED_WEIGHTS,
-  TF_MS
+  TF_MS,
+  // 测试用: 单个场所 / USDT/USD 的取数链路
+  fetchVenue,
+  fetchUsdtUsd
 };
