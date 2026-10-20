@@ -7316,3 +7316,16 @@ body {
   .dh-banner { margin: 6px 10px 0; font-size: 0.68rem; }
   .dh-pause-note { margin: 8px 10px; font-size: 0.74rem; }
 }
+
+/* 侧栏二级指标聚焦：只显示被选中的指标卡 */
+.view-panel .bento-card.module-focus-hidden {
+  display: none !important;
+}
+
+.bento-row-3:has(> .bento-card.module-focus-hidden) {
+  grid-template-columns: 1fr;
+}
+
+.bento-row-3:not(:has(> .bento-card:not(.module-focus-hidden))) {
+  display: none;
+}

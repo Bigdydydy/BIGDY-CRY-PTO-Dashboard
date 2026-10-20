@@ -878,6 +878,13 @@
           run: () => { if (typeof window.switchView === 'function') window.switchView(btn.dataset.view); }
         };
       });
+      const leaves = Array.from(document.querySelectorAll('#app-sidebar .sidebar-sub-item[data-module]')).map(btn => ({
+        group: '指标',
+        label: btn.textContent.trim(),
+        hint: btn.closest('.nav-sublist')?.previousElementSibling?.querySelector('.nav-title')?.textContent.trim() || '',
+        badge: '',
+        run: () => btn.click()
+      }));
       const arts = PAINTINGS.map((p, i) => ({
         group: '画作',
         label: `${p.title}`,
@@ -895,7 +902,7 @@
         { group: '命令', label: '收起 / 展开侧栏', hint: '快捷键 [', badge: '[', run: () => Rail.toggle() },
         { group: '命令', label: '重播开场', hint: '再看一次开场动画', badge: '▶', run: () => runSplash({ replay: true }) }
       ];
-      return [...views, ...arts, ...actions];
+      return [...views, ...leaves, ...arts, ...actions];
     }
 
     function render() {
@@ -1432,6 +1439,7 @@
     openGallery: () => Gallery.open(),
     contemplate: () => Contemplate.enter(),
     replayIntro: (opts) => runSplash(Object.assign({}, opts, { replay: true })),
-    snapshot: () => Snapshot.shoot()
+    snapshot: () => Snapshot.shoot(),
+    moveNavIndicator: () => Rail.moveIndicator()
   };
 })();
