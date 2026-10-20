@@ -1719,7 +1719,8 @@ describe('Module 9: Derivative Strategy Identification & Pricing Calibration (Me
     // Deribit inverse Put breakeven: K / (1 + P) = 80000 / (1 + 0.04) = 76,923.08
     assert.ok(putStrat.riskProfile.breakEven.includes('76,923'));
     // Maximum payoff in BTC diverges as S -> 0
-    assert.ok(putStrat.riskProfile.maxProfit.includes('+∞ BTC'));
+    assert.ok(putStrat.riskProfile.maxProfit.includes('BTC 计无上限'));
+    assert.equal(putStrat.riskProfile.bounds.isProfitCapped, false);
     assert.ok(putStrat.riskProfile.maxProfit.includes('$80,000'));
   });
 
@@ -1733,7 +1734,7 @@ describe('Module 9: Derivative Strategy Identification & Pricing Calibration (Me
     assert.equal(bcsStrat.strategyType, 'BULL_CALL_SPREAD');
     // Net debit BTC = 0.15 - 0.05 = 0.10 BTC per contract
     // Exact BTC max profit at K2 (100k): ((100k - 80k)/100k - 0.10) * 10 = (0.20 - 0.10) * 10 = 1.00 BTC
-    assert.ok(bcsStrat.riskProfile.maxProfit.includes('1.00 BTC'));
+    assert.ok(bcsStrat.riskProfile.maxProfit.includes('+1.000 BTC @ $100,000'));
     // Inverse breakeven: K1 / (1 - netDebitBTC) = 80000 / (1 - 0.10) = 88,888.89 -> 88,889
     assert.ok(bcsStrat.riskProfile.breakEven.includes('88,889'));
 

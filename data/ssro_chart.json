@@ -1,23 +1,23 @@
 {
   "code": 0,
-  "updatedAt": "2026-10-20T07:24:06.530Z",
+  "updatedAt": "2026-10-20T11:22:21.339Z",
   "source": "TradingView (CRYPTOCAP:STABLE.C) & DefiLlama & Binance",
   "pinescript": "method ssro(float src, array<float> stblsrc, int len) =>\n    float ssr = src / stblsrc.sum()               // Source of the underlying divided by the sum of stablecoin sources\n    (ssr - ta.sma(ssr, len)) / ta.stdev(ssr, len) // Z-Score Transformed",
   "latest": {
     "date": "2026-10-20",
-    "btcPrice": 81696.2,
-    "stableCap": 308623482375,
-    "stableCapBillions": "308.62",
-    "ssr": 5.316,
-    "ssro200": 1.115,
-    "ssro50": -0.289,
+    "btcPrice": 81488,
+    "stableCap": 303725297710,
+    "stableCapBillions": "303.73",
+    "ssr": 5.388,
+    "ssro200": 1.255,
+    "ssro50": 0.098,
     "tvQuote": {
       "symbol": "CRYPTOCAP:STABLE.C",
-      "change24h": -0.14166357557261805,
-      "priceUsd": 308623482375
+      "change24h": 0,
+      "priceUsd": 303725297710
     },
     "quantEvaluation": {
-      "zScore": 1.115,
+      "zScore": 1.255,
       "zone": "moderately_overbought",
       "label": "偏热警戒 (买力消耗)",
       "colorClass": "text-amber",
@@ -29686,34 +29686,34 @@
     },
     {
       "date": "2026-10-20",
-      "btcPrice": 81696.2,
-      "stableCap": 308623482375,
-      "ssr": 5.316,
-      "ssro200": 1.115,
+      "btcPrice": 81488,
+      "stableCap": 303725297710,
+      "ssr": 5.388,
+      "ssro200": 1.255,
       "sma200": 4.75,
       "stdev200": 0.508,
-      "upper2_200": 5.766,
+      "upper2_200": 5.767,
       "lower2_200": 3.734,
-      "ssro50": -0.289,
-      "sma50": 5.369,
+      "ssro50": 0.098,
+      "sma50": 5.37,
       "stdev50": 0.182
     }
   ],
   "dataHealth": {
-    "state": "OK",
+    "state": "DEGRADED",
     "analysisAllowed": true,
     "stale": false,
     "sources": {
       "ssro": {
         "id": "ssro",
         "observed": true,
-        "state": "OK",
+        "state": "FALLBACK",
         "freshnessStatus": "FRESH",
         "usable": true,
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 26646532,
+        "dataAgeMs": 40941347,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -29721,14 +29721,16 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-20T07:24:06.532Z",
-        "lastSuccessAt": "2026-10-20T07:24:06.532Z",
+        "lastAttemptAt": "2026-10-20T11:22:21.347Z",
+        "lastSuccessAt": "2026-10-20T11:22:21.347Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "ssro/build",
         "lastError": null,
         "consecutiveFailures": 0,
-        "issues": [],
+        "issues": [
+          "TradingView 实时报价缺失，未注入今日报价"
+        ],
         "available": true
       },
       "ssro_stable": {
@@ -29739,8 +29741,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 193,
-        "dataAgeMs": 26646532,
+        "ageMs": 8937,
+        "dataAgeMs": 40941347,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -29748,8 +29750,8 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-20T07:24:06.339Z",
-        "lastSuccessAt": "2026-10-20T07:24:06.339Z",
+        "lastAttemptAt": "2026-10-20T11:22:12.410Z",
+        "lastSuccessAt": "2026-10-20T11:22:12.410Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "defillama/stablecoincharts",
@@ -29759,20 +29761,22 @@
         "available": true
       }
     },
-    "failedSources": [],
+    "failedSources": [
+      "ssro"
+    ],
     "blockedSources": []
   },
   "ancillarySources": {
     "ssro_quote": {
       "id": "ssro_quote",
       "observed": true,
-      "state": "OK",
-      "freshnessStatus": "FRESH",
-      "usable": true,
+      "state": "UNAVAILABLE",
+      "freshnessStatus": "UNKNOWN",
+      "usable": false,
       "stale": false,
       "expired": false,
-      "ageMs": 8,
-      "dataAgeMs": 8,
+      "ageMs": null,
+      "dataAgeMs": null,
       "warnings": [],
       "policy": {
         "fetchWarnMs": 180000,
@@ -29780,13 +29784,13 @@
         "dataWarnMs": 180000,
         "dataBlockMs": 900000
       },
-      "lastAttemptAt": "2026-10-20T07:24:06.524Z",
-      "lastSuccessAt": "2026-10-20T07:24:06.524Z",
-      "dataAsOf": "2026-10-20T07:24:06.524Z",
-      "asOfKind": "received",
-      "source": "tradingview/scan",
-      "lastError": null,
-      "consecutiveFailures": 0,
+      "lastAttemptAt": "2026-10-20T11:22:21.323Z",
+      "lastSuccessAt": null,
+      "dataAsOf": null,
+      "asOfKind": null,
+      "source": null,
+      "lastError": "TradingView 报价缺 stableCap 或 btcPrice",
+      "consecutiveFailures": 1,
       "issues": [],
       "available": true
     }

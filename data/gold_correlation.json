@@ -9,30 +9,30 @@
     "timeRange": "2024-01-25 至 2026-10-20",
     "totalDays": 1000,
     "correlationWindowDays": 30,
-    "goldBenchmarkMarketCap": "$28.24T (全球地上黄金存量动态估算)",
+    "goldBenchmarkMarketCap": "$28.19T (全球地上黄金存量动态估算)",
     "isRealHistorical": true
   },
   "current": {
-    "btcPrice": 81619,
-    "goldPrice": 4133.87,
-    "btcGoldRatio": 19.74,
-    "goldBtcRatio": 0.05065,
-    "ratioChange24h": -0.4,
-    "marketCapShare": 5.72,
-    "rollingCorr30d": 0.349,
+    "btcPrice": 81542,
+    "goldPrice": 4125.96,
+    "btcGoldRatio": 19.76,
+    "goldBtcRatio": 0.0506,
+    "ratioChange24h": -0.3,
+    "marketCapShare": 5.73,
+    "rollingCorr30d": 0.351,
     "timestamp": 1792454400000,
     "date": "2026-10-20"
   },
   "regime": {
     "regimeCode": "MODERATE_LINKAGE",
-    "regimeName": "温和正向联动 (Moderate Linkage)",
+    "regimeName": "温和正相关 (Moderate Linkage)",
     "badgeClass": "badge-cyan",
     "color": "#38bdf8",
-    "summary": "BTC 与黄金保持温和正相关 (30D r = +0.35)。宏观大宗流动性平稳有序，两者维持基准协同但各自具有资产特色。",
+    "summary": "BTC 与黄金 30 日相关系数 r = +0.35，有一定同向性，但对彼此的解释力有限 (r² ≈ 0.12)。",
     "keyPointers": [
-      "流动性常态传导：宏观货币政策处于观察期，黄金稳步筑底，BTC 维持温和风险偏好。",
-      "比价震荡巩固：1 BTC 稳定在 19.7 盎司黄金区间，机构套利与再平衡策略顺畅。",
-      "关注事件催化：密切跟踪 CPI 通胀数据与地缘局势变化，观察是否触发共振升级。"
+      "比价：1 BTC ≈ 19.8 盎司黄金，BTC 市值约为黄金的 5.7%；看比价方向可知 BTC 相对黄金的强弱。",
+      "观察 CPI、利率决议等共同冲击是否推高相关性。",
+      "30 日窗口样本较少，单个宏观事件即可明显改变相关系数。"
     ]
   },
   "series": [
@@ -10029,15 +10029,15 @@
     {
       "date": "2026-10-20",
       "timestamp": 1792454400000,
-      "btcPrice": 81619,
-      "goldPrice": 4133.87,
-      "btcGoldRatio": 19.74,
-      "goldBtcRatio": 0.05065,
-      "marketCapShare": 5.72,
-      "rollingCorr30d": 0.349
+      "btcPrice": 81542,
+      "goldPrice": 4125.96,
+      "btcGoldRatio": 19.76,
+      "goldBtcRatio": 0.0506,
+      "marketCapShare": 5.73,
+      "rollingCorr30d": 0.351
     }
   ],
-  "updatedAt": "2026-10-20T07:26:05.783Z",
+  "updatedAt": "2026-10-20T11:27:00.813Z",
   "dataHealth": {
     "state": "OK",
     "analysisAllowed": true,
@@ -10052,7 +10052,7 @@
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 26765783,
+        "dataAgeMs": 41220813,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -10060,8 +10060,8 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-20T07:26:05.783Z",
-        "lastSuccessAt": "2026-10-20T07:26:05.783Z",
+        "lastAttemptAt": "2026-10-20T11:27:00.813Z",
+        "lastSuccessAt": "2026-10-20T11:27:00.813Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "Binance",

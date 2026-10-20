@@ -1,19 +1,34 @@
 """
-Core track store: daily close + market cap for the CoinGecko Top 300
+Core track store: daily sampled price + market cap for the CoinGecko Top 300
 candidates, so the Top 100 can be re-ranked point-in-time every day.
 
-core_daily.csv (long format, one row per coin per UTC close date):
-    date, coin_id, symbol, name, close, market_cap, volume
+core_daily.csv (long format, one row per coin per labeled UTC date):
+    date, coin_id, symbol, name, close, market_cap, volume,
+    observed_at, price_basis
+
+observed_at is the UTC retrieval timestamp of the row's quotes — when the
+snapshot was taken, not a guaranteed last-trade time (blank on rows written
+before provenance was tracked; never invented afterwards).
+price_basis is "snapshot" (live quote), "utc_close" (seeded daily close)
+or "legacy_unverified" (rows without a recorded basis).
 """
 
 import csv
+import math
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import config
 from src.http_client import get_json
 
-FIELDS = ["date", "coin_id", "symbol", "name", "close", "market_cap", "volume"]
+FIELDS = ["date", "coin_id", "symbol", "name", "close", "market_cap", "volume",
+          "observed_at", "price_basis"]
+
+
+def _utcnow():
+    """Sampling clock, isolated so tests can stub a fixed retrieval time."""
+    return datetime.now(timezone.utc)
 
 
 def _fmt(x: float) -> str:
@@ -24,7 +39,13 @@ def load_store(path: Path = config.CORE_STORE_FILE):
     if not path.exists():
         return []
     with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        # Legacy rows predate the provenance columns: keep observed_at empty
+        # (never invent a sampling time) and label the basis unverified.
+        r["observed_at"] = r.get("observed_at") or ""
+        r["price_basis"] = r.get("price_basis") or "legacy_unverified"
+    return rows
 
 
 def save_store(rows, path: Path = config.CORE_STORE_FILE):
@@ -44,6 +65,12 @@ def upsert(rows, new_rows):
     return list(merged.values())
 
 
+def replace_snapshot(rows, new_rows):
+    """Drop every stored row of the dates present in new_rows (whole-day replace)."""
+    dates = {r["date"] for r in new_rows}
+    return [r for r in rows if r["date"] not in dates] + list(new_rows)
+
+
 def index_store(rows):
     """
     by_date: {date: {coin_id: (close, market_cap)}}
@@ -52,14 +79,18 @@ def index_store(rows):
     by_date, meta = {}, {}
     for r in sorted(rows, key=lambda r: r["date"]):
         close = float(r["close"] or 0)
-        if close <= 0:
+        if not math.isfinite(close) or close <= 0:
             continue
-        by_date.setdefault(r["date"], {})[r["coin_id"]] = (close, float(r["market_cap"] or 0))
+        cap = float(r["market_cap"] or 0)
+        if not math.isfinite(cap) or cap < 0:
+            cap = 0.0
+        by_date.setdefault(r["date"], {})[r["coin_id"]] = (close, cap)
         meta[r["coin_id"]] = (r["symbol"], r["name"])
     return by_date, meta
 
 
-def make_row(date: str, coin_id: str, symbol: str, name: str, close, market_cap, volume):
+def make_row(date: str, coin_id: str, symbol: str, name: str, close, market_cap, volume,
+             *, observed_at: str = "", price_basis: str = "legacy_unverified"):
     return {
         "date": date,
         "coin_id": coin_id,
@@ -68,6 +99,8 @@ def make_row(date: str, coin_id: str, symbol: str, name: str, close, market_cap,
         "close": _fmt(float(close)),
         "market_cap": str(int(float(market_cap or 0))),
         "volume": str(int(float(volume or 0))),
+        "observed_at": observed_at,
+        "price_basis": price_basis,
     }
 
 
@@ -94,13 +127,21 @@ def fetch_candidates(n: int = config.CORE_CANDIDATE_N):
 
 
 def fetch_live_snapshot(trade_date: str):
-    """Today's close proxy (run near the UTC close) for the Top-300 candidates."""
+    """Live quote snapshot for the Top-300 candidates, dated to its own UTC day."""
+    coins = fetch_candidates()
+    retrieved = _utcnow()
+    observed_at = retrieved.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if retrieved.strftime("%Y-%m-%d") != trade_date:
+        raise ValueError(
+            f"[Core] sample crossed midnight: retrieved {observed_at} does not "
+            f"match requested trade_date {trade_date}")
     rows = []
-    for c in fetch_candidates():
+    for c in coins:
         price, mcap = c.get("current_price"), c.get("market_cap")
         if not price or not mcap:
             continue
         rows.append(make_row(trade_date, c["id"], c.get("symbol"), c.get("name"),
-                             price, mcap, c.get("total_volume")))
-    print(f"[Core] Live snapshot {trade_date}: {len(rows)} candidates")
+                             price, mcap, c.get("total_volume"),
+                             observed_at=observed_at, price_basis="snapshot"))
+    print(f"[Core] Live snapshot {trade_date} @ {observed_at}: {len(rows)} candidates")
     return rows

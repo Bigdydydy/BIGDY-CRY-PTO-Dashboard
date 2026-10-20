@@ -211,14 +211,25 @@
     return { S0, minS, maxS, prices: Array.from(priceSet).sort((a, b) => a - b) };
   }
 
-  // Zero-crossings via linear interpolation
-  function findBreakevens(points, key) {
+  // Zero-crossings of the sampled curve. With pnlAt(S) the bracket is refined by bisection, since
+  // inverse payoffs are curved in S and a linear interpolation drifts by tens of dollars.
+  function findBreakevens(points, key, pnlAt = null) {
     const breakevens = [];
     for (let i = 0; i < points.length - 1; i++) {
       const y1 = points[i][key];
       const y2 = points[i + 1][key];
       if (((y1 <= 0 && y2 >= 0) || (y1 >= 0 && y2 <= 0)) && y2 !== y1) {
-        const bep = Math.round(points[i].S + (0 - y1) * (points[i + 1].S - points[i].S) / (y2 - y1));
+        let bep = points[i].S + (0 - y1) * (points[i + 1].S - points[i].S) / (y2 - y1);
+        if (pnlAt && y1 !== 0 && y2 !== 0) {
+          let lo = points[i].S;
+          let hi = points[i + 1].S;
+          for (let k = 0; k < 40; k++) {
+            const mid = (lo + hi) / 2;
+            if ((pnlAt(mid) > 0) === (y1 > 0)) lo = mid; else hi = mid;
+          }
+          bep = (lo + hi) / 2;
+        }
+        bep = Math.round(bep);
         if (breakevens[breakevens.length - 1] !== bep) breakevens.push(bep);
       }
     }
@@ -339,7 +350,7 @@
 
     return {
       series,
-      breakevens: findBreakevens(series, 'pnlBtc'),
+      breakevens: findBreakevens(series, 'pnlBtc', S => calculatePortfolioPnLBTC(legs, S)),
       initialCashFlowBTC: initialCashFlow(legs),
       currentSpotPnLBTC: calculatePortfolioPnLBTC(legs, S0),
       ...tail,
@@ -378,8 +389,8 @@
 
     return {
       series,
-      breakevens: findBreakevens(series, 'expBtc'),
-      simBreakevens: findBreakevens(series, 'simBtc'),
+      breakevens: findBreakevens(series, 'expBtc', S => evaluatePortfolio(legs, S, expiryEvalMs, ivShiftPct).pnlBtc),
+      simBreakevens: findBreakevens(series, 'simBtc', S => evaluatePortfolio(legs, S, evalMs, ivShiftPct).pnlBtc),
       initialCashFlowBTC: initialCashFlow(legs),
       ...tail,
       ...buildExtrema(series, 'expBtc', tail),

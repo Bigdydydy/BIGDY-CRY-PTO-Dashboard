@@ -20,12 +20,8 @@ OUTPUT_JSON_FILE = BASE_DIR.parent.parent / "data" / "crypto_mcclellan.json"
 HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MacroQuant/2.0",
                 "Accept": "application/json"}
 
-# A snapshot is labeled with the UTC date of (run time - 12h), i.e. the close
-# it follows. The cron fires at 00:15 UTC and GitHub Actions has been starting
-# it 2-3.5h late, so any start before 12:00 UTC still lands on the same close.
-# An off-schedule daytime run labels the current day and is overwritten by the
-# next scheduled post-close run.
-TRADE_DATE_LAG_HOURS = 12
+# Quotes are sampled when the job runs, not reconstructed UTC closes.
+# Delayed jobs must use their actual UTC collection date.
 
 # -------------------------------------------------------------
 # McClellan parameters (classic ratio-adjusted form)
@@ -39,7 +35,12 @@ BAND_HIGH_PCT = 90
 BAND_MIN_OBS = 60           # minimum published days before bands are drawn
 
 # Max calendar gap between two observations that still counts as a daily change
-MAX_GAP_DAYS = 3
+MAX_GAP_DAYS = 1
+
+# Descriptive windows, not calibrated prediction thresholds.
+STRUCTURE_DRAWDOWN_DAYS = 52 * 7
+STRUCTURE_MA_DAYS = 200
+STRUCTURE_VOL_DAYS = 30
 
 # -------------------------------------------------------------
 # Core track (CoinGecko Top N, point-in-time)

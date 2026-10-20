@@ -86,15 +86,41 @@ function escapeMd(s) {
   return String(s).replace(/([\\`*_[\]|<>])/g, '\\$1');
 }
 
+const LIVE_UNCONFIGURED_REASON = 'Live dashboard audit URL not configured';
+
+function isLiveUnconfigured(report) {
+  return !!report && !!report.live &&
+    report.live.state === 'UNKNOWN' &&
+    report.live.reason === LIVE_UNCONFIGURED_REASON;
+}
+
 function formatSummary(report) {
   const lines = [
     '## Data source health',
     '',
     `- **Overall:** ${report.overallHealth} (checked ${report.checkedAt})`,
-    '',
+    ''
+  ];
+  if (isLiveUnconfigured(report)) {
+    lines.push(
+      'Live coverage is incomplete: `DASHBOARD_HEALTH_URL` is not configured.',
+      'This is a monitoring configuration gap, not a confirmed upstream outage.',
+      '',
+      'In this repository, open Settings > Secrets and variables > Actions >',
+      'Variables and set `DASHBOARD_HEALTH_URL` to',
+      '`https://<deployed-host>/api/system/health`. An Actions secret of the same',
+      'name is also supported; the variable takes precedence.',
+      '',
+      'Use an internet-reachable dashboard deployment, not `/healthz`, a GitHub',
+      'Pages URL, or your PC localhost. Re-run Data Source Health Monitor after',
+      'configuration; missing live coverage continues to fail the health gate.',
+      ''
+    );
+  }
+  lines.push(
     '| Check | State | Reason |',
     '| --- | --- | --- |'
-  ];
+  );
   const entries = [
     ...Object.entries(report.jobs).map(([k, v]) => [`job:${k}`, v]),
     ...Object.entries(report.artifacts).map(([k, v]) => [`artifact:${k}`, v]),
@@ -132,6 +158,11 @@ async function runCheck({
 
   console.log(`[data-health] overall ${report.overallHealth} @ ${report.checkedAt}`);
   for (const a of report.alerts) console.log(`[data-health] ${a.state} ${a.id}: ${a.reason}`);
+  if (isLiveUnconfigured(report)) {
+    console.log('[data-health] configuration required: set repository Actions ' +
+      'variable DASHBOARD_HEALTH_URL to https://<deployed-host>/api/system/health; ' +
+      'live coverage remains UNKNOWN until verified.');
+  }
 
   if (summaryPath) {
     try { fs.appendFileSync(summaryPath, formatSummary(report), 'utf8'); }

@@ -14,29 +14,32 @@ concurrency:
 
 jobs:
   monitor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout latest snapshots
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Check producer heartbeats and actual source dates
         id: health
-        continue-on-error: true
         env:
-          DASHBOARD_HEALTH_URL: ${{ vars.DASHBOARD_HEALTH_URL }}
-        run: node scripts/data_health_check.js --output "$RUNNER_TEMP/data-health-report.json"
+          DASHBOARD_HEALTH_URL: ${{ vars.DASHBOARD_HEALTH_URL || secrets.DASHBOARD_HEALTH_URL }}
+        # Collect diagnostics here; the final gate is the single health failure.
+        run: |
+          exit_code=0
+          node scripts/data_health_check.js --output "$RUNNER_TEMP/data-health-report.json" || exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
 
       - name: Retain diagnostic report
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: data-health-report
           path: ${{ runner.temp }}/data-health-report.json
@@ -44,11 +47,13 @@ jobs:
           retention-days: 14
 
       - name: Optional configured webhook
-        if: ${{ !cancelled() && steps.health.outcome == 'failure' }}
+        if: ${{ !cancelled() && (steps.health.outcome != 'success' || steps.health.outputs.exit_code != '0') }}
         env:
           DATA_HEALTH_WEBHOOK_URL: ${{ secrets.DATA_HEALTH_WEBHOOK_URL }}
         run: node scripts/data_health_alert.js "$RUNNER_TEMP/data-health-report.json"
 
       - name: Fail visibly on incomplete or unhealthy coverage
-        if: ${{ !cancelled() && steps.health.outcome != 'success' }}
-        run: exit 1
+        if: ${{ !cancelled() && (steps.health.outcome != 'success' || steps.health.outputs.exit_code != '0') }}
+        run: |
+          echo "Data health coverage is incomplete or unhealthy. See the Data source health summary and data-health-report artifact."
+          exit 1

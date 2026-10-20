@@ -57,7 +57,10 @@ def history_rows(coin: dict, data: dict):
             continue
         close_date = datetime.fromtimestamp((ts - DAY_MS) / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
         rows.append(core_track.make_row(close_date, coin["id"], coin.get("symbol"), coin.get("name"),
-                                        price, caps.get(ts) or 0, vols.get(ts) or 0))
+                                        price, caps.get(ts) or 0, vols.get(ts) or 0,
+                                        observed_at=datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                                                   .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                        price_basis="utc_close"))
     return rows
 
 
