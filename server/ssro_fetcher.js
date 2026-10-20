@@ -365,31 +365,31 @@ async function fetchAndBuildSsroData() {
 
   // Determine market liquidity state & quant evaluation
   let quantZone = 'neutral';
-  let quantZoneLabel = '均衡博弈区';
+  let quantZoneLabel = '均衡区间';
   let quantColor = 'text-primary';
-  let quantSignal = '流动性供需处于统计正态平衡区间，价格受现货与微观期权综合驱动。';
+  let quantSignal = 'BTC 市值与稳定币总量之比处于统计常态区间 (|z| ≤ 1)。';
 
   const z = latestPoint.ssro200 !== null ? latestPoint.ssro200 : (latestPoint.ssro50 || 0);
   if (z <= -2.0) {
     quantZone = 'extreme_oversold';
-    quantZoneLabel = '极度充沛 (强劲支撑)';
+    quantZoneLabel = '稳定币相对充裕 (z ≤ -2)';
     quantColor = 'text-green';
-    quantSignal = '稳定币蓄水池相对于 BTC 市值处于历史充沛高位，场外买盘承接与抄底法币弹药充盈，具有高胜率宏观支撑。';
+    quantSignal = 'BTC 市值相对稳定币总量处于统计低位，稳定币存量相对 BTC 偏大。存量不等于买入意愿：稳定币也用作保证金、支付与 DeFi 抵押；本模块未统计该区间之后的历史胜率。';
   } else if (z < -1.0) {
     quantZone = 'moderately_oversold';
-    quantZoneLabel = '充裕健康 (偏强支撑)';
+    quantZoneLabel = '稳定币偏充裕 (-2 < z < -1)';
     quantColor = 'text-green-light';
-    quantSignal = '稳定币购买力充沛，下行回踩具备充足法币流动性缓冲与吸筹意愿。';
+    quantSignal = 'BTC 市值相对稳定币总量偏低；稳定币存量是否转化为现货买盘，需结合交易所稳定币净流入观察。';
   } else if (z >= 2.0) {
     quantZone = 'extreme_overbought';
-    quantZoneLabel = '购买力衰竭 (顶部风险)';
+    quantZoneLabel = '稳定币相对紧缺 (z ≥ 2)';
     quantColor = 'text-red';
-    quantSignal = 'BTC 涨速脱离稳定币总量扩张斜率，稳定币买盘承接力过度透支，警惕流动性挤压或顶部回调。';
+    quantSignal = 'BTC 市值增速明显快于稳定币总量，上涨更多依赖稳定币以外的资金或杠杆。这提高了回撤时的脆弱性，但不构成顶部判断。';
   } else if (z > 1.0) {
     quantZone = 'moderately_overbought';
-    quantZoneLabel = '偏热警戒 (买力消耗)';
+    quantZoneLabel = '稳定币偏紧 (1 < z < 2)';
     quantColor = 'text-amber';
-    quantSignal = 'BTC 相对稳定币市值扩张较为激进，增量流动性承接开始收紧，建议注意阶段性止盈。';
+    quantSignal = 'BTC 市值相对稳定币总量偏高，稳定币存量对现价的覆盖在下降。';
   }
 
   const payload = {

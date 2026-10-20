@@ -3,7 +3,7 @@ name: Crypto McClellan Daily Update
 on:
   schedule:
     # 收盘后多个时段各排一次（避开整点高峰，GitHub 高峰期会延迟甚至丢弃定时任务）。
-    # 12:00 UTC 前启动的运行都记为刚收盘的那一天 (TRADE_DATE_LAG_HOURS = 12)；
+    # 报价按实际 UTC 采集日和采样时间记录，不冒充固定时点的 UTC 收盘；
     # 第一次成功采集即定稿，之后的时段直接跳过、不产生提交 (--skip-if-final)
     - cron: '37 0 * * *'
     - cron: '37 3 * * *'

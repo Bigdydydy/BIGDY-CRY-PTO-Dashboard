@@ -12,9 +12,10 @@ Run: python export_to_json.py            (collect + compute)
 
 import argparse
 import json
+import math
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -22,13 +23,13 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import config
-from src import anchor, breadth, core_track, frontier_track
+from src import anchor, breadth, core_track, frontier_track, structure
 
 
 def trade_date_now(now: datetime = None) -> str:
-    """UTC close a run belongs to: the date of (run time - TRADE_DATE_LAG_HOURS)."""
+    """The actual UTC date on which live quotes are sampled."""
     now = now or datetime.now(timezone.utc)
-    return (now - timedelta(hours=config.TRADE_DATE_LAG_HOURS)).strftime("%Y-%m-%d")
+    return now.astimezone(timezone.utc).strftime("%Y-%m-%d")
 
 
 def load_collection_log():
@@ -38,22 +39,22 @@ def load_collection_log():
 
 
 def is_final(entry, trade_date: str) -> bool:
-    """
-    A trade date is final once Core and Frontier were both collected after
-    that day's UTC close. Intraday snapshots (a daytime manual refresh) are not
-    final and get replaced by the next post-close run.
-    """
-    if not entry or entry.get("failed"):
+    """Skip repeat jobs only for a complete, correctly dated new snapshot."""
+    if not entry or entry.get("failed") or entry.get("sampling_basis") != "utc_snapshot":
         return False
-    close = (datetime.fromisoformat(trade_date) + timedelta(days=1)).replace(tzinfo=timezone.utc)
-    return datetime.fromisoformat(entry["collected_at"].replace("Z", "+00:00")) >= close
+    try:
+        collected = datetime.fromisoformat(entry["collected_at"].replace("Z", "+00:00"))
+        return collected.tzinfo is not None and trade_date_now(collected) == trade_date
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def record_collection(trade_date: str, failed, now: datetime = None):
     log = load_collection_log()
     now = now or datetime.now(timezone.utc)
     log[trade_date] = {"collected_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                       "failed": [f for f in failed if f in ("core", "frontier")]}
+                       "failed": [f for f in failed if f in ("core", "frontier")],
+                       "sampling_basis": "utc_snapshot"}
     config.COLLECTION_LOG_FILE.write_text(json.dumps(log, indent=1, sort_keys=True), encoding="utf-8")
 
 
@@ -83,7 +84,7 @@ def collect(trade_date: str):
 
     snapshot = _with_retry("Core", lambda: core_track.fetch_live_snapshot(trade_date))
     if snapshot:
-        core_track.save_store(core_track.upsert(core_track.load_store(), snapshot))
+        core_track.save_store(core_track.replace_snapshot(core_track.load_store(), snapshot))
     else:
         failed.append("core")
 
@@ -105,48 +106,89 @@ def collect(trade_date: str):
 
 
 def track_summary(rows, warmup: int):
-    """Oscillator / summation series plus the latest reading for one track."""
-    # Frontier rows carry a chain-equal-weighted RAMO; Core uses plain counts
-    ramo = [b.get("ramo", breadth.ratio_adjusted(b["adv"], b["dec"])) for b in rows]
-    osc, summ = breadth.mcclellan(ramo, warmup)
-    published = [o for o in osc if o is not None]
+    """Reset after incomplete/gapped days; every historical band is causal."""
+    by_date, published, osc, summ = {}, [], [], []
+    alpha_fast = 2 / (config.EMA_FAST + 1)
+    alpha_slow = 2 / (config.EMA_SLOW + 1)
+    fast = slow = None
+    running, streak, previous_date = 0.0, 0, None
+    bands, percentile, ramo = None, None, None
+    for original in rows:
+        b = dict(original)
+        ramo = b.get("ramo", breadth.ratio_adjusted(b["adv"], b["dec"]))
+        if previous_date and breadth.day_gap(previous_date, b["date"]) != 1:
+            fast = slow = None
+            running, streak = 0.0, 0
+        valid = b.get("complete", True) and b["n"] > 0 and math.isfinite(ramo)
+        if valid:
+            fast = ramo if fast is None else alpha_fast * ramo + (1 - alpha_fast) * fast
+            slow = ramo if slow is None else alpha_slow * ramo + (1 - alpha_slow) * slow
+            streak += 1
+        else:
+            fast = slow = None
+            running, streak = 0.0, 0
+        o = fast - slow if valid and streak >= warmup else None
+        bands = None
+        if len(published) >= config.BAND_MIN_OBS:
+            bands = {"low": _r(breadth.quantile(published, config.BAND_LOW_PCT / 100)),
+                     "high": _r(breadth.quantile(published, config.BAND_HIGH_PCT / 100))}
+        percentile = (breadth.percentile_rank(published, o)
+                      if o is not None and published else None)
+        if o is not None:
+            running += o
+            published.append(o)
+        s = running if o is not None else None
+        b.update({"band_low": bands["low"] if bands else None,
+                  "band_high": bands["high"] if bands else None,
+                  "percentile": _r(percentile, 0), "valid_streak_days": streak})
+        osc.append(o)
+        summ.append(s)
+        by_date[b["date"]] = (b, ramo, o, s)
+        previous_date = b["date"]
 
-    bands = None
-    if len(published) >= config.BAND_MIN_OBS:
-        bands = {"low": _r(breadth.quantile(published, config.BAND_LOW_PCT / 100)),
-                 "high": _r(breadth.quantile(published, config.BAND_HIGH_PCT / 100))}
-
-    current = {"ready": bool(published), "breadth_days": len(rows), "warmup_days": warmup}
-    if rows:
-        last = rows[-1]
+    current = {"ready": bool(osc and osc[-1] is not None), "breadth_days": len(rows),
+               "warmup_days": warmup, "valid_streak_days": streak}
+    if by_date:
+        last = next(reversed(by_date.values()))[0]
         current.update({
             "date": last["date"],
             "advances": last["adv"],
             "declines": last["dec"],
             "unchanged": last["unch"],
             "constituents": last["n"],
-            "ramo": _r(ramo[-1], 1),
+            "ramo": _r(ramo, 1),
             "oscillator": _r(osc[-1]),
             "summation": _r(summ[-1], 1),
             "summation_change_10d": (_r(summ[-1] - summ[-11], 1)
-                                     if len(summ) > 10 and summ[-11] is not None else None),
-            "percentile": (_r(breadth.percentile_rank(published, osc[-1]), 0)
-                           if osc[-1] is not None else None),
+                                     if streak >= warmup + 10 and summ[-11] is not None else None),
+            "percentile": _r(percentile, 0),
+            "expected_constituents": last.get("expected_n", last["n"]),
+            "coverage_pct": _r(last.get("coverage_pct", 100.0), 1),
         })
-    by_date = {b["date"]: (b, ramo[i], osc[i], summ[i]) for i, b in enumerate(rows)}
     return by_date, current, bands
 
 
 def build_payload():
-    core_by_date, core_meta = core_track.index_store(core_track.load_store())
-    excluded = breadth.core_exclusions(core_by_date, core_meta)
-    core_rows = breadth.core_breadth(core_by_date, excluded)
+    core_store = core_track.load_store()
+    core_by_date, _core_meta = core_track.index_store(core_store)
+    meta_by_date = {}
+    for row in core_store:
+        meta_by_date.setdefault(row["date"], {})[row["coin_id"]] = (row["symbol"], row["name"])
+    exclusions = breadth.core_exclusions_by_date(core_by_date, meta_by_date)
+    core_rows = breadth.core_breadth(core_by_date, exclusions_by_date=exclusions)
 
     frontier_store = frontier_track.load_store()
     frontier_rows = breadth.frontier_breadth(frontier_track.index_store(frontier_store))
 
     core_series, core_cur, core_bands = track_summary(core_rows, config.WARMUP_DAYS)
     fr_series, fr_cur, fr_bands = track_summary(frontier_rows, config.WARMUP_DAYS)
+    structure_data = structure.build_structure(core_rows, core_by_date)
+
+    for cur, store in ((core_cur, core_store), (fr_cur, frontier_store)):
+        latest_rows = [r for r in store if r["date"] == cur.get("date")]
+        observed = [r.get("observed_at") for r in latest_rows if r.get("observed_at")]
+        cur["observed_at"] = max(observed) if observed else None
+        cur["sampling_time_verified"] = bool(latest_rows) and len(observed) == len(latest_rows)
 
     snapshot_dates = sorted({r["date"] for r in frontier_store})
     fr_cur["started"] = snapshot_dates[0] if snapshot_dates else None
@@ -196,6 +238,9 @@ def build_payload():
                 f"{prefix}_ramo": _r(ramo, 1),
                 f"{prefix}_oscillator": _r(osc),
                 f"{prefix}_summation": _r(summ, 1),
+                f"{prefix}_band_low": b.get("band_low") if b else None,
+                f"{prefix}_band_high": b.get("band_high") if b else None,
+                f"{prefix}_coverage_pct": _r(b.get("coverage_pct"), 1) if b else None,
             })
         b = fr_series.get(d, (None,))[0]
         if b:
@@ -213,25 +258,41 @@ def build_payload():
     return {
         "metadata": {
             "title": "加密麦克莱伦市场宽度振荡器",
-            "subtitle": "Core Top 100 (按当日市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
-            "version": "2.0.0",
+            "subtitle": "Core Top 100 (按前次采样市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
+            "version": "3.0.0",
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "benchmark_date": latest_date,
             "total_days": len(series),
+            "sampling_basis": "daily_snapshots_not_fixed_utc_close",
+            "quality": {
+                "historical_candidate_survivorship_bias": True,
+                "historical_metadata_not_archived_point_in_time": True,
+                "legacy_sampling_times_unverified": any(not r.get("observed_at") for r in core_store + frontier_store),
+                "predictive_validation": "not_performed",
+                "notes": [
+                    "Live quotes use their actual UTC collection date, not a reconstructed UTC close.",
+                    "Legacy date labels and missing sampling times are retained, not retrospectively invented.",
+                    "Historical backfill uses the seeding-date candidate pool and metadata; survivorship bias remains.",
+                    "Exclusions and percentile bands use only prices/metadata available up to each observation.",
+                    "Missing member prices or calendar gaps restart indicator warmup and price-index segments.",
+                ],
+            },
             "parameters": {
                 "ema_fast": config.EMA_FAST,
                 "ema_slow": config.EMA_SLOW,
                 "ratio_scale": config.RATIO_SCALE,
                 "warmup_days": config.WARMUP_DAYS,
                 "band_percentiles": [config.BAND_LOW_PCT, config.BAND_HIGH_PCT],
-                "adv_dec_basis": "utc_close_to_close_ex_ante_universe",
+                "adv_dec_basis": "daily_observation_to_observation_ex_ante_universe",
+                "percentile_basis": "strictly_prior_published_observations",
+                "max_calendar_gap_days": config.MAX_GAP_DAYS,
             },
             "core": {
                 "top_n": config.CORE_TOP_N,
                 "candidate_n": config.CORE_CANDIDATE_N,
                 "source": "CoinGecko",
                 "history_start": core_rows[0]["date"] if core_rows else None,
-                "excluded_count": len(excluded),
+                "excluded_count": len(exclusions.get(core_rows[-1]["previous_date"], {})) if core_rows else 0,
             },
             "frontier": {
                 "chains": list(config.MEME_CHAINS),
@@ -253,6 +314,7 @@ def build_payload():
             "frontier": fr_cur,
         },
         "series": series,
+        "structure": structure_data,
     }
 
 
@@ -260,7 +322,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="skip data collection")
     parser.add_argument("--skip-if-final", action="store_true",
-                        help="exit without changes when today's trade date already has a post-close snapshot")
+                        help="exit without changes when today's UTC date already has a complete daily snapshot")
     args = parser.parse_args()
 
     failed = []
@@ -268,8 +330,7 @@ def main():
     if args.offline:
         pass
     elif args.skip_if_final and is_final(load_collection_log().get(trade_date), trade_date):
-        # Leave every file untouched so the later cron slots produce no commit
-        print(f"[Collect] {trade_date} already has a final post-close snapshot; nothing to do")
+        print(f"[Collect] {trade_date} already has a complete UTC-dated daily snapshot; nothing to do")
         return
     else:
         failed = collect(trade_date)

@@ -1,6 +1,6 @@
 {
   "performance": {
-    "price": 56,
+    "price": 54,
     "level": "中性波动",
     "levelEn": "Neutral Volatility",
     "color": "#93ea2a",
@@ -5127,7 +5127,7 @@
       55,
       55,
       57,
-      56
+      54
     ],
     "priceList": [
       39375.1,
@@ -6820,11 +6820,11 @@
       81455.9,
       82078,
       81903.3,
-      81583.6
+      81432
     ]
   },
-  "updatedAt": "2026-10-20 15:26:05",
-  "timestamp": 1792481165504,
+  "updatedAt": "2026-10-20 19:22:10",
+  "timestamp": 1792495330713,
   "dataHealth": {
     "state": "OK",
     "analysisAllowed": true,
@@ -6839,7 +6839,7 @@
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 26765978,
+        "dataAgeMs": 40931319,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -6847,8 +6847,8 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-20T07:26:05.978Z",
-        "lastSuccessAt": "2026-10-20T07:26:05.978Z",
+        "lastAttemptAt": "2026-10-20T11:22:11.319Z",
+        "lastSuccessAt": "2026-10-20T11:22:11.319Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "coinglass/cgri",

@@ -1,7 +1,7 @@
 """
 Frontier meme track: on-chain heat on Solana / BSC / Robinhood Chain.
 
-Daily flow (run near the UTC close):
+Daily flow (one snapshot sample per labeled UTC date):
   1. Discover candidates from GeckoTerminal trending + top-volume pools.
   2. Admit tokens passing the per-chain gatekeeper (liquidity, 24h volume, FDV).
   3. Keep every admitted token tracked for MEME_RETENTION_DAYS after the last
@@ -14,14 +14,21 @@ track accumulates forward from its first run only.
 
 frontier_snapshots.csv columns:
     date, key, chain, symbol, address, price, liquidity_usd, volume_24h_usd,
-    fdv_usd, qualified, tracked, first_qualified, status
+    fdv_usd, qualified, tracked, first_qualified, status,
+    observed_at, price_basis
 
 status is "ok" or "dead" (pool gone / liquidity below MEME_DEAD_LIQUIDITY_USD).
+observed_at is the UTC retrieval timestamp of the row's quotes — when the
+snapshot was taken, not a guaranteed last-trade time (blank on rows written
+before provenance was tracked); price_basis is "snapshot" for live quotes or
+"legacy_unverified" for rows without a recorded basis.
 """
 
 import csv
 import json
+import math
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import config
@@ -29,7 +36,13 @@ from src.breadth import day_gap
 from src.http_client import get_json
 
 FIELDS = ["date", "key", "chain", "symbol", "address", "price", "liquidity_usd",
-          "volume_24h_usd", "fdv_usd", "qualified", "tracked", "first_qualified", "status"]
+          "volume_24h_usd", "fdv_usd", "qualified", "tracked", "first_qualified", "status",
+          "observed_at", "price_basis"]
+
+
+def _utcnow():
+    """Sampling clock, isolated so tests can stub a fixed retrieval time."""
+    return datetime.now(timezone.utc)
 
 
 def norm_addr(addr: str) -> str:
@@ -56,7 +69,11 @@ def load_store(path: Path = config.FRONTIER_STORE_FILE):
     if not path.exists():
         return []
     with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        r["observed_at"] = r.get("observed_at") or ""
+        r["price_basis"] = r.get("price_basis") or "legacy_unverified"
+    return rows
 
 
 def save_store(rows, path: Path = config.FRONTIER_STORE_FILE):
@@ -72,9 +89,12 @@ def index_store(rows):
     """{date: {key: {chain, price, tracked, dead, first_qualified}}}"""
     by_date = {}
     for r in rows:
+        price = _f(r["price"])
+        if not math.isfinite(price):
+            price = 0.0
         by_date.setdefault(r["date"], {})[r["key"]] = {
             "chain": r["chain"],
-            "price": _f(r["price"]),
+            "price": price,
             "tracked": r["tracked"] == "1",
             "dead": r.get("status") == "dead",
             "first_qualified": r.get("first_qualified") or r["date"],
@@ -290,6 +310,12 @@ def update(trade_date: str, store_rows):
                 g = gt_quotes.get(a)
                 if g and g["price"] > 0 and g["liquidity_usd"] >= config.MEME_DEAD_LIQUIDITY_USD:
                     quotes[a] = g
+        retrieved = _utcnow()
+        observed_at = retrieved.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if retrieved.strftime("%Y-%m-%d") != trade_date:
+            raise ValueError(
+                f"[Frontier] {chain} pricing crossed midnight: retrieved {observed_at} "
+                f"does not match requested trade_date {trade_date}")
         for addr in addrs:
             key = make_key(chain, addr)
             entry = registry.get(key, {})
@@ -319,6 +345,8 @@ def update(trade_date: str, store_rows):
                 "tracked": "1" if key in tracked and not dead else "0",
                 "first_qualified": entry.get("first_qualified", trade_date),
                 "status": "dead" if dead else "ok",
+                "observed_at": observed_at,
+                "price_basis": "snapshot",
             })
 
     registry = {k: e for k, e in registry.items()

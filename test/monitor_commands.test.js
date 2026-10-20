@@ -102,6 +102,71 @@ describe('scripts/data_health_check runCheck', () => {
     assert.notEqual(report.overallHealth, 'HEALTHY');
   });
 
+  test('missing live URL -> actionable step summary + fixed console hint (no real URL leaked)', async () => {
+    const dir = mk();
+    greenDataDir(dir);
+    const summaryFile = path.join(dir, 'summary.md');
+    let calls = 0;
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...a) => logs.push(a.join(' '));
+    let report;
+    try {
+      report = await runCheck({
+        dataDir: dir, now: NOW, env: {},
+        fetcher: async () => { calls++; return fakeResp(greenLiveReport()); },
+        summaryPath: summaryFile
+      });
+    } finally {
+      console.log = origLog;
+    }
+    assert.equal(calls, 0, 'no live URL => zero network');
+    assert.equal(report.overallHealth, 'UNKNOWN');
+    for (const j of Object.values(report.jobs)) assert.equal(j.state, 'HEALTHY');
+    for (const a of Object.values(report.artifacts)) assert.equal(a.state, 'HEALTHY');
+    assert.ok(report.alerts.some(a => a.id === 'live_dashboard' && a.state === 'UNKNOWN'),
+      'alerts must carry the live_dashboard UNKNOWN');
+
+    const md = fs.readFileSync(summaryFile, 'utf8');
+    assert.match(md, /Live coverage is incomplete/);
+    assert.match(md, /monitoring configuration gap, not a confirmed upstream outage/);
+    assert.match(md, /Settings > Secrets and variables > Actions >\s*Variables/);
+    assert.match(md, /DASHBOARD_HEALTH_URL/);
+    assert.match(md, /https:\/\/<deployed-host>\/api\/system\/health/, 'placeholder endpoint, never a real URL');
+    assert.ok(logs.some(l => l.includes('[data-health] configuration required') &&
+      l.includes('DASHBOARD_HEALTH_URL') && l.includes('<deployed-host>')),
+      'runCheck prints the fixed console hint with a placeholder URL');
+  });
+
+  test('configured live audit -> summary carries no missing-configuration instructions', async () => {
+    const dir = mk();
+    greenDataDir(dir);
+    const okFile = path.join(dir, 'ok.md');
+    const ok = await runCheck({
+      dataDir: dir, now: NOW, env: { DASHBOARD_HEALTH_URL: 'http://127.0.0.1:9/audit' },
+      fetcher: async () => fakeResp(greenLiveReport()),
+      summaryPath: okFile
+    });
+    assert.equal(ok.overallHealth, 'HEALTHY');
+    const okMd = fs.readFileSync(okFile, 'utf8');
+    assert.ok(!okMd.includes('Settings > Secrets'), 'healthy report carries no configuration instructions');
+    assert.ok(!okMd.includes('coverage is incomplete'));
+
+    // Configured but the body is not an audit report: UNKNOWN via a different
+    // reason — the missing-configuration paragraph must NOT appear.
+    const badFile = path.join(dir, 'bad.md');
+    const bad = await runCheck({
+      dataDir: dir, now: NOW, env: { DASHBOARD_HEALTH_URL: 'https://dash.example/audit' },
+      fetcher: async () => fakeResp('<html>broken</html>'),
+      summaryPath: badFile
+    });
+    assert.equal(bad.live.state, 'UNKNOWN');
+    assert.notEqual(bad.live.reason, 'Live dashboard audit URL not configured');
+    const badMd = fs.readFileSync(badFile, 'utf8');
+    assert.ok(!badMd.includes('Settings > Secrets'), 'a different UNKNOWN reason must not print config instructions');
+    assert.ok(!badMd.includes('coverage is incomplete'));
+  });
+
   test('live fetch HTTP error / bad JSON body -> live.error, overall not healthy', async () => {
     const dir = mk();
     greenDataDir(dir);

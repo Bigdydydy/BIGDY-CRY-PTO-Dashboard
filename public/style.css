@@ -4846,10 +4846,75 @@ body {
   margin-bottom: 4px;
 }
 
+/* Core structural breadth block (descriptive, below the oscillator panels) */
+.mcclellan-structure {
+  margin-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+.mcclellan-structure-head h4 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcclellan-structure-tag {
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.mcclellan-structure-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mcclellan-structure-kpis .macro-metric-card {
+  min-width: 0;
+}
+
+.mcclellan-structure-kpis .mm-val-wrap {
+  flex-wrap: wrap;
+}
+
+.mcclellan-structure-kpis .mm-label,
+.mcclellan-structure-kpis .mm-sub {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.mcclellan-structure .mcclellan-echarts {
+  height: 460px;
+}
+
+.mcclellan-structure-note {
+  margin: 0 4px 10px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.mcclellan-structure-warning {
+  color: var(--text-secondary);
+  border-left: 2px solid rgba(245, 158, 11, 0.5);
+  padding-left: 8px;
+}
+
 /* Responsive McClellan Grid */
 @media (max-width: 992px) {
   .mcclellan-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .mcclellan-structure-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .methodology-inner-grid {
     grid-template-columns: 1fr;
@@ -4859,6 +4924,12 @@ body {
 @media (max-width: 768px) {
   .mcclellan-echarts {
     height: 540px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mcclellan-structure-kpis {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

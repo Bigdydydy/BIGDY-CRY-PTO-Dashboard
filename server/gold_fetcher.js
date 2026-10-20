@@ -128,61 +128,64 @@ function calculateRollingPearsonCorrelation(series1, series2, window = 30) {
 }
 
 /**
- * Classify correlation regime and provide institutional macroeconomic insights
+ * Classify the 30D return correlation. A correlation only says how the two series co-move: it
+ * cannot tell joint rallies from joint sell-offs, and it is not evidence of flows between them.
  */
 function classifyCorrelationRegime(r, btcGoldRatio, btcMarketCapShare) {
   const corr = typeof r === 'number' && !isNaN(r) ? r : 0;
+  const ratioText = `比价：1 BTC ≈ ${btcGoldRatio?.toFixed(1) || '--'} 盎司黄金，BTC 市值约为黄金的 ${btcMarketCapShare?.toFixed(1) || '--'}%；看比价方向可知 BTC 相对黄金的强弱。`;
+  const windowText = '30 日窗口样本较少，单个宏观事件即可明显改变相关系数。';
 
   if (corr >= 0.5) {
     return {
       regimeCode: 'DEBASEMENT_HEDGE',
-      regimeName: '高抗通胀共振 (Debasement Hedge)',
+      regimeName: '强正相关 (Strong Co-movement)',
       badgeClass: 'badge-pos',
       color: '#10b981',
-      summary: `BTC 与黄金呈现强正向共振联动 (30D r = +${corr.toFixed(2)})。两者作为“抗法币贬值硬资产”的宏观定位高度共鸣，全球流动性扩张推动两者同步上涨。`,
+      summary: `BTC 与黄金 30 日收益率相关系数 r = +${corr.toFixed(2)}，同向波动显著。正相关只说明同向，不说明方向：共同上涨与共同下跌都会产生它。“同受全球流动性驱动”是一种可能解释，需结合实际利率、美元与 ETF 资金流验证。`,
       keyPointers: [
-        `硬资产溢价同频：机构资金将两者共同纳入去中心化储备对冲篮子，对冲美元信用扩张与主权债务压力。`,
-        `高贝塔弹性释放：在法币贬值主升浪中，BTC 表现为黄金的“杠杆高贝塔版本”，兑黄金比价持续扩张。`,
-        `宏观驱动胜过微观：美联储利率预期与全球央行资产负债表是二者价格中枢的最核心主线。`
+        `先区分同涨与同跌：对照同期两者各自的收益方向。`,
+        ratioText,
+        windowText
       ]
     };
   } else if (corr >= 0.1) {
     return {
       regimeCode: 'MODERATE_LINKAGE',
-      regimeName: '温和正向联动 (Moderate Linkage)',
+      regimeName: '温和正相关 (Moderate Linkage)',
       badgeClass: 'badge-cyan',
       color: '#38bdf8',
-      summary: `BTC 与黄金保持温和正相关 (30D r = +${corr.toFixed(2)})。宏观大宗流动性平稳有序，两者维持基准协同但各自具有资产特色。`,
+      summary: `BTC 与黄金 30 日相关系数 r = +${corr.toFixed(2)}，有一定同向性，但对彼此的解释力有限 (r² ≈ ${(corr * corr).toFixed(2)})。`,
       keyPointers: [
-        `流动性常态传导：宏观货币政策处于观察期，黄金稳步筑底，BTC 维持温和风险偏好。`,
-        `比价震荡巩固：1 BTC 稳定在 ${btcGoldRatio?.toFixed(1) || '--'} 盎司黄金区间，机构套利与再平衡策略顺畅。`,
-        `关注事件催化：密切跟踪 CPI 通胀数据与地缘局势变化，观察是否触发共振升级。`
+        ratioText,
+        `观察 CPI、利率决议等共同冲击是否推高相关性。`,
+        windowText
       ]
     };
   } else if (corr >= -0.2) {
     return {
       regimeCode: 'DECOUPLED_REGIME',
-      regimeName: '独立脱钩震荡 (Decoupled Regime)',
+      regimeName: '低相关 (Decoupled)',
       badgeClass: 'badge-warning',
       color: '#f59e0b',
-      summary: `BTC 与黄金走势基本脱钩 (30D r = ${corr.toFixed(2)})。BTC 主要由加密原生基本面（期权衍生品伽马、ETF 净申赎与链上筹码分布）自主定价。`,
+      summary: `BTC 与黄金 30 日相关系数 r = ${corr.toFixed(2)}，近期走势基本没有线性关系。BTC 的变化需要从其他因素解释，但低相关本身不能指认具体驱动。`,
       keyPointers: [
-        `原生微观主导：加密衍生品市场微观结构与现货 ETF 资金流主导盘面，剥离传统大宗商品节奏。`,
-        `避险偏好分歧：避险资金单向流入传统黄金，而加密市场处于存量博弈或高波动去杠杆通道。`,
-        `相对估值参考：BTC 相对黄金市值渗透率稳定在 ${btcMarketCapShare?.toFixed(1) || '--'}%，估值具备长期向上空间。`
+        ratioText,
+        `低相关可能持续，也可能只是两种状态之间的过渡。`,
+        windowText
       ]
     };
   } else {
     return {
       regimeCode: 'ASSET_ROTATION',
-      regimeName: '资产跷跷板轮动 (Asset Rotation)',
+      regimeName: '负相关 (Inverse Co-movement)',
       badgeClass: 'badge-neg',
       color: '#f43f5e',
-      summary: `BTC 与黄金呈现显著负相关 (30D r = ${corr.toFixed(2)})。市场资金在“传统实物黄金避险”与“高风险投机资产”之间出现结构性转移或吸血。`,
+      summary: `BTC 与黄金 30 日相关系数 r = ${corr.toFixed(2)}，近期反向波动。这与“资金在黄金与 BTC 之间转移”的解释相容，但相关系数不能证明资金流向，需要 ETF 申赎、期货持仓等流量数据佐证。`,
       keyPointers: [
-        `极度风险规避：地缘或黑天鹅冲击导致机构选择传统黄金防守，流动性收紧迫使加密杠杆头寸平仓。`,
-        `相对购买力回撤：1 BTC 等价黄金盎司数收缩，数字黄金相对实物黄金估值暂时处于相对低位。`,
-        `反转窗口酝酿：历史上长期深负相关多为非理性恐慌或流动性休克，往往酝酿中长期均值回归良机。`
+        ratioText,
+        `本模块未统计负相关阶段之后的走势，不应据此推断反转。`,
+        windowText
       ]
     };
   }

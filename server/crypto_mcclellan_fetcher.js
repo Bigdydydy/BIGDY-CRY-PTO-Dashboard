@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { isDeepStrictEqual } = require('util');
 const { exec, execSync } = require('child_process');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth } = require('./data_health_cache');
@@ -98,7 +99,84 @@ function validateMcClellanData(data) {
       throw new Error(`McClellan ${name}.date ${track.date} 晚于最新源行 ${newest}`);
     }
   }
+  const majorVersion = parseInt(String(data.metadata && data.metadata.version || '').split('.')[0], 10);
+  if (data.structure !== undefined && data.structure !== null) {
+    validateStructureBlock(data);
+  } else if (Number.isFinite(majorVersion) && majorVersion >= 3) {
+    throw new Error('McClellan v3+ payload 缺少 structure 块');
+  }
   return true;
+}
+
+// Numeric display fields on a structure point: present-and-non-null must be a
+// real finite number — never a numeric string smuggled through JSON.
+const STRUCT_NUMERIC_FIELDS = [
+  'consecutive_days', 'ew_index', 'cw_index', 'ew_drawdown_52w', 'cw_drawdown_52w',
+  'drawdown_gap_pp', 'gap_percentile', 'median_constituent_drawdown_52w',
+  'drawdown_eligible', 'pct_above_sma200', 'sma200_eligible', 'constituents',
+  'expected_constituents', 'coverage_pct', 'realized_vol_30d', 'alt_btc_corr_30d',
+  'volatility_observations'
+];
+
+/**
+ * Structural-breadth block. Required on metadata.version >= 3 payloads;
+ * legacy payloads may omit it. Every historical point is checked, not just
+ * current: boolean ready/index_ready, valid sorted non-future dates, finite
+ * numbers for any non-null numeric field. A ready point requires
+ * index_ready=true plus finite 0..100 EW/CW drawdowns and a finite -100..100
+ * gap. `current` must deep-equal the latest series row and carry the Core
+ * track's own date.
+ */
+function validateStructureBlock(data) {
+  const structure = data.structure;
+  if (typeof structure !== 'object' || !structure.current || !Array.isArray(structure.series)) {
+    throw new Error('McClellan structure 缺少 current 或 series');
+  }
+  if (!structure.series.length) throw new Error('McClellan structure series 为空');
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  const today = new Date(Date.now() + 5 * 60000).toISOString().slice(0, 10);
+  for (let i = 0; i < structure.series.length; i++) {
+    const row = structure.series[i];
+    if (!validDateStr(row && row.date)) {
+      throw new Error(`McClellan structure series[${i}] date 非法`);
+    }
+    if (row.date > today) {
+      throw new Error(`McClellan structure series[${i}] date 在未来`);
+    }
+    if (i > 0 && row.date <= structure.series[i - 1].date) {
+      throw new Error('McClellan structure series 非日期升序');
+    }
+    if (typeof row.ready !== 'boolean' || typeof row.index_ready !== 'boolean') {
+      throw new Error(`McClellan structure series[${i}] ready/index_ready 非布尔值`);
+    }
+    if (row.ready === true && row.index_ready !== true) {
+      throw new Error(`McClellan structure series[${i}] ready 但 index_ready 非 true`);
+    }
+    for (const f of STRUCT_NUMERIC_FIELDS) {
+      const v = row[f];
+      if (v !== null && v !== undefined && !fin(v)) {
+        throw new Error(`McClellan structure series[${i}].${f} 非有限数`);
+      }
+    }
+    if (row.ready === true) {
+      const ddOk = v => fin(v) && v >= 0 && v <= 100;
+      const gapOk = v => fin(v) && v >= -100 && v <= 100;
+      if (!ddOk(row.ew_drawdown_52w) || !ddOk(row.cw_drawdown_52w)) {
+        throw new Error(`McClellan structure series[${i}] ready 但 52 周回撤非 0..100 有限数`);
+      }
+      if (!gapOk(row.drawdown_gap_pp)) {
+        throw new Error(`McClellan structure series[${i}] ready 但回撤差非 -100..100 有限数`);
+      }
+    }
+  }
+  const current = structure.current;
+  const last = structure.series[structure.series.length - 1];
+  if (!isDeepStrictEqual(current, last)) {
+    throw new Error('McClellan structure current 非最新行');
+  }
+  if (current.date !== data.current.core.date) {
+    throw new Error('McClellan structure current.date 与 core.date 不一致');
+  }
 }
 
 /**

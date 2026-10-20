@@ -118,3 +118,42 @@ Producer job 窗口（`JOB_POLICIES`）：`macro_snapshot` 8h/1d；`liquidity_ho
 - 宽度数据：按 track `date` 与 `*_n` 源行；旧 artifact 改 `generated_at` 不会变绿（数据日期不动）。
 - **无心跳的旧文件是 UNKNOWN，不是故障**——明确「未核验」与「确认失败」的区别。
 - **已知限制**：对完全没有 provider 时钟、也不产生归档回执的来源，「静默停更」只能识别到「最后已知数据日期不再前进」这一层面；无法 100% 区分「来源真停发」与「行情无变化」，健康结论如实反映可核验的部分。
+
+## 8. Troubleshooting: live_dashboard UNKNOWN (English)
+
+If the Data Source Health Monitor report shows every local job and artifact
+HEALTHY but `live_dashboard` UNKNOWN with reason
+`Live dashboard audit URL not configured`, live monitoring is not configured.
+This is a configuration gap, not a confirmed upstream outage. Other UNKNOWN
+reasons, such as an invalid audit response, require different investigation.
+Fail-closed is preserved on purpose: the check exits non-zero until live
+coverage is actually verified, so the gate keeps failing until then.
+
+To configure it:
+
+1. In this repository, open Settings > Secrets and variables > Actions >
+   Variables and create `DASHBOARD_HEALTH_URL` with the full deployed audit
+   endpoint, for example `https://<deployed-host>/api/system/health`.
+   An Actions secret of the same name is also supported; the variable takes
+   precedence when both exist.
+2. Repository variables are not environment variables automatically — the
+   workflow maps this name into the check step's env, so the name must match
+   exactly.
+3. Use the public deployment's API endpoint. Do not use `/healthz`, a GitHub
+   Pages URL, or a localhost address on your own PC. Do not infer a
+   `*.onrender.com` hostname from the service name in render.yaml — use the
+   real deployed URL.
+4. Re-run the Data Source Health Monitor workflow manually after setting it;
+   missing live coverage continues to fail the health gate until the endpoint
+   responds with a valid audit report.
+
+Notes:
+
+- Node 20 action deprecation warnings and `ubuntu-latest` migration notices
+  are unrelated to this failure. This monitor workflow uses Node 24 actions
+  and runtime on `ubuntu-24.04`; other workflows are untouched.
+- The monitoring health URL performs a read-only GET. It does not refresh or
+  wake idle modules, so `live_dashboard` may remain UNKNOWN until the audited
+  deployment holds genuine source observations.
+- This change documents the configuration only — it does not set GitHub
+  variables or secrets and does not verify any deployment.

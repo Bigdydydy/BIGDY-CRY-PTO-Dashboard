@@ -196,6 +196,8 @@ function extractFn(file, signature) {
 
 function makeUiSandbox(fetchImpl) {
   const toasts = [];
+  const loaderCalls = [];
+  const loader = name => async (...args) => { loaderCalls.push({ name, args }); };
   const el = () => ({ classList: { add() {}, remove() {}, contains: () => false, toggle() {} }, textContent: '', disabled: false, value: '' });
   const sandbox = {
     console,
@@ -204,10 +206,10 @@ function makeUiSandbox(fetchImpl) {
     showToast: (msg) => toasts.push(msg),
     triggerRecomputedAnimation() {},
     renderAll() {},
-    loadMacroData: async () => {},
-    loadPreferredsData: async () => {},
-    loadCdriData: async () => {},
-    fetchSsroData: async () => {},
+    loadMacroData: loader('macro'),
+    loadPreferredsData: loader('preferreds'),
+    loadCdriData: loader('cdri'),
+    fetchSsroData: loader('ssro'),
     btnRefresh: el(),
     elRefreshBtnText: el(),
     elSyncPulseDot: el(),
@@ -223,7 +225,7 @@ function makeUiSandbox(fetchImpl) {
   vm.createContext(sandbox);
   const fnSrc = extractFn(path.join(__dirname, '..', 'public', 'app.js'), 'async function loadMarketData');
   sandbox.loadMarketData = vm.runInContext(`(${fnSrc})`, sandbox);
-  return { sandbox, toasts };
+  return { sandbox, toasts, loaderCalls };
 }
 
 const okResp = body => ({ ok: true, status: 200, json: async () => body });
@@ -271,4 +273,17 @@ test('UI: fully healthy refresh with new data → recompute toast', async () => 
   await sandbox.loadMarketData(true);
   assert.equal(toasts.length, 1);
   assert.match(toasts[0], /已重新计算/);
+});
+
+test('UI: manual refresh forces upstreams once — aux loaders only read the caches /api/refresh filled', async () => {
+  const urls = [];
+  const { sandbox, loaderCalls } = makeUiSandbox(async (url) => {
+    urls.push(url);
+    if (url.startsWith('/api/refresh')) return okResp({ code: 0, status: 'ok', ok: true, hasAnyUpdate: false });
+    return okResp({ code: 0, syncStatus: { dataVersion: 1 }, dataHealth: { state: 'OK', failedSources: [] } });
+  });
+  await sandbox.loadMarketData(true);
+  assert.equal(urls.filter(u => u.startsWith('/api/refresh')).length, 1);
+  assert.deepEqual(loaderCalls.map(c => c.name).sort(), ['cdri', 'macro', 'preferreds', 'ssro']);
+  for (const c of loaderCalls) assert.equal(c.args.length, 0, `${c.name} must not be force-refreshed again`);
 });

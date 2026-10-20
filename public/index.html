@@ -601,7 +601,7 @@
           <span class="card-subtitle-inline">主流 Top 100 vs 链上 Meme · 比率调整 McClellan</span>
         </div>
         <div class="header-controls">
-          <span class="tz-badge" id="mcclellan-update-time">更新中... (UTC 收盘)</span>
+          <span class="tz-badge" id="mcclellan-update-time">更新中... (UTC 快照)</span>
           <button class="chart-refresh-btn" id="btn-refresh-mcclellan" title="强制刷新麦克莱伦宽度数据">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M23 4v6h-6"></path>
@@ -688,16 +688,16 @@
             <div class="methodology-inner-grid">
               <div class="methodology-col full-width">
                 <h5>1. 比率调整 McClellan（两条轨道同一公式）</h5>
-                <p>每天统计成分池中收盘对收盘上涨与下跌的家数，按比率调整消除成分数量变化的影响，再取两条 EMA 之差：</p>
+                <p>每天统计成分池中相邻日度采样价格上涨与下跌的家数，按比率调整消除成分数量变化的影响，再取两条 EMA 之差：</p>
                 <div class="formula-box"><code>RAMO = (Adv − Dec) / (Adv + Dec) × 1000　·　Oscillator = EMA19(RAMO) − EMA39(RAMO)　·　Summation = Σ Oscillator</code></div>
-                <p>前 40 个交易日为 EMA 预热期，不发布读数。图中的虚线区间是该轨道振荡器历史读数的 10% / 90% 分位，用来替代固定的超买超卖阈值。</p>
+                <p>前 40 个有效交易日为预热期，不发布读数；报价不完整或日历缺口会重置预热。图中的分位虚线按<strong>当日之前</strong>的已发布读数逐日计算（因果口径），不用今天的恒定区间回看历史。累加指数从首个发布日归零起算，基准是任意的：它是宽度振荡的积分形态，不代表资金流入流出，"为正"本身不构成看多依据。</p>
               </div>
               <div class="methodology-col">
-                <h5>2. Core 轨：按当日市值的 Top 100</h5>
+                <h5>2. Core 轨：按前次采样市值的 Top 100</h5>
                 <ul class="gatekeeper-list">
-                  <li><strong>成分池：</strong>每天按<strong>前一日收盘市值</strong>重新排出 Top 100，当天的涨跌按这份事先确定的名单统计，避免"因为暴涨才入选"的偏差。</li>
-                  <li><strong>排除：</strong>稳定币、包装/跨链资产、LST/LRT、代币化黄金与国债。另外用数据自动识别：日波动中位数低于 0.15% 的视为稳定币，与 BTC/ETH/SOL/BNB 日收益差中位数低于 0.25% 的视为锚定衍生品。</li>
-                  <li><strong>数据：</strong>CoinGecko，回溯 365 天（公共接口上限），之后每天 UTC 23:30 追加收盘快照。历史候选池取当前 Top 300，跌出 Top 300 的币有轻微幸存者偏差。</li>
+                  <li><strong>成分池：</strong>每天按<strong>前次日度采样市值</strong>重新排出 Top 100，当天的涨跌按这份事先确定的名单统计，避免"因为暴涨才入选"的偏差。</li>
+                  <li><strong>排除：</strong>稳定币、包装/跨链资产、LST/LRT、代币化黄金与国债。另外用数据自动识别：日波动中位数低于 0.15% 的视为稳定币，与 BTC/ETH/SOL/BNB 日收益差中位数低于 0.25% 的视为锚定衍生品（识别只用到当日及以前的数据）。</li>
+                  <li><strong>数据：</strong>CoinGecko，历史回溯 365 天（公共接口上限，标记为 UTC 收盘），之后每天定时任务追加一次<strong>实时报价快照</strong>——每行记录自己的 UTC 采集时刻（observed_at，非最后成交时刻），日期按实际采样日标注，不再按固定收盘时刻对齐。早期行没有采样时刻的留空并标记 legacy_unverified，不做事后推断。历史候选池取当前 Top 300，跌出 Top 300 的币有幸存者偏差。若任务跨过 UTC 零点，当日快照作废重写而非混入两天报价。</li>
                 </ul>
               </div>
               <div class="methodology-col">
@@ -709,11 +709,82 @@
                   <li><strong>撤池计为下跌：</strong>跟踪中的币如果池子消失或流动性跌破 $5k，当天计为下跌后移出，不会悄悄从样本里消失。成分少于 20 个的日子标记为样本不足（悬停图表可查看撤池数、新进/移出数和成分年龄中位数）。</li>
                   <li><strong>按链等权：</strong>Solana、BSC、Robinhood 各自计算 RAMO 后取平均（成分少于 3 个的链不参与），防止某条链上币数暴增时主导读数。合并计数的 RAMO 保留为诊断项。</li>
                   <li><strong>外部热度锚：</strong>DefiLlama 三条链的 DEX 成交额动量 ln(7 日均值 / 28 日均值)，同样按链等权（图上紫色虚线）。它不依赖我们的选币，振荡器发布满 30 天后显示两者的相关系数，用来检验 Meme 振荡器是否跟随真实的链上热度。</li>
-                  <li><strong>报价与历史：</strong>每天用 DexScreener 批量报价。链上无法还原"过去哪些池在热榜上"，所以这条轨道不回填历史，只从首次采集日开始累积。</li>
+                  <li><strong>报价与历史：</strong>每天用 DexScreener 批量报价，记录该行实际 UTC 采样时刻。链上无法还原"过去哪些池在热榜上"，所以这条轨道不回填历史，只从首次采集日开始累积。</li>
+                </ul>
+              </div>
+              <div class="methodology-col full-width">
+                <h5>4. Core 结构宽度（下方新面板，描述性指标）</h5>
+                <p>同一套 Core 前次采样成分池上，等权（EW，日再平衡）与前市值加权（CW）两条指数各自从 100 起算，再取各自相对完整 52 周日历窗口高点的回撤。正差值表示同一成分池的等权价格指数距自身高点更远，不等于逐个成分都比头部跌得深。差值收窄可能来自权重补跌、等权修复或旧高点退出滚动窗口，不能单独判断风险解除或下跌集中在头部。</p>
+                <ul class="gatekeeper-list">
+                  <li><strong>严格约束：</strong>任一成分报价缺失或日历缺口会使当日整篮观测作废并重置指数段；52 周窗口必须完整才发布回撤，预热期内只给指数与进度。</li>
+                  <li><strong>非预测：</strong>这是结构描述，不是资金流指标，也没有经过验证的崩盘预测阈值；历史采样时刻、候选池幸存者偏差与覆盖不足都列在下方警示中。</li>
                 </ul>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Core-only structural breadth (descriptive diagnostics, no forecast) -->
+        <div class="mcclellan-structure" id="mcclellan-structure">
+          <div class="mcclellan-structure-head">
+            <h4>Core 结构宽度 <span class="mcclellan-structure-tag">描述性 · 非预测</span></h4>
+          </div>
+          <div class="mcclellan-kpi-grid mcclellan-structure-kpis" id="mcclellan-structure-kpis">
+            <div class="macro-metric-card">
+              <span class="mm-label">等权−市值加权 52周回撤差</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-gap">--</span>
+                <span class="mm-chip" id="kpi-ms-gap-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-gap-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">52 周窗口 / 覆盖</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-window">--</span>
+                <span class="mm-chip" id="kpi-ms-window-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-window-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">成分 52 周回撤中位数</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-median_dd">--</span>
+                <span class="mm-chip" id="kpi-ms-median_dd-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-median_dd-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">成分高于 200 日均线</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-sma200">--</span>
+                <span class="mm-chip" id="kpi-ms-sma200-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-sma200-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">Core EW 已实现波动 30d</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-rv30">--</span>
+                <span class="mm-chip" id="kpi-ms-rv30-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-rv30-sub">--</span>
+            </div>
+            <div class="macro-metric-card">
+              <span class="mm-label">Alt/BTC 30 日相关</span>
+              <div class="mm-val-wrap">
+                <span class="mm-val" id="kpi-ms-corr">--</span>
+                <span class="mm-chip" id="kpi-ms-corr-chip">--</span>
+              </div>
+              <span class="mm-sub" id="kpi-ms-corr-sub">--</span>
+            </div>
+          </div>
+          <div class="mcclellan-chart-card">
+            <div class="mcclellan-notice hidden" id="mcclellan-structure-notice"></div>
+            <div id="mcclellan-structure-echarts" class="mcclellan-echarts"></div>
+          </div>
+          <p class="mcclellan-structure-note" id="mcclellan-structure-dvol"></p>
+          <p class="mcclellan-structure-note mcclellan-structure-warning" id="mcclellan-structure-disclaimer"></p>
         </div>
 
       </div>
@@ -2278,11 +2349,11 @@
           </div>
 
           <div class="macro-metric-card" id="card-ssro-status">
-            <span class="mm-label">宏观购买力研判</span>
+            <span class="mm-label">稳定币相对存量</span>
             <div class="mm-val-wrap">
               <span class="mm-val" id="ssro-zone-label">研判中...</span>
             </div>
-            <span class="mm-sub" id="ssro-zone-sub">极度充沛 / 均衡 / 购买力衰竭</span>
+            <span class="mm-sub" id="ssro-zone-sub">相对充裕 / 均衡 / 相对紧缺</span>
           </div>
         </div>
 
@@ -3239,6 +3310,8 @@
   <!-- DataHealthUI 必须先于 app.js/wave_ui：注册各卡片数据源健康横幅与实时结论闸门 -->
   <script src="/data_health_ui.js"></script>
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
+  <!-- mcclellan_structure 必须先于 app.js：Module 1-B 结构宽度面板由 app.js 调用其 window 全局 -->
+  <script src="/mcclellan_structure.js"></script>
   <script src="/app.js?v=20261014_1"></script>
 </body>
 </html>

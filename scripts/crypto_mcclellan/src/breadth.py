@@ -137,7 +137,18 @@ def core_exclusions(by_date: dict, meta: dict):
     return excluded
 
 
-def core_breadth(by_date: dict, excluded, top_n: int = config.CORE_TOP_N):
+def core_exclusions_by_date(by_date: dict, meta_by_date: dict):
+    """Freeze each day's exclusions using only prices and metadata known then."""
+    prefix, known_meta, out = {}, {}, {}
+    for d in sorted(by_date):
+        prefix[d] = by_date[d]
+        known_meta.update(meta_by_date.get(d, {}))
+        out[d] = core_exclusions(prefix, known_meta)
+    return out
+
+
+def core_breadth(by_date: dict, excluded=None, top_n: int = config.CORE_TOP_N,
+                 exclusions_by_date=None):
     """
     Daily Core breadth. Universe for day t = Top N by market cap at the
     previous observation p (excluded coins skipped).
@@ -149,8 +160,10 @@ def core_breadth(by_date: dict, excluded, top_n: int = config.CORE_TOP_N):
         if day_gap(p, t) > config.MAX_GAP_DAYS:
             continue
         prev_day, cur_day = by_date[p], by_date[t]
+        day_excluded = (exclusions_by_date.get(p, {}) if exclusions_by_date is not None
+                        else (excluded or set()))
         ranked = sorted(
-            (cid for cid, (_c, mcap) in prev_day.items() if mcap > 0 and cid not in excluded),
+            (cid for cid, (_c, mcap) in prev_day.items() if mcap > 0 and cid not in day_excluded),
             key=lambda cid: prev_day[cid][1], reverse=True,
         )[:top_n]
         adv = dec = unch = 0
@@ -168,8 +181,11 @@ def core_breadth(by_date: dict, excluded, top_n: int = config.CORE_TOP_N):
                 dec += 1
             else:
                 unch += 1
-        out.append({"date": t, "adv": adv, "dec": dec, "unch": unch,
-                    "n": len(members), "members": members})
+        out.append({"date": t, "previous_date": p, "adv": adv, "dec": dec, "unch": unch,
+                    "n": len(members), "members": members, "universe": ranked,
+                    "expected_n": len(ranked),
+                    "coverage_pct": len(members) / len(ranked) * 100 if ranked else 0.0,
+                    "complete": len(ranked) == top_n and len(members) == len(ranked)})
     return out
 
 
@@ -228,6 +244,8 @@ def frontier_breadth(by_date: dict):
                 c["dec"] += 1
             else:
                 unch += 1
+        # An unquoted tracked member still belongs to the ex-ante basket:
+        # it must make coverage incomplete, not disappear from the denominator.
         prev_set = {k for k, r in prev_day.items() if r["tracked"]}
         cur_set = {k for k, r in cur_day.items() if r["tracked"]}
         pooled = ratio_adjusted(adv, dec)
@@ -240,5 +258,9 @@ def frontier_breadth(by_date: dict):
                     "dead": dead,
                     "entries": len(cur_set - prev_set),
                     "exits": len(prev_set - cur_set),
-                    "age_median": median(ages) if ages else None})
+                    "age_median": median(ages) if ages else None,
+                    "expected_n": len(prev_set),
+                    "coverage_pct": len(members) / len(prev_set) * 100 if prev_set else 0.0,
+                    "complete": len(members) == len(prev_set)
+                    and len(members) >= config.MEME_MIN_CONSTITUENTS})
     return out

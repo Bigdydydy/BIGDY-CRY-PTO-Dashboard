@@ -143,6 +143,9 @@ function reloadAllChartsForTheme() {
     try { mcclellanChartInstance.dispose(); } catch (e) {}
     mcclellanChartInstance = null;
   }
+  if (window.McClellanStructure && typeof window.McClellanStructure.dispose === 'function') {
+    try { window.McClellanStructure.dispose(); } catch (e) {}
+  }
   if (typeof cdriChartInstance !== 'undefined' && cdriChartInstance) {
     try { cdriChartInstance.dispose(); } catch (e) {}
     cdriChartInstance = null;
@@ -205,6 +208,7 @@ function reloadAllChartsForTheme() {
   }
   if (typeof renderMcClellanCharts === 'function' && typeof rawMcClellanData !== 'undefined' && rawMcClellanData) {
     renderMcClellanCharts();
+    renderMcClellanStructure();
   }
   if (window.WaveRadarModule && typeof window.WaveRadarModule.updateTheme === 'function') {
     window.WaveRadarModule.updateTheme();
@@ -512,13 +516,15 @@ async function loadMarketData(triggerRefresh = false) {
     const threshold = thresholdSelect ? thresholdSelect.value : 30000000;
     const timeRange = timeRangeSelect ? timeRangeSelect.value : 'all';
     
-    // Fetch options market data, macro chart data, CDRI, and SSRO data in parallel
+    // Fetch options market data, macro chart data, CDRI, and SSRO data in parallel.
+    // /api/refresh above already force-refreshed macro / preferreds / CDRI / SSRO, so these only
+    // read the fresh caches — forcing again would hit every upstream twice per click.
     const [mResp] = await Promise.all([
       fetch(`/api/market-data?threshold=${threshold}&timeRange=${timeRange}`),
-      loadMacroData(triggerRefresh).catch(e => console.error('[App] Macro fetch error:', e.message)),
-      loadPreferredsData(triggerRefresh).catch(e => console.error('[App] Preferreds fetch error:', e.message)),
-      loadCdriData(triggerRefresh).catch(e => console.error('[App] CDRI fetch error:', e.message)),
-      fetchSsroData(triggerRefresh).catch(e => console.error('[App] SSRO fetch error:', e.message))
+      loadMacroData().catch(e => console.error('[App] Macro fetch error:', e.message)),
+      loadPreferredsData().catch(e => console.error('[App] Preferreds fetch error:', e.message)),
+      loadCdriData().catch(e => console.error('[App] CDRI fetch error:', e.message)),
+      fetchSsroData().catch(e => console.error('[App] SSRO fetch error:', e.message))
     ]);
 
     if (!mResp.ok) throw new Error(`Server returned ${mResp.status}`);
@@ -2738,10 +2744,13 @@ btnTabSingles.addEventListener('click', () => {
   contentIcebergs.classList.add('hidden');
 });
 
-// Auto-refresh every 30 seconds
+// Auto-refresh every 30 seconds while the page is visible; catch up as soon as it is shown again.
 setInterval(() => {
-  loadMarketData(false);
+  if (!document.hidden) loadMarketData(false);
 }, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadMarketData(false);
+});
 
 // ============================================================================
 // Macro & On-Chain Cost Chart Controller
@@ -2780,9 +2789,9 @@ const macroLegendGroup = document.getElementById('macro-legend-group');
 /**
  * Load Macro Chart Data from API
  */
-async function loadMacroData(forceRefresh = false) {
+async function loadMacroData() {
   try {
-    const url = forceRefresh ? '/api/macro-chart?refresh=true' : '/api/macro-chart';
+    const url = '/api/macro-chart';
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
@@ -3562,9 +3571,9 @@ let rawPrefData = null;
 let prefStrcChart = null;
 let prefSpreadChart = null;
 
-async function loadPreferredsData(forceRefresh = false) {
+async function loadPreferredsData() {
   try {
-    const resp = await fetch(forceRefresh ? '/api/mstr-preferreds?refresh=true' : '/api/mstr-preferreds');
+    const resp = await fetch('/api/mstr-preferreds');
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.error || 'Failed to load preferreds data');
@@ -3825,9 +3834,9 @@ function setupGaugeArcs() {
 /**
  * Load CDRI data from API
  */
-async function loadCdriData(forceRefresh = false) {
+async function loadCdriData() {
   try {
-    const url = forceRefresh ? '/api/cdri?refresh=true' : '/api/cdri';
+    const url = '/api/cdri';
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
@@ -5494,9 +5503,9 @@ let ssroLen = 200; // 200 (macro) or 50 (tactical)
 /**
  * Fetch SSRO dataset from backend /api/ssro
  */
-async function fetchSsroData(force = false) {
+async function fetchSsroData() {
   try {
-    const url = `/api/ssro${force ? '?force=1' : ''}`;
+    const url = '/api/ssro';
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -5644,13 +5653,13 @@ function renderSsroChart() {
         const pt = filtered[idx];
         if (!pt) return '';
         const zVal = ssroLen === 200 ? pt.ssro200 : pt.ssro50;
-        let zoneText = '均衡博弈';
+        let zoneText = '均衡区间';
         let zoneColor = '#38bdf8';
         if (zVal !== null) {
-          if (zVal <= -2.0) { zoneText = '极度充沛 (高胜率大底)'; zoneColor = '#34d399'; }
-          else if (zVal >= 2.0) { zoneText = '购买力透支 (顶部警戒)'; zoneColor = '#f87171'; }
-          else if (zVal > 1.0) { zoneText = '偏热警戒'; zoneColor = '#fbbf24'; }
-          else if (zVal < -1.0) { zoneText = '充裕健康'; zoneColor = '#6ee7b7'; }
+          if (zVal <= -2.0) { zoneText = '稳定币相对充裕'; zoneColor = '#34d399'; }
+          else if (zVal >= 2.0) { zoneText = '稳定币相对紧缺'; zoneColor = '#f87171'; }
+          else if (zVal > 1.0) { zoneText = '稳定币偏紧'; zoneColor = '#fbbf24'; }
+          else if (zVal < -1.0) { zoneText = '稳定币偏充裕'; zoneColor = '#6ee7b7'; }
         }
 
         return `
@@ -7227,6 +7236,9 @@ function switchView(viewId, updateHash = true) {
     } else if (rawMcClellanData && (viewId === 'view-overview' || viewId === 'view-all')) {
       renderMcClellanCharts();
     }
+    if (window.McClellanStructure && typeof window.McClellanStructure.resize === 'function') {
+      window.McClellanStructure.resize();
+    }
 
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
@@ -7871,31 +7883,58 @@ function renderMcClellanDashboard(data) {
     if (cls !== undefined) el.className = cls;
   };
 
-  setText('mcclellan-update-time', current.date ? `${current.date} (UTC 收盘)` : '--');
+  // Badge: each track keeps its OWN date — current.date is only the max of
+  // the two, so borrowing Core's observed_at for a newer Frontier date would
+  // mix days. Verified sampling times shown; legacy rows keep their label
+  // and are flagged unverified, never presented as known sample times.
+  const coreDate = core.date || null;
+  const frDate = fr.date || null;
+  // Verified only when BOTH tracks explicitly say so — an absent flag on a
+  // legacy v2 payload must render as unverified, not verified-by-default.
+  const verified = core.sampling_time_verified === true && fr.sampling_time_verified === true;
+  const obs = verified && core.observed_at ? ` ${String(core.observed_at).slice(11, 16)}Z` : '';
+  let badge = '--';
+  if (coreDate && frDate && coreDate !== frDate) {
+    // Divergent track dates: label both explicitly; a lone sampling time
+    // would be misattributed, so it is omitted here.
+    badge = `Core ${coreDate} / Meme ${frDate} (UTC 快照)`;
+    if (!verified) badge += ' · 采样时刻未核验';
+  } else if (coreDate || frDate || current.date) {
+    badge = `${coreDate || frDate || current.date}${obs} (UTC 快照)`;
+    if (!verified) badge += ' · 采样时刻未核验';
+  }
+  setText('mcclellan-update-time', badge);
 
-  // Core oscillator & summation
-  setText('kpi-mc-core-osc', mcFmtSigned(core.oscillator, 1),
-    `mm-val ${core.oscillator >= 0 ? 'text-cyan' : 'text-neg'}`);
-  mcOscillatorChip(document.getElementById('kpi-mc-core-osc-chip'), core, bands.core);
+  const warmupDays = metadata.parameters?.warmup_days || fr.warmup_days || core.warmup_days || 40;
+  const streakOf = cur => cur.valid_streak_days ?? cur.breadth_days ?? 0;
+
+  // Core oscillator & summation — warmup (ready=false) shown like Frontier's
+  if (core.ready) {
+    setText('kpi-mc-core-osc', mcFmtSigned(core.oscillator, 1),
+      `mm-val ${core.oscillator >= 0 ? 'text-cyan' : 'text-neg'}`);
+    mcOscillatorChip(document.getElementById('kpi-mc-core-osc-chip'), core, bands.core);
+  } else {
+    setText('kpi-mc-core-osc', '预热中', 'mm-val text-cyan');
+    setText('kpi-mc-core-osc-chip', `${streakOf(core)}/${warmupDays} 天`, 'mm-chip');
+  }
   setText('kpi-mc-core-osc-sub', mcAdvDecText(core) || 'EMA19 − EMA39 of RAMO');
 
-  setText('kpi-mc-core-sum', mcFmtSigned(core.summation, 0),
-    `mm-val ${core.summation >= 0 ? 'text-pos' : 'text-neg'}`);
-  setText('kpi-mc-core-sum-chip', ...mcChangeChip(core.summation_change_10d));
-  setText('kpi-mc-core-sum-sub', `${core.constituents ?? '--'} 个成分 · 数据始于 ${metadata.core?.history_start || '--'}`);
+  // Summation baseline is arbitrary: no automatic bullish colour when > 0.
+  setText('kpi-mc-core-sum', core.ready ? mcFmtSigned(core.summation, 0) : '--', 'mm-val');
+  setText('kpi-mc-core-sum-chip', ...(core.ready ? mcChangeChip(core.summation_change_10d) : ['预热', 'mm-chip']));
+  setText('kpi-mc-core-sum-sub',
+    `${core.constituents ?? '--'} 个成分 · 任意基线非资金流 · 始于 ${metadata.core?.history_start || '--'}`);
 
   // Frontier: accumulated forward only, so it may still be warming up
-  const warmup = fr.warmup_days || metadata.parameters?.warmup_days || 40;
   if (fr.ready) {
     setText('kpi-mc-fr-osc', mcFmtSigned(fr.oscillator, 1),
       `mm-val ${fr.oscillator >= 0 ? 'text-fuchsia' : 'text-neg'}`);
     mcOscillatorChip(document.getElementById('kpi-mc-fr-osc-chip'), fr, bands.frontier);
-    setText('kpi-mc-fr-sum', mcFmtSigned(fr.summation, 0),
-      `mm-val ${fr.summation >= 0 ? 'text-pos' : 'text-neg'}`);
+    setText('kpi-mc-fr-sum', mcFmtSigned(fr.summation, 0), 'mm-val');
     setText('kpi-mc-fr-sum-chip', ...mcChangeChip(fr.summation_change_10d));
   } else {
     setText('kpi-mc-fr-osc', '预热中', 'mm-val text-fuchsia');
-    setText('kpi-mc-fr-osc-chip', `${fr.breadth_days || 0}/${warmup} 天`, 'mm-chip');
+    setText('kpi-mc-fr-osc-chip', `${streakOf(fr)}/${warmupDays} 天`, 'mm-chip');
     setText('kpi-mc-fr-sum', '--', 'mm-val');
     setText('kpi-mc-fr-sum-chip', '预热', 'mm-chip');
   }
@@ -7910,6 +7949,27 @@ function renderMcClellanDashboard(data) {
   setText('kpi-mc-fr-sum-sub', fr.tracked_today !== undefined ? `跟踪 ${fr.tracked_today} · ${chainText}${deadText}` : '--');
 
   renderMcClellanCharts();
+  renderMcClellanStructure();
+}
+
+/**
+ * Core structural breadth panel — shared by dashboard rendering and the
+ * theme redraw (the theme switch disposes the chart, so it must re-render).
+ * Optional module + optional payload block; missing both is a silent no-op.
+ */
+function renderMcClellanStructure() {
+  if (!rawMcClellanData) return;
+  if (window.McClellanStructure && typeof window.McClellanStructure.render === 'function') {
+    window.McClellanStructure.render({
+      data: rawMcClellanData,
+      deps: {
+        echarts: typeof echarts !== 'undefined' ? echarts : null,
+        echartsTheme: typeof getEchartsTheme === 'function' ? getEchartsTheme() : null,
+        colors: getChartThemeColors(),
+        marketData: currentMarketData
+      }
+    });
+  }
 }
 
 function mcFilterSeries(series) {
@@ -7938,21 +7998,29 @@ function renderMcClellanCharts() {
   const dates = rows.map(d => d.date);
   const track = mcclellanActiveTrack;
   const tracks = track === 'compare' ? ['core', 'frontier'] : [track];
+  const core = data.current?.core || {};
   const fr = data.current?.frontier || {};
   const posColor = '#10b981';
   const negColor = '#f43f5e';
   const axisLabel = { color: colors.tickColor, fontSize: 10, fontFamily: 'monospace' };
 
-  // Warm-up notice for the forward-accumulated Meme track
+  // Warm-up notice: Frontier accumulates forward; Core resets its streak on
+  // incomplete quotes or calendar gaps and can be mid-warmup too.
   const notice = document.getElementById('mcclellan-warmup-notice');
   if (notice) {
-    const showNotice = track !== 'core' && !fr.ready;
+    const warmup = data.metadata?.parameters?.warmup_days || fr.warmup_days || core.warmup_days || 40;
+    const streakOf = cur => cur.valid_streak_days ?? cur.breadth_days ?? 0;
+    const cold = tracks.filter(t => !(t === 'core' ? core : fr).ready);
+    const showNotice = cold.length > 0;
     notice.classList.toggle('hidden', !showNotice);
     if (showNotice) {
-      const warmup = fr.warmup_days || 40;
-      notice.textContent = fr.started
-        ? `链上 Meme 轨从 ${fr.started} 开始逐日累积（链上热度无法回填历史），需 ${warmup} 个交易日预热后才发布振荡器，目前 ${fr.breadth_days || 0}/${warmup}。`
-        : '链上 Meme 轨尚未开始采集。';
+      if (cold.includes('frontier') && track !== 'core') {
+        notice.textContent = fr.started
+          ? `链上 Meme 轨从 ${fr.started} 开始逐日累积（链上热度无法回填历史），需 ${warmup} 个有效交易日预热后才发布振荡器，目前 ${streakOf(fr)}/${warmup}。`
+          : '链上 Meme 轨尚未开始采集。';
+      } else {
+        notice.textContent = `Core 轨预热中：连续有效观测 ${streakOf(core)}/${warmup} 天（报价不完整或日历缺口会重置 streak）。`;
+      }
     }
   }
 
@@ -8002,12 +8070,26 @@ function renderMcClellanCharts() {
         markLine: idx === 0 ? { silent: true, symbol: 'none', data: [zeroLine] } : undefined
       });
     } else {
-      const bands = data.bands?.[t];
       const bandLines = [zeroLine];
-      if (bands) {
-        bandLines.push(
-          { yAxis: bands.high, lineStyle: { color: 'rgba(245, 158, 11, 0.75)', type: 'dashed' }, label: { formatter: `P90 ${mcFmtSigned(bands.high, 0)}`, position: 'insideEndTop', fontSize: 10, color: '#f59e0b' } },
-          { yAxis: bands.low, lineStyle: { color: 'rgba(244, 63, 94, 0.75)', type: 'dashed' }, label: { formatter: `P10 ${mcFmtSigned(bands.low, 0)}`, position: 'insideEndBottom', fontSize: 10, color: negColor } }
+      // Per-date causal bands only (each date's P10/P90 of PRIOR published
+      // readings). Without them there is deliberately NO line: painting
+      // today's constant range over old dates would leak the future backward.
+      if (rows.some(d => d[`${t}_band_low`] !== null && d[`${t}_band_low`] !== undefined)) {
+        series.push(
+          {
+            name: `${meta.label} P90 分位`,
+            type: 'line', xAxisIndex: 1, yAxisIndex: 1, showSymbol: false,
+            data: rows.map(d => d[`${t}_band_high`]),
+            lineStyle: { width: 1, color: 'rgba(245, 158, 11, 0.75)', type: 'dashed' },
+            itemStyle: { color: '#f59e0b' }
+          },
+          {
+            name: `${meta.label} P10 分位`,
+            type: 'line', xAxisIndex: 1, yAxisIndex: 1, showSymbol: false,
+            data: rows.map(d => d[`${t}_band_low`]),
+            lineStyle: { width: 1, color: 'rgba(244, 63, 94, 0.75)', type: 'dashed' },
+            itemStyle: { color: negColor }
+          }
         );
       }
       series.push({
@@ -8249,7 +8331,6 @@ initNavigation();
 loadMarketData(false);
 loadEtfLinkageData(false);
 loadTermCurve(false);
-fetchSsroData(false);
 fetchCoinbaseLiquidityData(false);
 fetchCbLiquidityHistory(false);
 loadGoldCorrelationData(false);
