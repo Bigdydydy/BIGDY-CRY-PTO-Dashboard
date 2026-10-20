@@ -150,7 +150,7 @@
   "address": "0x4902c5ebc598265ed2212b559b042de8a5eeec3f",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-14",
+  "last_qualified": "2026-10-20",
   "symbol": "B13B"
  },
  "bsc:0x4b3d30992f003c8167699735f5ab2831b2a087d3": {
@@ -885,7 +885,7 @@
   "address": "0x3ba500f1ababbcf0f0247d06d1c56fd7e6c4c09d",
   "chain": "robinhood",
   "first_qualified": "2026-10-05",
-  "last_qualified": "2026-10-12",
+  "last_qualified": "2026-10-20",
   "symbol": "WORM"
  },
  "robinhood:0x42afa2124ca5a2b83898e46b2da9a190995b1e18": {
@@ -1193,7 +1193,7 @@
   "address": "0x88ad8ddf1e3898412146a534538d418c6f8a9062",
   "chain": "robinhood",
   "first_qualified": "2026-10-13",
-  "last_qualified": "2026-10-15",
+  "last_qualified": "2026-10-20",
   "symbol": "STANDARD"
  },
  "robinhood:0x8953e3d1674cacf330acc81c35d945c7badede49": {
@@ -1623,6 +1623,13 @@
   "last_qualified": "2026-10-10",
   "symbol": "CRH"
  },
+ "robinhood:0xd52d2034d65ee749fb713b0209996cbc987d2b07": {
+  "address": "0xd52d2034d65ee749fb713b0209996cbc987d2b07",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-20",
+  "last_qualified": "2026-10-20",
+  "symbol": "GIGATENEV"
+ },
  "robinhood:0xd7814b24b031bb0b6c5d68d64c36c8d72c0e5b07": {
   "address": "0xd7814b24b031bb0b6c5d68d64c36c8d72c0e5b07",
   "chain": "robinhood",
@@ -1853,6 +1860,13 @@
   "first_qualified": "2026-10-09",
   "last_qualified": "2026-10-09",
   "symbol": "LOL"
+ },
+ "robinhood:0xff0bd1856b68d07448215b917cae0cc6b17b212e": {
+  "address": "0xff0bd1856b68d07448215b917cae0cc6b17b212e",
+  "chain": "robinhood",
+  "first_qualified": "2026-10-20",
+  "last_qualified": "2026-10-20",
+  "symbol": "NMJAR"
  },
  "solana:2Afp3Hfy36Z9BuXTbqJrpR8PfVwDPqcBpwoAibYEDRRS": {
   "address": "2Afp3Hfy36Z9BuXTbqJrpR8PfVwDPqcBpwoAibYEDRRS",
@@ -2385,6 +2399,13 @@
   "first_qualified": "2026-10-18",
   "last_qualified": "2026-10-19",
   "symbol": "PIERRE"
+ },
+ "solana:D42TjMjz5H7toPu5md5KBXreZkCSdZMEfLQwmBhJXvb1": {
+  "address": "D42TjMjz5H7toPu5md5KBXreZkCSdZMEfLQwmBhJXvb1",
+  "chain": "solana",
+  "first_qualified": "2026-10-20",
+  "last_qualified": "2026-10-20",
+  "symbol": "POKÉMON"
  },
  "solana:DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP": {
   "address": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP",

@@ -64,7 +64,8 @@
   "failed": []
  },
  "2026-10-20": {
-  "collected_at": "2026-10-20T12:03:28Z",
-  "failed": []
+  "collected_at": "2026-10-20T14:29:57Z",
+  "failed": [],
+  "sampling_basis": "utc_snapshot"
  }
 }
