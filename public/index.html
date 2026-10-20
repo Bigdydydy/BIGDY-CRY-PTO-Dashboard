@@ -1656,6 +1656,186 @@
         </div>
       </div>
     </section>
+
+    <!-- Bento Row 3: 做市商敞口 (Deribit 全链自算，惯例口径) -->
+    <section class="bento-card" id="module-dealer-exposure">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">02B DEALER</span>
+          <h2>做市商敞口 · 全链自算 (惯例口径)</h2>
+        </div>
+        <div class="card-badge badge-normal" id="dealer-regime-badge">分析中...</div>
+      </div>
+
+      <div class="card-body">
+        <div class="narrative-brief" id="dealer-alert-box" style="display: none;">
+          <div class="brief-header">
+            <span>🚨</span>
+            <span>做市商对冲结构化预警</span>
+          </div>
+          <div class="brief-content" id="dealer-alert-list"></div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-pill-box">
+            <span class="m-label" id="dealer-state-label">对冲状态</span>
+            <span class="m-value text-accent" id="dealer-state">--</span>
+            <span class="m-sub" id="dealer-state-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">过去 24h 已触发对冲流</span>
+            <span class="m-value" id="dealer-realized">--</span>
+            <span class="m-sub" id="dealer-realized-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">下行情景卖出 / 盘口买盘</span>
+            <span class="m-value" id="dealer-depth">--</span>
+            <span class="m-sub" id="dealer-depth-sub">--</span>
+          </div>
+        </div>
+
+        <div class="rule-banner">
+          <span>⚠️</span>
+          <span id="dealer-assumption-text">持仓符号假设做市商多 Call、空 Put，未用成交方向校正；Greeks 按 Black-76 与 Deribit 标记 IV 逐合约计算。</span>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-pill-box">
+            <span class="m-label">DEX 做市商期权 Delta</span>
+            <span class="m-value" id="dealer-dex">--</span>
+            <span class="m-sub" id="dealer-dex-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">GEX · 现货 +1%</span>
+            <span class="m-value" id="dealer-gex">--</span>
+            <span class="m-sub">做市商 Delta 变化</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">VEX · IV +1 点</span>
+            <span class="m-value" id="dealer-vex">--</span>
+            <span class="m-sub">做市商 Delta 变化</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">CEX · 过 1 天</span>
+            <span class="m-value" id="dealer-cex">--</span>
+            <span class="m-sub">做市商 Delta 变化</span>
+          </div>
+        </div>
+
+        <div class="metrics-row" style="margin-top: 6px;">
+          <div class="metric-pill-box">
+            <span class="m-label">零 Gamma 翻转位 (现货滑动重估)</span>
+            <span class="m-value text-accent" id="dealer-flip">--</span>
+            <span class="m-sub" id="dealer-flip-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label" id="dealer-near-label">近端到期</span>
+            <span class="m-value" id="dealer-near">--</span>
+            <span class="m-sub" id="dealer-near-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label">下一个大交割</span>
+            <span class="m-value" id="dealer-major">--</span>
+            <span class="m-sub" id="dealer-major-sub">--</span>
+          </div>
+        </div>
+
+        <div class="horizon-table-scroll" style="margin-top: 10px;">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th>持仓符号口径</th>
+                <th>净 GEX / 1%</th>
+                <th>Gamma 体制</th>
+                <th>零 Gamma 翻转位</th>
+              </tr>
+            </thead>
+            <tbody id="dealer-sensitivity-body">
+              <tr><td colspan="4">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="insight-note" id="dealer-sensitivity-note">--</p>
+
+        <div class="horizon-table-scroll" id="dealer-screen-wrap" style="margin-top: 10px; display: none;">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th title="屏幕成交主动方计为客户的比例：0 = 只信大宗与强平，1 = 屏幕主动方全算客户">屏幕成交折扣系数</th>
+                <th>净 GEX / 1%</th>
+                <th>Gamma 体制</th>
+                <th>零 Gamma 翻转位</th>
+                <th>校正覆盖 Gamma</th>
+              </tr>
+            </thead>
+            <tbody id="dealer-screen-body"></tbody>
+          </table>
+        </div>
+        <p class="insight-note" id="dealer-flow-note" style="display: none;">--</p>
+
+        <div class="horizon-flow-head" style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+          <span class="m-label">现货滑动重估（±20%，黏性行权价）</span>
+          <div class="view-switch">
+            <button class="switch-btn active" id="btn-dealer-slide-gex">GEX</button>
+            <button class="switch-btn" id="btn-dealer-slide-dex">DEX</button>
+          </div>
+        </div>
+        <div id="dealer-slide-chart" style="width: 100%; height: 260px;"></div>
+
+        <div style="margin-top: 12px;">
+          <span class="m-label">做市商 GEX 与零 Gamma 翻转位走势（日度档案）</span>
+        </div>
+        <div id="dealer-history-chart" style="width: 100%; height: 260px;"></div>
+        <p class="insight-note" id="dealer-history-note">--</p>
+
+        <div class="horizon-table-scroll" style="margin-top: 10px;">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th>压力情景</th>
+                <th>现货</th>
+                <th>IV</th>
+                <th>时间</th>
+                <th title="全链重估：正 = 做市商需买入 BTC，负 = 需卖出">做市商对冲流</th>
+                <th title="一阶近似分解：Gamma / Vanna / Charm">一阶分解 Γ / Vanna / Charm</th>
+              </tr>
+            </thead>
+            <tbody id="dealer-stress-body">
+              <tr><td colspan="6">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="horizon-table-scroll" style="margin-top: 10px;">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th>到期</th>
+                <th>类型</th>
+                <th>剩余</th>
+                <th>OI 占比</th>
+                <th>Gamma 占比</th>
+                <th>净 GEX / 1%</th>
+                <th title="交割后解除对冲需交易的量，按当前 Delta 估计；惯例口径下含合成多头，量级仅作参考">解除对冲 (参考)</th>
+              </tr>
+            </thead>
+            <tbody id="dealer-expiry-body">
+              <tr><td colspan="7">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="narrative-brief" id="dealer-narrative-box">
+          <div class="brief-header">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            <span>做市商对冲流研判</span>
+          </div>
+          <p class="brief-content" id="dealer-narrative-text">正在用 Deribit 全链快照计算做市商敞口...</p>
+        </div>
+      </div>
+    </section>
   </div> <!-- /#view-options -->
 
   <!-- View 4: 大宗巨鲸与战略雷达 -->

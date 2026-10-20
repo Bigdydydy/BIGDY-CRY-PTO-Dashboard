@@ -34,6 +34,7 @@ const SOURCE_POLICIES = Object.freeze({
   cot: policy(12 * HOUR, 3 * DAY, 12 * DAY, 21 * DAY),
   option_marks: policy(MINUTE, 5 * MINUTE, MINUTE, 5 * MINUTE),
   oi_history: ARCHIVE,
+  option_flow_ledger: policy(2 * HOUR, DAY, 36 * HOUR, 3 * DAY),
   block_flow: policy(2 * HOUR, DAY, 36 * HOUR, 3 * DAY),
   smart_money: policy(2 * HOUR, DAY, 36 * HOUR, 3 * DAY),
   liquidity_history: policy(30 * MINUTE, 6 * HOUR, 3 * HOUR, DAY),

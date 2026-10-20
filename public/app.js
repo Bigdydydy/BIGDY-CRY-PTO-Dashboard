@@ -151,6 +151,12 @@ function reloadAllChartsForTheme() {
     try { pnlChartInstance.dispose(); } catch (e) {}
     pnlChartInstance = null;
   }
+  if (typeof dealerSlideChartInstance !== 'undefined') {
+    [dealerSlideChartInstance, dealerHistoryChartInstance].forEach(ch => { if (ch) { try { ch.dispose(); } catch (e) {} } });
+    dealerSlideChartInstance = null;
+    dealerHistoryChartInstance = null;
+    if (lastDealerExposure) { renderDealerSlideChart(); renderDealerHistoryChart(); }
+  }
   if (typeof insightHeatmapChart !== 'undefined') {
     [insightHeatmapChart, insightCumChart].forEach(ch => { if (ch) { try { ch.dispose(); } catch (e) {} } });
     insightHeatmapChart = null;
@@ -602,6 +608,7 @@ function renderAll() {
   renderGex(currentMarketData.gex);
   renderIvSmile(currentMarketData.ivSmile);
   render25DeltaSkew(currentMarketData.delta25Skew);
+  renderDealerExposure(currentMarketData.dealerExposure);
   renderBlockTrades(currentMarketData.blockTrades);
   if (currentMarketData.termPremium) {
     const shouldForce = !termPremiumChartInstance || !!(currentMarketData.syncStatus && currentMarketData.syncStatus.hasAnyUpdate);
@@ -888,6 +895,290 @@ function render25DeltaSkew(data) {
 
   elSkewNarrativeText.textContent = data.paragraph || '';
 }
+
+/**
+ * Render Module 2B: 做市商敞口 (Deribit 全链自算，惯例口径)
+ */
+function renderDealerExposure(data) {
+  const narrative = document.getElementById('dealer-narrative-text');
+  const badge = document.getElementById('dealer-regime-badge');
+  if (!narrative) return;
+  if (!data || data.status !== 'ok') {
+    narrative.textContent = data?.summaryText || '暂无做市商敞口数据。';
+    if (badge) { badge.textContent = '数据不可用'; badge.className = 'card-badge badge-normal'; }
+    return;
+  }
+
+  const usdM = v => (typeof v === 'number' && Number.isFinite(v) ? `${v >= 0 ? '+' : '-'}$${Math.abs(v / 1e6).toFixed(1)}M` : '--');
+  const flowCell = v => `<span class="${v >= 0 ? 'text-pos' : 'text-neg'}">${usdM(v)}</span>`;
+  const setSigned = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = usdM(v);
+    el.className = `m-value ${v >= 0 ? 'text-pos' : 'text-neg'}`;
+  };
+  const ex = data.exposures || {};
+
+  const basisLabel = data.primaryBasis === 'flow_adjusted' ? '全成交校正' : '惯例口径';
+  const primaryGex = data.primaryExposures?.gexUsd ?? ex.gexUsd;
+  if (badge) {
+    const robustTag = data.primaryRobust === false ? ' · 不稳健' : '';
+    badge.textContent = `${primaryGex > 0 ? '正 Gamma' : '负 Gamma'} · ${basisLabel}${robustTag}${data.stale ? ' · 快照过期' : ''}`;
+    badge.className = `card-badge ${data.primaryRobust === false || primaryGex <= 0 ? 'badge-extreme' : 'badge-normal'}`;
+  }
+
+  // 结构化预警
+  const alertBox = document.getElementById('dealer-alert-box');
+  const alertList = document.getElementById('dealer-alert-list');
+  const alerts = data.alerts || [];
+  if (alertBox) alertBox.style.display = alerts.length ? '' : 'none';
+  if (alertList) {
+    const levelText = { high: '高优先级', medium: '预警', low: '提示' };
+    const levelClass = { high: 'text-neg', medium: 'text-neg', low: 'text-accent' };
+    alertList.innerHTML = alerts.map(a => `
+      <p><strong class="${levelClass[a.level] || ''}">【${escapeHtml(levelText[a.level] || a.level)} · ${escapeHtml(a.title)}】</strong>${escapeHtml(a.detail)}</p>`).join('');
+  }
+
+  // 对冲状态、过去 24h 已触发对冲流、对冲流 vs 盘口深度
+  setTextIfPresent('dealer-state-label', `对冲状态 · ${basisLabel}`);
+  setTextIfPresent('dealer-state', data.state?.label || '--');
+  setTextIfPresent('dealer-state-sub', data.state?.desc || '--');
+  const rp = data.realized24h?.primary || data.realized24h?.convention;
+  if (rp) {
+    setSigned('dealer-realized', rp.flowUsd);
+    setTextIfPresent('dealer-realized-sub', `现货 ${rp.spotPct >= 0 ? '+' : ''}${rp.spotPct}% · DVOL ${rp.dvolChange >= 0 ? '+' : ''}${rp.dvolChange} 点 · 正为买入`);
+  } else {
+    setTextIfPresent('dealer-realized', '--');
+    setTextIfPresent('dealer-realized-sub', '缺少 24 小时现货/DVOL 数据');
+  }
+  const depth = data.depth;
+  if (depth) {
+    setTextIfPresent('dealer-depth', `${depth.downsideRatioPct}%`);
+    setTextIfPresent('dealer-depth-sub', `卖出 ${usdM(-depth.downsideSellUsd)} / ${depth.venue} ${depth.band} 买盘 ${usdM(depth.bidUsd)} · 量级参考`);
+  } else {
+    setTextIfPresent('dealer-depth', '--');
+    setTextIfPresent('dealer-depth-sub', '盘口深度不可用');
+  }
+
+  const sens = data.sensitivity;
+  const sensBody = document.getElementById('dealer-sensitivity-body');
+  if (sensBody && sens) {
+    sensBody.innerHTML = (sens.scenarios || []).map(s => `
+      <tr>
+        <td>${escapeHtml(s.label)}</td>
+        <td><span class="${s.gexUsd >= 0 ? 'text-pos' : 'text-neg'}">${usdM(s.gexUsd)}</span></td>
+        <td>${s.regime === 'long_gamma' ? '正 Gamma' : '负 Gamma'}</td>
+        <td>${s.gammaFlip ? `$${Number(s.gammaFlip.price).toLocaleString()} (${s.gammaFlip.distancePct >= 0 ? '+' : ''}${escapeHtml(s.gammaFlip.distancePct)}%)` : '±20% 内无'}</td>
+      </tr>`).join('');
+  }
+  if (sens) {
+    const th = sens.threshold || {};
+    const thText = th.sharePct == null
+      ? ''
+      : `翻号阈值：把 ${th.side === 'call' ? 'Call' : 'Put'} 侧 ${th.sharePct}% 的 Gamma 改划为${th.side === 'call' ? '客户买入' : '客户卖出'}，净 GEX 即归零（净值仅占总 Gamma 的 ${th.netShareOfGrossPct}%）。`;
+    const cov = sens.coverage;
+    let covText;
+    if (cov && cov.source === 'ledger') {
+      covText = `全成交校正覆盖 OI ${cov.oiShare}% / Gamma ${cov.gammaShare}%，覆盖部分与惯例一致 ${cov.agreeShare ?? '--'}%（台账截至 ${cov.syncedThrough ? cov.syncedThrough.slice(0, 10) : '--'}${cov.stale ? '，已过期' : ''}）。`;
+    } else if (cov) {
+      covText = `台账不可用，退回 30 天大宗校正：覆盖 OI ${cov.oiShare}% / Gamma ${cov.gammaShare}%，覆盖部分与惯例一致 ${cov.agreeShare ?? '--'}%。`;
+    } else {
+      covText = '缺少成交数据，未做订单流校正。';
+    }
+    let robustText;
+    if (sens.robust) {
+      robustText = '✅ 各口径同号，Gamma 方向结论稳健。';
+    } else if (cov?.source === 'ledger' && sens.flowRobust) {
+      const convGex = (sens.scenarios || []).find(s => s.key === 'convention')?.gexUsd;
+      const flowGex = (sens.scenarios || []).find(s => s.key === 'flow_adjusted')?.gexUsd;
+      const sameSign = Math.sign(convGex) === Math.sign(flowGex);
+      robustText = sameSign
+        ? `⚠️ 惯例与全成交校正同号，只有"虚值 Call 客户买入"假设情景变号${cov.netCallBtc < 0 ? `（订单流显示客户净卖出 Call ${Math.abs(cov.netCallBtc).toFixed(0)} BTC，与该假设相反）` : ''}。`
+        : '⚠️ 惯例与全成交校正不同号，以订单流校正为准。';
+    } else {
+      robustText = '⚠️ 各口径不同号，Gamma 方向结论不稳健。';
+    }
+    setTextIfPresent('dealer-sensitivity-note', `${robustText}${thText}${covText}`);
+
+    const screenWrap = document.getElementById('dealer-screen-wrap');
+    const screenBody = document.getElementById('dealer-screen-body');
+    const flowNote = document.getElementById('dealer-flow-note');
+    const ws = sens.screenWeights || [];
+    if (screenWrap) screenWrap.style.display = ws.length ? '' : 'none';
+    if (flowNote) flowNote.style.display = ws.length ? '' : 'none';
+    if (screenBody && ws.length) {
+      screenBody.innerHTML = ws.map(w => `
+        <tr>
+          <td>${escapeHtml(w.screenWeight)}</td>
+          <td><span class="${w.gexUsd >= 0 ? 'text-pos' : 'text-neg'}">${usdM(w.gexUsd)}</span></td>
+          <td>${w.regime === 'long_gamma' ? '正 Gamma' : '负 Gamma'}</td>
+          <td>${w.gammaFlip ? `$${Number(w.gammaFlip.price).toLocaleString()} (${w.gammaFlip.distancePct >= 0 ? '+' : ''}${escapeHtml(w.gammaFlip.distancePct)}%)` : '±20% 内无'}</td>
+          <td>${escapeHtml(w.coverageGammaShare)}%</td>
+        </tr>`).join('');
+    }
+    if (flowNote && cov && cov.source === 'ledger') {
+      const cap = cov.capCheck || {};
+      const mix = cov.volumeMix || {};
+      flowNote.textContent = `${sens.flowRobust ? '✅ 订单流口径内部同号' : '⚠️ 订单流口径内部随折扣系数变号'}。OI 封顶自检：${cap.flowInstruments} 个有成交的合约中 ${cap.overCapInstruments} 个累计净额超过 OI（占其 Gamma ${cap.overCapGammaShare}%，超出量占净额 ${cap.overshootPct}%）。成交构成：屏幕 ${mix.screen}% / 大宗 ${mix.block}% / 强平 ${mix.liq}%。`;
+    }
+  }
+  setSigned('dealer-dex', ex.dexUsd);
+  const syntheticShare = ex.dexBtc ? Math.round(ex.syntheticForwardBtc / Math.abs(ex.dexBtc) * 100) : 0;
+  setTextIfPresent('dealer-dex-sub', `其中 ${syntheticShare}% 为假设产生的合成多头 · 币本位 ${usdM(ex.dexPremAdjUsd)}`);
+  setSigned('dealer-gex', ex.gexUsd);
+  setSigned('dealer-vex', ex.vexUsd);
+  setSigned('dealer-cex', ex.cexUsd);
+
+  const flip = data.gammaFlip;
+  setTextIfPresent('dealer-flip', flip ? `$${Number(flip.price).toLocaleString()}` : '区间内无');
+  setTextIfPresent('dealer-flip-sub', flip
+    ? `距现货 ${flip.distancePct >= 0 ? '+' : ''}${flip.distancePct}% · 下方 ${flip.from > 0 ? '正' : '负'} / 上方 ${flip.to > 0 ? '正' : '负'} Gamma`
+    : '现货 ±20% 内 GEX 不变号');
+  setTextIfPresent('dealer-near-label', `近 ${data.nearTermDays || 10} 天到期`);
+  setTextIfPresent('dealer-near', `${data.nearTermOiShare}% OI`);
+  setTextIfPresent('dealer-near-sub', `净 GEX ${usdM(data.nearTermGexUsd)} / 1%`);
+  const major = data.nextMajorExpiry;
+  setTextIfPresent('dealer-major', major ? `${major.expiry} · ${major.kind}` : '--');
+  setTextIfPresent('dealer-major-sub', major ? `剩 ${major.dte} 天 · OI ${major.oiShare}% · Gamma ${major.gexShare}%` : '--');
+
+  const signedNum = (v, unit) => `${v > 0 ? '+' : ''}${v}${unit}`;
+  const stressBody = document.getElementById('dealer-stress-body');
+  if (stressBody) {
+    stressBody.innerHTML = (data.stress || []).map(s => `
+      <tr>
+        <td>${escapeHtml(s.label)}</td>
+        <td>${escapeHtml(signedNum(s.spotPct, '%'))}</td>
+        <td>${escapeHtml(signedNum(s.volPts, ' 点'))}</td>
+        <td>${s.days ? `${escapeHtml(s.days)} 天` : '--'}</td>
+        <td>${flowCell(s.flowUsd)}</td>
+        <td>${usdM(s.approx?.gammaUsd)} / ${usdM(s.approx?.vannaUsd)} / ${usdM(s.approx?.charmUsd)}</td>
+      </tr>`).join('');
+  }
+
+  const expiryBody = document.getElementById('dealer-expiry-body');
+  if (expiryBody) {
+    expiryBody.innerHTML = (data.expiries || []).map(e => `
+      <tr>
+        <td>${escapeHtml(e.expiry)}</td>
+        <td>${escapeHtml(e.kind)}</td>
+        <td>${e.dte < 1 ? `${Math.round(e.dte * 24)} 小时` : `${escapeHtml(e.dte)} 天`}</td>
+        <td>${escapeHtml(e.oiShare)}%</td>
+        <td>${escapeHtml(e.gexShare)}%</td>
+        <td>${flowCell(e.gexUsd)}</td>
+        <td>${flowCell(e.rollOffFlowUsd)}</td>
+      </tr>`).join('');
+  }
+
+  narrative.textContent = data.paragraph || '';
+  lastDealerExposure = data;
+  renderDealerSlideChart();
+  renderDealerHistoryChart();
+}
+
+let lastDealerExposure = null;
+let dealerSlideMode = 'gex';
+let dealerSlideChartInstance = null;
+let dealerHistoryChartInstance = null;
+
+/** 现货滑动重估曲线：惯例与全成交校正两条，标出现货与翻转位 */
+function renderDealerSlideChart() {
+  const data = lastDealerExposure;
+  const dom = document.getElementById('dealer-slide-chart');
+  if (!data || !dom || typeof echarts === 'undefined') return;
+  const curves = (data.sensitivity?.scenarios || []).filter(s => Array.isArray(s.curve));
+  if (!curves.length) return;
+  if (!dealerSlideChartInstance) dealerSlideChartInstance = echarts.init(dom, getEchartsTheme());
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const field = dealerSlideMode === 'dex' ? 'dexUsd' : 'gexUsd';
+  const palette = { convention: '#38bdf8', flow_adjusted: '#f59e0b' };
+  const series = curves.map(s => ({
+    name: s.label,
+    type: 'line',
+    showSymbol: false,
+    data: s.curve.map(p => [p.price, p[field]]),
+    lineStyle: { width: 2, color: palette[s.key] || '#a855f7' },
+    itemStyle: { color: palette[s.key] || '#a855f7' },
+    markLine: s.key === 'convention' ? {
+      symbol: 'none',
+      label: { color: colors.textSecondary, fontSize: 10 },
+      lineStyle: { color: colors.crossColor, type: 'dashed' },
+      data: [{ xAxis: Math.round(data.spot), label: { formatter: '现货' } }]
+    } : undefined,
+    markPoint: s.gammaFlip && field === 'gexUsd' ? {
+      symbol: 'circle', symbolSize: 8,
+      label: { show: true, position: 'top', color: colors.textSecondary, fontSize: 10, formatter: `翻转 $${Number(s.gammaFlip.price).toLocaleString()}` },
+      data: [{ coord: [s.gammaFlip.price, 0] }]
+    } : undefined
+  }));
+  dealerSlideChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 64, right: 16, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: { ...elTooltipBase(colors), valueFormatter: v => `${v >= 0 ? '+' : '-'}$${Math.abs(v / 1e6).toFixed(1)}M` },
+    xAxis: { type: 'value', scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, formatter: v => `$${(v / 1000).toFixed(0)}k` } },
+    yAxis: { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: v => `$${(v / 1e6).toFixed(0)}M` } },
+    series
+  }, true);
+}
+
+/** 日度档案：GEX (惯例 / 全成交校正) 柱，翻转位与现货为右轴折线 */
+function renderDealerHistoryChart() {
+  const data = lastDealerExposure;
+  const dom = document.getElementById('dealer-history-chart');
+  const note = document.getElementById('dealer-history-note');
+  const rows = data?.history || [];
+  if (!dom || typeof echarts === 'undefined') return;
+  if (note) {
+    // 当日档案会被实时点覆盖，计数时补回
+    const archived = rows.filter(r => !r.live).length + rows.filter(r => r.live && r.replacesArchived).length;
+    note.textContent = archived
+      ? `日度档案 ${archived} 天（每日由 GitHub Actions 写入），最后一点为当前实时值${rows.some(r => r.live && r.replacesArchived) ? '（覆盖当日档案）' : ''}。翻转位为空表示该日现货 ±20% 内无翻转位。`
+      : '日度档案尚无记录（每日由 GitHub Actions 写入），当前只显示实时值。';
+  }
+  if (!rows.length) return;
+  if (!dealerHistoryChartInstance) dealerHistoryChartInstance = echarts.init(dom, getEchartsTheme());
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const days = rows.map(r => (r.live ? `${r.day} 实时` : r.day));
+  const usdFmt = v => (v === null || v === undefined ? '--' : `${v >= 0 ? '+' : '-'}$${Math.abs(v / 1e6).toFixed(1)}M`);
+  dealerHistoryChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 64, right: 64, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: { ...elTooltipBase(colors) },
+    xAxis: { type: 'category', data: days, ...common, splitLine: { show: false } },
+    yAxis: [
+      { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: v => `$${(v / 1e6).toFixed(0)}M` } },
+      { type: 'value', scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, formatter: v => `$${(v / 1000).toFixed(0)}k` } }
+    ],
+    series: [
+      { name: '净 GEX · 惯例', type: 'bar', data: rows.map(r => r.conv?.gexUsd ?? null), itemStyle: { color: '#38bdf8' }, tooltip: { valueFormatter: usdFmt } },
+      { name: '净 GEX · 全成交校正', type: 'bar', data: rows.map(r => r.flow?.gexUsd ?? null), itemStyle: { color: '#f59e0b' }, tooltip: { valueFormatter: usdFmt } },
+      { name: '现货', type: 'line', yAxisIndex: 1, showSymbol: rows.length < 3, data: rows.map(r => r.spot), lineStyle: { width: 1.6, color: colors.textSecondary }, itemStyle: { color: colors.textSecondary } },
+      { name: '翻转位 · 主口径', type: 'line', yAxisIndex: 1, showSymbol: true, connectNulls: false, data: rows.map(r => (r.flow ? r.flow.flip : r.conv?.flip) ?? null), lineStyle: { width: 1.6, type: 'dashed', color: '#a855f7' }, itemStyle: { color: '#a855f7' } }
+    ]
+  }, true);
+}
+
+document.getElementById('btn-dealer-slide-gex')?.addEventListener('click', () => {
+  dealerSlideMode = 'gex';
+  document.getElementById('btn-dealer-slide-gex')?.classList.add('active');
+  document.getElementById('btn-dealer-slide-dex')?.classList.remove('active');
+  renderDealerSlideChart();
+});
+document.getElementById('btn-dealer-slide-dex')?.addEventListener('click', () => {
+  dealerSlideMode = 'dex';
+  document.getElementById('btn-dealer-slide-dex')?.classList.add('active');
+  document.getElementById('btn-dealer-slide-gex')?.classList.remove('active');
+  renderDealerSlideChart();
+});
+window.addEventListener('resize', () => {
+  dealerSlideChartInstance?.resize();
+  dealerHistoryChartInstance?.resize();
+});
 
 /**
  * Render Module 3: Block Trades & Icebergs
@@ -1774,6 +2065,9 @@ function renderPnLPositions(s, view) {
 function renderPnLChart(s, view, resetChart) {
   const elChartDom = document.getElementById('pnl-chart-container');
   if (!elChartDom || !window.echarts) return;
+  // The health gate can keep the chart wrapper hidden until live marks arrive —
+  // never init or measure a chart against a zero-size container.
+  if (elChartDom.clientWidth <= 0 || elChartDom.clientHeight <= 0) return;
 
   if (!pnlChartInstance) {
     pnlChartInstance = echarts.init(elChartDom, getEchartsTheme());
@@ -1781,6 +2075,10 @@ function renderPnLChart(s, view, resetChart) {
     window.addEventListener('resize', () => {
       if (pnlChartInstance) pnlChartInstance.resize();
     });
+  } else {
+    // The container may have been unhidden or resized since the last render —
+    // re-measure synchronously before applying options.
+    pnlChartInstance.resize();
   }
 
   const unit = s.unit;
@@ -1919,9 +2217,6 @@ function renderPnLChart(s, view, resetChart) {
 
   if (resetChart) {
     pnlChartInstance.setOption(option, true);
-    setTimeout(() => {
-      if (pnlChartInstance) pnlChartInstance.resize();
-    }, 60);
   } else {
     // Keep the user's zoom window while sliders move
     pnlChartInstance.setOption(option, { replaceMerge: ['series'] });
@@ -6935,6 +7230,10 @@ function switchView(viewId, updateHash = true) {
 
     if (cdriChartInstance) cdriChartInstance.resize();
     if (termPremiumChartInstance) termPremiumChartInstance.resize();
+    if (viewId === 'view-options' || viewId === 'view-all') {
+      dealerSlideChartInstance?.resize();
+      dealerHistoryChartInstance?.resize();
+    }
     resizeEtfLinkageCharts();
     if (termCurveChartInstance) {
       termCurveChartInstance.resize();

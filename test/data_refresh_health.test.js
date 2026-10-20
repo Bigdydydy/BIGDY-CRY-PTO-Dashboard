@@ -255,7 +255,8 @@ test('recovery: source returns to OK and error cleared after a failed round', as
 test('single-flight: concurrent refreshes share one upstream round', async () => {
   const { df, shared } = loadFetcher();
   const [a, b] = await Promise.all([df.refreshAllMarketData('BTC'), df.refreshAllMarketData('BTC')]);
-  assert.equal(shared.calls, 8, 'one upstream call per source for two concurrent refreshes');
+  // 8 个数据源各一次 + DVOL 小时线一次 (做市商过去 24 小时已触发对冲流)
+  assert.equal(shared.calls, 9, 'one upstream call per source for two concurrent refreshes');
   assert.equal(a, b, 'single-flight returns the same in-flight promise');
 });
 

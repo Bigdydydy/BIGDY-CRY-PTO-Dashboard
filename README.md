@@ -68,6 +68,12 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **到期日动态滚动筛选**：卡片聚焦当月月底、季度主交割期（3月、6月、9月、12月）以及年度最终交割期。
 - **Gamma 体制按全部到期日判定**：近端周度合约 Gamma 最大，不能被过滤；分别给出全部到期、近端 10 天、主力交割的净 GEX，净额不足总敞口 10% 时判为中性；附按行权价累计 GEX 变号的零 Gamma 翻转位近似。
 - **口径说明**：正负号沿用 Call 记正、Put 记负（假设做市商为客户卖 Call、买 Put 的对手方），该假设未经 Deribit 成交方向验证。
+- **做市商敞口 · 全链自算（`server/dealer_engine.js`）**：用 Deribit `get_book_summary_by_currency` 全链快照（标记 IV、到期远期价、OI），逐合约按 Black-76（r = 0）计算 Delta / Gamma / Vanna / Charm，聚合为 DEX、GEX（现货 +1%）、VEX（IV +1 点）、CEX（过 1 天）；在现货 ±20% 上滑动全链重估求零 Gamma 翻转位；列出各到期日（日度/周度/月度/季度）的 OI 与 Gamma 占比；压力情景（如现货 −3% 且 IV +5 点）一律全链重估做市商对冲流。第一阶段沿用同一惯例符号，并单独列出由该假设产生的合成多头（同行权价 Call 多 + Put 空），DEX 水平与交割解除对冲量只作参考。
+- **全成交累计净额台账（`server/option_flow_ledger.js`）**：用 `history.deribit.com` 回补每个现存期权合约上市以来的全部逐笔成交，只存按合约汇总的累计净额，屏幕、大宗、强平分开记账（强平按被强平方确定客户方向）；从上市累计时开仓与平仓自然抵消。`node scripts/option_flow_ledger.js --backfill` 全量回补（约 3000 页，接近 1 小时，每 200 页存检查点），之后由 `.github/workflows/option_flow_daily.yml` 每日增量同步并提交 `data/option_flow_ledger_BTC.json`；线上从 GitHub raw 读取。
+- **主口径、对冲状态与预警**：台账可用时以全成交校正后的账本为主口径（惯例口径并列对照）。对冲状态按当前 GEX 与两个压力情景的对冲方向判定（逆周期缓冲 / 缓冲但下破转助跌、上破转助涨 / 顺周期助跌 / 上行逼空 / 双向加速）。结构化预警：负 Gamma 助跌 + 25Δ Put 偏斜极端（相对历史，历史不足时 30D RR ≤ −3）+ IV 上升时做市商卖出，升为高优先级；持仓符号结论不稳健时降一级；翻转位距现货 3% 以内且跨过后转负 Gamma 时给提示。
+- **已触发对冲流与盘口深度**：用 Deribit 永续与 DVOL 小时线算过去 24 小时的现货与波动率变化，按当前账本（OI 视为不变）回到 24 小时前重估，得到做市商已被动买卖的量，并拆成 Gamma / Vanna / Charm；压力情景的对冲量与 Coinbase ±2% 盘口深度（Module 6）对比，只说明量级。
+- **日度档案与走势图（`server/dealer_history.js`）**：`scripts/dealer_exposure_snapshot.js` 在每日台账同步后写入 `data/dealer_exposure_history_BTC.json`（惯例与全成交校正的净 GEX、DEX、翻转位、已触发对冲流、状态），卡片上画出现货滑动 GEX/DEX 曲线与 GEX、翻转位、现货的历史走势。
+- **持仓符号敏感性**：并列显示惯例、虚值 Call 改为客户买入、全成交校正（主动方视为客户，覆盖量封顶 OI；台账不可用时退回 30 天大宗校正）三种口径的净 GEX 与翻转位，另给屏幕成交折扣系数 0 ~ 1 五档的敏感性与 OI 封顶自检（累计净额超过 OI 的合约占比与超出量）；各口径不同号时标为"结论不稳健"；给出翻号阈值（Call 或 Put 侧改划多少比例的 Gamma 会让净 GEX 归零）以及大宗校正的 OI / Gamma 覆盖率和与惯例的一致率。
 
 ### Module 3 期权套件：25Δ 微笑与偏度
 - **微笑按固定 Delta 度量**：25Δ / 10Δ 风险逆转 (RR) 与蝶式 (BF)，标注真实到期与剩余天数，并与远月对比。

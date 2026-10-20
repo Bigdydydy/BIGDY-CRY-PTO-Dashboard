@@ -1,0 +1,63 @@
+name: Option Flow Ledger Daily (Deribit 全成交累计净额)
+
+on:
+  schedule:
+    # 每日增量同步 Deribit 期权逐笔成交到台账；定时任务可能被延迟或丢弃，排两个时段，重复运行只补新成交
+    - cron: '23 8 * * *'
+    - cron: '47 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: option-flow-ledger
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 日常增量只需几十页；台账缺失时会触发全量回补 (约 3000 页，接近 1 小时)
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 只用 Node 内置模块，无需 npm install；台账不存在时自动全量回补
+      - name: Sync option flow ledger
+        id: ledger
+        run: node scripts/option_flow_ledger.js
+
+      # 台账同步后写当日做市商敞口记录 (同日覆盖)；台账失败时仍用磁盘上的旧台账照常记录
+      - name: Dealer exposure daily record
+        if: ${{ !cancelled() }}
+        run: node scripts/dealer_exposure_snapshot.js
+
+      - name: Commit and push
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 任一步失败时对应文件可能不存在，只添加实际存在的文件
+          for f in data/option_flow_ledger_BTC.json data/dealer_exposure_history_BTC.json; do
+            if [ -f "$f" ]; then git add "$f"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "No changes; skipping commit."
+            exit 0
+          fi
+          # [skip render] 避免触发 Render 重新部署；线上从 GitHub raw 读取最新台账
+          git commit -m "chore(flow): daily option flow ledger and dealer exposure record [skip ci] [skip render]"
+          pushed=0
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push; then pushed=1; break; fi
+            sleep 8
+          done
+          [ "$pushed" = 1 ]

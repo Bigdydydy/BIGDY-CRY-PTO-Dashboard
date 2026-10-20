@@ -35,6 +35,26 @@ const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./opt
 const optionOiHistory = require('./option_oi_history');
 const blockInsight = require('./block_insight');
 const volSurfaceHistory = require('./vol_surface_history');
+const { analyzeDealerExposure } = require('./dealer_engine');
+const optionFlowLedger = require('./option_flow_ledger');
+const dealerHistory = require('./dealer_history');
+
+/**
+ * Coinbase ±200bps 盘口深度 (Module 6 的缓存)，用于对冲流量级对比；最多等 2.5 秒，取不到时返回 null
+ */
+async function coinbaseDepthForDealer() {
+  try {
+    const cb = await Promise.race([
+      getCoinbaseLiquidityData(false),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+    ]);
+    const tier = cb?.depthProfile?.[200];
+    if (!tier || !(tier.bidUsd > 0) || !(tier.askUsd > 0)) return null;
+    return { venue: 'Coinbase', band: '±2%', bidUsd: tier.bidUsd, askUsd: tier.askUsd, asOf: cb.timestamp ? new Date(cb.timestamp).toISOString() : null };
+  } catch (err) {
+    return null;
+  }
+}
 const { analyzeWaves, evaluateUserCount, evaluateUserSketch, USER_TOOLS } = require('./wave_engine');
 
 const PORT = process.env.PORT || 3000;
@@ -749,6 +769,41 @@ async function handleApiRequest(req, res, parsedUrl) {
         })
         : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
 
+      // 做市商敞口：Deribit 全链快照自算 DEX/GEX/VEX/CEX、滑动翻转位、到期脱落与压力矩阵；
+      // 台账可用时以全成交校正为主口径，惯例口径并列。
+      // 快照与 Module 4 PV 视图共用 option_marks 的 30s 缓存；刷新失败时用上一份快照并标注 stale。
+      let dealerExposure;
+      try {
+        const marksSnapshot = await getOptionMarks('BTC');
+        let flowLedger = null;
+        try {
+          flowLedger = await optionFlowLedger.getLedger();
+        } catch (err) {
+          console.warn('[API] option flow ledger unavailable:', err.message);
+        }
+        const depth = await coinbaseDepthForDealer();
+        dealerExposure = analyzeDealerExposure(marksSnapshot, {
+          // 全成交累计净额台账：台账可用时作为主口径 (状态、预警、压力情景)，惯例口径并列对照
+          flowLedger,
+          gexReference: gexAnalysis.status === 'data_unavailable' ? null : gexAnalysis,
+          // 台账不可用时退回 30 天大宗成交库
+          blockTrades: data.blockTrades || [],
+          // 过去 24 小时现货与 DVOL 变化 (已触发对冲流)
+          recent24h: data.dvolStats?.recent24h || null,
+          // 25Δ 偏度：预警中的偏度条件
+          skew: skewAnalysis && skewAnalysis.status !== 'data_unavailable' ? skewAnalysis : null,
+          depth
+        });
+        if (dealerExposure.status === 'ok') {
+          // 日度档案 (Actions 每日提交) + 当前实时记录
+          const archived = await dealerHistory.getHistory().catch(() => []);
+          dealerExposure.history = dealerHistory.withLivePoint(archived, dealerHistory.recordFromAnalysis(dealerExposure));
+        }
+      } catch (err) {
+        console.warn('[API] dealer exposure unavailable:', err.message);
+        dealerExposure = { status: 'data_unavailable', summaryText: `Deribit 全链快照不可用：${err.message}` };
+      }
+
       // The daily vol-surface record is written ONLY from genuinely usable
       // inputs: every required source must be live-OK (not FALLBACK/STALE/
       // UNKNOWN, no lastError) AND its receipt must be from today (UTC) — a
@@ -809,6 +864,7 @@ async function handleApiRequest(req, res, parsedUrl) {
         blockTrades: blockAnalysis,
         ivSmile: smileAnalysis,
         delta25Skew: skewAnalysis,
+        dealerExposure,
         termPremium: termPremiumOut
       };
 
