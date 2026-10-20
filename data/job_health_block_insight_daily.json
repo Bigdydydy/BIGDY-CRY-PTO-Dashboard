@@ -1,0 +1,33 @@
+{
+  "id": "block_insight_daily",
+  "status": "partial",
+  "lastAttemptAt": "2026-10-20T06:23:27.942Z",
+  "lastSuccessAt": null,
+  "lastError": "option_oi: option_oi outcome=failure archiveToday=false",
+  "steps": {
+    "option_oi": {
+      "status": "failed",
+      "lastAttemptAt": "2026-10-20T06:23:27.959Z",
+      "lastSuccessAt": null,
+      "lastError": "option_oi outcome=failure archiveToday=false",
+      "dataAsOf": null,
+      "verifiedSkip": false
+    },
+    "block_trades": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-20T06:23:28.617Z",
+      "lastSuccessAt": "2026-10-20T06:23:28.617Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-18T00:00:00.000Z",
+      "verifiedSkip": false
+    },
+    "marks": {
+      "status": "ok",
+      "lastAttemptAt": "2026-10-20T06:23:29.436Z",
+      "lastSuccessAt": "2026-10-20T06:23:29.436Z",
+      "lastError": null,
+      "dataAsOf": "2026-10-20T06:23:28.618Z",
+      "verifiedSkip": false
+    }
+  }
+}

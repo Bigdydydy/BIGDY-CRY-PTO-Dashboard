@@ -1,10 +1,10 @@
 {
   "performance": {
-    "price": 58,
+    "price": 56,
     "level": "中性波动",
     "levelEn": "Neutral Volatility",
     "color": "#93ea2a",
-    "yesterday": 55,
+    "yesterday": 57,
     "yesterdayRisk": {
       "level": "中性波动",
       "levelEn": "Neutral Volatility",
@@ -12,7 +12,7 @@
       "bg": "rgba(147, 234, 42, 0.15)",
       "border": "#93ea2a"
     },
-    "week": 57,
+    "week": 55,
     "weekRisk": {
       "level": "中性波动",
       "levelEn": "Neutral Volatility",
@@ -20,7 +20,7 @@
       "bg": "rgba(147, 234, 42, 0.15)",
       "border": "#93ea2a"
     },
-    "month": 65,
+    "month": 64,
     "monthRisk": {
       "level": "高风险",
       "levelEn": "High Risk",
@@ -1740,7 +1740,8 @@
       1792108800,
       1792195200,
       1792281600,
-      1792368000
+      1792368000,
+      1792454400
     ],
     "dates": [
       "2022-03-05",
@@ -3432,7 +3433,8 @@
       "2026-10-16",
       "2026-10-17",
       "2026-10-18",
-      "2026-10-19"
+      "2026-10-19",
+      "2026-10-20"
     ],
     "valueList": [
       48,
@@ -5124,7 +5126,8 @@
       56,
       55,
       55,
-      58
+      57,
+      56
     ],
     "priceList": [
       39375.1,
@@ -6815,12 +6818,13 @@
       82195.4,
       81578.3,
       81455.9,
-      82073.9,
-      82130.3
+      82078,
+      81903.3,
+      81583.6
     ]
   },
-  "updatedAt": "2026-10-19 19:33:15",
-  "timestamp": 1792409595759,
+  "updatedAt": "2026-10-20 15:26:05",
+  "timestamp": 1792481165504,
   "dataHealth": {
     "state": "OK",
     "analysisAllowed": true,
@@ -6835,7 +6839,7 @@
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 41596359,
+        "dataAgeMs": 26765978,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -6843,9 +6847,9 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-19T11:33:16.359Z",
-        "lastSuccessAt": "2026-10-19T11:33:16.359Z",
-        "dataAsOf": "2026-10-19T00:00:00.000Z",
+        "lastAttemptAt": "2026-10-20T07:26:05.978Z",
+        "lastSuccessAt": "2026-10-20T07:26:05.978Z",
+        "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "coinglass/cgri",
         "lastError": null,
