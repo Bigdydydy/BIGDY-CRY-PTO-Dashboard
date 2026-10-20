@@ -38609,7 +38609,7 @@
     },
     {
       "date": "2026-10-20",
-      "btcPrice": 81532.78,
+      "btcPrice": 81490,
       "mstrCost": 75446,
       "mstrHoldings": 848517,
       "mstrBuyVelocity30d": 115.6,
@@ -38626,7 +38626,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 81532.78,
+    "currentBtc": 81490,
     "currentMstrCost": 75446,
     "currentMstrHoldings": 848517,
     "currentMstrVelocity30d": 115.6,
@@ -38826,7 +38826,7 @@
       "start": "2020-08-01",
       "end": "2026-10-20"
     },
-    "updatedAt": "2026-10-20T11:32:02.253Z"
+    "updatedAt": "2026-10-20T11:52:44.112Z"
   },
   "rawMstr": [
     {
@@ -39464,7 +39464,7 @@
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 41522253,
+        "dataAgeMs": 42764112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39472,8 +39472,8 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-20T11:32:02.253Z",
-        "lastSuccessAt": "2026-10-20T11:32:02.253Z",
+        "lastAttemptAt": "2026-10-20T11:52:44.112Z",
+        "lastSuccessAt": "2026-10-20T11:52:44.112Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "macro/build",
@@ -39490,8 +39490,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1081,
-        "dataAgeMs": 387122253,
+        "ageMs": 1610,
+        "dataAgeMs": 388364112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39499,8 +39499,8 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-20T11:32:01.172Z",
-        "lastSuccessAt": "2026-10-20T11:32:01.172Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.502Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.502Z",
         "dataAsOf": "2026-10-16T00:00:00.000Z",
         "asOfKind": "source",
         "source": "fred.stlouisfed.org",
@@ -39517,8 +39517,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1230,
-        "dataAgeMs": 387122253,
+        "ageMs": 1655,
+        "dataAgeMs": 388364112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39526,8 +39526,8 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-20T11:32:01.023Z",
-        "lastSuccessAt": "2026-10-20T11:32:01.023Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.457Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.457Z",
         "dataAsOf": "2026-10-16T00:00:00.000Z",
         "asOfKind": "source",
         "source": "fred.stlouisfed.org",
@@ -39544,8 +39544,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1316,
-        "dataAgeMs": 559922253,
+        "ageMs": 1711,
+        "dataAgeMs": 561164112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39553,8 +39553,8 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-20T11:32:00.937Z",
-        "lastSuccessAt": "2026-10-20T11:32:00.937Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.401Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.401Z",
         "dataAsOf": "2026-10-14T00:00:00.000Z",
         "asOfKind": "source",
         "source": "fred.stlouisfed.org",
@@ -39571,8 +39571,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1350,
-        "dataAgeMs": 559922253,
+        "ageMs": 1704,
+        "dataAgeMs": 561164112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39580,8 +39580,8 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-20T11:32:00.903Z",
-        "lastSuccessAt": "2026-10-20T11:32:00.903Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.408Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.408Z",
         "dataAsOf": "2026-10-14T00:00:00.000Z",
         "asOfKind": "source",
         "source": "fred.stlouisfed.org",
@@ -39598,8 +39598,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1291,
-        "dataAgeMs": 127922253,
+        "ageMs": 1491,
+        "dataAgeMs": 129164112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39607,8 +39607,8 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-20T11:32:00.962Z",
-        "lastSuccessAt": "2026-10-20T11:32:00.962Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.621Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.621Z",
         "dataAsOf": "2026-10-19T00:00:00.000Z",
         "asOfKind": "source",
         "source": "fred.stlouisfed.org",
@@ -39625,8 +39625,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 934,
-        "dataAgeMs": 41522253,
+        "ageMs": 31,
+        "dataAgeMs": 42764112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39634,8 +39634,8 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-20T11:32:01.319Z",
-        "lastSuccessAt": "2026-10-20T11:32:01.319Z",
+        "lastAttemptAt": "2026-10-20T11:52:44.081Z",
+        "lastSuccessAt": "2026-10-20T11:52:44.081Z",
         "dataAsOf": "2026-10-20T00:00:00.000Z",
         "asOfKind": "source",
         "source": "binance/BTCUSDT-1d",
@@ -39652,8 +39652,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 1408,
-        "dataAgeMs": 127922253,
+        "ageMs": 1560,
+        "dataAgeMs": 129164112,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39661,8 +39661,8 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-20T11:32:00.845Z",
-        "lastSuccessAt": "2026-10-20T11:32:00.845Z",
+        "lastAttemptAt": "2026-10-20T11:52:42.552Z",
+        "lastSuccessAt": "2026-10-20T11:52:42.552Z",
         "dataAsOf": "2026-10-19T00:00:00.000Z",
         "asOfKind": "source",
         "source": "yahoo.finance/MSTR",
@@ -39684,8 +39684,8 @@
       "usable": true,
       "stale": false,
       "expired": false,
-      "ageMs": 1399,
-      "dataAgeMs": 1399,
+      "ageMs": 1487,
+      "dataAgeMs": 1487,
       "warnings": [],
       "policy": {
         "fetchWarnMs": 1800000,
@@ -39693,9 +39693,9 @@
         "dataWarnMs": 1800000,
         "dataBlockMs": 21600000
       },
-      "lastAttemptAt": "2026-10-20T11:32:00.854Z",
-      "lastSuccessAt": "2026-10-20T11:32:00.854Z",
-      "dataAsOf": "2026-10-20T11:32:00.854Z",
+      "lastAttemptAt": "2026-10-20T11:52:42.625Z",
+      "lastSuccessAt": "2026-10-20T11:52:42.625Z",
+      "dataAsOf": "2026-10-20T11:52:42.625Z",
       "asOfKind": "received",
       "source": "coinglass/microStrategyCostV2",
       "lastError": null,
@@ -39711,8 +39711,8 @@
       "usable": true,
       "stale": false,
       "expired": false,
-      "ageMs": 8,
-      "dataAgeMs": 8,
+      "ageMs": 1600,
+      "dataAgeMs": 1600,
       "warnings": [],
       "policy": {
         "fetchWarnMs": 1800000,
@@ -39720,9 +39720,9 @@
         "dataWarnMs": 1800000,
         "dataBlockMs": 21600000
       },
-      "lastAttemptAt": "2026-10-20T11:32:02.245Z",
-      "lastSuccessAt": "2026-10-20T11:32:02.245Z",
-      "dataAsOf": "2026-10-20T11:32:02.245Z",
+      "lastAttemptAt": "2026-10-20T11:52:42.512Z",
+      "lastSuccessAt": "2026-10-20T11:52:42.512Z",
+      "dataAsOf": "2026-10-20T11:52:42.512Z",
       "asOfKind": "received",
       "source": "bitcointreasuries.net",
       "lastError": null,

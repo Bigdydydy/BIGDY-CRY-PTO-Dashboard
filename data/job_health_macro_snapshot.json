@@ -1,22 +1,22 @@
 {
   "id": "macro_snapshot",
   "status": "ok",
-  "lastAttemptAt": "2026-10-20T05:02:39.311Z",
-  "lastSuccessAt": "2026-10-20T05:02:41.555Z",
+  "lastAttemptAt": "2026-10-20T11:52:42.220Z",
+  "lastSuccessAt": "2026-10-20T11:52:44.242Z",
   "lastError": null,
   "steps": {
     "macro": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-20T05:02:41.424Z",
-      "lastSuccessAt": "2026-10-20T05:02:41.424Z",
+      "lastAttemptAt": "2026-10-20T11:52:44.120Z",
+      "lastSuccessAt": "2026-10-20T11:52:44.120Z",
       "lastError": null,
       "dataAsOf": "2026-10-20T00:00:00.000Z",
       "verifiedSkip": false
     },
     "preferreds": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-20T05:02:41.555Z",
-      "lastSuccessAt": "2026-10-20T05:02:41.555Z",
+      "lastAttemptAt": "2026-10-20T11:52:44.241Z",
+      "lastSuccessAt": "2026-10-20T11:52:44.241Z",
       "lastError": null,
       "dataAsOf": "2026-10-19T00:00:00.000Z",
       "verifiedSkip": false
