@@ -38626,11 +38626,11 @@
     },
     {
       "date": "2026-10-21",
-      "btcPrice": 84543.23,
+      "btcPrice": 84823.81,
       "mstrCost": 75446,
       "mstrHoldings": 848517,
       "mstrBuyVelocity30d": 83.9,
-      "mnav": 1.098,
+      "mnav": 1.09,
       "mnavEstimated": true,
       "us1y": 4.5,
       "us10y": 5.15,
@@ -38643,7 +38643,7 @@
     }
   ],
   "summary": {
-    "currentBtc": 84543.23,
+    "currentBtc": 84823.81,
     "currentMstrCost": 75446,
     "currentMstrHoldings": 848517,
     "currentMstrVelocity30d": 83.9,
@@ -38653,7 +38653,7 @@
     "velocityToIssuance": 0.19,
     "mstrCostSource": "coinglass",
     "mstrCostAsOf": "2026-10-19",
-    "currentMnav": 1.098,
+    "currentMnav": 1.09,
     "mnavEstimated": true,
     "mnavAnchorDate": "2026-09-12",
     "mnavBasis": "ev",
@@ -38843,7 +38843,7 @@
       "start": "2020-08-01",
       "end": "2026-10-21"
     },
-    "updatedAt": "2026-10-21T17:24:31.275Z"
+    "updatedAt": "2026-10-21T21:51:10.967Z"
   },
   "rawMstr": [
     {
@@ -39481,7 +39481,7 @@
         "stale": false,
         "expired": false,
         "ageMs": 0,
-        "dataAgeMs": 62671275,
+        "dataAgeMs": 78670967,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39489,8 +39489,8 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-21T17:24:31.275Z",
-        "lastSuccessAt": "2026-10-21T17:24:31.275Z",
+        "lastAttemptAt": "2026-10-21T21:51:10.967Z",
+        "lastSuccessAt": "2026-10-21T21:51:10.967Z",
         "dataAsOf": "2026-10-21T00:00:00.000Z",
         "asOfKind": "source",
         "source": "macro/build",
@@ -39522,7 +39522,7 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.143Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.869Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
@@ -39549,7 +39549,7 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.142Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.750Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
@@ -39576,7 +39576,7 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.146Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.835Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
@@ -39603,7 +39603,7 @@
           "dataWarnMs": 864000000,
           "dataBlockMs": 2592000000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.181Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.858Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
@@ -39630,7 +39630,7 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.158Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.831Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
@@ -39648,8 +39648,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 33,
-        "dataAgeMs": 62671275,
+        "ageMs": 25,
+        "dataAgeMs": 78670967,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39657,8 +39657,8 @@
           "dataWarnMs": 259200000,
           "dataBlockMs": 604800000
         },
-        "lastAttemptAt": "2026-10-21T17:24:31.242Z",
-        "lastSuccessAt": "2026-10-21T17:24:31.242Z",
+        "lastAttemptAt": "2026-10-21T21:51:10.942Z",
+        "lastSuccessAt": "2026-10-21T21:51:10.942Z",
         "dataAsOf": "2026-10-21T00:00:00.000Z",
         "asOfKind": "source",
         "source": "binance/BTCUSDT-1d",
@@ -39675,8 +39675,8 @@
         "usable": true,
         "stale": false,
         "expired": false,
-        "ageMs": 984,
-        "dataAgeMs": 62671275,
+        "ageMs": 1111,
+        "dataAgeMs": 78670967,
         "warnings": [],
         "policy": {
           "fetchWarnMs": 1800000,
@@ -39684,8 +39684,8 @@
           "dataWarnMs": 432000000,
           "dataBlockMs": 1209600000
         },
-        "lastAttemptAt": "2026-10-21T17:24:30.291Z",
-        "lastSuccessAt": "2026-10-21T17:24:30.291Z",
+        "lastAttemptAt": "2026-10-21T21:51:09.856Z",
+        "lastSuccessAt": "2026-10-21T21:51:09.856Z",
         "dataAsOf": "2026-10-21T00:00:00.000Z",
         "asOfKind": "source",
         "source": "yahoo.finance/MSTR",
@@ -39720,8 +39720,8 @@
       "usable": true,
       "stale": false,
       "expired": false,
-      "ageMs": 1093,
-      "dataAgeMs": 1093,
+      "ageMs": 1251,
+      "dataAgeMs": 1251,
       "warnings": [],
       "policy": {
         "fetchWarnMs": 1800000,
@@ -39729,9 +39729,9 @@
         "dataWarnMs": 1800000,
         "dataBlockMs": 21600000
       },
-      "lastAttemptAt": "2026-10-21T17:24:30.182Z",
-      "lastSuccessAt": "2026-10-21T17:24:30.182Z",
-      "dataAsOf": "2026-10-21T17:24:30.182Z",
+      "lastAttemptAt": "2026-10-21T21:51:09.716Z",
+      "lastSuccessAt": "2026-10-21T21:51:09.716Z",
+      "dataAsOf": "2026-10-21T21:51:09.716Z",
       "asOfKind": "received",
       "source": "coinglass/microStrategyCostV2",
       "lastError": null,
@@ -39747,8 +39747,8 @@
       "usable": true,
       "stale": false,
       "expired": false,
-      "ageMs": 844,
-      "dataAgeMs": 844,
+      "ageMs": 1096,
+      "dataAgeMs": 1096,
       "warnings": [],
       "policy": {
         "fetchWarnMs": 1800000,
@@ -39756,9 +39756,9 @@
         "dataWarnMs": 1800000,
         "dataBlockMs": 21600000
       },
-      "lastAttemptAt": "2026-10-21T17:24:30.431Z",
-      "lastSuccessAt": "2026-10-21T17:24:30.431Z",
-      "dataAsOf": "2026-10-21T17:24:30.431Z",
+      "lastAttemptAt": "2026-10-21T21:51:09.871Z",
+      "lastSuccessAt": "2026-10-21T21:51:09.871Z",
+      "dataAsOf": "2026-10-21T21:51:09.871Z",
       "asOfKind": "received",
       "source": "bitcointreasuries.net",
       "lastError": null,
