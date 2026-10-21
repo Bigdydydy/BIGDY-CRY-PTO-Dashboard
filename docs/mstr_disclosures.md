@@ -2,9 +2,10 @@
 
 Scope: the official Strategy BTC ledger, the separately dated issuer share
 baseline, the issuer capital-structure page, the issuer press index, SEC
-filing *discovery*, and the versioned official mNAV overlay (methodology
-`2026-07-23`) — connected to Module 1 health monitoring. It does **not**
-implement SEC document body extraction or press-release body verification.
+filing *discovery* plus 8-K body extraction (see "SEC path" below), and the
+versioned official mNAV overlay (methodology `2026-07-23`) — connected to
+Module 1 health monitoring. It does **not** implement press-release body
+verification.
 Announcement kinds are title-level heuristics only; no amounts are extracted
 from headlines. Those limits are explicitly reported in the payload
 `coverage` block (`announcements_only` / `index_only` / `not_computed` /
@@ -18,7 +19,8 @@ from headlines. Those limits are explicitly reported in the payload
 | `mstr_official_shares` | https://strategy.com/shares | issuer-reported share counts (page units = thousands) |
 | `mstr_official_capital` | https://strategy.com/debt | issuer capital snapshot, convertible debt instruments, preferred-stock terms |
 | `mstr_official_press` | https://strategy.com/press | press-release discovery only; titles are signals, never facts |
-| `mstr_sec_index` | https://data.sec.gov/submissions/CIK0001050446.json | filing discovery only; bodies not verified |
+| `mstr_sec_index` | https://data.sec.gov/submissions/CIK0001050446.json | filing discovery (index) |
+| `mstr_sec_filings` | 8-K primary documents under https://www.sec.gov/Archives/edgar/data/1050446/ + two XBRL company concepts | BTC holdings, USD Reserve/Cash, ATM/repurchase flows, STRC rate announcements; XBRL is a cross-check only |
 | `mstr_mnav_inputs` | Yahoo `v8/finance/chart/MSTR` + Coinbase Exchange `BTC-USD` ticker | market inputs for the derived official-mNAV overlay (no evidence body) |
 
 Every successful response body is written *before parsing is accepted* as
@@ -155,11 +157,53 @@ merged or compared; every result carries `methodologyVersion: '2026-07-23'`
 so the boundary is machine-checkable, and the UI prints a 新旧口径不可比
 note next to the official line.
 
+## SEC path (strategy.com unavailable)
+
+Since 2026-10-21 strategy.com answers every non-browser client with an Akamai
+`403 Access Denied` (home page and robots.txt included), from local machines
+and GitHub Actions alike. The collector does not try to get around that. The
+issuer pages stay in the scan — the moment they answer again they are used —
+but the capital structure is otherwise derived from SEC filings:
+
+- **8-K bodies** (`server/mstr_sec_model.js`, pure): the newest 20 8-Ks plus
+  month-end 8-Ks of the last ~15 months, fetched once each (accession-keyed
+  cache in `secDocs`, parser-versioned), ≤ 40 new documents per scan, 150 ms
+  apart, with `SEC_USER_AGENT`. Each body is hashed into the evidence store.
+  Extracted: the as-of holdings triple (holdings / aggregate cost $B / average
+  cost — table, sale, combined and prose layouts), USD Reserve and USD Cash,
+  ATM shares sold and shares repurchased per security and period, and the
+  STRC regular-rate announcement (announced/effective dates, rate, previous
+  rate, maintain/increase/decrease, contingent flag). A cost triple that does
+  not reconcile (aggregate ≈ holdings × average) is rejected with an issue.
+- **Capital terms reference** (`data/mstr_capital_reference.json`, built by
+  `scripts/build_mstr_capital_reference.js` from the captured /debt page,
+  evidence sha256 recorded): convertible notionals/strikes, preferred shares
+  outstanding, dilutive components, STRE FX. Share counts are rolled forward
+  with the 8-K ATM/repurchase flows for periods ending after `flowsCutoff`
+  (each period counted once). Issues: `capital_reference_stale` (> 120 days),
+  `xbrl_debt_differs_from_reference` (10-Q/10-K long-term debt drifts > 2%),
+  `usd_balances_lag_holdings`, `usd_cash_not_disclosed`. Re-run the script
+  with a fresh browser capture when the convertible lineup changes.
+- **USD Assets** = USD Reserve + USD Cash on both paths. The issuer stats row
+  reports the reserve as `cash` and USD Cash as `operating_cash` (8-K
+  2026-10-19: $4.83B / $447.3M); the issuer path now adds both.
+- **Path choice**: the issuer /debt snapshot when it is at least as recent as
+  the SEC-derived snapshot, else the SEC path (`capitalSource: 'sec'`).
+  Health follows the path: on the SEC path `dataHealth` covers
+  `mstr_sec_index`, `mstr_sec_filings` and `mstr_mnav_inputs`; issuer
+  sources are reported under `optionalSources` and never downgrade the
+  payload. `lastCompletedAt` and the persisted `requiredSources` (read by the
+  monitor) follow the same rule; the audit gates on the same path.
+- **STRC rate history**: `strcRateSchedule` (one entry per effective date,
+  plus the prior rate inferred from the first "from X%") feeds
+  `mstr_preferreds`, which books the rate in effect on the 1st of every month
+  from STRC's listing (2025-07) to the current month into
+  `data/strc_rate_history.json`. Future conditional rates are not booked.
+
 ## Not yet implemented (explicit)
 
-- SEC filing body verification: filings are labelled
-  `contents_not_verified` / `申报已发现 · 正文待核验`. No business numbers
-  are read from filing bodies.
+- 10-Q/10-K body extraction: XBRL concepts are cross-checks only (no
+  per-series preferred or per-note convertible facts exist there).
 - Press-release body verification: announcements are labelled
   `标题级，正文未核验`. Kinds (BTC买入 / STRC回购 / 优先股融资 / 股息政策 /
   债务资本 / 业绩 / 提及) are conservative title heuristics; titles never

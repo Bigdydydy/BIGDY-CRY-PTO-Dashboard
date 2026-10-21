@@ -3632,7 +3632,7 @@ function renderPreferredsSummary(s, monthly) {
   const cov = s.strcRateCoverage || {};
   if (!s.strcRateConfigured || !m) {
     const why = cov.officialStatus === 'unavailable'
-      ? '官网股息率暂未采集到'
+      ? '官网与 SEC 股息率暂未采集到'
       : '尚无股息率记录';
     setText('pref-tbill-val', '暂无数据');
     setText('pref-tbill-sub', `${why}；可在 data/mstr_preferreds.json 手动补录`);
@@ -3641,12 +3641,12 @@ function renderPreferredsSummary(s, monthly) {
     setText('pref-gap-sub', '需 STRC 月度股息率');
     return;
   }
-  const rateSource = m.rateSource === 'official' ? '官网' : '手动';
+  const rateSource = { official: '官网', sec: 'SEC 8-K', manual: '手动' }[m.rateSource] || m.rateSource;
   setText('pref-tbill-val', m.spreadOverTbillPct !== null ? `${m.spreadOverTbillPct.toFixed(2)}%` : '--');
   setText('pref-tbill-sub', `${m.month} 股息率 ${m.ratePct.toFixed(2)}% (${rateSource})，T-bill ${m.tbill1mPct?.toFixed(2) ?? '--'}%`);
   setText('pref-gap-val', `${s.hikeFailedMonths} / ${s.hikeMonths}`);
   setText('pref-gap-chip', m.hikeFailed ? '本月触发' : '本月未触发', `mm-chip ${m.hikeFailed ? 'chip-negative' : 'chip-positive'}`);
-  const months = (cov.officialMonths || 0) + (cov.manualMonths || 0);
+  const months = (cov.officialMonths || 0) + (cov.secMonths || 0) + (cov.manualMonths || 0);
   const coverage = months < 2 ? ' · 仅 1 个月数据，需至少 2 个月才能判断上调' : ` · 共 ${months} 个月`;
   setText('pref-gap-sub', `隐含利率缺口 ${m.impliedGapBp} bp${coverage}`);
 }

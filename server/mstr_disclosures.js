@@ -56,11 +56,29 @@ const {
   mergeRevisions, latestActive, reconcileLatest, reconcileCapital
 } = require('./mstr_disclosure_model');
 
+const {
+  PARSER_VERSION: SEC_PARSER_VERSION, XBRL_CONCEPTS, SEC_ARCHIVE_PREFIX,
+  parseSecEightK, parseXbrlConcept, deriveSecCapital
+} = require('./mstr_sec_model');
+
 const SOURCE_IDS = [
   'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
   'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'
 ];
 const MNAV_ID = 'mstr_mnav_inputs';
+// SEC 8-K bodies (+ XBRL cross-checks). Kept out of SOURCE_IDS, which remains
+// the issuer-path contract; ALL_SOURCE_IDS covers persistence/health seeding.
+const SEC_FILINGS_ID = 'mstr_sec_filings';
+const ALL_SOURCE_IDS = [...SOURCE_IDS, SEC_FILINGS_ID];
+// When the SEC path supplies the capital snapshot, these are the sources the
+// payload actually depends on; issuer pages become optional.
+const SEC_PATH_IDS = ['mstr_sec_index', SEC_FILINGS_ID, MNAV_ID];
+const REFERENCE_FILE = path.join(__dirname, '..', 'data', 'mstr_capital_reference.json');
+const SEC_RECENT_8K = 20;          // newest weekly 8-Ks (holdings, USD, flows)
+const SEC_RATE_LOOKBACK_DAYS = 460; // month-end 8-Ks carry STRC rate announcements
+const SEC_MAX_NEW_DOCS = 40;       // bound one scan's EDGAR requests
+const SEC_SPACING_MS = 150;        // well under SEC's 10 requests/second
+const XBRL_REFRESH_MS = 24 * 60 * 60 * 1000;
 const POLL_MS = 5 * 60 * 1000;
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const STRATEGY_UA = 'BIGDY-Dashboard/1.0 (+https://github.com/Bigdydydy/BIGDY-CRY-PTO-Dashboard)';
@@ -98,6 +116,8 @@ function emptyState() {
     filings: [],
     evidence: {},
     mnav: null, // derived official-mNAV record — never evidence, never fingerprinted
+    secDocs: {}, // accession -> parsed 8-K record (body sha256 kept; body itself is evidence)
+    secXbrl: null, // { fetchedAt, longTermDebt, optionsOutstanding } cross-check facts
     dataHealth: { sources: {} },
     lastAttemptAt: null,
     lastCompletedAt: null
@@ -142,9 +162,28 @@ function validatePersisted(state, nowMs) {
       && (typeof state.mnav !== 'object' || Array.isArray(state.mnav))) {
     return 'mnav record invalid';
   }
+  // SEC 8-K records arrived after v1 snapshots: backfill, then validate shape.
+  if (state.secDocs === undefined) state.secDocs = {};
+  if (state.secXbrl === undefined) state.secXbrl = null;
+  if (!state.secDocs || typeof state.secDocs !== 'object' || Array.isArray(state.secDocs)) return 'secDocs invalid';
+  for (const [acc, d] of Object.entries(state.secDocs)) {
+    if (!/^\d{10}-\d{2}-\d{6}$/.test(acc) || !d || d.accession !== acc
+        || !Array.isArray(d.holdings) || !Array.isArray(d.flows) || !Array.isArray(d.issues)
+        || typeof d.filedOn !== 'string' || typeof d.documentUrl !== 'string'
+        || !d.documentUrl.startsWith(SEC_ARCHIVE_PREFIX)) {
+      return `secDocs record ${acc} invalid`;
+    }
+  }
+  if (state.secXbrl !== null && (typeof state.secXbrl !== 'object' || !isIso(state.secXbrl.fetchedAt))) {
+    return 'secXbrl record invalid';
+  }
+  if (state.requiredSources !== undefined && (!Array.isArray(state.requiredSources)
+      || !state.requiredSources.every(id => ALL_SOURCE_IDS.includes(id)))) {
+    return 'requiredSources invalid';
+  }
   const sources = state.dataHealth && state.dataHealth.sources;
   if (!sources || typeof sources !== 'object') return 'dataHealth.sources missing';
-  for (const id of SOURCE_IDS) {
+  for (const id of ALL_SOURCE_IDS) {
     const r = sources[id];
     if (r === undefined) continue;
     if (!r || typeof r !== 'object') return `source record ${id} invalid`;
@@ -243,7 +282,11 @@ function createDisclosureService({
   request = fetchWithTimeout,
   clock = Date.now,
   secUserAgent = () => process.env.SEC_USER_AGENT || '',
-  prices = defaultMnavPrices
+  prices = defaultMnavPrices,
+  capitalReference = () => {
+    try { return JSON.parse(fs.readFileSync(REFERENCE_FILE, 'utf8')); } catch (err) { return null; }
+  },
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 } = {}) {
   const stateFile = path.join(dataDir, 'mstr_disclosures.json');
   const evidenceDir = path.join(dataDir, 'mstr_disclosure_evidence');
@@ -268,7 +311,7 @@ function createDisclosureService({
       return; // cold state; never seed health from an untrusted file
     }
     state = parsed;
-    for (const id of SOURCE_IDS) {
+    for (const id of ALL_SOURCE_IDS) {
       const rec = state.dataHealth.sources[id];
       if (rec) state.dataHealth.sources[id] = { ...rec, source: 'disk' }; // disk-bound receipt -> FALLBACK, never fresh
       seedCachedHealth(state, id);
@@ -438,6 +481,128 @@ function createDisclosureService({
   }
 
   /**
+   * 8-K bodies discovered by the SEC index. Picks the newest weekly 8-Ks plus
+   * month-end 8-Ks (STRC rate announcements) not yet parsed with the current
+   * parser, fetches them sequentially with SEC_SPACING_MS between requests,
+   * hashes each body into evidence, and stores the parsed record. Already
+   * parsed accessions are never refetched. XBRL cross-check concepts refresh
+   * at most daily; their failure is an issue, not a source failure.
+   */
+  function sec8kCandidates(nowMs) {
+    const eightKs = state.filings.filter(f => /^8-K(\/A)?$/.test(f.form)
+      && typeof f.documentUrl === 'string' && f.documentUrl.startsWith(SEC_ARCHIVE_PREFIX));
+    const recent = eightKs.slice(0, SEC_RECENT_8K);
+    const cutoff = iso(nowMs - SEC_RATE_LOOKBACK_DAYS * 86400000).slice(0, 10);
+    const monthEnd = eightKs.filter(f => {
+      const d = Number(f.filedOn.slice(8, 10));
+      return f.filedOn >= cutoff && (d >= 28 || d <= 2);
+    });
+    const picked = new Map();
+    for (const f of [...recent, ...monthEnd]) picked.set(f.accession, f);
+    return [...picked.values()].filter(f => {
+      const have = state.secDocs[f.accession];
+      return !have || have.parserVersion !== SEC_PARSER_VERSION;
+    }).slice(0, SEC_MAX_NEW_DOCS);
+  }
+
+  async function secGet(url, ua, accept) {
+    const resp = await request(url, { timeout: 20000, retries: 1, headers: { Accept: accept, 'User-Agent': ua } });
+    if (!resp || !resp.ok) throw new Error(`HTTP ${resp ? resp.status : 'no response'}`);
+    const body = await resp.text();
+    if (Buffer.byteLength(body, 'utf8') > MAX_BODY_BYTES) throw new Error('response exceeds 5 MB limit');
+    return body;
+  }
+
+  async function collectSecFilings(nowMs) {
+    const nowIso = iso(nowMs);
+    recordAttempt(SEC_FILINGS_ID, { now: nowMs });
+    let ua = null;
+    try {
+      ua = secUserAgent();
+      if (typeof ua !== 'string' || !SEC_UA_SHAPE.test(ua)) throw new Error(SEC_UA_MESSAGE);
+      const secDocs = { ...state.secDocs };
+      const failures = [];
+      let first = true;
+      for (const f of sec8kCandidates(nowMs)) {
+        if (!first) await sleep(SEC_SPACING_MS);
+        first = false;
+        try {
+          const body = await secGet(f.documentUrl, ua, 'text/html');
+          const digest = sha256(body);
+          writeEvidence(digest, { sourceUrl: f.documentUrl, receivedAt: nowIso, sha256: digest, body });
+          secDocs[f.accession] = parseSecEightK(body, f);
+        } catch (err) {
+          failures.push(`${f.accession}: ${sanitizeError(err, f.documentUrl, ua)}`);
+        }
+      }
+      const issues = [];
+      let secXbrl = state.secXbrl;
+      if (!secXbrl || nowMs - Date.parse(secXbrl.fetchedAt) >= XBRL_REFRESH_MS) {
+        try {
+          await sleep(SEC_SPACING_MS);
+          const longTermDebt = parseXbrlConcept(await secGet(XBRL_CONCEPTS.longTermDebt, ua, 'application/json'), 'USD');
+          await sleep(SEC_SPACING_MS);
+          const optionsOutstanding = parseXbrlConcept(await secGet(XBRL_CONCEPTS.optionsOutstanding, ua, 'application/json'), 'shares');
+          secXbrl = { fetchedAt: nowIso, longTermDebt, optionsOutstanding };
+        } catch (err) {
+          issues.push(`xbrl_unavailable: ${sanitizeError(err, null, ua)}`);
+        }
+      }
+      const next = { ...state, secDocs, secXbrl, dataHealth: { ...state.dataHealth, sources: { ...state.dataHealth.sources } } };
+      for (const d of Object.values(secDocs)) for (const i of d.issues) issues.push(`${d.accession}: ${i}`);
+      if (failures.length) {
+        // Parsed documents are still kept (each is evidence-backed); the
+        // source records the failure so the success clock never advances.
+        const message = `8-K fetch failed for ${failures.length} document(s): ${failures.slice(0, 3).join('; ')}`;
+        next.dataHealth.sources[SEC_FILINGS_ID] = failureRecord(state.dataHealth.sources[SEC_FILINGS_ID], nowIso, message);
+        try { commitState(next); } catch (e) { state = next; }
+        recordFailure(SEC_FILINGS_ID, message, { now: nowMs });
+        return false;
+      }
+      next.dataHealth.sources[SEC_FILINGS_ID] = successRecord(nowIso, URLS.submissions, issues);
+      commitState(next);
+      recordSuccess(SEC_FILINGS_ID, { now: nowMs, dataAsOf: nowIso, asOfKind: 'received', source: URLS.submissions, issues });
+      return true;
+    } catch (err) {
+      const message = sanitizeError(err, null, ua);
+      recordFailure(SEC_FILINGS_ID, message, { now: nowMs });
+      const next = { ...state, dataHealth: { ...state.dataHealth, sources: { ...state.dataHealth.sources } } };
+      next.dataHealth.sources[SEC_FILINGS_ID] = failureRecord(state.dataHealth.sources[SEC_FILINGS_ID], nowIso, message);
+      try { commitState(next); } catch (e) { state = next; }
+      return false;
+    }
+  }
+
+  /**
+   * Capital path: the issuer /debt snapshot when it is at least as recent as
+   * the SEC-derived one, else the SEC path (8-K facts + issuer reference
+   * terms rolled forward). Pure over current state.
+   */
+  function capitalPath(nowMs) {
+    const sec = deriveSecCapital({
+      reference: capitalReference(),
+      docs: Object.values(state.secDocs || {}),
+      xbrl: state.secXbrl || {},
+      today: iso(nowMs).slice(0, 10)
+    });
+    const issuerCapital = latestActive(state.capitalSnapshots, 'asOf');
+    const useSec = !!(sec && sec.capital) && (!issuerCapital || sec.capital.asOf > issuerCapital.asOf);
+    if (useSec) {
+      return {
+        source: 'sec', sec,
+        capital: sec.capital, instruments: sec.instruments, preferreds: sec.preferreds, shares: sec.shares
+      };
+    }
+    return {
+      source: issuerCapital ? 'issuer' : 'none', sec,
+      capital: issuerCapital,
+      instruments: state.debtInstruments.filter(i => !i.supersededAt),
+      preferreds: state.preferredTerms.filter(x => !x.supersededAt),
+      shares: latestActive(state.shareSnapshots, 'asOf')
+    };
+  }
+
+  /**
    * Milestone 3 overlay: fetch market inputs and compute the official
    * (2026-07-23) mNAV from the currently accepted disclosures. This is an
    * isolated failure domain — a price-feed outage or an incomplete capital
@@ -457,13 +622,22 @@ function createDisclosureService({
       const priceAsOf = isIso(p.priceAsOfIso)
         && Date.parse(p.priceAsOfIso) <= nowMs + 300000 ? p.priceAsOfIso : null;
       const issues = [];
+      const pathIn = capitalPath(nowMs);
+      // Methodology "USD Assets" = USD Reserve + USD Cash. The issuer stats
+      // row reports the reserve as `cash` and USD Cash as `operating_cash`
+      // (8-K 2026-10-19: reserve $4.83B, cash $447.3M); the SEC path already
+      // sums both into cashUsd.
+      let capitalIn = pathIn.capital;
+      if (capitalIn && pathIn.source === 'issuer' && isPosNum(capitalIn.operatingCashUsd)) {
+        capitalIn = { ...capitalIn, cashUsd: capitalIn.cashUsd + capitalIn.operatingCashUsd };
+      }
       const result = computeOfficialMnav({
         mstrPriceUsd,
         btcPriceUsd,
-        capital: latestActive(state.capitalSnapshots, 'asOf'),
-        instruments: state.debtInstruments.filter(i => !i.supersededAt),
-        preferreds: state.preferredTerms.filter(x => !x.supersededAt),
-        shares: latestActive(state.shareSnapshots, 'asOf'),
+        capital: capitalIn,
+        instruments: pathIn.instruments,
+        preferreds: pathIn.preferreds,
+        shares: pathIn.shares,
         issues
       });
       const sourceLabel = [p.mstrSource, p.btcSource]
@@ -475,6 +649,8 @@ function createDisclosureService({
         btcPriceUsd,
         btcSource: typeof p.btcSource === 'string' ? p.btcSource : null,
         mstrSource: typeof p.mstrSource === 'string' ? p.mstrSource : null,
+        capitalSource: pathIn.source,
+        capitalAsOf: pathIn.capital ? pathIn.capital.asOf : null,
         result,
         issues: [...issues]
       };
@@ -510,10 +686,21 @@ function createDisclosureService({
     state = { ...state, lastAttemptAt: iso(started) };
     const results = [];
     for (const src of SOURCES) results.push(await collectSource(src, started));
+    // 8-K bodies need the freshly merged SEC index; skipped (and recorded as
+    // failed) without an SEC identity, exactly like the index itself.
+    const secOk = await collectSecFilings(started);
     // Derived mNAV runs after the evidence scans; its failure does not gate
-    // lastCompletedAt, which remains the five-source evidence-scan receipt.
+    // lastCompletedAt, which remains the evidence-scan receipt.
     await collectMnavInputs(started);
-    if (results.every(Boolean)) {
+    // Completion follows the capital path in use: the five issuer+index
+    // scans on the issuer path, or the SEC index + 8-K scan on the SEC path.
+    const secIndexOk = results[SOURCES.findIndex(s => s.sec)];
+    const onSecPath = capitalPath(started).source === 'sec';
+    const complete = onSecPath ? secIndexOk && secOk : results.every(Boolean);
+    const requiredSources = onSecPath ? SEC_PATH_IDS : SOURCE_IDS;
+    state = { ...state, requiredSources: [...requiredSources] };
+    try { commitState(state); } catch (e) { /* in-memory marker still set */ }
+    if (complete) {
       // lastCompletedAt = last FULLY accepted scan — doubles as the
       // success-bound aggregate clock the producer step consumes.
       const next = { ...state, lastCompletedAt: iso(clock()) };
@@ -530,12 +717,19 @@ function createDisclosureService({
         || (b.order ?? 0) - (a.order ?? 0) || b.id.localeCompare(a.id));
     const filings = [...state.filings]
       .sort((a, b) => b.acceptedAt.localeCompare(a.acceptedAt) || b.id.localeCompare(a.id));
-    const latest = latestActive(state.events, 'reportedOn');
-    const shares = latestActive(state.shareSnapshots, 'asOf');
-    const capital = latestActive(state.capitalSnapshots, 'asOf');
-    const instruments = state.debtInstruments.filter(i => !i.supersededAt)
+    const cp = capitalPath(clock());
+    const sec = cp.sec;
+    const issuerLatest = latestActive(state.events, 'reportedOn');
+    const secLatest = sec && sec.events.length ? sec.events[sec.events.length - 1] : null;
+    // Holdings: the issuer ledger when it is at least as new as the 8-Ks.
+    const useSecEvents = !!secLatest && (!issuerLatest || secLatest.reportedOn > issuerLatest.reportedOn);
+    const latest = useSecEvents ? secLatest : issuerLatest;
+    const viewEvents = useSecEvents ? [...sec.events].reverse() : events;
+    const shares = cp.shares;
+    const capital = cp.capital;
+    const instruments = [...(cp.instruments || [])]
       .sort((a, b) => a.maturityDate.localeCompare(b.maturityDate) || a.id.localeCompare(b.id));
-    const preferreds = state.preferredTerms.filter(p => !p.supersededAt)
+    const preferreds = [...(cp.preferreds || [])]
       .sort((a, b) => a.ticker.localeCompare(b.ticker) || a.id.localeCompare(b.id));
     const announcements = [...state.announcements]
       .sort((a, b) => b.publishedOn.localeCompare(a.publishedOn) || b.id.localeCompare(a.id))
@@ -549,7 +743,17 @@ function createDisclosureService({
       capital,
       instruments,
       preferreds,
-      events,
+      events: viewEvents,
+      capitalSource: cp.source,
+      holdingsSource: useSecEvents ? 'sec_8k' : (issuerLatest ? 'issuer' : 'none'),
+      // STRC regular-rate schedule from 8-K announcements (oldest first).
+      strcRateSchedule: sec ? sec.strcRateSchedule : [],
+      sec: {
+        documentsParsed: Object.keys(state.secDocs || {}).length,
+        capitalIssues: sec ? sec.issues : [],
+        provenance: sec && sec.capital ? sec.capital.provenance : null,
+        xbrl: state.secXbrl || null
+      },
       revisionCount: state.events.filter(e => e.supersededAt).length,
       filings: filings.slice(0, 30),
       announcements,
@@ -559,11 +763,11 @@ function createDisclosureService({
         ...reconcileCapital(capital, latest, shares)
       ],
       coverage: {
-        btc: latest ? 'issuer_reported' : 'unavailable',
-        shares: shares ? 'issuer_reported' : 'unavailable',
-        sec: state.filings.length ? 'index_only' : 'unavailable',
-        strc: 'announcements_only',
-        capitalStructure: capital ? 'issuer_reported' : 'unavailable',
+        btc: !latest ? 'unavailable' : useSecEvents ? 'sec_8k' : 'issuer_reported',
+        shares: !shares ? 'unavailable' : cp.source === 'sec' ? 'sec_8k_rolled_reference' : 'issuer_reported',
+        sec: Object.keys(state.secDocs || {}).length ? '8k_parsed' : (state.filings.length ? 'index_only' : 'unavailable'),
+        strc: sec && sec.strcRateSchedule.length ? 'sec_8k_rate_schedule' : 'announcements_only',
+        capitalStructure: !capital ? 'unavailable' : cp.source === 'sec' ? 'sec_8k+issuer_reference' : 'issuer_reported',
         officialMnav: state.mnav && state.mnav.result && state.mnav.result.mnav != null
           ? 'computed' : 'not_computed'
       },
@@ -571,9 +775,15 @@ function createDisclosureService({
       cacheIssues: cacheIssues.length ? [...cacheIssues] : undefined,
       dataHealth: { sources: state.dataHealth.sources }
     };
+    // Health follows the capital path in use. On the SEC path the issuer
+    // pages are optional: reported separately, never degrading the payload.
+    const required = cp.source === 'sec' ? SEC_PATH_IDS : SOURCE_IDS;
+    const optional = ALL_SOURCE_IDS.filter(id => !required.includes(id));
     // Bound to this payload's persisted receipts — never borrows a fresher
     // sibling registry clock for an older accepted snapshot.
-    return withDataHealth(payload, SOURCE_IDS);
+    const out = withDataHealth(payload, required);
+    out.optionalSources = withDataHealth({ dataHealth: { sources: state.dataHealth.sources } }, optional).dataHealth.sources;
+    return out;
   }
 
   async function get(force = false) {
@@ -600,6 +810,9 @@ const service = createDisclosureService();
 
 module.exports = {
   SOURCE_IDS,
+  SEC_FILINGS_ID,
+  ALL_SOURCE_IDS,
+  SEC_PATH_IDS,
   POLL_MS,
   createDisclosureService,
   getMstrDisclosures: service.get,

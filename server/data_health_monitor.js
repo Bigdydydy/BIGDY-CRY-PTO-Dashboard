@@ -44,7 +44,10 @@ function inspectJob(id, record, now) {
 
 function inspectSourceSnapshot(rule, data, now) {
   const sources = {};
-  for (const id of rule.sources) {
+  const declared = rule.requiredSourcesField && Array.isArray(data[rule.requiredSourcesField])
+    ? data[rule.requiredSourcesField].filter(id => (rule.allowedSources || rule.sources).includes(id))
+    : [];
+  for (const id of declared.length ? declared : rule.sources) {
     const h = data.dataHealth?.sources?.[id];
     if (!h || timestamp(h.lastSuccessAt, now) === null) {
       sources[id] = { state: 'UNKNOWN', reason: 'Verified source receipt missing' };

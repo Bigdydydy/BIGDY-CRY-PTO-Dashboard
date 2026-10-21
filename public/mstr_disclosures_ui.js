@@ -29,7 +29,7 @@
   var MAX_ANNOUNCEMENTS = 10;
   var SOURCE_IDS = [
     'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
-    'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'
+    'mstr_official_press', 'mstr_sec_index', 'mstr_sec_filings', 'mstr_mnav_inputs'
   ];
   var SOURCE_NAMES = {
     mstr_official_ledger: '官方 BTC 账本',
@@ -37,6 +37,7 @@
     mstr_official_capital: '官方资本结构',
     mstr_official_press: '官方公告索引',
     mstr_sec_index: 'SEC 申报索引',
+    mstr_sec_filings: 'SEC 8-K 正文',
     mstr_mnav_inputs: '官方 mNAV 输入'
   };
   var ALLOWED_LINK_HOSTS = {
@@ -176,8 +177,12 @@
     var sources = (lastPayload.dataHealth && lastPayload.dataHealth.sources) || {};
     var parts = [];
     var allOk = true;
-    for (var i = 0; i < SOURCE_IDS.length; i++) {
-      var id = SOURCE_IDS[i];
+    // 必需源随资本结构路径而定 (payload 只携带必需源)；旧版 payload 没有 optionalSources 时按原六个源处理
+    var requiredIds = lastPayload.optionalSources
+      ? SOURCE_IDS.filter(function (id) { return sources[id] !== undefined; })
+      : SOURCE_IDS.filter(function (id) { return id !== 'mstr_sec_filings'; });
+    for (var i = 0; i < requiredIds.length; i++) {
+      var id = requiredIds[i];
       var a = agedSource(sources[id], now);
       var label = SOURCE_NAMES[id];
       if (a.state === 'OK') {
@@ -187,6 +192,16 @@
         var why = a.src && a.src.lastError ? ' (' + a.src.lastError + ')' : '';
         parts.push(label + ' ' + a.state + why);
       }
+    }
+    var optional = lastPayload.optionalSources || {};
+    var optionalDown = Object.keys(optional).filter(function (id) {
+      return optional[id] && optional[id].state !== 'OK';
+    });
+    if (optionalDown.length) {
+      parts.push('可选源不可用（不影响结论）：' + optionalDown.map(function (id) {
+        var o = optional[id];
+        return (SOURCE_NAMES[id] || id) + (o.lastError ? ' (' + o.lastError + ')' : '');
+      }).join('，'));
     }
     var issues = lastPayload.reconciliationIssues || [];
     var conflicted = (lastPayload.events || []).filter(function (e) { return (e.issues || []).length; });
@@ -214,8 +229,9 @@
     if (!lastPayload) return;
     var latest = lastPayload.latest;
     var shares = lastPayload.shares;
+    var viaSec = lastPayload.holdingsSource === 'sec_8k';
     if (latest) {
-      var line = '披露日 ' + latest.reportedOn + ' · 报告持仓 ' + fmtInt(latest.holdingsBtc) + ' BTC' +
+      var line = (viaSec ? '8-K 申报日 ' + latest.reportedOn + '（持仓截至 ' + latest.holdingsAsOf + '）' : '披露日 ' + latest.reportedOn) + ' · 报告持仓 ' + fmtInt(latest.holdingsBtc) + ' BTC' +
         ' · 报告持仓均价 ' + fmtUsd(latest.averageCostUsd);
       if (latest.aggregateCostUsd !== null && latest.aggregateCostUsd !== undefined) {
         line += ' · 报告累计成本 ' + fmtUsd(latest.aggregateCostUsd);
@@ -224,7 +240,12 @@
     } else {
       box.appendChild(node('div', '暂无发行人披露持仓记录'));
     }
-    if (shares) {
+    var capViaSec = lastPayload.capitalSource === 'sec';
+    if (shares && capViaSec) {
+      box.appendChild(node('div',
+        '股数基线 asOf ' + shares.asOf + ' · basic ' + fmtInt(shares.basicShares) +
+        '（官网参考基线 + 其后 8-K 披露的增发/回购逐期累加）'));
+    } else if (shares) {
       box.appendChild(node('div',
         '股数基线 asOf ' + shares.asOf + ' · basic ' + fmtInt(shares.basicShares) +
         ' · ADSO ' + fmtInt(shares.assumedDilutedShares)));
@@ -233,12 +254,20 @@
     var capital = lastPayload.capital;
     if (capital) {
       // 发行人 annualDividendsUsd 以百万美元口径披露，UI 仅标注单位，不改写数值。
-      var capLine = '资本结构 (asOf ' + capital.asOf + ')：债务 ' + fmtUsdB(capital.debtUsd) +
+      var capLine = '资本结构 (asOf ' + capital.asOf + (capViaSec ? '，SEC 8-K 推导' : '') + ')：债务 ' + fmtUsdB(capital.debtUsd) +
         ' · 优先股 ' + fmtUsdB(capital.prefUsd) + ' · 美元资产 ' + fmtUsdB(capital.cashUsd);
       if (capital.annualDividendsUsd !== null && capital.annualDividendsUsd !== undefined) {
         capLine += ' · 年化优先股股息 $' + fmtInt(capital.annualDividendsUsd) + 'M';
       }
       box.appendChild(node('div', capLine));
+      var prov = lastPayload.sec && lastPayload.sec.provenance;
+      if (capViaSec && prov) {
+        box.appendChild(node('div', '来源：持仓/美元资产 ' + prov.holdings +
+          '；可转债条款与优先股股数取自 ' + prov.termsReference +
+          (prov.rolledForwardPeriods ? '，已累加其后 ' + prov.rolledForwardPeriods + ' 期增发/回购' : '')));
+      }
+      var capIssues = (lastPayload.sec && lastPayload.sec.capitalIssues) || [];
+      if (capViaSec && capIssues.length) box.appendChild(node('div', '推导注记：' + capIssues.join('；')));
     }
     var prefs = lastPayload.preferreds || [];
     if (prefs.length) {
@@ -287,9 +316,19 @@
     }
     var rc = lastPayload.revisionCount || 0;
     if (rc > 0) box.appendChild(node('div', '历史修订记录 ' + rc + ' 条（保留原始版本）'));
-    box.appendChild(node('div', 'SEC 当前仅发现申报，正文待核验；' +
-      (capital ? '资本结构 已接入官方快照' : '资本结构 官方快照不可用') +
-      '；STRC 仅公告发现（标题级，正文未核验）。'));
+    var cov = lastPayload.coverage || {};
+    if (cov.sec === '8k_parsed') {
+      var docs = lastPayload.sec && lastPayload.sec.documentsParsed;
+      box.appendChild(node('div', 'SEC 8-K 正文已解析 ' + (docs || 0) + ' 份（持仓、美元资产、增发/回购、STRC 股息率）；' +
+        (capViaSec ? '资本结构 由 8-K 与官网参考条款推导' : capital ? '资本结构 已接入官方快照' : '资本结构 不可用') +
+        '；' + (cov.strc === 'sec_8k_rate_schedule'
+          ? 'STRC 股息率按 8-K 公告逐期记录（' + (lastPayload.strcRateSchedule || []).length + ' 条）。'
+          : 'STRC 仅公告发现（标题级，正文未核验）。')));
+    } else {
+      box.appendChild(node('div', 'SEC 当前仅发现申报，正文待核验；' +
+        (capital ? '资本结构 已接入官方快照' : '资本结构 官方快照不可用') +
+        '；STRC 仅公告发现（标题级，正文未核验）。'));
+    }
   }
 
   function renderEvents() {

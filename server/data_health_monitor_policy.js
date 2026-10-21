@@ -86,6 +86,13 @@ const SNAPSHOT_CHECKS = Object.freeze([
     sources: [
       'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
       'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'
+    ],
+    // The collector records which sources its capital path depends on (issuer
+    // pages, or SEC index + 8-K bodies when strategy.com is unavailable).
+    requiredSourcesField: 'requiredSources',
+    allowedSources: [
+      'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
+      'mstr_official_press', 'mstr_sec_index', 'mstr_sec_filings', 'mstr_mnav_inputs'
     ]
   }
 ]);

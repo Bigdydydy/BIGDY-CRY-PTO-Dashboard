@@ -589,6 +589,46 @@ describe('MstrDisclosuresUI', () => {
     assert.ok(summary.includes('MSTR 价格无效'), 'reason surfaces from the record, in plain language');
   });
 
+  it('SEC path: holdings and capital name their 8-K provenance; issuer 403 is optional, not a downgrade', () => {
+    const world = mdUiWorld();
+    const iso = new Date(world.now()).toISOString();
+    const srcOk = () => ({ state: 'OK', lastAttemptAt: iso, lastSuccessAt: iso, lastError: null,
+      policy: { fetchWarnMs: 600000, fetchBlockMs: 3600000 } });
+    const down = () => ({ state: 'UNAVAILABLE', lastAttemptAt: iso, lastSuccessAt: null, lastError: 'HTTP 403',
+      policy: { fetchWarnMs: 600000, fetchBlockMs: 3600000 } });
+    const p = mdPayload(world.now(), {
+      capitalSource: 'sec',
+      holdingsSource: 'sec_8k',
+      latest: { id: 'sec8k:0001193125-26-424688:2026-10-18', reportedOn: '2026-10-19', holdingsAsOf: '2026-10-18',
+        holdingsBtc: 848517, averageCostUsd: 75446, aggregateCostUsd: 64020000000 },
+      shares: { asOf: '2026-10-18', basicShares: 422353257, source: 'sec_8k+issuer_reference' },
+      capital: { id: 'sec-derived:2026-10-18', asOf: '2026-10-18', cashUsd: 5277300000, debtUsd: 6713750000,
+        prefUsd: 13663235844, btcHoldings: 848517, basicShares: 422353257 },
+      sec: { documentsParsed: 42, capitalIssues: ['usd_balances_lag_holdings'], xbrl: null,
+        provenance: { holdings: '8-K 0001193125-26-424688 (as of 2026-10-18)',
+          termsReference: 'strategy.com/debt (captured issuer page) (as of 2026-10-19)', rolledForwardPeriods: 2 } },
+      strcRateSchedule: [{ effectiveFrom: '2026-10-16', ratePct: 12 }],
+      coverage: { btc: 'sec_8k', shares: 'sec_8k_rolled_reference', sec: '8k_parsed', strc: 'sec_8k_rate_schedule',
+        capitalStructure: 'sec_8k+issuer_reference', officialMnav: 'not_computed' },
+      dataHealth: { state: 'OK', summary: '', sources: {
+        mstr_sec_index: srcOk(), mstr_sec_filings: srcOk(), mstr_mnav_inputs: srcOk() } },
+      optionalSources: { mstr_official_ledger: down(), mstr_official_capital: down() }
+    });
+    world.UI.applyPayload(p);
+    const summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('8-K 申报日 2026-10-19（持仓截至 2026-10-18）'), 'holdings line names the filing');
+    assert.ok(summary.includes('资本结构 (asOf 2026-10-18，SEC 8-K 推导)'));
+    assert.ok(summary.includes('已累加其后 2 期增发/回购'), 'roll-forward disclosed');
+    assert.ok(summary.includes('推导注记：usd_balances_lag_holdings'));
+    assert.ok(summary.includes('SEC 8-K 正文已解析 42 份'));
+    assert.ok(summary.includes('STRC 股息率按 8-K 公告逐期记录（1 条）'));
+    assert.ok(!summary.includes('ADSO 不是 FDSO'), 'no ADSO line on the SEC path');
+    const status = allText(mdEl(world, '#mstr-disclosure-status'));
+    assert.ok(status.startsWith('已检查'), 'optional issuer outage does not downgrade the verdict');
+    assert.ok(status.includes('SEC 8-K 正文 回执'));
+    assert.ok(status.includes('可选源不可用（不影响结论）：官方 BTC 账本 (HTTP 403)'));
+  });
+
   it('non-positive Net BPS renders 不适用 instead of a negative multiple; issue codes are translated', () => {
     const world = mdUiWorld();
     const p = mdPayload(world.now(), {

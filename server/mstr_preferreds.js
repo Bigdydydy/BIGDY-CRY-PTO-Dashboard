@@ -53,6 +53,11 @@ async function recordOfficialStrcRate(history, {
   } catch (err) {
     return { status: 'unavailable', reason: err.message };
   }
+  // Preferred: the 8-K announcement schedule (full history, one entry per
+  // effective date). Fallback: the single current rate on the issuer page.
+  if (Array.isArray(disc && disc.strcRateSchedule) && disc.strcRateSchedule.length) {
+    return recordStrcRateSchedule(history, disc.strcRateSchedule, { file, now });
+  }
   const strc = Array.isArray(disc && disc.preferreds) ? disc.preferreds.find(p => p && p.ticker === 'STRC') : null;
   const rate = strc ? strc.dividendPct : null;
   if (!strc || typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0
@@ -78,6 +83,58 @@ async function recordOfficialStrcRate(history, {
   return { status: prev ? 'revised' : 'recorded', month };
 }
 
+// STRC 于 2025 年 7 月底上市：推断出的初始股息率 (首次公告里的 "from X%") 只回填到这个月为止
+const STRC_FIRST_MONTH = '2025-07';
+
+/**
+ * 按 8-K 股息率公告时间表回填每个月的股息率：取每月 1 日生效的利率。
+ * 只记录到当月为止 (下个月的有条件公告不提前入账)；与已有记录相同则不改写。
+ */
+function recordStrcRateSchedule(history, schedule, { file, now }) {
+  const valid = schedule.filter(e => e && typeof e.ratePct === 'number' && Number.isFinite(e.ratePct) && e.ratePct > 0
+    && (e.effectiveFrom === null || (typeof e.effectiveFrom === 'string' && ISO_DAY.test(e.effectiveFrom))));
+  const dated = valid.filter(e => e.effectiveFrom).sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  if (!dated.length) return { status: 'unavailable', reason: 'empty STRC rate schedule' };
+  const inferred = valid.find(e => e.effectiveFrom === null) || null;
+  const nowDate = now();
+  const currentMonth = nowDate.toISOString().slice(0, 7);
+  const startMonth = inferred ? STRC_FIRST_MONTH : dated[0].effectiveFrom.slice(0, 7);
+  let changed = 0;
+  let revised = 0;
+  for (let m = startMonth; m <= currentMonth; m = nextMonth(m)) {
+    let hit = inferred;
+    for (const e of dated) if (e.effectiveFrom <= `${m}-01`) hit = e;
+    if (!hit) continue;
+    const prev = history.months[m];
+    if (prev && prev.ratePct === hit.ratePct && prev.source === 'sec_8k') continue;
+    history.months[m] = {
+      ratePct: hit.ratePct,
+      effectiveFrom: hit.effectiveFrom,
+      source: 'sec_8k',
+      documentUrl: hit.documentUrl || null,
+      accession: hit.accession || null,
+      inferred: !!hit.inferred,
+      conditional: !!hit.conditional,
+      observedAt: nowDate.toISOString(),
+      ...(prev && prev.ratePct !== hit.ratePct ? { revisedFrom: prev.ratePct } : {})
+    };
+    changed++;
+    if (prev && prev.ratePct !== hit.ratePct) revised++;
+  }
+  if (!changed) return { status: 'unchanged', month: currentMonth };
+  try {
+    atomicWriteJson(file, history, 2);
+  } catch (err) {
+    console.error('[Preferreds] Failed to save STRC rate history:', err.message);
+  }
+  return { status: revised ? 'revised' : 'recorded', month: currentMonth, months: changed };
+}
+
+function nextMonth(m) {
+  const [y, mo] = m.split('-').map(Number);
+  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+}
+
 /**
  * 官方自动记录 + 手动配置合并。手动配置用于回填官方记录开始之前的月份；
  * 同一月份两者不一致时以官方为准，并在 issues 中注明。
@@ -95,7 +152,7 @@ function mergeStrcRates(history, manual) {
       issues.push(`strc_rate_conflict:${month}:manual=${rates[month]},official=${rec.ratePct}`);
     }
     rates[month] = rec.ratePct;
-    sourceOf[month] = 'official';
+    sourceOf[month] = rec.source === 'sec_8k' ? 'sec' : 'official';
   }
   return { rates, sourceOf, issues };
 }
@@ -324,6 +381,7 @@ async function fetchAndBuildPreferreds() {
     strcLatestRatedMonth: lastRated,
     strcRateCoverage: {
       officialMonths: ratedMonths.filter(m => m.rateSource === 'official').length,
+      secMonths: ratedMonths.filter(m => m.rateSource === 'sec').length,
       manualMonths: ratedMonths.filter(m => m.rateSource === 'manual').length,
       officialStatus: officialRate.status,
       issues: strcRateIssues
@@ -442,5 +500,5 @@ async function getPreferredsData(forceRefresh = false) {
 
 module.exports = {
   getPreferredsData,
-  _internal: { recordOfficialStrcRate, mergeStrcRates }
+  _internal: { recordOfficialStrcRate, recordStrcRateSchedule, mergeStrcRates }
 };

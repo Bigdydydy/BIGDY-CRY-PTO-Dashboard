@@ -585,11 +585,25 @@ function mdGoodBodies() {
     shares: mdShares([MD_SHARE_ROW]),
     capital: mdCapital([MD_CAPITAL_STATS], [MD_CONVERT_ROW]),
     press: mdPress([MD_PRESS_ROW, MD_PRESS_ROW2]),
-    sec: MD_SEC_JSON
+    sec: MD_SEC_JSON,
+    // The index lists one 8-K; its body carries no BTC/USD/STRC sections.
+    sec8k: '<html><body>Item 5.02 Departure of Directors</body></html>',
+    xbrl: MD_XBRL_JSON
   };
 }
+const MD_XBRL_JSON = {
+  cik: 1050446,
+  units: {
+    USD: [{ end: '2026-06-30', val: 2e9, form: '10-Q', filed: '2026-08-03', accn: '0001050446-26-000001' }],
+    shares: [{ end: '2026-06-30', val: 20, form: '10-Q', filed: '2026-08-03', accn: '0001050446-26-000001' }]
+  }
+};
 const MD_BODY_KEYS = ['ledger', 'shares', 'capital', 'press', 'sec'];
+// A cold scan also reads the listed 8-K body and two XBRL cross-check concepts.
+const MD_SCAN_KEYS = [...MD_BODY_KEYS, 'sec8k', 'xbrl', 'xbrl'];
 function mdBodyKey(url) {
+  if (url.includes('/Archives/edgar/')) return 'sec8k';
+  if (url.includes('/api/xbrl/')) return 'xbrl';
   if (url.includes('/ledger')) return 'ledger';
   if (url.includes('/shares')) return 'shares';
   if (url.includes('/debt')) return 'capital';
@@ -621,7 +635,8 @@ function mdService(bodies, { now = MD_T0, secUa = MD_UA, dataDir, prices } = {})
   const rq = mdRequest(bodies);
   const svc = createDisclosureService({
     dataDir: dir, request: rq.request, clock: () => now, secUserAgent: () => secUa,
-    prices: prices || (async () => ({ ...MD_PRICES }))
+    prices: prices || (async () => ({ ...MD_PRICES })),
+    sleep: async () => {}
   });
   return { svc, dir, calls: rq.calls };
 }
@@ -767,8 +782,8 @@ describe('MSTR disclosure service', () => {
     const bodies = mdGoodBodies();
     const { svc, dir, calls } = mdService(bodies);
     const view = await svc.get();
-    assert.deepEqual(calls.map(mdBodyKey), MD_BODY_KEYS,
-      'each source fetched exactly once, in order');
+    assert.deepEqual(calls.map(mdBodyKey), MD_SCAN_KEYS,
+      'each source fetched exactly once, in order, then the 8-K body and XBRL cross-checks');
     assert.equal(view.schemaVersion, 1);
     assert.equal(view.latest.reportedOn, '2026-10-02');
     assert.equal(view.latest.holdingsBtc, 1100);
@@ -805,9 +820,13 @@ describe('MSTR disclosure service', () => {
     // fixture shares row reports the older 1000-BTC position vs latest ledger 1100
     assert.ok(view.reconciliationIssues.includes('issuer_holdings_conflict'));
 
-    assert.equal(view.coverage.sec, 'index_only');
+    // The listed 8-K body was fetched and parsed (it has no BTC/USD/STRC sections),
+    // so the SEC path has no holdings and the issuer path stays in use.
+    assert.equal(view.coverage.sec, '8k_parsed');
     assert.equal(view.coverage.strc, 'announcements_only');
     assert.equal(view.coverage.capitalStructure, 'issuer_reported');
+    assert.equal(view.capitalSource, 'issuer');
+    assert.deepEqual(Object.keys(view.dataHealth.sources).sort(), [...MD_SOURCE_IDS].sort(), 'issuer path keeps the six-source contract');
     // Milestone 3: the injected price provider + stored capital/share inputs
     // produce a computed official mNAV record (derived — never evidence).
     assert.equal(view.coverage.officialMnav, 'computed');
@@ -823,12 +842,14 @@ describe('MSTR disclosure service', () => {
     const snap = JSON.parse(fs.readFileSync(path.join(dir, 'mstr_disclosures.json'), 'utf8'));
     assert.equal(snap.schemaVersion, 1);
     assert.equal(snap.events.length, 2);
-    assert.equal(Object.keys(snap.dataHealth.sources).length, 6,
-      'five evidence sources plus the derived mNAV input leg');
+    assert.equal(Object.keys(snap.dataHealth.sources).length, 7,
+      'five evidence sources, the 8-K body scan and the derived mNAV input leg');
+    assert.deepEqual(snap.requiredSources, MD_SOURCE_IDS, 'issuer path recorded for the monitor');
     assert.ok(snap.mnav && snap.mnav.result, 'mnav record persisted with state');
     assert.ok(!snap.mnav.fingerprint, 'derived record is never fingerprinted');
     const evDir = path.join(dir, 'mstr_disclosure_evidence');
-    assert.equal(fs.readdirSync(evDir).length, 5, 'one immutable evidence file per source response');
+    assert.equal(fs.readdirSync(evDir).length, 6,
+      'one immutable evidence file per source response, incl. the 8-K body (XBRL cross-checks are not evidence)');
     const evMap = view.evidence || {};
     assert.ok(view.events.every(e => evMap[e.fingerprint] && evMap[e.fingerprint].sha256 &&
       fs.existsSync(path.join(evDir, evMap[e.fingerprint].sha256 + '.json'))));
@@ -841,9 +862,10 @@ describe('MSTR disclosure service', () => {
     const { svc, calls } = mdService(bodies);
     await svc.get();
     const v2 = await svc.get();
-    assert.equal(calls.length, 5, 'get() within the poll interval does not refetch');
+    assert.equal(calls.length, 8, 'get() within the poll interval does not refetch');
     const [a, b] = await Promise.all([svc.get(true), svc.get(true)]);
-    assert.equal(calls.length, 10, 'concurrent force shares a single request sequence');
+    // Second scan: the five pages again; the parsed 8-K and same-day XBRL are not refetched.
+    assert.equal(calls.length, 13, 'concurrent force shares a single request sequence');
     assert.equal(a.events.length, 2);
     assert.equal(b.events.length, 2);
     assert.equal(a.events[0].reportedOn, '2026-10-02', 'disclosed date never follows the receipt clock');
@@ -1046,7 +1068,7 @@ describe('MSTR disclosure service', () => {
     assert.equal(hc.lastSuccessAt, capReceipt, 'capital success clock untouched');
     assert.equal(hp.lastSuccessAt, pressReceipt, 'press success clock untouched');
     // Sibling sources still refreshed (sequential independence).
-    assert.equal(calls.length, 10);
+    assert.equal(calls.length, 13, 'second scan refetches the five pages only (8-K parsed, XBRL same day)');
     assert.equal(v2.dataHealth.sources.mstr_official_ledger.state, 'OK');
     assert.notEqual(v2.dataHealth.state, 'OK');
   });
@@ -1406,7 +1428,7 @@ describe('MSTR disclosure service — official mNAV wiring', () => {
       prices: async () => { throw new Error('price feed down'); }
     });
     const view = await svc.get();
-    assert.equal(calls.length, 5, 'all five issuer/SEC sources still collected');
+    assert.equal(calls.length, 8, 'all five issuer/SEC sources (plus 8-K body and XBRL) still collected');
     assert.equal(view.events.length, 2);
     assert.equal(view.capital.debtUsd, 2e9);
     assert.equal(view.officialMnav, null, 'no mnav record when inputs never arrived');

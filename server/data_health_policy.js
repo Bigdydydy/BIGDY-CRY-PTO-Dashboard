@@ -52,6 +52,7 @@ const SOURCE_POLICIES = Object.freeze({
   mstr_official_capital: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
   mstr_official_press: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
   mstr_sec_index: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  mstr_sec_filings: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
   // Official-mNAV market inputs (Yahoo MSTR + Coinbase BTC): same cadence —
   // the price leg rides the same 5-minute collector and 6-hour producer.
   mstr_mnav_inputs: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),

@@ -100,6 +100,22 @@ function getElapsedMetrics(isoOrTs) {
 }
 
 /**
+ * Strategy disclosures gate on the capital path in use: the SEC path (index +
+ * 8-K bodies + mNAV) when the 8-K scan is healthy and the issuer /debt page is
+ * not; otherwise the issuer path. The other path's sources stay ancillary.
+ */
+function mstrDisclosureSourceIds(now = Date.now()) {
+  const issuer = ['mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
+    'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'];
+  const secPath = ['mstr_sec_index', 'mstr_sec_filings', 'mstr_mnav_inputs'];
+  const onSec = getSourceHealth('mstr_sec_filings', now).state === 'OK'
+    && getSourceHealth('mstr_official_capital', now).state !== 'OK';
+  return onSec
+    ? { sourceIds: secPath, ancillaryIds: issuer.filter(id => !secPath.includes(id)) }
+    : { sourceIds: issuer, ancillaryIds: ['mstr_sec_filings'] };
+}
+
+/**
  * Aggregate registry health for a module's mapped source ids.
  * ancillary ids are reported in `sources` but never gate the status.
  */
@@ -474,10 +490,12 @@ async function getSystemAuditData(doProbe = false) {
         'https://www.strategy.com/debt',
         'https://www.strategy.com/press',
         'https://data.sec.gov/submissions/CIK0001050446.json',
+        'https://www.sec.gov/Archives/edgar/data/1050446/ (8-K)',
+        'https://data.sec.gov/api/xbrl/companyconcept/CIK0001050446/',
         'https://query1.finance.yahoo.com/v8/finance/chart/MSTR',
         'https://api.exchange.coinbase.com/products/BTC-USD/ticker'
       ],
-      timeframe: '事件披露与资本结构；公告/SEC 仅标题级发现，正文未核验；官方 mNAV 按 2026-07-23 方法由披露输入推算',
+      timeframe: '事件披露与资本结构；strategy.com 可用时为主，否则由 SEC 8-K 正文 (持仓、美元资产、增发/回购、STRC 股息率) 与官网参考条款推导；XBRL 仅作交叉核对；官方 mNAV 按 2026-07-23 方法由披露输入推算',
       updateInterval: '常驻实例每 5 分钟检查',
       isRealtime: false,
       provenanceSignatures: [
@@ -486,9 +504,10 @@ async function getSystemAuditData(doProbe = false) {
         'STRATEGY_CAPITAL_SNAPSHOT',
         'STRATEGY_PRESS_INDEX',
         'SEC_FILING_DISCOVERY_ONLY',
+        'SEC_8K_PARSED',
         'STRATEGY_MNAV_2026_07_23'
       ],
-      sourceIds: ['mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital', 'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs']
+      ...mstrDisclosureSourceIds()
     },
     {
       id: 'option_marks',
