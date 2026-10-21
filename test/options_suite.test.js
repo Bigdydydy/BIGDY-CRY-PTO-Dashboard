@@ -352,3 +352,90 @@ describe('期权套件 · 数据层：现货对齐与偏度日度档案', () => 
     assert.deepEqual(written.map(r => [r.day, r.rr30]), [['2026-10-14', -1.9], ['2026-10-15', -2.5]]);
   });
 });
+
+describe('期权套件 · MerQube/Kaiko 曲面拆解、Black-76 远期价 F 与大宗时段/Smile Alpha', () => {
+  const { analyzeBlockTrades, buildForwardsMap, classifyMarketSession, calcGreeks } = require('../server/analytics_engine');
+
+  test('analyzeIvSmile 输出对数虚实值 x=ln(K/F) 两翼拆解、极端尾部延伸与 wingRegime', () => {
+    // Greeks.live iv_skew_month 的 delta 字段为 Call Delta (0~1)：25Δ Put 对应 callDelta=0.75，25Δ Call 对应 callDelta=0.25
+    const list = [
+      { strike: 40000, iv: 65, delta: 0.95 },
+      { strike: 60000, iv: 48, delta: 0.75 },
+      { strike: 80000, iv: 36, delta: 0.50 },
+      { strike: 100000, iv: 39, delta: 0.25 },
+      { strike: 160000, iv: 58, delta: 0.06 }
+    ];
+    const res = analyzeIvSmile({
+      month1: { underlying_index: 'BTC-27NOV26', underlying_price: 80000, iv_list: list }
+    }, 79500, new Date(Date.UTC(2026, 9, 15, 8)));
+    assert.equal(res.putWingPremium, 12);
+    assert.equal(res.callWingPremium, 3);
+    assert.equal(res.wingRegime.key, 'crash_hedge_asymmetric');
+    assert.ok(res.logMoneyness && Math.abs(res.logMoneyness.downsideSkew - 12) < 1e-6);
+    assert.ok(res.logMoneyness && Math.abs(res.logMoneyness.upsideConvexity - 3) < 1e-6);
+    assert.equal(res.tailExtension.putMinStrike, 40000);
+    assert.equal(res.tailExtension.putMinPct, 50);
+    assert.equal(res.tailExtension.callMaxStrike, 160000);
+    assert.equal(res.tailExtension.callMaxPct, 200);
+  });
+
+  test('classifyMarketSession 区分美股 ETF 时段 (09:30–16:00 ET)、工作日离岸时段与周末', () => {
+    // 2026-10-20 (周二，美东夏令时 EDT = UTC-4)：14:30 UTC = 10:30 ET (美股时段)
+    assert.equal(classifyMarketSession(Date.UTC(2026, 9, 20, 14, 30)).key, 'us_etf_hours');
+    // 2026-10-20 06:00 UTC = 02:00 ET (亚太/欧洲离岸时段)
+    assert.equal(classifyMarketSession(Date.UTC(2026, 9, 20, 6, 0)).key, 'off_hours');
+    // 2026-10-18 (周日) -> 周末休市窗口
+    assert.equal(classifyMarketSession(Date.UTC(2026, 9, 18, 15, 0)).key, 'weekend');
+  });
+
+  test('analyzeBlockTrades 注入 smileContext 与 forwardsByExpiry：激活 smileAlphaRating、按远期价 F 计算 Greeks 并统计时段拆分', () => {
+    const forwardsByExpiry = buildForwardsMap(
+      [{ underlying_index: 'BTC-25DEC26', underlying_price: 84000 }],
+      { marks: { 'BTC-30OCT26-80000-C': { underlyingPrice: 80500 } } }
+    );
+    assert.equal(forwardsByExpiry['25DEC26'], 84000);
+    assert.equal(forwardsByExpiry['30OCT26'], 80500);
+
+    const tsUs = Date.UTC(2026, 9, 20, 15, 0); // 周二 11:00 ET (美股时段)
+    const tsWknd = Date.UTC(2026, 9, 18, 12, 0); // 周日 (周末窗口)
+    const trades = [
+      {
+        block_trade_id: 'BLK-US-1',
+        instrument_name: 'BTC-25DEC26-84000-C',
+        direction: 'buy',
+        amount: 500,
+        price: 0.04,
+        iv: 40,
+        index_price: 80000,
+        timestamp: tsUs
+      },
+      {
+        block_trade_id: 'BLK-WK-1',
+        instrument_name: 'BTC-25DEC26-75000-P',
+        direction: 'buy',
+        amount: 500,
+        price: 0.03,
+        iv: 45,
+        index_price: 80000,
+        timestamp: tsWknd
+      }
+    ];
+    const blockRes = analyzeBlockTrades(trades, 30000000, 'all', 80000, [], {
+      smileContext: { skew25d: -4.2, bf25: 1.8 },
+      forwardsByExpiry
+    });
+    assert.equal(blockRes.whaleBlocks.length, 2);
+    const callBlock = blockRes.whaleBlocks.find(b => b.blockId === 'BLK-US-1');
+    assert.ok(callBlock.smileAlphaRating && callBlock.smileAlphaRating.rating.includes('逆势做多'), `expected smileAlphaRating, got ${JSON.stringify(callBlock.smileAlphaRating)}`);
+    assert.equal(callBlock.sessionProfile.key, 'us_etf_hours');
+    // 验证该腿 Delta 按 F=84000 (平值 Call Δ > 0.5) 计算，而非按 S=80000 (虚值 Call)
+    const T = (callBlock.legs[0].expiryMs - tsUs) / (365.25 * 24 * 3600 * 1000);
+    const gSpot = calcGreeks(80000, 84000, T, 40, true, 0, 80000);
+    const gFwd = calcGreeks(80000, 84000, T, 40, true, 0, 84000);
+    assert.equal(callBlock.legs[0].forwardPrice, 84000);
+    assert.ok(Math.abs(callBlock.legs[0].delta - 500 * gFwd.delta) < 1e-6);
+    assert.ok(gFwd.delta > 0.5 && gSpot.delta < 0.5);
+    assert.equal(blockRes.sessionSplit.usHoursPct, 50);
+    assert.equal(blockRes.sessionSplit.weekendPct, 50);
+  });
+});

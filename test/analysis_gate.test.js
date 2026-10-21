@@ -14,7 +14,7 @@ const { recordSuccess, recordFailure, resetHealthForTests } = require('../server
 const ANALYZERS = ['analyzeAtmIv', 'analyzeDynamicGex', 'analyzeBlockTrades', 'analyzeIvSmile', 'analyze25DeltaSkew'];
 
 function buildServer(t, calls, { flowPayload } = {}) {
-  const analytics = { calcGreeks: () => ({}), parseInstrument: () => null, parseDeribitExpiry: () => null };
+  const analytics = { calcGreeks: () => ({}), parseInstrument: () => null, parseDeribitExpiry: () => null, buildForwardsMap: () => ({}) };
   ANALYZERS.forEach(name => {
     calls[name] = 0;
     analytics[name] = () => { calls[name]++; return { ok: true, summaryText: 'live' }; };

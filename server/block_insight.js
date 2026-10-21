@@ -62,7 +62,7 @@ const round = (v, d = 0) => {
  * @param {number} coverageStartMs - 数据源最早覆盖时刻：起点之后才开始的 OI 日才算完整
  * @returns {Object<string, {complete: boolean, rows: Array<Object>}>}
  */
-function aggregateTrades(trades, coverageStartMs, nowMs = Date.now()) {
+function aggregateTrades(trades, coverageStartMs, nowMs = Date.now(), forwardsByExpiry = null) {
   const days = {};
   for (const t of trades || []) {
     const inst = parseInstrument(t.instrument_name || '');
@@ -80,7 +80,8 @@ function aggregateTrades(trades, coverageStartMs, nowMs = Date.now()) {
       day.rows.set(rowKey, row);
     }
     const T = Math.max(0.0005, (expMs - t.timestamp) / YEAR_MS);
-    const g = calcGreeks(S, inst.strike, T, t.iv || 35.0, inst.isCall);
+    const F = Number(t.underlying_price || t.forward_price || (forwardsByExpiry && forwardsByExpiry[inst.expiryStr])) || S;
+    const g = calcGreeks(S, inst.strike, T, t.iv || 35.0, inst.isCall, 0, F);
     const sign = t.direction === 'buy' ? 1 : -1;
     if (sign > 0) row.buyQty += amt; else row.sellQty += amt;
     row.netDeltaUSD += sign * g.delta * amt * S;
@@ -246,11 +247,18 @@ const FAMILY_LABELS = {
   'short-vol': '卖出波动率 / 区间'
 };
 
-/** 按 Delta / Vega 画像分组：|净 Delta| 超过名义额 10% 视为方向性，否则按 Vega 符号 */
+/** 按 Delta / Vega 画像分组：|净 Delta| 超过名义额 10% 视为方向性；纯单向买入深虚值 Call/Put (|Δ|≤10%) 亦归入方向性尾部头寸，不误归为跨式买波 */
 function familyOf(s) {
   const ratio = (Number(s.netDeltaUSD) || 0) / (Number(s.notionalUSD) || 1);
   if (ratio > 0.1) return 'bull';
   if (ratio < -0.1) return 'bear';
+  if (Array.isArray(s.legs) && s.legs.length > 0) {
+    const parsed = s.legs.map(l => ({ dir: l.direction, inst: parseInstrument(l.instrument || '') })).filter(x => x.inst);
+    if (parsed.length === s.legs.length && parsed.every(x => x.dir === 'buy')) {
+      if (parsed.every(x => !x.inst.isCall) && (Number(s.netDeltaUSD) || 0) <= 0) return 'bear';
+      if (parsed.every(x => x.inst.isCall) && (Number(s.netDeltaUSD) || 0) >= 0) return 'bull';
+    }
+  }
   return (Number(s.netVegaUSD) || 0) >= 0 ? 'long-vol' : 'short-vol';
 }
 
@@ -936,7 +944,7 @@ let storeCache = { key: null, daily: null, analysis: null };
  * 服务器端组装 4B 数据：仓库日聚合 + 30 天成交库重算的近几天；登记册合并本机补采，并在后台补登记 / 盯市。
  * @param {{trades: Array, nowMs?: number, spot?: number, expiry?: string, oiSnapshots?: Array, fetchRows: Function}} opts
  */
-async function getServerInsight({ trades, nowMs = Date.now(), spot = null, expiry = null, oiSnapshots = [], fetchRows }) {
+async function getServerInsight({ trades, nowMs = Date.now(), spot = null, expiry = null, oiSnapshots = [], fetchRows, forwardsByExpiry = null, smileContext = null }) {
   const { analyzeBlockTrades } = require('./analytics_engine');
   const list = trades || [];
   const latestTs = list.reduce((m, t) => Math.max(m, t.timestamp || 0), 0);
@@ -945,8 +953,8 @@ async function getServerInsight({ trades, nowMs = Date.now(), spot = null, expir
     const coverage = list.reduce((m, t) => Math.min(m, t.timestamp || Infinity), Infinity);
     storeCache = {
       key,
-      daily: aggregateTrades(list, coverage, nowMs),
-      analysis: analyzeBlockTrades(list, STRUCTURE_MIN_NOTIONAL, 'all', spot || 0, oiSnapshots)
+      daily: aggregateTrades(list, coverage, nowMs, forwardsByExpiry),
+      analysis: analyzeBlockTrades(list, STRUCTURE_MIN_NOTIONAL, 'all', spot || 0, oiSnapshots, { smileContext, forwardsByExpiry })
     };
   }
   const daily = mergeDaily(await getCommittedDaily(nowMs), storeCache.daily);

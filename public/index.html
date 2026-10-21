@@ -1596,12 +1596,12 @@
               <span class="m-sub" id="smile-atm-strike">ATM: $--</span>
             </div>
             <div class="metric-pill-box">
-              <span class="m-label">25Δ Put 溢价</span>
+              <span class="m-label" title="左翼下行偏度 (Downside Skew) = 25Δ Put IV − ATM IV；下方显示固定对数虚实值 x=ln(0.75)≈−0.29 偏度">左翼下行偏度 (25Δ Put)</span>
               <span class="m-value text-neg" id="smile-put-wing">--%</span>
               <span class="m-sub" id="smile-put-sub">--</span>
             </div>
             <div class="metric-pill-box">
-              <span class="m-label">25Δ Call 溢价</span>
+              <span class="m-label" title="右翼上行凸度 (Upside Convexity) = 25Δ Call IV − ATM IV；下方显示固定对数虚实值 x=ln(1.25)≈+0.22 凸度">右翼上行凸度 (25Δ Call)</span>
               <span class="m-value text-pos" id="smile-call-wing">--%</span>
               <span class="m-sub" id="smile-call-sub">--</span>
             </div>
@@ -1617,6 +1617,11 @@
               <span class="m-label">25Δ 蝶式 / 肥尾 (BF)</span>
               <span class="m-value text-accent" id="smile-kurtosis-curv">--</span>
               <span class="m-sub" id="smile-kurtosis-sub">25Δ 两翼均值 − ATM (Volga 敏感)</span>
+            </div>
+            <div class="metric-pill-box">
+              <span class="m-label" title="两翼最低/最高挂牌行权价相对远期价 F 的延伸跨度与 10Δ 深虚值偏度">极端尾部触达 (Put / Call 翼界)</span>
+              <span class="m-value" id="smile-tail-reach">--</span>
+              <span class="m-sub" id="smile-tail-sub">--</span>
             </div>
           </div>
 
@@ -1707,8 +1712,8 @@
     <section class="bento-card" id="module-gex">
       <div class="card-header">
         <div class="card-title-group">
-          <span class="card-module-tag">02 GEX</span>
-          <h2>GEX by Expiration 动态主力交割期与钉盘研判</h2>
+          <span class="card-module-tag">02 EXPIRY PINNING</span>
+          <h2>各交割期 Call/Put 磁吸墙与分期限钉盘分布 (Greeks.live 参照口径)</h2>
         </div>
         <div class="view-switch">
           <button class="switch-btn active" id="btn-gex-focused">核心主力交割 (动态锁定)</button>
@@ -1719,27 +1724,27 @@
       <div class="card-body">
         <div class="rule-banner">
           <span>⚙️</span>
-          <span id="gex-rule-text">动态交割期算法已激活：卡片聚焦月底、季末及年底交割；Gamma 体制按全部到期日合计判定。</span>
+          <span id="gex-rule-text">本卡展示各独立到期日的 Call Wall / Put Wall 钉盘阻力位（Greeks.live 参照口径）；全链 Black-76 精算 GEX、订单流符号校正与滑动翻转位请以 02B 做市商敞口引擎为准。</span>
         </div>
 
         <div class="metrics-row" id="gex-summary-row">
           <div class="metric-pill-box">
-            <span class="m-label">全部到期净 GEX</span>
+            <span class="m-label">数据源全部到期净 GEX (参照)</span>
             <span class="m-value" id="gex-total-all">--</span>
             <span class="m-sub" id="gex-regime-sub">--</span>
           </div>
           <div class="metric-pill-box">
-            <span class="m-label" id="gex-near-label">近端到期净 GEX</span>
+            <span class="m-label" id="gex-near-label">近端到期净 GEX (参照)</span>
             <span class="m-value" id="gex-total-near">--</span>
             <span class="m-sub">Gamma 最大，主导近期对冲流</span>
           </div>
           <div class="metric-pill-box">
-            <span class="m-label">主力交割净 GEX</span>
+            <span class="m-label">主力交割净 GEX (参照)</span>
             <span class="m-value" id="gex-total-focused">--</span>
             <span class="m-sub">月底 / 季末 / 年底</span>
           </div>
           <div class="metric-pill-box">
-            <span class="m-label">零 Gamma 翻转位 (近似)</span>
+            <span class="m-label" title="仅按离散行权价局部净 GEX 变号线性插值；精确全链重估翻转位见下方 02B">离散行权价翻转位 (参照)</span>
             <span class="m-value text-accent" id="gex-flip">--</span>
             <span class="m-sub" id="gex-flip-sub">按行权价局部净 GEX 变号</span>
           </div>
@@ -1842,6 +1847,29 @@
             <span class="m-value" id="dealer-major">--</span>
             <span class="m-sub" id="dealer-major-sub">--</span>
           </div>
+          <div class="metric-pill-box">
+            <span class="m-label" title="模拟剔除下一个月度/季度主力交割后，剩余全链账本的主口径残余 GEX 与体制变化">交割断崖 · 脱落残余 GEX</span>
+            <span class="m-value" id="dealer-cliff">--</span>
+            <span class="m-sub" id="dealer-cliff-sub">--</span>
+          </div>
+        </div>
+
+        <div class="metrics-row" style="margin-top: 6px;">
+          <div class="metric-pill-box">
+            <span class="m-label" title="全链现价上方最大 Call OI 与下方最大 Put OI 行权价">全链 OI 阻力 / 支撑墙</span>
+            <span class="m-value" id="dealer-walls">--</span>
+            <span class="m-sub" id="dealer-walls-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label" title="全链 Call OI ÷ Put OI 持仓比，反映市场整体看涨/对冲结构平衡度">全链 Call : Put 持仓比</span>
+            <span class="m-value text-accent" id="dealer-cp-ratio">--</span>
+            <span class="m-sub" id="dealer-cp-sub">--</span>
+          </div>
+          <div class="metric-pill-box">
+            <span class="m-label" title="左翼深度虚值 Put (K≤0.75F) 与右翼深虚值 Call (K≥1.50F) 持仓占比">深度尾部对冲 / 彩票仓占比</span>
+            <span class="m-value" id="dealer-tail-oi">--</span>
+            <span class="m-sub" id="dealer-tail-sub">--</span>
+          </div>
         </div>
 
         <div class="horizon-table-scroll" style="margin-top: 10px;">
@@ -1909,6 +1937,25 @@
             </tbody>
           </table>
         </div>
+
+        <div class="horizon-table-scroll" style="margin-top: 10px;">
+          <table class="horizon-flow-table">
+            <thead>
+              <tr>
+                <th>期限分档 (MerQube/Kaiko 5档)</th>
+                <th>Call OI (BTC)</th>
+                <th>Put OI (BTC)</th>
+                <th>OI 占比</th>
+                <th title="Call OI ÷ Put OI：高比值偏向上行投机/备兑，低比值偏向机构下行保护">Call : Put 比</th>
+                <th>分档净 GEX / 1%</th>
+              </tr>
+            </thead>
+            <tbody id="dealer-maturity-body">
+              <tr><td colspan="6">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="insight-note" id="dealer-maturity-note">--</p>
 
         <div class="horizon-table-scroll" style="margin-top: 10px;">
           <table class="horizon-flow-table">
@@ -2000,6 +2047,11 @@
           <div class="flow-stat">
             <span class="stat-label" title="按去重后全集：买 Call + 卖 Put 名义额占比">主流资金倾向</span>
             <span class="stat-val text-accent" id="flow-bias-label">--</span>
+          </div>
+          <div class="flow-stat">
+            <span class="stat-label" title="按美东时间 09:30–16:00 (Cboe/IBIT 期权交易时段) vs 离岸时段 vs 周末休市窗口拆分去重名义额">交易时段分布 (美股/离岸/周末)</span>
+            <span class="stat-val" id="session-split-val">--</span>
+            <span class="stat-sub" id="session-split-sub">--</span>
           </div>
         </div>
 
@@ -3094,6 +3146,8 @@
             <div class="intent-header-row">
               <div class="intent-badge-large" id="m-intent-badge">看震荡</div>
               <div class="strategy-name-badge" id="m-strategy-name">策略结构</div>
+              <span class="intent-badge-pill badge-neutral" id="m-smile-alpha-badge" style="display:none;"></span>
+              <span class="intent-badge-pill badge-neutral" id="m-session-badge" style="display:none;"></span>
             </div>
             <p class="intent-narrative-text" id="m-intent-narrative">分析生成中...</p>
           </div>

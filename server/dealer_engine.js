@@ -231,6 +231,212 @@ function expiryRollOff(contracts, spot, nowMs) {
   return { totalOiBtc: Number(totalOi.toFixed(1)), expiries: rows };
 }
 
+const MATURITY_BUCKETS = [
+  { key: 'lt2w', label: '<2周 (短线战术)', maxDays: 14 },
+  { key: 'w2_6', label: '2–6周 (月度主力)', maxDays: 42 },
+  { key: 'w6_10', label: '6–10周 (双月展期)', maxDays: 70 },
+  { key: 'w10_16', label: '10–16周 (季度合约)', maxDays: 112 },
+  { key: 'gt16w', label: '>16周 (远端结构)', maxDays: Infinity }
+];
+
+/**
+ * 全链与主力交割日行权价墙 (Call Wall / Put Wall)：
+ * 聚合全链各行权价 Call/Put OI 与 Gamma，替代旧版仅取单一最近交割日最大 GEX 行权价的口径。
+ */
+function strikeWalls(contracts, spot, nextMajorExpiry = null) {
+  const byStrike = new Map();
+  const majorByStrike = new Map();
+  for (const c of contracts) {
+    const row = byStrike.get(c.strike) || { strike: c.strike, callOiBtc: 0, putOiBtc: 0 };
+    if (c.isCall) row.callOiBtc += c.oi; else row.putOiBtc += c.oi;
+    byStrike.set(c.strike, row);
+    if (nextMajorExpiry && c.expiry === nextMajorExpiry) {
+      const mRow = majorByStrike.get(c.strike) || { strike: c.strike, callOiBtc: 0, putOiBtc: 0 };
+      if (c.isCall) mRow.callOiBtc += c.oi; else mRow.putOiBtc += c.oi;
+      majorByStrike.set(c.strike, mRow);
+    }
+  }
+  const allRows = [...byStrike.values()];
+  const callCandidates = allRows.filter(r => r.strike >= spot && r.callOiBtc > 0).sort((a, b) => b.callOiBtc - a.callOiBtc);
+  const putCandidates = allRows.filter(r => r.strike <= spot && r.putOiBtc > 0).sort((a, b) => b.putOiBtc - a.putOiBtc);
+  const fmtWall = (r, oiField, extra = {}) => r ? {
+    strike: r.strike,
+    oiBtc: Number(r[oiField].toFixed(1)),
+    distancePct: Number((((r.strike - spot) / spot) * 100).toFixed(2)),
+    ...extra
+  } : null;
+
+  const majorRows = [...majorByStrike.values()];
+  const majorCall = majorRows.filter(r => r.strike >= spot && r.callOiBtc > 0).sort((a, b) => b.callOiBtc - a.callOiBtc)[0] || null;
+  const majorPut = majorRows.filter(r => r.strike <= spot && r.putOiBtc > 0).sort((a, b) => b.putOiBtc - a.putOiBtc)[0] || null;
+
+  const topStrikes = allRows
+    .map(r => ({
+      strike: r.strike,
+      callOiBtc: Number(r.callOiBtc.toFixed(1)),
+      putOiBtc: Number(r.putOiBtc.toFixed(1)),
+      totalOiBtc: Number((r.callOiBtc + r.putOiBtc).toFixed(1)),
+      distancePct: Number((((r.strike - spot) / spot) * 100).toFixed(2))
+    }))
+    .sort((a, b) => b.totalOiBtc - a.totalOiBtc)
+    .slice(0, 6);
+
+  return {
+    callWall: fmtWall(callCandidates[0], 'callOiBtc'),
+    putWall: fmtWall(putCandidates[0], 'putOiBtc'),
+    nextMajorCallWall: fmtWall(majorCall, 'callOiBtc', { expiry: nextMajorExpiry }),
+    nextMajorPutWall: fmtWall(majorPut, 'putOiBtc', { expiry: nextMajorExpiry }),
+    topStrikes
+  };
+}
+
+/**
+ * MerQube & Kaiko 报告 5 档期限结构矩阵 (<2w, 2–6w, 6–10w, 10–16w, >16w) + 深度尾部行权价 OI 分布
+ */
+function maturityStructure(contracts, spot, nowMs) {
+  const totalOi = contracts.reduce((acc, c) => acc + c.oi, 0);
+  let chainCallOi = 0;
+  let chainPutOi = 0;
+  let deepPutOi = 0;       // K <= 0.75 * F
+  let ultraDeepPutOi = 0;  // K <= 0.50 * F
+  let deepCallOi = 0;      // K >= 1.50 * F
+  let ultraDeepCallOi = 0; // K >= 2.00 * F
+  let minPutStrike = null;
+  let minPutRatio = null;
+  let maxCallStrike = null;
+  let maxCallRatio = null;
+
+  const bucketContracts = MATURITY_BUCKETS.map(() => []);
+  for (const c of contracts) {
+    const dte = (c.expiryMs - nowMs) / DAY_MS;
+    const idx = MATURITY_BUCKETS.findIndex(b => dte <= b.maxDays);
+    if (idx >= 0) bucketContracts[idx].push(c);
+    const ratio = c.strike / c.forward;
+    if (c.isCall) {
+      chainCallOi += c.oi;
+      if (ratio >= 1.5) deepCallOi += c.oi;
+      if (ratio >= 2.0) ultraDeepCallOi += c.oi;
+      if (maxCallStrike === null || c.strike > maxCallStrike) {
+        maxCallStrike = c.strike;
+        maxCallRatio = ratio;
+      }
+    } else {
+      chainPutOi += c.oi;
+      if (ratio <= 0.75) deepPutOi += c.oi;
+      if (ratio <= 0.50) ultraDeepPutOi += c.oi;
+      if (minPutStrike === null || c.strike < minPutStrike) {
+        minPutStrike = c.strike;
+        minPutRatio = ratio;
+      }
+    }
+  }
+
+  const buckets = MATURITY_BUCKETS.map((b, i) => {
+    const list = bucketContracts[i];
+    let callOi = 0;
+    let putOi = 0;
+    for (const c of list) {
+      if (c.isCall) callOi += c.oi; else putOi += c.oi;
+    }
+    const tot = callOi + putOi;
+    const book = list.length ? evaluateBook(list) : { gamma1pct: 0, delta: 0 };
+    return {
+      key: b.key,
+      label: b.label,
+      callOiBtc: Number(callOi.toFixed(1)),
+      putOiBtc: Number(putOi.toFixed(1)),
+      totalOiBtc: Number(tot.toFixed(1)),
+      oiSharePct: totalOi > 0 ? Number((tot / totalOi * 100).toFixed(1)) : 0,
+      callPutRatio: putOi > 0 ? Number((callOi / putOi).toFixed(2)) : null,
+      gexUsd: book.gamma1pct * spot,
+      dexUsd: book.delta * spot
+    };
+  });
+
+  const chainCallPutRatio = chainPutOi > 0 ? Number((chainCallOi / chainPutOi).toFixed(2)) : null;
+  const shortDatedOiSharePct = buckets[0].oiSharePct;
+  const longDatedOiSharePct = buckets[4].oiSharePct;
+
+  let maturityRegime = { key: 'balanced_multi_tenor', label: '多期限均衡分布' };
+  if (longDatedOiSharePct >= 25 && chainCallPutRatio !== null && chainCallPutRatio <= 2.2) {
+    maturityRegime = { key: 'institutional_hedged', label: '机构中期头寸与尾部对冲主导' };
+  } else if (chainCallPutRatio !== null && chainCallPutRatio >= 2.5) {
+    maturityRegime = { key: 'directional_call_heavy', label: '看涨方向性多头主导' };
+  } else if (shortDatedOiSharePct >= 35) {
+    maturityRegime = { key: 'short_tenor_tactical', label: '短周期战术博弈集中' };
+  }
+
+  return {
+    buckets,
+    chainCallOiBtc: Number(chainCallOi.toFixed(1)),
+    chainPutOiBtc: Number(chainPutOi.toFixed(1)),
+    chainCallPutRatio,
+    shortDatedOiSharePct,
+    longDatedOiSharePct,
+    maturityRegime,
+    tailWings: {
+      deepPutOiBtc: Number(deepPutOi.toFixed(1)),
+      ultraDeepPutOiBtc: Number(ultraDeepPutOi.toFixed(1)),
+      deepPutSharePct: chainPutOi > 0 ? Number((deepPutOi / chainPutOi * 100).toFixed(1)) : 0,
+      minPutStrike,
+      minPutMoneynessPct: minPutRatio !== null ? Math.round(minPutRatio * 100) : null,
+      deepCallOiBtc: Number(deepCallOi.toFixed(1)),
+      ultraDeepCallOiBtc: Number(ultraDeepCallOi.toFixed(1)),
+      deepCallSharePct: chainCallOi > 0 ? Number((deepCallOi / chainCallOi * 100).toFixed(1)) : 0,
+      maxCallStrike,
+      maxCallMoneynessPct: maxCallRatio !== null ? Math.round(maxCallRatio * 100) : null
+    }
+  };
+}
+
+/**
+ * 交割断崖模拟 (Post-Expiry Residual GEX & Unwind Cliff)：
+ * 模拟剔除近端 (≤10D) 或下一个月度/季度大交割后，剩余账本的残余 GEX、零 Gamma 翻转位位移与体制是否变号。
+ */
+function postExpiryCliff(primaryBook, spot, nowMs, rollOff, primaryExposures) {
+  const baseGex = primaryExposures.gexUsd;
+  const nearFiltered = primaryBook.filter(c => (c.expiryMs - nowMs) / DAY_MS > NEAR_TERM_DAYS);
+  const nearEval = nearFiltered.length ? evaluateBook(nearFiltered) : { gamma1pct: 0, delta: 0 };
+  const nearResidualGex = nearEval.gamma1pct * spot;
+  const nearSlide = nearFiltered.length ? spotSlide(nearFiltered, spot) : { gammaFlip: null };
+
+  const nextMajor = rollOff.expiries.find(e => e.kind === '月度' || e.kind === '季度') || null;
+  let afterNextMajor = null;
+  if (nextMajor) {
+    const exMajor = primaryBook.filter(c => c.expiry !== nextMajor.expiry);
+    const exEval = exMajor.length ? evaluateBook(exMajor) : { gamma1pct: 0, delta: 0 };
+    const resGex = exEval.gamma1pct * spot;
+    const exSlide = exMajor.length ? spotSlide(exMajor, spot) : { gammaFlip: null };
+    const regimeFlips = baseGex !== 0 && resGex !== 0 && Math.sign(resGex) !== Math.sign(baseGex);
+    const bufferDropPct = baseGex !== 0 ? Number(((1 - Math.abs(resGex) / Math.abs(baseGex)) * 100).toFixed(1)) : 0;
+    afterNextMajor = {
+      expiry: nextMajor.expiry,
+      kind: nextMajor.kind,
+      dte: nextMajor.dte,
+      removedOiSharePct: nextMajor.oiShare,
+      removedGexSharePct: nextMajor.gexShare,
+      residualGexUsd: resGex,
+      residualDexUsd: exEval.delta * spot,
+      residualRegime: resGex > 0 ? 'long_gamma' : 'short_gamma',
+      residualGammaFlip: exSlide.gammaFlip,
+      regimeFlips,
+      bufferDropPct
+    };
+  }
+
+  return {
+    afterNearTerm: {
+      days: NEAR_TERM_DAYS,
+      residualGexUsd: nearResidualGex,
+      residualDexUsd: nearEval.delta * spot,
+      residualRegime: nearResidualGex > 0 ? 'long_gamma' : 'short_gamma',
+      residualGammaFlip: nearSlide.gammaFlip,
+      regimeFlips: baseGex !== 0 && nearResidualGex !== 0 && Math.sign(nearResidualGex) !== Math.sign(baseGex)
+    },
+    afterNextMajor
+  };
+}
+
 /** 压力情景：全链重估得到对冲流，同时给出 Gamma / Vanna / Charm 一阶分解便于解释 */
 function stressMatrix(contracts, spot, base) {
   return STRESS_SCENARIOS.map(sc => {
@@ -570,7 +776,7 @@ function depthComparison(crashFlowUsd, squeezeFlowUsd, depth) {
 /**
  * 结构化预警：负 Gamma 状态 + 偏度极端 + Vanna 方向一致时升为高优先级；持仓符号结论不稳健时降一级。
  */
-function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeezeFlowUsd, basisLabel, gammaFlip = null }) {
+function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeezeFlowUsd, basisLabel, gammaFlip = null, cliff = null }) {
   const out = [];
   // 翻转位贴近现货：跨过后转为负 Gamma
   if (gammaFlip && Math.abs(gammaFlip.distancePct) <= FLIP_NEAR_PCT) {
@@ -584,6 +790,15 @@ function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeeze
         detail: `${basisLabel}：翻转位 $${gammaFlip.price.toLocaleString()} 距现货 ${gammaFlip.distancePct >= 0 ? '+' : ''}${gammaFlip.distancePct}%，现货${spotAbove ? '跌破' : '升破'}后做市商转为负 Gamma`
       });
     }
+  }
+  if (cliff && cliff.afterNextMajor && cliff.afterNextMajor.dte <= 7 && (cliff.afterNextMajor.regimeFlips || cliff.afterNextMajor.bufferDropPct >= 50)) {
+    const cm = cliff.afterNextMajor;
+    out.push({
+      key: 'expiry_cliff',
+      level: cm.regimeFlips ? 'medium' : 'low',
+      title: `${cm.expiry} 交割断崖预警`,
+      detail: `${basisLabel}：${cm.expiry}（${cm.kind}，剩 ${cm.dte} 天）占全链 Gamma 绝对量 ${cm.removedGexSharePct}%，交割脱落${cm.regimeFlips ? `后残余 GEX 变号为 ${fmtUsdM(cm.residualGexUsd)}/1%（体制翻转）` : `后残余 GEX 缩水 ${cm.bufferDropPct}% 至 ${fmtUsdM(cm.residualGexUsd)}/1%`}`
+    });
   }
   const downgrade = level => (robust ? level : (level === 'high' ? 'medium' : 'low'));
   const sk = skewSignal(skew);
@@ -692,6 +907,19 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     primary: flowBook ? realizedFlow(primaryBook, spot, opts.recent24h) : null
   };
   const depth = depthComparison(pCrash.flowUsd, pSqueeze.flowUsd, opts.depth);
+  const grossGex = rollOff.expiries.reduce((acc, e) => acc + Math.abs(e.gexUsd), 0);
+  for (const e of rollOff.expiries) {
+    e.gexShare = grossGex > 0 ? Number((Math.abs(e.gexUsd) / grossGex * 100).toFixed(1)) : 0;
+  }
+  const nearTerm = rollOff.expiries.filter(e => e.dte <= NEAR_TERM_DAYS);
+  const nearOiShare = nearTerm.reduce((acc, e) => acc + e.oiShare, 0);
+  const nearGexUsd = nearTerm.reduce((acc, e) => acc + e.gexUsd, 0);
+  const nextMajor = rollOff.expiries.find(e => e.kind === '月度' || e.kind === '季度') || null;
+
+  const walls = strikeWalls(contracts, spot, nextMajor?.expiry || null);
+  const maturity = maturityStructure(contracts, spot, nowMs);
+  const cliff = postExpiryCliff(primaryBook, spot, nowMs, rollOff, primaryExposures);
+
   const alerts = buildAlerts({
     state,
     vexUsd: primaryExposures.vexUsd,
@@ -701,17 +929,9 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     crashFlowUsd: pCrash.flowUsd,
     squeezeFlowUsd: pSqueeze.flowUsd,
     basisLabel: primaryLabel,
-    gammaFlip: flowBook ? sensitivity.scenarios.find(x => x.key === 'flow_adjusted').gammaFlip : slide.gammaFlip
+    gammaFlip: flowBook ? sensitivity.scenarios.find(x => x.key === 'flow_adjusted').gammaFlip : slide.gammaFlip,
+    cliff
   });
-
-  const grossGex = rollOff.expiries.reduce((acc, e) => acc + Math.abs(e.gexUsd), 0);
-  for (const e of rollOff.expiries) {
-    e.gexShare = grossGex > 0 ? Number((Math.abs(e.gexUsd) / grossGex * 100).toFixed(1)) : 0;
-  }
-  const nearTerm = rollOff.expiries.filter(e => e.dte <= NEAR_TERM_DAYS);
-  const nearOiShare = nearTerm.reduce((acc, e) => acc + e.oiShare, 0);
-  const nearGexUsd = nearTerm.reduce((acc, e) => acc + e.gexUsd, 0);
-  const nextMajor = rollOff.expiries.find(e => e.kind === '月度' || e.kind === '季度') || null;
 
   const isLongGamma = exposures.gexUsd > 0;
   // 叙述以主口径为准 (台账可用时为全成交校正)，惯例口径数字并列
@@ -739,9 +959,13 @@ function analyzeDealerExposure(snapshot, opts = {}) {
 
   const vexText = `Vanna：全曲面 IV 每升 1 点，做市商需${flowWord(-primaryExposures.vexUsd)} ${fmtAbsUsdM(primaryExposures.vexUsd)}；Charm：每过 1 天需${flowWord(-primaryExposures.cexUsd)} ${fmtAbsUsdM(primaryExposures.cexUsd)}。`;
 
-  const rollText = nextMajor
-    ? `${NEAR_TERM_DAYS} 天内到期的合约占全链 OI ${nearOiShare.toFixed(1)}%（惯例口径 GEX ${fmtUsdM(nearGexUsd)}）；下一个大交割 ${nextMajor.expiry}（${nextMajor.kind}，剩 ${nextMajor.dte} 天）占 OI ${nextMajor.oiShare}%、占全链 Gamma 绝对量 ${nextMajor.gexShare}%，交割后这部分 Gamma 消失。`
+  const cliffNote = cliff.afterNextMajor
+    ? `，剔除该到期后主口径残余 GEX 为 ${fmtUsdM(cliff.afterNextMajor.residualGexUsd)}/1%${cliff.afterNextMajor.regimeFlips ? '（触发正负 Gamma 体制翻转）' : ''}`
     : '';
+  const rollText = nextMajor
+    ? `${NEAR_TERM_DAYS} 天内到期的合约占全链 OI ${nearOiShare.toFixed(1)}%（惯例口径 GEX ${fmtUsdM(nearGexUsd)}）；下一个大交割 ${nextMajor.expiry}（${nextMajor.kind}，剩 ${nextMajor.dte} 天）占 OI ${nextMajor.oiShare}%、占全链 Gamma 绝对量 ${nextMajor.gexShare}%，交割后这部分 Gamma 消失${cliffNote}。`
+    : '';
+  const maturityText = `【期限与行权价结构】全链 Call:Put 持仓比 ${maturity.chainCallPutRatio ?? '--'}:1，>16周长端 OI 占 ${maturity.longDatedOiSharePct}%、<2周短端占 ${maturity.shortDatedOiSharePct}%（${maturity.maturityRegime.label}）；深度虚值 Put（≤0.75F）占 Put OI ${maturity.tailWings.deepPutSharePct}%，深虚值 Call（≥1.50F）占 Call OI ${maturity.tailWings.deepCallSharePct}%。`;
 
   const crush = primaryStress.find(s => s.key === 'vol_crush');
   const stressText = `压力情景（${primaryLabel}，全链重估）：现货 −3% 且 IV +5 点时需${flowWord(pCrash.flowUsd)} ${fmtAbsUsdM(pCrash.flowUsd)}；+3% 且 IV +2 点时需${flowWord(pSqueeze.flowUsd)} ${fmtAbsUsdM(pSqueeze.flowUsd)}；IV −5 点并过 1 天时需${flowWord(crush.flowUsd)} ${fmtAbsUsdM(crush.flowUsd)}。IV 情景为全曲面平移，未计偏斜随现货的变形。`;
@@ -796,7 +1020,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     ? `对冲流与盘口深度：${primaryLabel}下行情景需卖出 ${fmtAbsUsdM(depth.downsideSellUsd)}，为 ${depth.venue} ${depth.band} 买盘深度的 ${depth.downsideRatioPct}%；上行情景需买入 ${fmtAbsUsdM(depth.upsideBuyUsd)}，为卖盘深度的 ${depth.upsideRatioPct}%（单一现货场所，做市商多在永续/期货上分批对冲，比值只说明量级）。`
     : '';
 
-  const paragraph = `${alertText}${stateText}${regimeText}${flipText}${realizedText}${depthText}${sensitivityText}${vexText}${rollText}${stressText}${referenceText}${assumptionText}`;
+  const paragraph = `${alertText}${stateText}${regimeText}${flipText}${realizedText}${depthText}${sensitivityText}${vexText}${rollText}${maturityText}${stressText}${referenceText}${assumptionText}`;
 
   return {
     status: 'ok',
@@ -819,6 +1043,9 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     nearTermGexUsd: nearGexUsd,
     expiries: rollOff.expiries,
     nextMajorExpiry: nextMajor,
+    walls,
+    maturity,
+    postExpiryCliff: cliff,
     stress,
     primaryBasis,
     primaryExposures,
@@ -835,11 +1062,15 @@ function analyzeDealerExposure(snapshot, opts = {}) {
 module.exports = {
   CONVENTION_SIGN,
   STRESS_SCENARIOS,
+  MATURITY_BUCKETS,
   black76,
   contractsFromMarks,
   evaluateBook,
   spotSlide,
   expiryRollOff,
+  strikeWalls,
+  maturityStructure,
+  postExpiryCliff,
   stressMatrix,
   applyBlockFlow,
   flipThreshold,

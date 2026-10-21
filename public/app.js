@@ -803,30 +803,47 @@ function renderIvSmile(data) {
     elSmileCallWing.textContent = '--'; elSmileCallSub.textContent = '--';
     elSmileSmirkDiff.textContent = '--'; elSmileSmirkDesc.textContent = '--';
     setTextIfPresent('smile-kurtosis-curv', '--');
+    setTextIfPresent('smile-tail-reach', '--');
+    setTextIfPresent('smile-tail-sub', '--');
     elStrikesStripContainer.innerHTML = '<div class="loading-placeholder">实时行权价数据不可用</div>';
     elSmileNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
     return;
   }
 
-  elSmileShapeBadge.textContent = data.skewShape ? data.skewShape.split('/')[0].trim() : '标准微笑';
+  elSmileShapeBadge.textContent = data.wingRegime?.label || (data.skewShape ? data.skewShape.split('/')[0].trim() : '标准微笑');
   elSmileAtmIv.textContent = `${Number(data.atmIv || 0).toFixed(1)}%`;
-  elSmileAtmStrike.textContent = `ATM: $${data.atmStrike?.toLocaleString()}`;
+  elSmileAtmStrike.textContent = `ATM: $${data.atmStrike?.toLocaleString()} (F: $${Math.round(Number(data.underlyingPrice) || 0).toLocaleString()})`;
 
   elSmilePutWing.textContent = fmtSignedNum(data.putWingPremium, 1, '%');
+  const lmPut = data.logMoneyness && Number.isFinite(data.logMoneyness.downsideSkew)
+    ? ` · 0.75F(${fmtSignedNum(data.logMoneyness.downsideSkew, 1, '点')})`
+    : '';
   elSmilePutSub.textContent = data.put25
-    ? `$${Number(data.put25.strike).toLocaleString()} (IV: ${Number(data.put25.iv).toFixed(1)}%)`
+    ? `$${Number(data.put25.strike).toLocaleString()} (IV ${Number(data.put25.iv).toFixed(1)}%)${lmPut}`
     : '--';
 
   elSmileCallWing.textContent = fmtSignedNum(data.callWingPremium, 1, '%');
+  const lmCall = data.logMoneyness && Number.isFinite(data.logMoneyness.upsideConvexity)
+    ? ` · 1.25F(${fmtSignedNum(data.logMoneyness.upsideConvexity, 1, '点')})`
+    : '';
   elSmileCallSub.textContent = data.call25
-    ? `$${Number(data.call25.strike).toLocaleString()} (IV: ${Number(data.call25.iv).toFixed(1)}%)`
+    ? `$${Number(data.call25.strike).toLocaleString()} (IV ${Number(data.call25.iv).toFixed(1)}%)${lmCall}`
     : '--';
 
   const rr = Number(data.rr25) || 0;
   elSmileSmirkDiff.textContent = fmtSignedNum(rr, 1, '%');
-  elSmileSmirkDesc.textContent = rr >= 0 ? '25Δ Call 贵于 Put (追涨倾斜)' : '25Δ Put 贵于 Call (避险倾斜)';
+  elSmileSmirkDesc.textContent = rr >= 0 ? '右翼上行凸度占优 (Call 贵于 Put)' : '左翼防崩盘偏度占优 (Put 贵于 Call)';
 
   setTextIfPresent('smile-kurtosis-curv', fmtSignedNum(data.bf25, 1, '% IV'));
+  if (data.tailExtension) {
+    const te = data.tailExtension;
+    setTextIfPresent('smile-tail-reach', `${te.putMinPct}%F ~ ${te.callMaxPct}%F`);
+    const tenNote = Number.isFinite(data.rr10) ? ` · 10Δ RR ${fmtSignedNum(data.rr10, 1)}` : '';
+    setTextIfPresent('smile-tail-sub', `Put $${(te.putMinStrike / 1000).toFixed(0)}k (${te.putMinIv.toFixed(0)}%) / Call $${(te.callMaxStrike / 1000).toFixed(0)}k (${te.callMaxIv.toFixed(0)}%)${tenNote}`);
+  } else {
+    setTextIfPresent('smile-tail-reach', '--');
+    setTextIfPresent('smile-tail-sub', '--');
+  }
   setTextIfPresent('smile-dist-title', `${data.underlying || '近月'}（剩 ${data.dte ?? '--'} 天）行权价 IV 梯度分布`);
 
   const strikes = data.strikes || [];
@@ -834,11 +851,12 @@ function renderIvSmile(data) {
     let stripHtml = '';
     for (const s of strikes) {
       const isAtm = s.strike === data.atmStrike;
+      const logMTitle = Number.isFinite(s.logM) ? `x=ln(K/F)=${s.logM >= 0 ? '+' : ''}${s.logM} (${s.moneynessPct}%F)` : '';
       stripHtml += `
-        <div class="strike-pill ${isAtm ? 'is-atm' : ''}">
+        <div class="strike-pill ${isAtm ? 'is-atm' : ''}" title="${escapeHtml(logMTitle)}">
           <span class="sp-strike">$${((Number(s.strike) || 0) / 1000).toFixed(0)}k</span>
           <span class="sp-iv ${isAtm ? 'text-accent' : ''}">${(Number(s.iv) || 0).toFixed(1)}%</span>
-          <span class="sp-delta">${isAtm ? 'ATM' : (s.delta !== null ? `Δ ${escapeHtml(s.delta)}` : '')}</span>
+          <span class="sp-delta">${isAtm ? 'ATM' : (s.delta !== null ? `Δ ${escapeHtml(s.delta)}` : `${escapeHtml(s.moneynessPct)}%F`)}</span>
         </div>
       `;
     }
@@ -1030,7 +1048,7 @@ function renderDealerExposure(data) {
   }
   setSigned('dealer-dex', ex.dexUsd);
   const syntheticShare = ex.dexBtc ? Math.round(ex.syntheticForwardBtc / Math.abs(ex.dexBtc) * 100) : 0;
-  setTextIfPresent('dealer-dex-sub', `其中 ${syntheticShare}% 为假设产生的合成多头 · 币本位 ${usdM(ex.dexPremAdjUsd)}`);
+  setTextIfPresent('dealer-dex-sub', `含 ${syntheticShare}% 合成多头假设 · 币本位会计 Δ*(Δ−V/F) ${usdM(ex.dexPremAdjUsd)}`);
   setSigned('dealer-gex', ex.gexUsd);
   setSigned('dealer-vex', ex.vexUsd);
   setSigned('dealer-cex', ex.cexUsd);
@@ -1046,6 +1064,49 @@ function renderDealerExposure(data) {
   const major = data.nextMajorExpiry;
   setTextIfPresent('dealer-major', major ? `${major.expiry} · ${major.kind}` : '--');
   setTextIfPresent('dealer-major-sub', major ? `剩 ${major.dte} 天 · OI ${major.oiShare}% · Gamma ${major.gexShare}%` : '--');
+
+  const cm = data.postExpiryCliff?.afterNextMajor;
+  if (cm) {
+    setSigned('dealer-cliff', cm.residualGexUsd);
+    setTextIfPresent('dealer-cliff-sub', `剔除 ${cm.expiry} 后${cm.regimeFlips ? '⚠️ 体制变号' : `缓冲变化 ${cm.bufferDropPct >= 0 ? '-' : '+'}${Math.abs(cm.bufferDropPct)}%`}`);
+  } else {
+    setTextIfPresent('dealer-cliff', '--');
+    setTextIfPresent('dealer-cliff-sub', '--');
+  }
+
+  const w = data.walls;
+  if (w && (w.callWall || w.putWall)) {
+    const cStr = w.callWall ? `C $${(w.callWall.strike / 1000).toFixed(0)}k` : '--';
+    const pStr = w.putWall ? `P $${(w.putWall.strike / 1000).toFixed(0)}k` : '--';
+    setTextIfPresent('dealer-walls', `${cStr} / ${pStr}`);
+    setTextIfPresent('dealer-walls-sub', `Call 墙 ${w.callWall?.oiBtc ?? '--'} BTC · Put 墙 ${w.putWall?.oiBtc ?? '--'} BTC`);
+  } else {
+    setTextIfPresent('dealer-walls', '--');
+    setTextIfPresent('dealer-walls-sub', '--');
+  }
+
+  const mat = data.maturity;
+  if (mat) {
+    setTextIfPresent('dealer-cp-ratio', mat.chainCallPutRatio !== null ? `${mat.chainCallPutRatio} : 1` : '--');
+    setTextIfPresent('dealer-cp-sub', `>16周长端占 ${mat.longDatedOiSharePct}% · <2周短端占 ${mat.shortDatedOiSharePct}%`);
+    const tw = mat.tailWings || {};
+    setTextIfPresent('dealer-tail-oi', `Put ${tw.deepPutSharePct ?? 0}% / Call ${tw.deepCallSharePct ?? 0}%`);
+    setTextIfPresent('dealer-tail-sub', `≤0.75F Put ${tw.deepPutOiBtc ?? 0} BTC · ≥1.50F Call ${tw.deepCallOiBtc ?? 0} BTC`);
+
+    const matBody = document.getElementById('dealer-maturity-body');
+    if (matBody && Array.isArray(mat.buckets)) {
+      matBody.innerHTML = mat.buckets.map(b => `
+        <tr>
+          <td><strong>${escapeHtml(b.label)}</strong></td>
+          <td>${Number(b.callOiBtc || 0).toLocaleString()}</td>
+          <td>${Number(b.putOiBtc || 0).toLocaleString()}</td>
+          <td>${escapeHtml(b.oiSharePct)}%</td>
+          <td><span class="${(b.callPutRatio || 0) >= 2 ? 'text-pos' : 'text-accent'}">${b.callPutRatio !== null ? `${escapeHtml(b.callPutRatio)}:1` : '--'}</span></td>
+          <td>${flowCell(b.gexUsd)}</td>
+        </tr>`).join('');
+    }
+    setTextIfPresent('dealer-maturity-note', `【期限与尾部画像】${mat.maturityRegime?.label || '--'}：全链 Call ${mat.chainCallOiBtc.toLocaleString()} BTC vs Put ${mat.chainPutOiBtc.toLocaleString()} BTC（比值 ${mat.chainCallPutRatio ?? '--'}:1，对照 MerQube/Kaiko 报告 IBIT 成熟期均衡值 ~1.8:1）；全链挂牌最低 Put $${(tw.minPutStrike || 0).toLocaleString()}（${tw.minPutMoneynessPct ?? '--'}%F），最高 Call $${(tw.maxCallStrike || 0).toLocaleString()}（${tw.maxCallMoneynessPct ?? '--'}%F）。`);
+  }
 
   const signedNum = (v, unit) => `${v > 0 ? '+' : ''}${v}${unit}`;
   const stressBody = document.getElementById('dealer-stress-body');
@@ -1200,6 +1261,8 @@ function renderBlockTrades(data) {
     elWhaleSingleCount.textContent = '--';
     elIcebergClusterCount.textContent = '--';
     elFlowBiasLabel.textContent = '--';
+    setTextIfPresent('session-split-val', '--');
+    setTextIfPresent('session-split-sub', '--');
     return;
   }
 
@@ -1216,6 +1279,15 @@ function renderBlockTrades(data) {
   elWhaleSingleCount.textContent = `${data.whaleBlocks?.length || 0} 笔`;
   elIcebergClusterCount.textContent = `${data.icebergClusters?.length || 0} 组`;
   elFlowBiasLabel.textContent = `${data.flowBias || '--'} (${data.bullRatio || 50}% 多)`;
+
+  if (data.sessionSplit) {
+    const sp = data.sessionSplit;
+    setTextIfPresent('session-split-val', `美股 ${sp.usHoursPct}% / 离岸 ${sp.offHoursPct}%`);
+    setTextIfPresent('session-split-sub', `周末窗口 ${sp.weekendPct}% ($${((Number(sp.weekendUSD) || 0) / 1e6).toFixed(1)}M)`);
+  } else {
+    setTextIfPresent('session-split-val', '--');
+    setTextIfPresent('session-split-sub', '--');
+  }
 
   badgeIcebergs.textContent = data.icebergClusters?.length || 0;
   badgeSingles.textContent = data.whaleBlocks?.length || 0;
@@ -1314,6 +1386,8 @@ function renderIcebergsList(clusters) {
             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
               ${c.actionTag ? `<span class="intent-badge-pill ${escapeHtml(c.actionBadgeClass || 'badge-neutral')}">${escapeHtml(c.actionTag)}</span>` : ''}
               ${oiBadgeHtml(c.oiProfile)}
+              ${c.sessionProfile?.tag ? `<span class="intent-badge-pill ${escapeHtml(c.sessionProfile.badgeClass || 'badge-neutral')}" title="${escapeHtml(c.sessionProfile.desc || '')}">${escapeHtml(c.sessionProfile.tag)}</span>` : ''}
+              ${c.smileAlphaRating ? `<span class="intent-badge-pill badge-neutral" title="${escapeHtml(c.smileAlphaRating.comment || '')}">${escapeHtml(c.smileAlphaRating.rating || c.smileAlphaRating)}</span>` : ''}
               ${c.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(c.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE: ${escapeHtml(c.timingTag)}</span>` : ''}
               <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
             </div>
@@ -1392,6 +1466,8 @@ function renderWhaleSinglesList(blocks) {
           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
             ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
             ${oiBadgeHtml(b.oiProfile)}
+            ${b.sessionProfile?.tag ? `<span class="intent-badge-pill ${escapeHtml(b.sessionProfile.badgeClass || 'badge-neutral')}" title="${escapeHtml(b.sessionProfile.desc || '')}">${escapeHtml(b.sessionProfile.tag)}</span>` : ''}
+            ${b.smileAlphaRating ? `<span class="intent-badge-pill badge-neutral" title="${escapeHtml(b.smileAlphaRating.comment || '')}">${escapeHtml(b.smileAlphaRating.rating || b.smileAlphaRating)}</span>` : ''}
             ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE ${escapeHtml(b.timingTag)}</span>` : ''}
           </div>
           <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
@@ -1476,6 +1552,28 @@ function populateActionTimingDrawer(item) {
 
   const action = item.actionProfile || {};
   const timing = item.timingProfile || {};
+  const elSmileAlphaBadge = document.getElementById('m-smile-alpha-badge');
+  const elSessionBadge = document.getElementById('m-session-badge');
+  if (elSmileAlphaBadge) {
+    const ratingText = item.smileAlphaRating?.rating || (typeof item.smileAlphaRating === 'string' ? item.smileAlphaRating : '');
+    if (ratingText) {
+      elSmileAlphaBadge.textContent = ratingText;
+      elSmileAlphaBadge.title = item.smileAlphaRating?.comment || '';
+      elSmileAlphaBadge.style.display = '';
+    } else {
+      elSmileAlphaBadge.style.display = 'none';
+    }
+  }
+  if (elSessionBadge) {
+    if (item.sessionProfile?.tag) {
+      elSessionBadge.textContent = item.sessionProfile.tag;
+      elSessionBadge.title = item.sessionProfile.desc || '';
+      elSessionBadge.className = `intent-badge-pill ${item.sessionProfile.badgeClass || 'badge-neutral'}`;
+      elSessionBadge.style.display = '';
+    } else {
+      elSessionBadge.style.display = 'none';
+    }
+  }
 
   if (elActionBadge) {
     elActionBadge.textContent = action.tag || item.actionTag || '常规撮合';

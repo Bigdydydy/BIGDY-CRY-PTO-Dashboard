@@ -16,7 +16,8 @@ const {
   analyzeDynamicGex,
   analyzeBlockTrades,
   analyzeIvSmile,
-  analyze25DeltaSkew
+  analyze25DeltaSkew,
+  buildForwardsMap
 } = require('./analytics_engine');
 const { getMacroChartData } = require('./macro_fetcher');
 const { getPreferredsData } = require('./mstr_preferreds');
@@ -741,9 +742,43 @@ async function handleApiRequest(req, res, parsedUrl) {
         console.warn('[API] option OI history unavailable:', err.message);
       }
 
+      const volHist = volSurfaceHistory.getHistory();
+      const smileAnalysis = (allowed('ivSmile') && spotPrice !== null)
+        ? analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date(), { history: volHist })
+        : unavailableAnalysis(analysisHealth.ivSmile, data.ivSkewMonth);
+      const skewAnalysis = allowed('delta25Skew')
+        ? analyze25DeltaSkew(data.skewChart, {
+          // Never feed an unavailable-shaped placeholder into a live analyzer.
+          atm: atmAnalysis.status === 'data_unavailable' ? null : atmAnalysis,
+          dvolStats: data.dvolStats,
+          history: volHist
+        })
+        : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
+
+      // 拉取 Deribit 全链快照，既用于提取各到期日 Black-76 远期价 F（喂给大宗 Greeks），又用于做市商敞口引擎
+      let marksSnapshot = null;
+      let marksErr = null;
+      try {
+        marksSnapshot = await getOptionMarks('BTC');
+      } catch (err) {
+        marksErr = err;
+      }
+      const forwardsByExpiry = buildForwardsMap(data.atmData, marksSnapshot);
+      const liveSmile = smileAnalysis && smileAnalysis.status !== 'data_unavailable' && smileAnalysis.status !== 'insufficient_data' ? smileAnalysis : null;
+      const liveSkew = skewAnalysis && skewAnalysis.status !== 'data_unavailable' && skewAnalysis.status !== 'insufficient_data' ? skewAnalysis : null;
+      const smileContext = (liveSmile || liveSkew) ? {
+        skew25d: Number.isFinite(liveSkew?.d30) ? liveSkew.d30 : (Number.isFinite(liveSmile?.rr25) ? liveSmile.rr25 : undefined),
+        bf25: liveSmile?.bf25,
+        putWingPremium: liveSmile?.putWingPremium,
+        callWingPremium: liveSmile?.callWingPremium
+      } : null;
+
       let blockAnalysis;
       if (allowed('blockTrades') && spotPrice !== null) {
-        blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots);
+        blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots, {
+          smileContext,
+          forwardsByExpiry
+        });
       } else {
         blockAnalysis = unavailableAnalysis(analysisHealth.blockTrades, activeTrades);
         if (spotPrice === null && analysisHealth.blockTrades.analysisAllowed) {
@@ -758,24 +793,12 @@ async function handleApiRequest(req, res, parsedUrl) {
       blockAnalysis.activeTradesCount = activeTrades.length;
       blockAnalysis.tradeStoreStats = data.tradeStoreStats || null;
 
-      const smileAnalysis = (allowed('ivSmile') && spotPrice !== null)
-        ? analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date())
-        : unavailableAnalysis(analysisHealth.ivSmile, data.ivSkewMonth);
-      const skewAnalysis = allowed('delta25Skew')
-        ? analyze25DeltaSkew(data.skewChart, {
-          // Never feed an unavailable-shaped placeholder into a live analyzer.
-          atm: atmAnalysis.status === 'data_unavailable' ? null : atmAnalysis,
-          dvolStats: data.dvolStats,
-          history: volSurfaceHistory.getHistory()
-        })
-        : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
-
       // 做市商敞口：Deribit 全链快照自算 DEX/GEX/VEX/CEX、滑动翻转位、到期脱落与压力矩阵；
       // 台账可用时以全成交校正为主口径，惯例口径并列。
       // 快照与 Module 4 PV 视图共用 option_marks 的 30s 缓存；刷新失败时用上一份快照并标注 stale。
       let dealerExposure;
       try {
-        const marksSnapshot = await getOptionMarks('BTC');
+        if (!marksSnapshot) throw (marksErr || new Error('Deribit option_marks unavailable'));
         let flowLedger = null;
         try {
           flowLedger = await optionFlowLedger.getLedger();
@@ -916,13 +939,15 @@ async function handleApiRequest(req, res, parsedUrl) {
       } catch (err) {
         console.warn('[API] option OI history unavailable:', err.message);
       }
+      const marksSnap = await getOptionMarks('BTC').catch(() => null);
       const insight = await blockInsight.getServerInsight({
         trades: data.blockTrades,
         nowMs: Date.now(),
         spot: data.gex?.index_price || null,
         expiry: /^\d{1,2}[A-Z]{3}\d{2}$/.test(expiryParam) ? expiryParam : null,
         oiSnapshots,
-        fetchRows: () => fetchBookSummaryRows('BTC')
+        fetchRows: () => fetchBookSummaryRows('BTC'),
+        forwardsByExpiry: buildForwardsMap(data.atmData, marksSnap)
       });
       sendJsonResponse(req, res, 200, {
         code: 0,

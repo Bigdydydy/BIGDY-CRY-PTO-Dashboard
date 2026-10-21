@@ -41,7 +41,7 @@ function upsertRecord(records, record, retentionDays = RETENTION_DAYS) {
 function recordFromAnalyses({ atm, smile, skew, spot, ts = Date.now() }) {
   if (!skew || !Number.isFinite(skew.d30)) return null;
   const num = v => (Number.isFinite(v) ? v : null);
-  return {
+  const rec = {
     day: dayKey(ts),
     ts,
     spot: num(spot),
@@ -52,6 +52,9 @@ function recordFromAnalyses({ atm, smile, skew, spot, ts = Date.now() }) {
     rr90: num(skew.d90),
     bf25: num(smile?.bf25)
   };
+  if (Number.isFinite(smile?.putWingPremium)) rec.putWing25 = smile.putWingPremium;
+  if (Number.isFinite(smile?.callWingPremium)) rec.callWing25 = smile.callWingPremium;
+  return rec;
 }
 
 function getHistory() {

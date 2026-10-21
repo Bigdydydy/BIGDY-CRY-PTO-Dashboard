@@ -148,7 +148,9 @@ describe('SEC rate schedule and capital derivation', () => {
 
 // --- service: strategy.com blocked, SEC path ---------------------------------
 
-const T0 = Date.parse('2026-10-21T06:00:00Z');
+// Clock must track real now: persisted receipts are evaluated against
+// Date.now() by the health binder — a fixed T0 goes stale ~1h after writing.
+const T0 = Date.now();
 const UA = 'BIGDY-CRY-PTO/1.0 (ops@example.com)';
 const FILINGS = ['8k-2026-10-19-weekly', '8k-2026-10-16-strc-conditional', '8k-2026-10-01-strc-maintain', '8k-2026-01-02-strc-increase'].map(fixture);
 const SUBMISSIONS = {
@@ -183,7 +185,7 @@ function secPathService(dir, { ua = UA } = {}) {
   const svc = createDisclosureService({
     dataDir: dir, request, clock: () => T0, secUserAgent: () => ua,
     capitalReference: () => REFERENCE, sleep: async () => {},
-    prices: async () => ({ mstrPriceUsd: 142.72, btcPriceUsd: 82840.42, mstrSource: 'yahoo', btcSource: 'coinbase', priceAsOfIso: '2026-10-21T05:59:00Z' })
+    prices: async () => ({ mstrPriceUsd: 142.72, btcPriceUsd: 82840.42, mstrSource: 'yahoo', btcSource: 'coinbase', priceAsOfIso: new Date(T0 - 60000).toISOString() })
   });
   return { svc, calls };
 }

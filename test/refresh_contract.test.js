@@ -51,7 +51,7 @@ function buildServer(t, holder) {
     [srv('analytics_engine.js')]: {
       analyzeAtmIv: () => ({}), analyzeDynamicGex: () => ({}), analyzeBlockTrades: () => ({}),
       analyzeIvSmile: () => ({}), analyze25DeltaSkew: () => ({}), calcGreeks: () => ({}),
-      parseInstrument: () => null, parseDeribitExpiry: () => null
+      parseInstrument: () => null, parseDeribitExpiry: () => null, buildForwardsMap: () => new Map()
     }
   });
   const idx = freshRequire('index.js');

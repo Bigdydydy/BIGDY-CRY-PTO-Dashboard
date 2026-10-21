@@ -137,7 +137,7 @@ describe('block_insight_daily CLI (mocked substeps)', () => {
       [srv('block_insight.js')]: BI,
       [srv('data_fetcher.js')]: { fetchBlockTrades: trades },
       [srv('option_marks.js')]: { fetchBookSummaryRows: async () => [{ instrument_name: 'BTC-X', mark_price: 1 }] },
-      [srv('analytics_engine.js')]: { analyzeBlockTrades: () => ({ whaleBlocks: [], icebergClusters: [] }) },
+      [srv('analytics_engine.js')]: { analyzeBlockTrades: () => ({ whaleBlocks: [], icebergClusters: [] }), buildForwardsMap: () => ({}) },
       [srv('option_oi_history.js')]: {
         COMMITTED_FILE: path.join(dir, 'oi.json'),
         readHistoryFile: () => [{ ts: Date.now() }],

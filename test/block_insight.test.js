@@ -67,11 +67,25 @@ test('horizonFlows: buckets by days left, weekly windows, expired contracts excl
   assert.equal(BI.horizonFlows(daily, now, 12).weekEnds.length, 12);
 });
 
-test('familyOf classifies by delta ratio, then vega sign', () => {
+test('familyOf classifies by delta ratio, then vega sign, and preserves directional tail buys', () => {
   assert.equal(BI.familyOf({ netDeltaUSD: 20, notionalUSD: 100, netVegaUSD: -1 }), 'bull');
   assert.equal(BI.familyOf({ netDeltaUSD: -20, notionalUSD: 100, netVegaUSD: 1 }), 'bear');
   assert.equal(BI.familyOf({ netDeltaUSD: 5, notionalUSD: 100, netVegaUSD: 1 }), 'long-vol');
   assert.equal(BI.familyOf({ netDeltaUSD: -5, notionalUSD: 100, netVegaUSD: -1 }), 'short-vol');
+  // Deep OTM Put buy with |netDeltaUSD / notionalUSD| <= 0.1 should be classified as 'bear', not 'long-vol'
+  assert.equal(BI.familyOf({
+    netDeltaUSD: -4,
+    notionalUSD: 100,
+    netVegaUSD: 2,
+    legs: [{ instrument: 'BTC-25DEC26-50000-P', direction: 'buy', amount: 10, price: 0.01 }]
+  }), 'bear');
+  // Deep OTM Call buy with |netDeltaUSD / notionalUSD| <= 0.1 should be classified as 'bull', not 'long-vol'
+  assert.equal(BI.familyOf({
+    netDeltaUSD: 4,
+    notionalUSD: 100,
+    netVegaUSD: 2,
+    legs: [{ instrument: 'BTC-25DEC26-150000-C', direction: 'buy', amount: 10, price: 0.01 }]
+  }), 'bull');
 });
 
 const leg = (instrument, direction, amount, price, indexPrice = 80000) => ({ instrument, direction, amount, price, indexPrice });

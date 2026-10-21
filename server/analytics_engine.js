@@ -1388,17 +1388,47 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
   // Inject Module 4 Smile / Skew Alignment Insights if context available
   let smileAlphaRating = null;
-  if (smileContext) {
-    const skew25d = Number(smileContext.skew25d || 0);
-    if (strategyType.includes('RISK_REVERSAL') && skew25d < -2.0) {
+  if (smileContext && typeof smileContext.skew25d === 'number' && Number.isFinite(smileContext.skew25d)) {
+    const skew25d = Number(smileContext.skew25d);
+    if (strategyType.includes('RISK_REVERSAL') && skew25d < -2.0 && netDeltaUSD >= 0) {
       smileAlphaRating = {
-        rating: '偏度套利高效 (High Skew Harvest)',
+        rating: '⭐ 偏度套利高效 (High Skew Harvest)',
         comment: `当前 25Δ Skew 为 ${skew25d.toFixed(1)}% (Put 相对 Call 显著高估)，该组合通过卖出昂贵 Put 资助廉价 Call，处于理论定价显著优势区。`
+      };
+    } else if (strategyType.includes('RISK_REVERSAL') && skew25d > 2.0 && netDeltaUSD <= 0) {
+      smileAlphaRating = {
+        rating: '⭐ 逆势收割 Call 偏度 (Overwriting Rich Call Skew)',
+        comment: `当前 25Δ Skew 为 +${skew25d.toFixed(1)}% (右翼上行凸度高企)，该组合高抛昂贵 Call 换取下行保护，享受偏度均值回归红利。`
       };
     } else if (strategyType.includes('CONDOR') || strategyType.includes('BUTTERFLY')) {
       smileAlphaRating = {
-        rating: '曲率/峰度收敛套利 (Volga Arbitrage)',
+        rating: '🦋 曲率/峰度收敛套利 (Volga Arbitrage)',
         comment: '两翼完全闭合结构在隐含波动率微笑曲面处于高位时极具防护力，不受单一方向偏度暴走冲击。'
+      };
+    } else if (skew25d < -2.0 && netDeltaUSD < -300000) {
+      smileAlphaRating = {
+        rating: '⚠️ 顺势追买昂贵 Put 偏度 (Paying Up for Fear Skew)',
+        comment: `当前 25Δ RR 处于左偏高溢价区 (${skew25d.toFixed(1)}%)，此时建立负 Delta 空头/保护头寸需支付高昂的防崩盘偏度溢价 (Skew Theta)。`
+      };
+    } else if (skew25d < -2.0 && netDeltaUSD > 300000) {
+      smileAlphaRating = {
+        rating: '⭐ 逆势做多/高抛昂贵 Put 翼 (Selling Expensive Downside Skew)',
+        comment: `当前 25Δ RR 显著左偏 (${skew25d.toFixed(1)}%)，多头方向配置顺带收获左翼高波动率溢价回归优势。`
+      };
+    } else if (skew25d > 2.0 && netDeltaUSD > 300000) {
+      smileAlphaRating = {
+        rating: '⚠️ 顺势追高右翼 Call 溢价 (Chasing Upside Call Convexity)',
+        comment: `当前 25Δ RR 显著右偏 (+${skew25d.toFixed(1)}%)，加密原生右翼上行凸度偏贵，追买上行敞口需承担曲面回落损耗。`
+      };
+    } else if (skew25d > 2.0 && netDeltaUSD < -300000) {
+      smileAlphaRating = {
+        rating: '⭐ 逆势高抛昂贵 Call 翼 (Harvesting Rich Upside Convexity)',
+        comment: `当前 25Δ RR 显著右偏 (+${skew25d.toFixed(1)}%)，空头/备兑方向配置顺势收割加密原生上行彩票溢价。`
+      };
+    } else {
+      smileAlphaRating = {
+        rating: '⚖️ 中性偏度环境 (Neutral Skew Environment)',
+        comment: `当前 25Δ RR (${skew25d >= 0 ? '+' : ''}${skew25d.toFixed(1)}%) 处于相对均衡区间，结构定价未受单侧极端偏度扭曲。`
       };
     }
   }
@@ -1720,10 +1750,100 @@ function oiProfileOf(oiSnapshots, legs) {
 }
 
 /**
+ * 从 atmData 或 Deribit option_marks 构建到期日远期价格映射 { '30OCT26': 80200, ... }，
+ * 供大宗交易与 4B 按 Black-76 远期价 F 计算远月 Greeks，消除用现货代替远期造成的 Delta 失真。
+ */
+function buildForwardsMap(atmData = null, marksSnapshot = null) {
+  const out = {};
+  if (Array.isArray(atmData)) {
+    for (const item of atmData) {
+      const exp = String(item?.underlying_index || '').split('-')[1];
+      const f = Number(item?.underlying_price);
+      if (exp && f > 0) out[exp] = f;
+    }
+  }
+  if (marksSnapshot && marksSnapshot.marks && typeof marksSnapshot.marks === 'object') {
+    for (const [name, m] of Object.entries(marksSnapshot.marks)) {
+      const exp = String(name).split('-')[1];
+      const f = Number(m?.underlyingPrice);
+      if (exp && f > 0 && !out[exp]) out[exp] = f;
+    }
+  }
+  return out;
+}
+
+const nySessionFmt = (() => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
+  } catch (e) {
+    return null;
+  }
+})();
+
+/**
+ * 跨市场交易时段归类（MerQube & Kaiko 报告第 2 节）：
+ * 区分 Cboe 美股 ETF 期权开盘窗口（美东周一至周五 09:30–16:00，存在跨市场套利同步）
+ * 与 24/7 加密原生独有窗口（亚欧非美时段、周末闭市独立定价窗口）。
+ */
+function classifyMarketSession(timestampMs) {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
+    return { key: 'unknown', tag: '未知时段', badgeClass: 'badge-neutral', isUsHours: false };
+  }
+  let weekday = '';
+  let mins = 0;
+  if (nySessionFmt) {
+    const parts = nySessionFmt.formatToParts(new Date(timestampMs));
+    const map = {};
+    for (const p of parts) map[p.type] = p.value;
+    weekday = map.weekday || '';
+    const h = parseInt(map.hour, 10) % 24;
+    const m = parseInt(map.minute, 10) || 0;
+    mins = h * 60 + m;
+  } else {
+    const d = new Date(timestampMs - 4 * 3600000); // fallback EDT
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    weekday = days[d.getUTCDay()];
+    mins = d.getUTCHours() * 60 + d.getUTCMinutes();
+  }
+  if (weekday === 'Sat' || weekday === 'Sun') {
+    return {
+      key: 'weekend',
+      tag: '🌙 周末独立定价',
+      badgeClass: 'badge-neutral',
+      isUsHours: false,
+      desc: 'Cboe/ETF 休市，Deribit 24/7 独立承担周末事件与跳空定价'
+    };
+  }
+  if (mins >= 9 * 60 + 30 && mins <= 16 * 60) {
+    return {
+      key: 'us_etf_hours',
+      tag: '🏛️ 美股ETF同频',
+      badgeClass: 'badge-bull',
+      isUsHours: true,
+      desc: '处于美东 09:30–16:00 交易窗口，与受监管 ETF 期权市场同步定价'
+    };
+  }
+  return {
+    key: 'off_hours',
+    tag: '🌏 亚欧非美时段',
+    badgeClass: 'badge-neutral',
+    isUsHours: false,
+    desc: '美股闭市后的亚欧交易窗口，由加密原生流动性主导'
+  };
+}
+
+/**
  * @param {Array} oiSnapshots - optional Deribit OI daily snapshots (server/option_oi_history.js) used to
  *   estimate whether each block / iceberg opened or closed positions
+ * @param {Object} [opts] - { smileContext: { skew25d, bf25 }, forwardsByExpiry: { [expiryStr]: number } }
  */
-function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all', spotPrice = 77250, oiSnapshots = null) {
+function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRange = 'all', spotPrice = 77250, oiSnapshots = null, opts = {}) {
   if (!rawTrades || !rawTrades.length) {
     return {
       status: 'insufficient_data',
@@ -1732,6 +1852,9 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       paragraph: '暂无近期大宗交易数据。'
     };
   }
+
+  const smileContext = opts?.smileContext || null;
+  const forwardsByExpiry = opts?.forwardsByExpiry || null;
 
   // 1. Group Trades by Block Trade ID (or unique trade ID for non-blocks) & Calculate Greeks
   const byBlock = {};
@@ -1779,8 +1902,14 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       const T_years = Math.max(0.001, (expDate.getTime() - leg.timestamp) / (365.25 * 86400000));
       const iv = leg.iv || 35.0;
 
-      // Calculate Greeks per contract
-      const greeks = calcGreeks(S, strike, T_years, iv, isCall);
+      // Prefer Black-76 expiry forward F when available (from trade's underlying_price or forwardsByExpiry map)
+      const fwdFromMap = inst && forwardsByExpiry && Number(forwardsByExpiry[inst.expiryStr]) > 0
+        ? Number(forwardsByExpiry[inst.expiryStr])
+        : null;
+      const F = Number(leg.underlying_price) > 0 ? Number(leg.underlying_price) : fwdFromMap;
+
+      // Calculate Greeks per contract (uses F for Black-76 d1/d2 when F is provided)
+      const greeks = calcGreeks(S, strike, T_years, iv, isCall, 0, F);
 
       // Sign: Buy = +1, Sell = -1
       const sign = leg.direction === 'buy' ? 1 : -1;
@@ -1808,6 +1937,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         timestamp: leg.timestamp,
         expiryMs: inst ? expDate.getTime() : null,
         indexPrice: leg.index_price,
+        forwardPrice: F || S,
         notionalUSD: notional,
         notionalM: notional / 1e6,
         delta: legDelta,
@@ -1837,7 +1967,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     });
 
     if (totalNotional >= notionalThresholdUSD) {
-      const intent = classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional);
+      const intent = classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional, smileContext);
 
       const blockCandidate = {
         legs: processedLegs,
@@ -1854,6 +1984,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       const S = processedLegs[0]?.indexPrice || spotPrice || 77250;
       const timingProfile = evaluate0DTEBehavior(blockCandidate, S);
       const actionProfile = evaluateTradeAction(blockCandidate, S, timingProfile);
+      const sessionProfile = classifyMarketSession(timestamp);
 
       const dateUtc8 = formatUTC8(timestamp);
       const oiProfile = oiProfileOf(oiSnapshots, processedLegs);
@@ -1875,6 +2006,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         legs: processedLegs,
         actionProfile,
         timingProfile,
+        sessionProfile,
         actionTag: actionProfile.tag,
         actionBadgeClass: actionProfile.badgeClass,
         timingTag: timingProfile.tag,
@@ -1987,7 +2119,8 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         clusterDeltaUSD,
         clusterVegaUSD,
         clusterThetaUSD,
-        clusterNotional
+        clusterNotional,
+        smileContext
       );
 
       const isMultiLeg = aggregatedLegs.length > 1;
@@ -2031,6 +2164,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       const S = aggregatedLegs[0]?.indexPrice || spotPrice || 77250;
       const timingProfile = evaluate0DTEBehavior(clusterCandidate, S);
       const actionProfile = evaluateTradeAction(clusterCandidate, S, timingProfile);
+      const sessionProfile = classifyMarketSession(group[group.length - 1].timestamp);
 
       const oiProfile = oiProfileOf(oiSnapshots, group.flatMap(b => b.legs));
       icebergClusters.push({
@@ -2061,6 +2195,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         legs: aggregatedLegs,
         actionProfile,
         timingProfile,
+        sessionProfile,
         actionTag: actionProfile.tag,
         actionBadgeClass: actionProfile.badgeClass,
         timingTag: timingProfile.tag,
@@ -2096,8 +2231,16 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   let putSellNotional = 0;
   let netBullishDeltaUSD = 0;
   let netBearishDeltaUSD = 0;
+  let usHoursUSD = 0;
+  let offHoursUSD = 0;
+  let weekendUSD = 0;
 
   for (const b of dedupedUnits) {
+    const sess = classifyMarketSession(b.timestamp);
+    if (sess.key === 'us_etf_hours') usHoursUSD += b.totalNotional;
+    else if (sess.key === 'weekend') weekendUSD += b.totalNotional;
+    else offHoursUSD += b.totalNotional;
+
     if (b.netDeltaUSD > 0) {
       netBullishDeltaUSD += b.netDeltaUSD;
     } else if (b.netDeltaUSD < 0) {
@@ -2115,6 +2258,16 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       }
     }
   }
+
+  const sessionTotal = usHoursUSD + offHoursUSD + weekendUSD || 1;
+  const sessionSplit = {
+    usHoursUSD,
+    offHoursUSD,
+    weekendUSD,
+    usHoursPct: dedupedTotal > 0 ? Math.round((usHoursUSD / sessionTotal) * 100) : 0,
+    offHoursPct: dedupedTotal > 0 ? Math.round((offHoursUSD / sessionTotal) * 100) : 0,
+    weekendPct: dedupedTotal > 0 ? Math.round((weekendUSD / sessionTotal) * 100) : 0
+  };
 
   const netBullishNotional = callBuyNotional + putSellNotional;
   const netBearishNotional = callSellNotional + putBuyNotional;
@@ -2202,7 +2355,10 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   const oiText = oiJudged
     ? `按 Deribit 未平仓量变化验证（冰山组与独立大单）：开仓 ${oiCounts.opening} 组，平仓 ${oiCounts.closing} 组，开平混合 ${oiCounts.mixed} 组${oiCounts.pending ? `，另 ${oiCounts.pending} 组待次日快照确认` : ''}。`
     : '';
-  const paragraph = `在【${rangeLabel}】窗口内，单笔巨鲸大单与冰山拆单组合去重后的大宗资金总名义为 $${M(dedupedTotal)}M：名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸 ${whaleBlocks.length} 笔、合计 $${M(totalWhaleVolume)}M${overlapText}；智能冰山算法捕获 ${icebergClusters.length} 组机构级时间切片拆单与组合价差聚合，另含 $${M(icebergOnlyUSD)}M 单笔未达门槛的拆单切片。整体大宗资金流向呈现【${flowBias}】特征（按去重后全集，多头倾向占比约 ${bullRatio}%）。${oiText}单笔巨鲸按成交特征的规则推断：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。${concentrationText}`;
+  const sessionText = dedupedTotal > 0
+    ? `跨市场时段切分：美股 ETF 同频窗口（09:30–16:00 ET）占 ${sessionSplit.usHoursPct}%，亚欧非美时段占 ${sessionSplit.offHoursPct}%，周末独立定价占 ${sessionSplit.weekendPct}%。`
+    : '';
+  const paragraph = `在【${rangeLabel}】窗口内，单笔巨鲸大单与冰山拆单组合去重后的大宗资金总名义为 $${M(dedupedTotal)}M：名义价值超 $${Math.round(notionalThresholdUSD / 1e6)}M 的单笔巨鲸 ${whaleBlocks.length} 笔、合计 $${M(totalWhaleVolume)}M${overlapText}；智能冰山算法捕获 ${icebergClusters.length} 组机构级时间切片拆单与组合价差聚合，另含 $${M(icebergOnlyUSD)}M 单笔未达门槛的拆单切片。整体大宗资金流向呈现【${flowBias}】特征（按去重后全集，多头倾向占比约 ${bullRatio}%）。${oiText}${sessionText}单笔巨鲸按成交特征的规则推断：全新建仓 ${openCount} 笔，平仓离场 ${closeCount} 笔，跨期展期 ${rollCount} 笔${zeroDteCount > 0 ? `；另检测到 ${zeroDteCount} 笔距结算不足 16 小时的末日 0DTE 极限博弈` : '；近端暂无 0DTE 末日穿透扰动'}。${concentrationText}`;
 
   return {
     whaleBlocks,
@@ -2214,6 +2370,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     whaleInClusterM: whaleInClusterUSD / 1e6,
     icebergOnlyM: icebergOnlyUSD / 1e6,
     oiVerified: oiJudged > 0 ? oiCounts : null,
+    sessionSplit,
     bullRatio,
     flowBias,
     paragraph
@@ -2251,15 +2408,19 @@ function dteOfUnderlying(underlyingIndex, now) {
 const round2 = v => (Number.isFinite(v) ? Math.round(v * 100) / 100 : null);
 const signed1 = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 
+// MerQube & Kaiko 报告基准点：x_0 = 0 (ATM), x_- = ln(0.75) ≈ -0.2877 (-25% Put 翼), x_+ = ln(1.25) ≈ +0.2231 (+25% Call 翼)
+const LOGM_PUT_BENCH = Math.log(0.75);
+const LOGM_CALL_BENCH = Math.log(1.25);
+
 /**
  * 单个到期日的微笑度量：ATM 取远期价处插值 IV；两翼按固定 Delta 取 25Δ/10Δ (市场惯例)，
- * 不再用列表里最低/最高行权价 (两侧虚实值距离不对称，且随数据商给出的行权价范围漂移)。
+ * 并同步计算 MerQube & Kaiko 报告的远期对数虚实值 x = ln(K/F) 标准化两翼与极端尾部延伸度。
  * iv_list 的 delta 为 Call Delta：25Δ Put ↔ Call Delta 0.75。
  */
 function smileMetricsFor(m, now) {
   if (!m || !Array.isArray(m.iv_list)) return null;
   const sorted = m.iv_list
-    .filter(s => Number.isFinite(s?.strike) && Number.isFinite(s?.iv))
+    .filter(s => Number.isFinite(s?.strike) && Number.isFinite(s?.iv) && s.strike > 0)
     .sort((a, b) => a.strike - b.strike);
   if (sorted.length < 3) return null;
 
@@ -2295,6 +2456,39 @@ function smileMetricsFor(m, now) {
   const put10 = basis === 'delta' ? atDelta(0.90) : null;
   const call10 = basis === 'delta' ? atDelta(0.10) : null;
 
+  // MerQube & Kaiko 远期对数虚实值 (x = ln(K/F)) 标准化两翼：x_- = ln(0.75), x_+ = ln(1.25)
+  const kLogPut = price * 0.75;
+  const kLogCall = price * 1.25;
+  const ivLogPut = interpolateOn(sorted, 'strike', kLogPut, 'iv');
+  const ivLogCall = interpolateOn(sorted, 'strike', kLogCall, 'iv');
+  const logMoneyness = {
+    xPut: round2(LOGM_PUT_BENCH),
+    xCall: round2(LOGM_CALL_BENCH),
+    putStrike: Math.round(kLogPut),
+    callStrike: Math.round(kLogCall),
+    putIv: ivLogPut !== null ? round2(ivLogPut) : null,
+    callIv: ivLogCall !== null ? round2(ivLogCall) : null,
+    downsideSkew: ivLogPut !== null ? round2(ivLogPut - atmIv) : null,
+    upsideConvexity: ivLogCall !== null ? round2(ivLogCall - atmIv) : null,
+    totalConvexity: (ivLogPut !== null && ivLogCall !== null)
+      ? round2((ivLogPut + ivLogCall) / 2 - atmIv)
+      : null
+  };
+
+  // 极端尾部延伸度 (Tail Strike Extension)：量化挂牌/有效报价向深虚值两翼的触达深度
+  const minItem = sorted[0];
+  const maxItem = sorted[sorted.length - 1];
+  const tailExtension = {
+    putMinStrike: minItem.strike,
+    putMinPct: round2((minItem.strike / price) * 100),
+    putMinLogM: round2(Math.log(minItem.strike / price)),
+    putMinIv: round2(minItem.iv),
+    callMaxStrike: maxItem.strike,
+    callMaxPct: round2((maxItem.strike / price) * 100),
+    callMaxLogM: round2(Math.log(maxItem.strike / price)),
+    callMaxIv: round2(maxItem.iv)
+  };
+
   const rr25 = call25.iv - put25.iv;
   const bf25 = (call25.iv + put25.iv) / 2 - atmIv;
   return {
@@ -2306,21 +2500,25 @@ function smileMetricsFor(m, now) {
     atmIv,
     put25: { strike: Math.round(put25.strike), iv: round2(put25.iv) },
     call25: { strike: Math.round(call25.strike), iv: round2(call25.iv) },
+    put10: put10 ? { strike: Math.round(put10.strike), iv: round2(put10.iv) } : null,
+    call10: call10 ? { strike: Math.round(call10.strike), iv: round2(call10.iv) } : null,
     rr25: round2(rr25),
     bf25: round2(bf25),
     rr10: put10 && call10 ? round2(call10.iv - put10.iv) : null,
     bf10: put10 && call10 ? round2((call10.iv + put10.iv) / 2 - atmIv) : null,
-    // √T 法则下固定 Delta 的 RR/σ_ATM 跨期限应近似不变 (行权价偏斜 ∝ 1/√T，而 25Δ 间距 ∝ σ√T)
     rrPerVol: atmIv > 0 ? round2(rr25 / atmIv) : null,
+    logMoneyness,
+    tailExtension,
     strikes: sorted
   };
 }
 
 /**
- * Module 4: IV Smile (25Δ Risk Reversal & Butterfly)
- * Bennett Ch6：三阶矩 ↔ 风险逆转 (Vanna)，四阶矩 ↔ 蝶式 (Volga)；近端由峰度主导、远端由偏斜主导
+ * Module 4: IV Smile (横截面曲面形态：左翼下行偏度 vs 右翼上行凸度 + 极端尾部延伸)
+ * 结合 Bennett Ch6 与 MerQube & Kaiko 报告方法论：将曲面拆解为左翼防崩盘溢价 (Downside Skew)
+ * 与右翼加密原生上行凸度 (Upside Convexity)，识别不对称微笑指纹。
  */
-function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date()) {
+function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date(), ctx = {}) {
   if (!ivSkewMonth || !ivSkewMonth.month1) {
     return {
       status: 'insufficient_data',
@@ -2339,36 +2537,71 @@ function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date
 
   const rr = front.rr25;
   const bf = front.bf25;
+  const putWing = round2(front.put25.iv - front.atmIv);
+  const callWing = round2(front.call25.iv - front.atmIv);
+
+  // 两翼历史分位（当 vol_surface_history 积累了 putWing25 / callWing25 样本时）
+  const histPutWings = (ctx.history || []).map(h => h?.putWing25).filter(Number.isFinite);
+  const histCallWings = (ctx.history || []).map(h => h?.callWing25).filter(Number.isFinite);
+  const wingRichness = {
+    putPercentile: histPutWings.length >= SKEW_HISTORY_MIN_DAYS ? Math.round(percentileOf(histPutWings, putWing) * 10) / 10 : null,
+    callPercentile: histCallWings.length >= SKEW_HISTORY_MIN_DAYS ? Math.round(percentileOf(histCallWings, callWing) * 10) / 10 : null,
+    n: Math.min(histPutWings.length, histCallWings.length)
+  };
+
   let skewShape;
   let skewBias;
   let momentText;
   if (rr > SKEW_SIDE_THRESHOLD) {
     skewShape = '右偏微笑 / 上行追涨溢价 (Call Skew / Upside Smirk)';
     skewBias = '25Δ Call 隐含波动率高于 25Δ Put，上行尾部定价更贵。';
-    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，右翼更贵，与股指常年的左偏相反，反映对上行跳空的凸性需求。`;
+    momentText = `【两翼非对称拆解】25Δ RR ${signed1(rr)} 点（右翼上行凸度 ${signed1(callWing)} 点 vs 左翼下行偏度 ${signed1(putWing)} 点）：呈现加密原生市场特有的结构性上行追涨偏好（Upside Convexity 主导），OTM Call 蕴含明显凸性溢价。`;
   } else if (rr < -SKEW_SIDE_THRESHOLD) {
     skewShape = '左偏倒斜 / 下行避险溢价 (Put Skew / Fear Smirk)';
     skewBias = '25Δ Put 隐含波动率高于 25Δ Call，下行保护需求占优。';
-    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，左翼更贵：持有 OTM Put 的一方为每单位 Gamma 支付更高的 Skew Theta（Bennett Ch6）。`;
+    momentText = `【两翼非对称拆解】25Δ RR ${signed1(rr)} 点（左翼下行偏度 ${signed1(putWing)} 点 vs 右翼上行凸度 ${signed1(callWing)} 点）：呈现典型机构防崩盘不对称微笑，左翼陡峭、持有 OTM Put 需支付更高的 Skew Theta（Bennett Ch6）。`;
   } else {
     skewShape = '对称标准微笑 (Symmetric Smile)';
     skewBias = '25Δ 两翼定价接近，多空尾部预期均衡。';
-    momentText = `【三阶矩 / 风险逆转】25Δ RR ${signed1(rr)} 点，两翼基本对称。`;
+    momentText = `【两翼非对称拆解】25Δ RR ${signed1(rr)} 点（左翼 ${signed1(putWing)} 点 / 右翼 ${signed1(callWing)} 点），两翼曲率基本对称。`;
   }
+
+  // 识别两翼主导体制 (Wing Regime)
+  let wingRegime = { key: 'balanced', label: '两翼均衡微笑' };
+  if (putWing >= 1.5 && putWing - callWing > 1.2) {
+    wingRegime = { key: 'crash_hedge_asymmetric', label: '防崩盘左翼陡峭' };
+  } else if (callWing >= 1.0 && callWing - putWing > 1.2) {
+    wingRegime = { key: 'crypto_upside_convexity', label: '加密原生上行凸度' };
+  } else if (putWing >= 1.5 && callWing >= 1.5) {
+    wingRegime = { key: 'two_way_fat_tail', label: '双向肥尾高凸度' };
+  }
+
   const kurtText = bf >= 0
-    ? `【四阶矩 / 蝶式】25Δ BF ${signed1(bf)} 点：两翼相对平值${bf >= 1 ? '明显' : '略微'}抬升，对应肥尾定价，两翼 Volga 敏感。`
-    : `【四阶矩 / 蝶式】25Δ BF ${signed1(bf)} 点：两翼低于平值，市场没有为肥尾付溢价。`;
+    ? `【四阶矩 / 蝶式曲率】25Δ BF ${signed1(bf)} 点：两翼相对平值${bf >= 1 ? '明显' : '略微'}抬升，对应肥尾定价，两翼 Volga 敏感。`
+    : `【四阶矩 / 蝶式曲率】25Δ BF ${signed1(bf)} 点：两翼低于平值，市场没有为肥尾付溢价。`;
   const tenText = (front.rr10 !== null && front.bf10 !== null)
-    ? `10Δ 两翼 RR ${signed1(front.rr10)} / BF ${signed1(front.bf10)} 点。`
+    ? `10Δ 深虚值两翼 RR ${signed1(front.rr10)} / BF ${signed1(front.bf10)} 点。`
+    : '';
+
+  const lm = front.logMoneyness;
+  const logMText = (lm && lm.downsideSkew !== null && lm.upsideConvexity !== null)
+    ? `按对数虚实值 x=ln(K/F) 固定跨度（Put 0.75F / Call 1.25F）：左翼偏度 ${signed1(lm.downsideSkew)} 点，右翼上行凸度 ${signed1(lm.upsideConvexity)} 点。`
+    : '';
+
+  const te = front.tailExtension;
+  const tailText = te
+    ? `【极端尾部触达】左翼最低行权价 $${te.putMinStrike.toLocaleString()}（远期价的 ${te.putMinPct}%，x=${signed1(te.putMinLogM)}，IV ${te.putMinIv.toFixed(1)}%），右翼最高 $${te.callMaxStrike.toLocaleString()}（${te.callMaxPct}%，x=${signed1(te.callMaxLogM)}，IV ${te.callMaxIv.toFixed(1)}%）。`
     : '';
 
   let termText = '';
-  if (back && front.rrPerVol !== null && back.rrPerVol !== null) {
-    termText = `与 ${back.underlying}（剩 ${back.dte} 天，RR ${signed1(back.rr25)} / BF ${signed1(back.bf25)}）相比：按 √T 法则固定 Delta 的 RR/σ 应近似不变，当前近月 ${front.rrPerVol.toFixed(3)} 对远月 ${back.rrPerVol.toFixed(3)}；近月 BF ${front.bf25 >= back.bf25 ? '高于' : '低于'}远月，${front.bf25 >= back.bf25 ? '符合' : '不符合'}"近端峰度主导、远端偏斜主导"的常态（Bennett Ch6）。`;
+  if (back) {
+    const backPutWing = round2(back.put25.iv - back.atmIv);
+    const backCallWing = round2(back.call25.iv - back.atmIv);
+    termText = `与远月 ${back.underlying}（剩 ${back.dte} 天，ATM ${back.atmIv.toFixed(1)}%，左翼 ${signed1(backPutWing)} / 右翼 ${signed1(backCallWing)}，BF ${signed1(back.bf25)}）相比：近月蝶式曲率 BF ${front.bf25 >= back.bf25 ? '高于' : '低于'}远月，${front.bf25 >= back.bf25 ? '符合' : '偏离'}"近端峰度主导、远端偏斜主导"的曲面结构（Bennett Ch6）。`;
   }
 
   const basisText = front.basis === 'delta' ? '固定 Delta' : '对称对数虚实值（无 Delta 时的近似）';
-  const paragraph = `${front.underlying}（剩 ${front.dte} 天，远期价 $${Math.round(front.underlyingPrice).toLocaleString()}）按${basisText}口径度量：ATM IV ${front.atmIv.toFixed(1)}%，25Δ Put（$${front.put25.strike.toLocaleString()}）${front.put25.iv.toFixed(1)}%，25Δ Call（$${front.call25.strike.toLocaleString()}）${front.call25.iv.toFixed(1)}%，呈【${skewShape}】。${momentText}${kurtText}${tenText}${termText}`;
+  const paragraph = `${front.underlying}（剩 ${front.dte} 天，远期价 $${Math.round(front.underlyingPrice).toLocaleString()}）按${basisText}口径度量：ATM IV ${front.atmIv.toFixed(1)}%，25Δ Put（$${front.put25.strike.toLocaleString()}）${front.put25.iv.toFixed(1)}%，25Δ Call（$${front.call25.strike.toLocaleString()}）${front.call25.iv.toFixed(1)}%，呈【${skewShape}】。${momentText}${kurtText}${tenText}${logMText}${tailText}${termText}`;
 
   return {
     underlying: front.underlying,
@@ -2379,8 +2612,14 @@ function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date
     atmIv: front.atmIv,
     put25: front.put25,
     call25: front.call25,
-    putWingPremium: round2(front.put25.iv - front.atmIv),
-    callWingPremium: round2(front.call25.iv - front.atmIv),
+    put10: front.put10,
+    call10: front.call10,
+    putWingPremium: putWing,
+    callWingPremium: callWing,
+    wingRegime,
+    wingRichness,
+    logMoneyness: front.logMoneyness,
+    tailExtension: front.tailExtension,
     rr25: front.rr25,
     bf25: front.bf25,
     rr10: front.rr10,
@@ -2393,13 +2632,17 @@ function analyzeIvSmile(ivSkewMonth, spotPrice = 77250, referenceDate = new Date
       underlying: back.underlying,
       dte: back.dte,
       atmIv: round2(back.atmIv),
+      putWingPremium: round2(back.put25.iv - back.atmIv),
+      callWingPremium: round2(back.call25.iv - back.atmIv),
       rr25: back.rr25,
       bf25: back.bf25
     } : null,
     strikes: front.strikes.map(s => ({
       strike: s.strike,
       iv: Math.round(s.iv * 10) / 10,
-      delta: Number.isFinite(s.delta) ? Math.round(s.delta * 100) / 100 : null
+      delta: Number.isFinite(s.delta) ? Math.round(s.delta * 100) / 100 : null,
+      logM: round2(Math.log(s.strike / front.underlyingPrice)),
+      moneynessPct: Math.round((s.strike / front.underlyingPrice) * 100)
     })),
     paragraph
   };
@@ -2643,6 +2886,8 @@ module.exports = {
   identifyInstitutionalStrategy,
   describeRiskBounds,
   evaluate0DTEBehavior,
-  evaluateTradeAction
+  evaluateTradeAction,
+  buildForwardsMap,
+  classifyMarketSession
 };
 

@@ -364,3 +364,54 @@ describe('dealer_engine · 全成交校正与屏幕折扣敏感性', () => {
     assert.equal(r.sensitivity.screenWeights.length, 5);
   });
 });
+
+describe('dealer_engine · 5 档期限矩阵、深度尾部行权价 OI、全链墙与交割断崖模拟', () => {
+  const { strikeWalls, maturityStructure, postExpiryCliff } = require('../server/dealer_engine');
+  const SPOT = 80000;
+  const marks = {
+    'BTC-23OCT26-78000-P': mark(45, 80000, 40),   // 3d (<2w)
+    'BTC-30OCT26-90000-C': mark(40, 80200, 120),  // 10d (<2w, 月度主力)
+    'BTC-30OCT26-50000-P': mark(60, 80200, 80),   // 10d (<2w, 深虚值 Put <= 0.75F)
+    'BTC-27NOV26-100000-C': mark(42, 80800, 60),  // 38d (2–6w)
+    'BTC-25DEC26-70000-P': mark(44, 81500, 100),  // 66d (6–10w, 季度)
+    'BTC-26MAR27-140000-C': mark(48, 83000, 90),  // 157d (>16w, 深虚值 Call >= 1.50F)
+    'BTC-26MAR27-60000-P': mark(52, 83000, 50)    // 157d (>16w, 深虚值 Put <= 0.75F)
+  };
+  const contracts = contractsFromMarks(marks, NOW);
+
+  test('strikeWalls 提取全链与主力交割 Call Wall / Put Wall', () => {
+    const w = strikeWalls(contracts, SPOT, '30OCT26');
+    assert.equal(w.callWall.strike, 90000);
+    assert.equal(w.callWall.oiBtc, 120);
+    assert.equal(w.putWall.strike, 70000);
+    assert.equal(w.putWall.oiBtc, 100);
+    assert.equal(w.nextMajorCallWall.strike, 90000);
+    assert.equal(w.nextMajorPutWall.strike, 50000);
+  });
+
+  test('maturityStructure 输出 5 档期限分布、Call:Put 比与深度尾部 OI 占比', () => {
+    const mat = maturityStructure(contracts, SPOT, NOW);
+    assert.equal(mat.buckets.length, 5);
+    assert.equal(mat.buckets[0].key, 'lt2w');
+    assert.equal(mat.buckets[0].totalOiBtc, 240);
+    assert.equal(mat.buckets[4].key, 'gt16w');
+    assert.equal(mat.buckets[4].totalOiBtc, 140);
+    assert.equal(mat.chainCallOiBtc, 270);
+    assert.equal(mat.chainPutOiBtc, 270);
+    assert.equal(mat.chainCallPutRatio, 1);
+    assert.equal(mat.tailWings.deepPutOiBtc, 130); // 50k Put (80) + 60k Put (50)
+    assert.equal(mat.tailWings.deepCallOiBtc, 90); // 140k Call (90)
+    assert.equal(mat.tailWings.minPutStrike, 50000);
+    assert.equal(mat.tailWings.maxCallStrike, 140000);
+  });
+
+  test('postExpiryCliff 模拟剔除主力交割后的残余 GEX 与变号判定', () => {
+    const roll = expiryRollOff(contracts, SPOT, NOW);
+    const base = evaluateBook(contracts);
+    const cliff = postExpiryCliff(contracts, SPOT, NOW, roll, { gexUsd: base.gamma1pct * SPOT });
+    assert.equal(cliff.afterNextMajor.expiry, '30OCT26');
+    const exMajor = contracts.filter(c => c.expiry !== '30OCT26');
+    close(cliff.afterNextMajor.residualGexUsd, evaluateBook(exMajor).gamma1pct * SPOT, 1e-6);
+    assert.equal(typeof cliff.afterNextMajor.regimeFlips, 'boolean');
+  });
+});
