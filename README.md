@@ -1,117 +1,146 @@
 # BIGDY Crypto Quantitative Intelligence Dashboard
-> **数字资产宏观量化、期权波动率表面与微观订单簿流动性全景雷达**
+> **数字资产宏观量化、期权波动率表面、做市商敞口与微观订单簿流动性全景雷达**
 
 [![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Architecture: Zero-Dependency](https://img.shields.io/badge/Architecture-Zero--Dependency-blue.svg)]()
-[![Tests: node:test](https://img.shields.io/badge/Tests-11%2F11%20Passing-brightgreen.svg)]()
+[![Tests: node:test](https://img.shields.io/badge/Tests-630%20Passing-brightgreen.svg)]()
 
-BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商的数字资产全景投研决策终端。系统以纯原生 Node.js（零外部 npm 运行时依赖）构建，整合了 Deribit 期权曲面、Amberdata 微观结构模型、Coinglass 链上衍生品、St. Louis FRED 宏观流动性以及 Coinbase L2 订单簿深度数据，深度融合 Sheldon Natenberg《期权波动率与定价》与 Colin Bennett《波动率交易》等经典量化工程方法论。
+BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商的数字资产全景投研决策终端。系统以纯原生 Node.js（零外部 npm 运行时依赖）构建，整合了 Deribit 期权曲面、CoinGlass 衍生品、St. Louis FRED 宏观流动性、Coinbase L2 订单簿、Strategy (MSTR) 官方披露与 SEC EDGAR 申报，深度融合 Sheldon Natenberg《期权波动率与定价》与 Colin Bennett《波动率交易》等经典量化工程方法论。
+
+**线上实例**：[https://bigdy-cry-pto-dashboard-3.onrender.com](https://bigdy-cry-pto-dashboard-3.onrender.com)
 
 ---
 
 ## 目录
 - [系统核心模块](#系统核心模块)
-  - [Module 1: 宏观流动性、美债曲线与 MSTR 成本全景](#module-1-宏观流动性美债曲线与-mstr-成本全景)
-  - [Module 1-B: 双轨加密麦克莱伦市场宽度振荡器与流动性背离利差](#module-1-b-双轨加密麦克莱伦市场宽度振荡器与流动性背离利差)
-  - [Module 2: 期现基差期限结构、套利评分与 ETF × 套利资金联动](#module-2-期现基差期限结构套利评分与-etf--套利资金联动)
-  - [Module 3: 大宗交易穿透与 30 天机构拆单聚合 (Iceberg)](#module-3-大宗交易穿透与-30-天机构拆单聚合-iceberg)
-  - [Module 4: ATM IV 期限结构与历史分位评估](#module-4-atm-iv-期限结构与历史分位评估)
-  - [Module 5: 动态 Gamma 敞口 (GEX) 与做市商钉扎效应](#module-5-动态-gamma-敞口-gex-与做市商钉扎效应)
-  - [Module 6: Coinbase BTC 订单簿微观流动性与金字塔穿透](#module-6-coinbase-btc-订单簿微观流动性与金字塔穿透)
+  - [宏观与风控总览 (Macro · MSTR · Preferreds)](#宏观与风控总览-macro--mstr--preferreds)
+  - [MSTR 官方披露账本与 SEC 8-K 回退链路](#mstr-官方披露账本与-sec-8-k-回退链路)
+  - [加密麦克莱伦市场宽度振荡器 (Module 1-B)](#加密麦克莱伦市场宽度振荡器-module-1-b)
+  - [期现基差期限结构与 ETF × 套利资金联动 (Module 2)](#期现基差期限结构与-etf--套利资金联动-module-2)
+  - [期权套件：ATM IV · Smile · 25Δ Skew (Cards 01/04/05)](#期权套件atm-iv--smile--25δ-skew-cards-010405)
+  - [GEX 钉盘与做市商全链敞口 (Cards 02/02B)](#gex-钉盘与做市商全链敞口-cards-0202b)
+  - [大宗交易与机构冰山拆单 (Card 03)](#大宗交易与机构冰山拆单-card-03)
+  - [大宗资金深度研判 (Module 4B)](#大宗资金深度研判-module-4b)
+  - [BTC 主导力量雷达与稳定币流动性 (Module 05/05B)](#btc-主导力量雷达与稳定币流动性-module-0505b)
+  - [Coinbase 订单簿微观流动性](#coinbase-订单簿微观流动性)
+  - [黄金与比特币跨资产联动](#黄金与比特币跨资产联动)
+  - [艾略特波浪与柳玉冬研判引擎 (Module 8)](#艾略特波浪与柳玉冬研判引擎-module-8)
+- [数据韧性与健康监测](#数据韧性与健康监测)
+- [定时数据管线 (GitHub Actions)](#定时数据管线-github-actions)
 - [关键工程架构与安全特性](#关键工程架构与安全特性)
+- [项目目录结构](#项目目录结构)
 - [快速开始与部署指南](#快速开始与部署指南)
 - [API 接口规范](#api-接口规范)
 - [自动化单元测试](#自动化单元测试)
+- [关联组件：本地宏观评论 Agent](#关联组件本地宏观评论-agent)
 - [开源协议](#开源协议)
 
 ---
 
 ## 系统核心模块
 
-### Module 1: 宏观流动性、美债曲线与 MSTR 成本全景
-- **FED 净流动性监测 (WALCL - TGA - RRP)**：实时同步美联储资产负债表（WALCL）、财政部一般账户（WTREGEN / TGA）与隔夜逆回购（RRPONTSYD），计算真实金融净流动性及其 20 日均线与斜率走势。
-- **MicroStrategy (MSTR) 持仓成本底线**：追踪 MicroStrategy 比特币持仓均价、累计持仓量与持仓市值，构建市场极端去杠杆周期的“机构硬支撑线”。
-- **美债基准利差 (US10Y / US02Y)**：比对无风险利率对加密资产贴现率与资本机会成本的传导效应。
+### 宏观与风控总览 (Macro · MSTR · Preferreds)
+- **FED 净流动性监测 (WALCL − TGA − RRP)**：实时同步美联储资产负债表、财政部一般账户与隔夜逆回购，计算真实金融净流动性及均线/斜率走势。
+- **美债曲线体制识别**：US10Y/US02Y 利差与曲线形态分类（牛陡/牛平/熊陡/熊平/扭曲/平坦化），多窗口（5D/20D）变化与图表时间窗联动。
+- **MicroStrategy (MSTR) 持仓与资本全景**：BTC 持仓量、累计成本、均价与市场极端去杠杆"机构硬支撑线"；EV/BTC 市值旧口径参考。
+- **优先股模块 (STRC/STRF/STRK/STRD/STRE)**：各期股息率、派息日与二级市场定价；STRC 月度股息率历史自动归档（`data/strc_rate_history.json`）。
 
-### Module 1-B: 双轨加密麦克莱伦市场宽度振荡器与流动性背离利差
-- **RAMO 风险调整动量振荡算法**：修正传统股票等权腾落线在加密生态被 99% 垃圾代币扭曲的问题，引入对数收益、换手率因子与流动池惩罚：
+### MSTR 官方披露账本与 SEC 8-K 回退链路
+> 详见 [`docs/mstr_disclosures.md`](docs/mstr_disclosures.md)。
+
+- **五源官方披露采集**（`server/mstr_disclosures.js`）：strategy.com `/ledger`（BTC 买卖事件账本）、`/shares`（千股单位已归一）、`/debt`（资本结构：可转债明细、mstrStats 现金/债务/优先股、五只优先股条款）、`/press`（公告标题级分类发现）+ SEC EDGAR 申报索引。每条事实保留证据 SHA-256、修订历史与发行方日期（与接收时间戳严格分离）。
+- **SEC 8-K 回退路径**（`server/mstr_sec_model.js`）：当官网对部署环境返回 403 时自动切换——从 weekly 8-K 解析持仓三元组（持仓/累计成本/均价，覆盖表格、卖出、双期间、行文四种版式）、USD Reserve/Cash、ATM 增发与回购流水、STRC 股息率公告（含半月计息与有条件生效标记）；`data/mstr_capital_reference.json` 提供静态条款基线，XBRL 作总债务/期权交叉核对。
+- **官方口径 mNAV（版本化方法论）**：按 2026-07-23 官方公式计算——`mNAV = MSTR价 / Net BPS`，`Net BTC($) = BTC持仓×BTC价 − 价外可转债名义 − 优先股名义(剔除价内STRK，STRE按汇率折算) + USD Assets`，`FDSO = 基本股数 + 期权 + RSU/PSU + 价内转股`。明确标注为基于披露输入的**推算值**，新旧口径不可比、不混编历史序列。
+- **完整性保障**：请求/解析/合并/持久化任一环节失败均不覆盖有效缓存；重复活跃修订、未来时间戳、无效 accession、不完整历史一律拒绝；官网更新时优先官网路径，被拦截时 SEC 为必需源、官网源降为展示性可选源。
+
+### 加密麦克莱伦市场宽度振荡器 (Module 1-B)
+- **RAMO 风险调整动量振荡算法**：修正传统股票等权腾落线在加密生态被垃圾代币扭曲的问题，引入对数收益、换手率因子与流动池惩罚：
   $$RAMO_i = \text{sign}(R_i) \cdot \ln(1 + |R_i|) \cdot \frac{\text{Vol}_{i}}{\text{Median}(\text{Vol})} \cdot \min\left(1, \frac{\text{LP}_i}{\$300\text{k}}\right)$$
-- **DEX 投机前沿 Meme 动态池 4 重门禁**：LP $\ge \$300\text{k}$、24h 交易量 $\ge \$1.5\text{M}$、FDV $\ge \$10\text{M}$ 以及 7 天留存滞后缓冲带，杜绝低摩擦抽毯与假性抖动。
-- **四象限宏观体制识别**：
-  - **Q1 全域共振繁荣 (Co-Expansion)**：Core > 0 & Frontier > 0，增量入场，蓝筹与投机共舞。
-  - **Q2 Meme 流动性抽血 (Meme Siphon)**：Core $\le$ 0 & Frontier > 0，存量内卷，利差 $\ge 40$ 触发逃顶预警。
-  - **Q3 核心价值蓄势 (Quality Accumulation)**：Core > 0 & Frontier $\le$ 0，机构吸筹优质资产，垃圾代币去泡沫。
-  - **Q4 流动性严冬深冻 (Deep Freeze)**：Core $\le$ 0 & Frontier $\le$ 0，全域出清，左侧周期见底。
-- **核心总和指数 (Core MSI)** 与 1083 天历史时序全景回测。
+- **DEX 投机前沿 Meme 动态池 4 重门禁**：LP ≥ $300k、24h 交易量 ≥ $1.5M、FDV ≥ $10M 以及 7 天留存滞后缓冲带。
+- **四象限宏观体制识别**：Q1 全域共振繁荣 / Q2 Meme 流动性抽血（利差 ≥40 触发逃顶预警）/ Q3 核心价值蓄势 / Q4 流动性严冬深冻。
+- **核心总和指数 (Core MSI)** 与 1083 天历史时序全景回测；Core 结构宽度（描述性、非预测）。
 
-### Module 2: 期现基差期限结构、套利评分与 ETF × 套利资金联动
-- **真实期限点曲线**：只用实际交易的期限——0D 全市场永续资金费率（CoinGlass 按各交易所持仓量加权，7 日已实现均值年化；Deribit 永续资金费率有抑制机制、会让短端利差偏高约 1.6 个百分点，只作对照和备用）、Deribit 当季、次季季度合约；当季距交割 <7 天时剔除，90D 恒定期限仅在相邻真实点之间线性插值，不做外推。历史 2024.01 至今，每日 08:00 UTC（北京时间 16:00，与 Deribit 日 K 线收盘和交割时点一致）快照，最新点为 Deribit 实时盘口（同一交易所、同一公式）。币安会以 HTTP 418 拒绝部署环境（Render 共享出口 IP），因此不使用币安。
-- **真实期限利差**：期限斜率 (90D − 资金费率)、短端利差 (当季 − 资金费率)、跨期斜率 (次季 − 当季)。
-- **动态资本成本**：FRED 3M 美债 (DGS3MO) 逐日对齐，机构门槛 = 美债 + 3.5%。
-- **套利评分 0-100**：60% 套利夏普（(90D − 美债) / 基差盯市年化波动）+ 25% 期限结构 + 15% 30 日基差动量；≥65 优质 / 45-65 合格 / 30-45 边际 / <30 回避。
-- **ETF 期现套利净年化**：90D 基差 − 3M 美债 − 管理费 0.25%/年 − 申赎与滑点 0.25% 按 90 天摊销。
-- **ETF × 套利资金联动验证**（CoinGlass ETF 流量 + CFTC TFF + CoinGlass OI，按 COT 周二对齐）：① ΔCME 杠杆基金净空头对 ETF 周流入的对冲比例 β（全样本 + 12 周滚动）；② 高/低基差分组 β 与交互项回归；③ 基差变化与资金流的领先滞后相关；④ 基差低于美债的平仓事件；⑤ ETF 累计流入拆分为 CME 空头匹配（套利）与方向性；另附 Binance 期货 OI + Deribit 期权 OI 离岸对冲持仓走势。
+### 期现基差期限结构与 ETF × 套利资金联动 (Module 2)
+- **真实期限点曲线**：只用实际交易的期限——0D 全市场永续资金费率（CoinGlass 按持仓量加权；Deribit 永续有抑制机制仅作对照）、Deribit 当季/次季季度合约；当季距交割 <7 天剔除，90D/180D 恒定期限仅在相邻真实点间线性插值不做外推。每日 08:00 UTC 快照归档，最新点为实时盘口。
+- **期限利差与套利评分**：期限斜率、短端利差、跨期斜率；FRED 3M 美债对齐，机构门槛 = 美债 + 3.5%；评分 0-100（60% 套利夏普 + 25% 期限结构 + 15% 基差动量）。
+- **ETF × 套利资金联动验证**（CoinGlass ETF 流量 + CFTC TFF + OI，按 COT 周二对齐）：ΔCME 杠杆基金净空头对 ETF 周流入的 β（全样本+12 周滚动）、高低基差分组回归、领先滞后相关、平仓事件与流入拆分；附 Binance 期货 + Deribit 期权离岸对冲持仓。
 
-### Module 3: 大宗交易穿透与 30 天机构拆单聚合 (Iceberg)
-- **本地持久化 30 天成交流水沉淀**：突破官方交易所 72 小时流水限制，滚动聚合长周期机构建仓足迹。
-- **冰山拆单聚类算法 (Iceberg Split Detection)**：基于 15 分钟时间滑动窗口、同合约、同方向的大单切片聚合，识别机构算法交易与大宗隐藏订单。
-- **黑盒穿透模态框**：点击任意大单即可穿透 Black-76 希腊字母（Delta、Gamma、Vega、Theta）敞口、策略意图分析（Collar、Straddle、Risk Reversal 等）与到期损益边界。
+### 期权套件：ATM IV · Smile · 25Δ Skew (Cards 01/04/05)
+- **ATM IV 期限结构与历史分位**：365 日历年化的时间平方根法则（日 σ/√365、周 σ/√52）；DVOL 730 日滚动分位；隐含 vs 已实现 VRP；Bennett 跳空波动率拆分的事件溢价。
+- **IV Smile 两翼非对称拆解（Card 04）**：固定 Delta（25Δ/10Δ）与固定远期对数虚实值（x=ln(K/F)，x−=ln0.75、x+=ln1.25）双口径翼溢价——`putWingPremium`（防崩盘左翼）与 `callWingPremium`（上行凸度）；自动 `wingRegime` 分类（防崩盘左翼陡峭/加密原生上行凸度/双向肥尾高凸度/两翼均衡）；极端尾部触达（Kmin/F、Kmax/F 及翼界 IV）。
+- **25Δ Skew 期限结构（Card 05）**：按 √T 比较各期限 RR/σ；Bennett 四种偏度实现机制由 90 日 ΔDVOL 对 Δln S 回归 β 判定；与日度档案（`data/vol_surface_history_BTC.local.json`，含 putWing25/callWing25，满 30 天启用）比较历史分位。
 
-### Module 4: ATM IV 期限结构与历史分位评估
-- **时间平方根法则 (Square Root of Time Rule)**：BTC 全年 24/7 交易，按 365 个日历日年化：日预期振幅 \(\sigma / \sqrt{365}\)，周预期振幅 \(\sigma / \sqrt{52}\)（Natenberg 的 \(\sigma/16\) 对应股票 256 个交易日，不适用）。各期限 ATM IV 按总方差 \(\sigma^2 T\) 插值。
-- **DVOL 730 日滚动历史分位数**：最新 DVOL 与 DVOL 自身历史比较（DVOL 为 VIX 式 30D 方差口径，结构性高于 ATM，不能拿 ATM 去比）；分位区间：极端低位 \(\le 5\%\)、偏低 \(\le 20\%\)、中性、偏高 \(\ge 75\%\)、极端高位 \(\ge 90\%\)。
-- **隐含 vs 已实现 (VRP)**：1M ATM − HV30。只有分位低且 VRP 不为正时才判定期权便宜；分位高但已实现更高时不建议做空波动率。
-- **近端事件溢价**：按 Bennett 跳空波动率拆分 \(\sigma_T^2 T = \sigma_J^2 + \sigma_D^2 (T-1)\)，扩散基准取一周后两期限间的远期波动率，给出事件窗口隐含的期望绝对涨跌幅。
+### GEX 钉盘与做市商全链敞口 (Cards 02/02B)
+- **Card 02 各交割期钉盘分布**（Greeks.live 参照口径）：主力交割期 Call/Put 磁吸墙、近端 10 天与全链净 GEX、零 Gamma 翻转位；正负号沿用 Call 记正、Put 记负惯例。
+- **Card 02B 做市商敞口 · 全链自算**（`server/dealer_engine.js`）：Deribit `get_book_summary_by_currency` 全链快照逐合约 Black-76（r=0）计算 DEX/GEX(+1%现货)/VEX(+1pt IV)/CEX(+1天)；现货 ±20% 滑动全链重估求零 Gamma 翻转位；币本位会计 Δ*（Δ−V/F）与合成远期多头假设占比标注。
+- **5 档期限结构矩阵**：<2周 / 2–6周 / 6–10周 / 10–16周 / >16周 各档 Call OI、Put OI、OI 占比、Call:Put 比与分档净 GEX；全链 Call:Put、>16w 结构性长端占比、深度尾部 OI（Put K≤0.75F / Call K≥1.50F）。
+- **交割断崖模拟**：剔除近端 ≤10D 或下一个月度/季度交割后重估残余 GEX 与体制符号；临近 ≤7D 且导致变号或缓冲缩水 ≥50% 时触发预警。
+- **全成交累计净额台账**（`server/option_flow_ledger.js`）：回补每个现存合约上市以来全部逐笔成交，屏幕/大宗/强平分开记账；CI 每日增量同步（`option_flow_daily.yml`），线上从 GitHub raw 读取。台账可用时为主口径，惯例口径并列对照。
+- **持仓符号敏感性**：惯例/虚值 Call 客户买入/全成交校正三口径并列，屏幕成交折扣五档敏感性与 OI 封顶自检；口径不同号标"结论不稳健"，并给翻号阈值。
+- **已触发对冲流与深度对比**：按 24h 现货/波动率变化重估做市商被动对冲量（拆 Gamma/Vanna/Charm），与 Coinbase ±2% 盘口深度对比量级；日度历史档案（`dealer_history.js`）。
 
-### Module 5: 动态 Gamma 敞口 (GEX) 与做市商钉扎效应
-- **到期日动态滚动筛选**：卡片聚焦当月月底、季度主交割期（3月、6月、9月、12月）以及年度最终交割期。
-- **Gamma 体制按全部到期日判定**：近端周度合约 Gamma 最大，不能被过滤；分别给出全部到期、近端 10 天、主力交割的净 GEX，净额不足总敞口 10% 时判为中性；附按行权价累计 GEX 变号的零 Gamma 翻转位近似。
-- **口径说明**：正负号沿用 Call 记正、Put 记负（假设做市商为客户卖 Call、买 Put 的对手方），该假设未经 Deribit 成交方向验证。
-- **做市商敞口 · 全链自算（`server/dealer_engine.js`）**：用 Deribit `get_book_summary_by_currency` 全链快照（标记 IV、到期远期价、OI），逐合约按 Black-76（r = 0）计算 Delta / Gamma / Vanna / Charm，聚合为 DEX、GEX（现货 +1%）、VEX（IV +1 点）、CEX（过 1 天）；在现货 ±20% 上滑动全链重估求零 Gamma 翻转位；列出各到期日（日度/周度/月度/季度）的 OI 与 Gamma 占比；压力情景（如现货 −3% 且 IV +5 点）一律全链重估做市商对冲流。第一阶段沿用同一惯例符号，并单独列出由该假设产生的合成多头（同行权价 Call 多 + Put 空），DEX 水平与交割解除对冲量只作参考。
-- **全成交累计净额台账（`server/option_flow_ledger.js`）**：用 `history.deribit.com` 回补每个现存期权合约上市以来的全部逐笔成交，只存按合约汇总的累计净额，屏幕、大宗、强平分开记账（强平按被强平方确定客户方向）；从上市累计时开仓与平仓自然抵消。`node scripts/option_flow_ledger.js --backfill` 全量回补（约 3000 页，接近 1 小时，每 200 页存检查点），之后由 `.github/workflows/option_flow_daily.yml` 每日增量同步并提交 `data/option_flow_ledger_BTC.json`；线上从 GitHub raw 读取。
-- **主口径、对冲状态与预警**：台账可用时以全成交校正后的账本为主口径（惯例口径并列对照）。对冲状态按当前 GEX 与两个压力情景的对冲方向判定（逆周期缓冲 / 缓冲但下破转助跌、上破转助涨 / 顺周期助跌 / 上行逼空 / 双向加速）。结构化预警：负 Gamma 助跌 + 25Δ Put 偏斜极端（相对历史，历史不足时 30D RR ≤ −3）+ IV 上升时做市商卖出，升为高优先级；持仓符号结论不稳健时降一级；翻转位距现货 3% 以内且跨过后转负 Gamma 时给提示。
-- **已触发对冲流与盘口深度**：用 Deribit 永续与 DVOL 小时线算过去 24 小时的现货与波动率变化，按当前账本（OI 视为不变）回到 24 小时前重估，得到做市商已被动买卖的量，并拆成 Gamma / Vanna / Charm；压力情景的对冲量与 Coinbase ±2% 盘口深度（Module 6）对比，只说明量级。
-- **日度档案与走势图（`server/dealer_history.js`）**：`scripts/dealer_exposure_snapshot.js` 在每日台账同步后写入 `data/dealer_exposure_history_BTC.json`（惯例与全成交校正的净 GEX、DEX、翻转位、已触发对冲流、状态），卡片上画出现货滑动 GEX/DEX 曲线与 GEX、翻转位、现货的历史走势。
-- **持仓符号敏感性**：并列显示惯例、虚值 Call 改为客户买入、全成交校正（主动方视为客户，覆盖量封顶 OI；台账不可用时退回 30 天大宗校正）三种口径的净 GEX 与翻转位，另给屏幕成交折扣系数 0 ~ 1 五档的敏感性与 OI 封顶自检（累计净额超过 OI 的合约占比与超出量）；各口径不同号时标为"结论不稳健"；给出翻号阈值（Call 或 Put 侧改划多少比例的 Gamma 会让净 GEX 归零）以及大宗校正的 OI / Gamma 覆盖率和与惯例的一致率。
+### 大宗交易与机构冰山拆单 (Card 03)
+- **本地持久化 30 天成交流水**：突破交易所 72 小时限制，滚动聚合长周期机构足迹。
+- **冰山拆单聚类**：15 分钟滑窗、同合约同方向大单切片聚合。
+- **Black-76 远期定价 Greeks**：大宗交易按**到期远期价 F**（`buildForwardsMap` 汇总 ATM 与 option marks 各到期远期）而非现货 S 计算 Greeks，消除远月 Δ 偏移。
+- **Smile 联动评级**：注入 smileContext（25Δ 偏度、BF、两翼溢价）激活 smileAlphaRating——偏度套利/逆势高抛/顺势追买评级。
+- **交易时段归类**：按美东时间（自动适配 EDT/EST）划分 美股 ETF 同频（工作日 09:30–16:00 ET）/ 亚欧非美时段 / 周末独立定价，顶部汇总名义额占比。
+- **黑盒穿透模态框**：单笔穿透希腊字母敞口、策略意图（Collar/Straddle/Risk Reversal）与到期损益边界。
 
-### Module 3 期权套件：25Δ 微笑与偏度
-- **微笑按固定 Delta 度量**：25Δ / 10Δ 风险逆转 (RR) 与蝶式 (BF)，标注真实到期与剩余天数，并与远月对比。
-- **25Δ 偏度**：叙述完全由数据生成；按 √T 法则比较各期限 RR/σ；偏度实现机制（Bennett 四种机制）由近 90 日 ΔDVOL 对 Δln S 的回归 β 与隐含偏斜斜率之比判定；偏度贵贱与本地累积的日度档案（`data/vol_surface_history_BTC.local.json`，满 30 天后启用）比较。
+### 大宗资金深度研判 (Module 4B)
+- **期限资金流向**：分期限大单净流向与 OI 开平仓验证。
+- **行权价热力图**：目标区间与价位墙。
+- **聪明钱命中率与信号加权**（`server/block_insight.js`）：历史大单家族分类（修正：纯买入深虚值 Put/Call 归入 bear/bull，不再误归 Delta 中性 long-vol）。
+- 由 `.github/workflows/block_insight_daily.yml` 每日产出 `block_flow`/`smart_money` 归档。
 
-### Module 6: Coinbase BTC 订单簿微观流动性与金字塔穿透
-- **Amberdata 微观流动性研究框架实证**：
-  - **多层级阶梯深度切片**：计算 \(\pm 5\text{bps}\)、\(\pm 10\text{bps}\)、\(\pm 20\text{bps}\)、\(\pm 50\text{bps}\)、\(\pm 100\text{bps}\)、\(\pm 200\text{bps}\) 的买卖双向挂单名义价值与买盘深度占比（Bid Depth %）。
-  - **订单簿金字塔结构检验**：计算 100bps / 10bps 深度扩张倍数（理论中枢 3.1x），实时诊断“近端薄弱、防线下移”或“近端充盈、吸收力强劲”。
-  - **机构吃单滑点仿真 (Order Book Walking Simulation)**：模拟 \$250K ~ \$20M 瞬间市价吃单穿透的真实冲击滑点（bps）。
-  - **虚假繁荣与微观背离诊断**：结合 90 天滚动价格与成交量百分位数，识别高位缩量价差走阔、流动性断层危机。
+### BTC 主导力量雷达与稳定币流动性 (Module 05/05B)
+- **Flow Force 主导力量指标**（`server/flow_force.js`）：2×2 场域矩阵——期货/现货 × 亚太/欧美（币安+OKX 亚太侧、Hyperliquid 欧美期货、Coinbase 欧美现货）；BVC 批量成交量分类（Easley-López de Prado-O'Hara 2012）估计主动买卖净额；已收盘 K 线"先写入者为准"定稿、不可篡改，缺场标记 missing 等待补齐；币安在云主机常被 418 拦截，经备用源链获取。
+- **SSRO 稳定币供应比率振荡器**：稳定币总市值对 BTC 市值的相对强弱与宏观流动性传导。
 
-### Module 7: 黄金与比特币跨资产联动与宏观比价 (Gold & BTC Correlation)
-- **Pearson 滚动相关性曲面**：追踪 BTC 与黄金（PAXG/XAU）的 30D / 90D / 180D 滚动相关系数。
-- **跨资产四象限机制判定**：量化识别“抗通胀避险共振”、“流动性分化背离”、“美元主导无差别挤压”与“独立加密 Alpha 周期”。
+### Coinbase 订单簿微观流动性
+- **多层级阶梯深度切片**：±5/10/20/50/100/200 bps 买卖双向名义价值与 Bid Depth %。
+- **金字塔结构检验**：100bps/10bps 深度扩张倍数（理论中枢 3.1x）。
+- **机构吃单滑点仿真**：$250K ~ $20M 市价单穿透冲击（bps）。
+- **虚假繁荣与微观背离**：90 天滚动价量分位识别高位缩量、价差走阔、流动性断层。逐时深度档案由 `liquidity_hourly.yml` 维护。
 
-### Module 8: 柳玉冬波浪理论智能研判系统 (Elliott Wave Theory & Liu Yudong Radar)
-- **三大铁律严格核验**：
-  - 浪2回撤绝不能跌破浪1起点（多头与空头双向对偶核验）。
-  - 浪3不能是最短的驱动浪。
-  - 推动浪中浪4底绝不能进入浪1顶领地（无重叠硬规则）。
-- **《波浪理论详解》手稿全量规则库**：
-  - 覆盖驱动浪基础、斐波那契系统比率、单锯齿、平台形、收缩三角形、双重与三重锯齿及联合形横向整理。
-  - 严格区分浪型规则、比率规则、时间规则与软性打分指引，杜绝规则与指引混淆。
-- **“出身决定命运”微观穿透**：
-  - 15m / 1h / 4h 多级别时间框架切片与子浪验证，向左延伸大级别前序脉络。
-- **艾略特通道与关键监测点**：
-  - 辅助通道动态投影，结合手稿斐波那契目标位与失效反转临界点。
-  - 决断度与概率权重的多重候选浪型智能排序输出。
-- **v3 柳氏实战信号层**（依据柳玉冬 2026 年微博研判按标的时间串联提炼，见 `docs/module8_wave_v3.md`）：
-  - 监测点战法（当前段小级别拐点 + 确认位）、最大回撤判据（回撤量超过段内最大回撤 → 小级别见顶/底）。
-  - 吃掉前段 0.618 / 0.7 判据与调整分部投射（三角形 b≈0.618、平台/联合形 b/x≥0.7、双锯齿 x 不必到 0.618）。
-  - 出身检验：当前段非五浪 → 不作新趋势起点，列出引导楔形成立条件。
-  - 级别阶梯：高一级别 → 本级别 → 当前段小级别嵌套计数。
-- **交替原则与子形态识别**：在浪2/浪4内部的低级别拐点上，用同一套手稿规则匹配单锯齿/平台形/收缩三角形/双重三重锯齿/联合形，判定「一陡一横、一简一繁」；浪3运行中预判浪4形态，浪4运行中列出仍成立的形态；联合形/双锯齿识别 w、y、z 组成部分（三角形只能作最后一部分）。
-- **柳玉冬语料仅作离线强化**：Module 8 只研判 BTC/ETH。`data/liu_wave_threads.json` 把柳玉冬对黄金、白银、原油、个股的研判按标的时间串联，用于提炼规则与回放校准，不在界面上提供这些标的。
-  - 重新生成：`node scripts/liu_threads/build_liu_threads.js [语料目录]`
-  - 真实 K 线回放校准：`node scripts/liu_threads/replay_liu_threads.js XAU,XAG,CL,CRCL`
+### 黄金与比特币跨资产联动
+- Pearson 30D/90D/180D 滚动相关性（PAXG/XAU）与金/BTC 比价矩阵。
+- 四象限机制：抗通胀避险共振 / 流动性分化背离 / 美元主导无差别挤压 / 独立加密 Alpha 周期。
+
+### 艾略特波浪与柳玉冬研判引擎 (Module 8)
+- **三大铁律严格核验**：浪2不破浪1起点（多空双向对偶）、浪3非最短驱动浪、推动浪浪4不入浪1领地。
+- **《波浪理论详解》手稿全量规则库**：驱动浪、斐波那契比率、单锯齿、平台形、收缩三角形、双重/三重锯齿与联合形；严格区分规则/比率/时间/软性打分。
+- **v3 柳氏实战信号层**（`docs/module8_wave_v3.md`）：监测点战法、最大回撤判据、0.618/0.7 吃掉判据、出身检验、级别阶梯嵌套计数、交替原则子形态识别。
+- **用户画浪评估**：`POST /api/wave/evaluate` 对用户手绘浪型做铁律校验与多级别证伪。
+- 语料仅作离线强化（`data/liu_wave_threads.json`），界面只研判 BTC/ETH；K 线经 Binance→Bybit→OKX 备用源链获取。
+
+---
+
+## 数据韧性与健康监测
+> 详见 [`docs/data_resilience.md`](docs/data_resilience.md)。核心目标：**任何模块都不能把过期的、备用源的或未核验的数据伪装成新鲜数据**。
+
+- **每源健康登记**（`server/data_health.js` + `data_health_policy.js`）：每个数据源记录尝试/成功回执/数据日期（`dataAsOf`，非接收时刻）/错误/备用来源/连续失败；状态机 `OK → FALLBACK → STALE → UNAVAILABLE / UNKNOWN`。
+- **时钟口径**：`lastSuccessAt` 仅被真实成功回执推进（fetch 成功 + schema 校验通过）；失败只推进 `lastAttemptAt`/`lastError`，**绝不推进成功时钟**。
+- **载荷校验**：各源对上游响应做 schema/递增日期/未来时间戳/有限正值校验，畸形载荷在覆盖缓存前被拒绝；持久化写盘走原子写。
+- **结论锁定**：required 源任一不可用即 `analysisAllowed=false`，实时结论被锁定（API 返回 `data_unavailable`，UI 显示暂停原因），历史曲线仍可浏览。
+- **统一健康面**：`GET /api/system/health` 汇总全部模块与生产者任务状态；`.github/workflows/data_health.yml` 每小时巡检线上健康端点（`DASHBOARD_HEALTH_URL`），异常时可经 `DATA_HEALTH_WEBHOOK_URL` 告警。
+- **单飞锁与备用源**：上游调用经 `fetchWithTimeout`（10s 超时/有限重试）+ 单飞 Promise 锁合并并发刷新；K 线/宏观数据有多源回退链并标记 `FALLBACK` 来源。
+
+---
+
+## 定时数据管线 (GitHub Actions)
+
+| 工作流 | 频率 | 产出 |
+|:---|:---|:---|
+| `macro_snapshot.yml` | 每 6 小时 | 宏观图、MSTR 披露账本+证据 artifact（14 天）、优先股/STRC 股息率 |
+| `mcclellan_daily.yml` | 每日 ×4 | McClellan 双轨宽度全量历史 |
+| `liquidity_hourly.yml` | 每小时 ×4 | Coinbase 深度快照档案 |
+| `block_insight_daily.yml` | 每日多次 | Module 4B 大宗流向、聪明钱、OI 历史 |
+| `option_flow_daily.yml` | 每日 | 期权全成交净额台账 + 做市商敞口历史 |
+| `data_health.yml` | 每小时 | 线上 `/api/system/health` 巡检与告警 |
+
+**仓库变量/密钥**：`SEC_USER_AGENT`（SEC 要求的申报方身份串，含联系邮箱，非密钥）、`DASHBOARD_HEALTH_URL`（健康端点）、`DATA_HEALTH_WEBHOOK_URL`（可选告警 webhook）。
 
 ---
 
@@ -133,29 +162,59 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
             │ Single-Flight Lock │       │ 10s IP Rate Limit  │
             │ & In-Memory Cache  │       │ (429 Anti-Abuse)   │
             └────────┬───────────┘       └────────────────────┘
-                     │ Resilient HTTP Client (10s AbortTimeout + Exponential Backoff)
+                     │ Resilient HTTP Client (10s Timeout + Backoff)
+                     │ Per-Source Health Registry + Schema Validation
                      ▼
   ┌─────────────────────────────────────────────────────────────┐
   │ Upstream Data Pipelines:                                    │
   │ • Greeks.live DataLab (X-Sign Authentication)               │
-  │ • Deribit Public API v2 (DVOL & Futures Book)               │
-  │ • Coinbase Exchange L2 REST API (Book & Candles)            │
-  │ • FRED API (WALCL / TGA / RRP CSV Ingestion)                │
-  │ • Coinglass Encrypted Channels (CDRI & MSTR AES-128 Decrypt)│
-  │ • TradingView Global Scanner                                │
+  │ • Deribit Public API v2 (DVOL / Futures / Book Summary)     │
+  │ • history.deribit.com (全成交台账回补)                       │
+  │ • Coinbase Exchange L2 REST API                             │
+  │ • Binance → Bybit → OKX K线备用源链                          │
+  │ • FRED API (WALCL / TGA / RRP / DGS 系列)                   │
+  │ • CoinGlass (CDRI / 资金费率 / ETF 流量)                     │
+  │ • strategy.com 官方披露 + SEC EDGAR (8-K/XBRL)              │
+  │ • TradingView Global Scanner / Hyperliquid                  │
   └─────────────────────────────────────────────────────────────┘
 ```
 
-1. **零外部依赖 (Zero Dependency)**：
-   - 生产环境除 Node.js 原生模块（`http`、`fs`、`path`、`zlib`、`crypto`、`url`）外，无需安装任何第三方 npm 运行时包。
-2. **带宽优化与协商缓存 (ETag & Gzip)**：
-   - 全接口响应体采用 MD5 Strong ETag 校验，当前端数据未发生变化时返回 `304 Not Modified`，0 响应体节省带宽。
-   - 启用动态 Gzip / Deflate 压缩传输，单次大数据集（约 1.5MB）体积压缩至 130KB 以下，传输性能提升 85%+。
-3. **并发防击穿与防护墙**：
-   - **Single-Flight 单例 Promise 锁**：合并并发刷新请求，防止上游交易所 API 因击穿而触发限频。
-   - **滑动窗口 IP 限流 (Rate Limiter)**：`/api/refresh` 接口限制单 IP 每 10 秒最多触发 1 次，防止外部恶意重放。
-4. **端到端 XSS 防护**：
-   - 前端全部动态插入点均通过 `escapeHtml` 严格转义，杜绝上游脏数据注入与 Cross-Site Scripting 风险。
+1. **零外部依赖**：生产环境仅 Node.js 原生模块（`http`、`fs`、`path`、`zlib`、`crypto`、`url`），无 npm 运行时包。
+2. **带宽优化与协商缓存**：MD5 Strong ETag + `304 Not Modified`；Gzip/Deflate 压缩（约 1.5MB 数据集压至 130KB 以下）。
+3. **并发防击穿**：Single-Flight 合并并发刷新；`/api/refresh` 单 IP 每 10 秒限 1 次。
+4. **端到端 XSS 防护**：全部动态插入点经 `escapeHtml` 转义。
+5. **离线降级诚实**：上游不可用时按源健康状态如实降级（FALLBACK/STALE/UNAVAILABLE），不用缓存伪装实时数据；Python 管线缺失时以 `pipelineUnavailable` 载入经核验的基准快照。
+
+---
+
+## 项目目录结构
+
+```
+├── server/                  # 后端引擎与数据采集（原生 Node.js，零依赖）
+│   ├── index.js             #   HTTP 路由与单飞刷新编排
+│   ├── analytics_engine.js  #   期权分析：Black-76 Greeks、Smile 两翼、25Δ Skew、时段归类
+│   ├── dealer_engine.js     #   做市商敞口全链重估、5档期限矩阵、交割断崖模拟
+│   ├── block_insight.js     #   Module 4B 大宗资金深度研判与家族分类
+│   ├── mstr_disclosures.js  #   MSTR 五源披露采集（证据哈希+修订历史+路径感知健康）
+│   ├── mstr_sec_model.js    #   SEC 8-K 正文解析与资本结构滚动推导
+│   ├── mstr_mnav.js         #   官方口径 mNAV（2026-07-23 版本化方法论）
+│   ├── data_health*.js      #   数据源健康登记、策略窗口、监控评估
+│   ├── audit_engine.js      #   统一审计/健康路径
+│   └── …                    #   各源 fetcher / term_curve / wave_engine / flow_force 等
+├── public/                  # 前端 SPA（ECharts + 暗色终端/画廊双主题）
+│   ├── index.html / app.js  #   主视图与渲染
+│   ├── mstr_disclosures_ui.js / data_health_ui.js / wave_ui.js …
+├── data/                    # 运行时数据与 CI 归档快照（由定时管线产出）
+├── scripts/                 # 定时任务入口与工具（macro_snapshot、option_flow_ledger…）
+│   ├── crypto_mcclellan/    #   McClellan Python 计量管线
+│   └── run_tests.js         #   测试运行器（沙箱副本，不写污染仓库）
+├── test/                    # 63 个测试文件 / 630 个用例（node:test，离线运行）
+├── .github/workflows/       # 6 条定时数据管线 + 健康巡检
+├── docs/                    # data_resilience / mstr_disclosures / module8_wave_v3 / crypto_breadth
+├── analyst_agent/           # 本地自用宏观评论 Agent（双视角方法论，不对外部署）
+├── tradingview/ tools/      # TradingView 抓取与工具脚本
+└── render.yaml              # Render 一键部署描述
+```
 
 ---
 
@@ -163,87 +222,77 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 
 ### 环境要求
 - **Node.js**: >= 18.0.0 (推荐 20.x 或 22.x LTS)
-- **npm**: >= 9.0.0
 
-### 1. 本地启动
+### 本地启动
 ```bash
-# 1. 克隆代码仓库
 git clone https://github.com/Bigdydydy/BIGDY-CRY-PTO-Dashboard.git
 cd BIGDY-CRY-PTO-Dashboard
-
-# 2. 启动服务 (默认端口 3000)
-npm start
-
-# 3. 打开浏览器访问
-http://localhost:3000
+npm start          # 默认端口 3000 → http://localhost:3000
 ```
 
-### 2. 环境变量支持
-| 变量名 | 默认值 | 作用说明 |
+### 环境变量
+| 变量名 | 默认值 | 说明 |
 |:---|:---|:---|
-| `PORT` | `3000` | Web 服务器监听端口 |
+| `PORT` | `3000` | Web 监听端口 |
+| `SEC_USER_AGENT` | — | SEC EDGAR 申报方身份串（含联系邮箱）；缺失时 SEC 源如实记录失败不发请求 |
+| `DATA_HEALTH_WEBHOOK_URL` | — | 可选：健康巡检告警 webhook |
 
-例如自定义端口运行：
-```bash
-PORT=8080 npm start
-```
-
-### 3. 云平台一键部署 (Render / Railway / Docker)
-项目已内置通用健康检查接口：
-- `GET /healthz` -> 返回 `200 OK`
-- `GET /api/health` -> 返回 `200 OK`
-- 监听地址默认绑定至 `0.0.0.0:${PORT}`，支持 Render 等容器云平台的无缝就绪探针（Readiness & Liveness Probe）。
+### 云平台部署
+项目内置 `render.yaml`（Render 一键部署）；健康检查端点 `GET /healthz`、`GET /api/health` 均返回 `200 OK`，监听 `0.0.0.0:${PORT}`。
 
 ---
 
 ## API 接口规范
 
-| 接口路径 | 方法 | 缓存/压缩 | 作用说明 |
+| 接口路径 | 方法 | 缓存/压缩 | 说明 |
 |:---|:---|:---|:---|
-| `/api/market-data` | `GET` | Gzip + ETag (304) | 获取期权 ATM IV、GEX 敞口、大宗拆单等核心曲面数据 |
-| `/api/term-premium` | `GET` | Gzip + ETag (304) | 获取真实期限点基差、期限利差与套利评分全量历史序列 |
-| `/api/etf-linkage` | `GET` | Gzip + ETag (304)，6h 缓存，`?force=1` 强制刷新 | ETF 资金 × CME 杠杆基金空头 × 基差联动验证结果与离岸对冲 OI |
-| `/api/coinbase-liquidity` | `GET` | Gzip + ETag (304) | 获取 Coinbase 订单簿多层级深度、金字塔倍数与滑点仿真 |
-| `/api/macro-chart` | `GET` | Gzip + ETag (304) | 获取美债收益率、FED 净流动性与 MSTR 链上持仓成本数据 |
-| `/api/crypto-mcclellan` | `GET` | Gzip + ETag (304) | 获取双轨加密麦克莱伦市场宽度振荡器、背离利差与宏观体制全量数据 |
-| `/api/cdri` | `GET` | Gzip + ETag (304) | 获取加密衍生品综合风险指数 (CDRI) 及历史分位 |
-| `/api/ssro` | `GET` | Gzip + ETag (304) | 获取稳定币供给比率振荡器 (SSRO) 宏观流动性指标 |
-| `/api/gold-correlation` | `GET` | Gzip + ETag (304) | 获取黄金与比特币滚动相关性、比价及四象限体制数据 |
-| `/api/wave/klines` | `GET` | 20 req/min IP 限流 | 币安合约/现货 K 线行情代理与缓存 (15m/1h/4h，最多 10000 根，按 endTime 分页拼接) |
-| `/api/wave/analysis` | `GET / POST` | 20 req/min IP 限流 | 柳玉冬波浪理论全量智能研判、铁律校验与候选集引擎 |
-| `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游数据源强制同步拉取并重算 |
-| `/healthz` | `GET / HEAD` | 即时响应 | 云端部署健康检查端点 |
+| `/api/market-data` | `GET` | Gzip + ETag | ATM IV、GEX、Smile、25Δ Skew、大宗拆单全量曲面 |
+| `/api/option-marks` | `GET` | Gzip + ETag | Deribit 全链 mark 快照（含远期价） |
+| `/api/block-insight` | `GET` | Gzip + ETag | Module 4B 资金流向、行权价热力、聪明钱 |
+| `/api/term-curve` | `GET` | Gzip + ETag | Deribit 期货期限曲线（真实合约点） |
+| `/api/term-premium` | `GET` | Gzip + ETag | 基差期限结构、利差与套利评分历史 |
+| `/api/etf-linkage` | `GET` | Gzip + ETag，`?force=1` | ETF 资金 × CME 空头 × 基差联动验证 |
+| `/api/mstr-preferreds` | `GET` | Gzip + ETag | STRC/STRF/STRK/STRD/STRE 优先股定价与股息率 |
+| `/api/mstr-disclosures` | `GET` | Gzip + ETag | MSTR 官方披露账本、资本结构、官方 mNAV |
+| `/api/macro-chart` | `GET` | Gzip + ETag | 美债收益率、FED 净流动性、MSTR 成本 |
+| `/api/cdri` | `GET` | Gzip + ETag | 加密衍生品综合风险指数及分位 |
+| `/api/ssro` | `GET` | Gzip + ETag | 稳定币供给比率振荡器 |
+| `/api/flow-force` | `GET` | Gzip + ETag | BTC 主导力量 2×2 场域矩阵 |
+| `/api/coinbase-liquidity` | `GET` | Gzip + ETag | 多层级深度、金字塔倍数、滑点仿真 |
+| `/api/coinbase-liquidity-history` | `GET` | Gzip + ETag | 逐时深度档案 |
+| `/api/gold-correlation` | `GET` | Gzip + ETag | 金/BTC 滚动相关性与四象限 |
+| `/api/crypto-mcclellan` | `GET` | Gzip + ETag | 双轨宽度振荡器、背离利差、体制 |
+| `/api/system/health` | `GET` | 即时 | 全模块+生产者统一健康面（OK/DEGRADED/UNAVAILABLE） |
+| `/api/refresh` | `POST` | 10s IP 限流 | 触发全量上游同步重算 |
+| `/api/wave/klines` | `GET` | 20 req/min | K 线代理（Binance→Bybit→OKX 备用链） |
+| `/api/wave/analysis` | `GET/POST` | 20 req/min | 波浪理论智能研判与候选集引擎 |
+| `/api/wave/evaluate` | `POST` | 20 req/min | 用户画浪铁律校验与证伪 |
+| `/healthz` `/api/health` | `GET/HEAD` | 即时 | 部署健康检查 |
 
-### Python 计量科学计算管线 (Quantitative Pipelines)
-系统内置完备的 Python 科学计算与计量分析管线（位于 `scripts/`）：
-
-1. **双轨加密麦克莱伦市场宽度管线 (`scripts/crypto_mcclellan/`)**：
+### Python 计量科学计算管线
 ```bash
 pip install -r scripts/crypto_mcclellan/requirements.txt
 python scripts/crypto_mcclellan/export_to_json.py
 ```
-> **注**：在无 Python 运行时环境（如轻量级 Node.js 容器）中，服务端将自动以 `pipelineUnavailable` 机制诚实响应，无缝载入经过核验的基准全量快照，不产生虚假解算反馈。
+> 无 Python 环境时服务端自动以 `pipelineUnavailable` 诚实降级，载入经核验的基准快照。
 
 ---
 
 ## 自动化单元测试
 
-测试套件基于 Node.js 原生测试运行器 `node:test` 与严格断言 `node:assert/strict` 编写，无需安装 Jest 或 Mocha，完全离线运行。
+基于 Node.js 原生 `node:test` + `node:assert/strict`，无需 Jest/Mocha，完全离线运行。
 
 ```bash
-npm test
+npm test    # 63 个测试文件 / 630 个用例（test/ 复制到沙箱执行，不写污染仓库）
 ```
 
-### 测试用例覆盖
-- [x] **ATM IV 极限分位数测试**：验证 `percentile === 0.0%` 时类型转换无缺陷，杜绝 `undefined%` 字符串污染。
-- [x] **DVOL 数据缺失降级测试**：验证历史统计数据缺失时，平滑降级至绝对波动率常模。
-- [x] **动态 GEX 算法验证**：验证 Call Wall（阻力位）、Put Wall（支撑位）以及到期日动态推进。
-- [x] **大宗拆单聚合聚类验证**：验证时间窗口内的冰山订单聚合与多腿组合拆解。
-- [x] **Black-76 希腊字母算法**：验证 Delta、Gamma、Vega、Theta 解析数学准确度。
-- [x] **RAMO 风险调整动量算法与惩罚项验证**：验证 LP 惩罚项、换手率缩放与零收益边界。
-- [x] **麦克莱伦双轨振荡器与四象限宏观体制**：验证 EMA19-EMA39 差值放大、背离利差与象限状态机。
-- [x] **ETag 协商缓存**：验证 MD5 生成、`If-None-Match` 一致时返回 304 及零响应体。
-- [x] **Gzip 传输压缩**：验证大响应体自动压缩与 `Content-Encoding: gzip` 响应头。
+覆盖：Black-76 Greeks 与远期定价、Smile 两翼与 wingRegime 分类、期限矩阵与交割断崖、时段归类、冰山聚合、GEX/做市商敞口三口径敏感性、MSTR 披露账本（修订合并/证据哈希/SEC 回退/官方 mNAV）、RAMO 与四象限体制、数据源健康状态机与时钟口径、ETag/Gzip 协商缓存、波浪规则引擎等。
+
+---
+
+## 关联组件：本地宏观评论 Agent
+
+`analyst_agent/` 是一套**本地自用**的双视角宏观策略评论 agent（Esther × Robin Brooks 方法论合成），含 FRED/Yahoo/财政部 85 指标快照层、观点台账与回测框架，由 Claude Code 会话按 `analyst_agent/AGENT.md` 运行，不对外部署、与 Dashboard 服务相互独立。
 
 ---
 
