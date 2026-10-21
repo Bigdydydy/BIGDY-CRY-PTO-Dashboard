@@ -2947,68 +2947,100 @@
   ],
   "evidence": {},
   "mnav": {
-    "computedAt": "2026-10-21T05:09:43.144Z",
-    "priceAsOf": "2026-10-21T05:09:41.979Z",
+    "computedAt": "2026-10-21T05:49:01.459Z",
+    "priceAsOf": "2026-10-21T05:49:09.051Z",
     "mstrPriceUsd": 142.72000122070312,
-    "btcPriceUsd": 82847.34,
+    "btcPriceUsd": 82715.87,
     "btcSource": "coinbase",
     "mstrSource": "yahoo",
-    "result": null,
-    "issues": [
-      "missing_input:capital",
-      "missing_input:shares"
-    ]
+    "capitalSource": "sec",
+    "capitalAsOf": "2026-10-18",
+    "result": {
+      "mnav": 1.1045,
+      "netBtcUsd": 55086136021,
+      "netBtcBtc": 665968.1633,
+      "netBpsUsd": 129.21,
+      "fdso": 426322075,
+      "usdAssetsUsd": 5277300000,
+      "claimsUsd": 20376985844,
+      "methodologyVersion": "2026-07-23",
+      "itmConverts": [],
+      "otmConverts": [
+        "Convert 2028",
+        "Convert 2029",
+        "Convert 2030 B",
+        "Convert 2030 A",
+        "Convert 2031",
+        "Convert 2032"
+      ],
+      "strkItm": false,
+      "strkConversionPrice": 1000.0531,
+      "fdsoBreakdown": {
+        "basic": 422353257,
+        "options": 3106115,
+        "rsu": 862703,
+        "converts": 0,
+        "strk": 0
+      },
+      "inputs": {
+        "mstrPriceUsd": 142.72000122070312,
+        "btcPriceUsd": 82715.87,
+        "capitalAsOf": "2026-10-18"
+      },
+      "issues": []
+    },
+    "issues": []
   },
   "dataHealth": {
     "sources": {
       "mstr_official_ledger": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
-        "source": null,
+        "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 1,
+        "consecutiveFailures": 2,
         "issues": [],
         "available": false
       },
       "mstr_official_shares": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
-        "source": null,
+        "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 1,
+        "consecutiveFailures": 2,
         "issues": [],
         "available": false
       },
       "mstr_official_capital": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
-        "source": null,
+        "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 1,
+        "consecutiveFailures": 2,
         "issues": [],
         "available": false
       },
       "mstr_official_press": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
-        "source": null,
+        "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 1,
+        "consecutiveFailures": 2,
         "issues": [],
         "available": false
       },
       "mstr_sec_index": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
-        "lastSuccessAt": "2026-10-21T05:09:43.144Z",
-        "dataAsOf": "2026-10-21T05:09:43.144Z",
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
+        "lastSuccessAt": "2026-10-21T05:49:01.459Z",
+        "dataAsOf": "2026-10-21T05:49:01.459Z",
         "asOfKind": "received",
         "source": "https://data.sec.gov/submissions/CIK0001050446.json",
         "lastError": null,
@@ -3017,18 +3049,1267 @@
         "available": true
       },
       "mstr_mnav_inputs": {
-        "lastAttemptAt": "2026-10-21T05:09:43.144Z",
-        "lastSuccessAt": null,
-        "dataAsOf": null,
-        "asOfKind": null,
-        "source": null,
-        "lastError": "missing_input:capital; missing_input:shares",
-        "consecutiveFailures": 1,
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
+        "lastSuccessAt": "2026-10-21T05:49:01.459Z",
+        "dataAsOf": "2026-10-21T05:49:01.459Z",
+        "asOfKind": "received",
+        "source": "yahoo+coinbase",
+        "lastError": null,
+        "consecutiveFailures": 0,
         "issues": [],
-        "available": false
+        "available": true
+      },
+      "mstr_sec_filings": {
+        "lastAttemptAt": "2026-10-21T05:49:01.459Z",
+        "lastSuccessAt": "2026-10-21T05:49:01.459Z",
+        "dataAsOf": "2026-10-21T05:49:01.459Z",
+        "asOfKind": "received",
+        "source": "https://data.sec.gov/submissions/CIK0001050446.json",
+        "lastError": null,
+        "consecutiveFailures": 0,
+        "issues": [],
+        "available": true
       }
     }
   },
-  "lastAttemptAt": "2026-10-21T05:09:43.144Z",
-  "lastCompletedAt": null
+  "lastAttemptAt": "2026-10-21T05:49:01.459Z",
+  "lastCompletedAt": "2026-10-21T05:49:10.050Z",
+  "secDocs": {
+    "0001193125-26-424688": {
+      "accession": "0001193125-26-424688",
+      "filedOn": "2026-10-19",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526424688/mstr-20261019.htm",
+      "sha256": "8dcc075b24df72c1cd3f4da21e8dd3798e04bc22db956b8d921eb07c7c9f794d",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-10-18",
+          "holdingsBtc": 848517,
+          "aggregateCostUsd": 64020000000,
+          "averageCostUsd": 75446
+        }
+      ],
+      "usd": {
+        "asOf": "2026-10-18",
+        "usdReserveUsd": 4830000000,
+        "usdCashUsd": 447300000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-10-12",
+          "periodEnd": "2026-10-18",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 140872
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-10-12",
+          "periodEnd": "2026-10-18",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1938780,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-423400": {
+      "accession": "0001193125-26-423400",
+      "filedOn": "2026-10-16",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526423400/mstr-20261015.htm",
+      "sha256": "0332d02d33fa3c4dbdea5cdc41260abac51e5083f452ab196c5fcc8a0424e503",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-10-15",
+        "effectiveFrom": "2026-11-01",
+        "ratePct": 12,
+        "previousPct": null,
+        "action": "set",
+        "conditional": true,
+        "accession": "0001193125-26-423400",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526423400/mstr-20261015.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-419726": {
+      "accession": "0001193125-26-419726",
+      "filedOn": "2026-10-13",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526419726/mstr-20261012.htm",
+      "sha256": "eea9da499dabeef38d38513b981d62e46dca58d40858ae731fed4c5012d51e65",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-413164": {
+      "accession": "0001193125-26-413164",
+      "filedOn": "2026-10-05",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526413164/mstr-20261005.htm",
+      "sha256": "2dee6ac1943d525829a68e48caa6ad62e15b5277c1db7bb8d4201732db0bee8d",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-09-30",
+          "holdingsBtc": 847666,
+          "aggregateCostUsd": 63950000000,
+          "averageCostUsd": 75436
+        },
+        {
+          "asOf": "2026-10-04",
+          "holdingsBtc": 848000,
+          "aggregateCostUsd": 63970000000,
+          "averageCostUsd": 75440
+        }
+      ],
+      "usd": {
+        "asOf": "2026-10-04",
+        "usdReserveUsd": 4880000000,
+        "usdCashUsd": 833400000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-09-28",
+          "periodEnd": "2026-09-30",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        },
+        {
+          "kind": "atm",
+          "periodStart": "2026-10-01",
+          "periodEnd": "2026-10-04",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 92894
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-09-28",
+          "periodEnd": "2026-09-30",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1033168,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-10-01",
+          "periodEnd": "2026-10-04",
+          "shares": {
+            "STRF": 0,
+            "STRC": 740634,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-409863": {
+      "accession": "0001193125-26-409863",
+      "filedOn": "2026-10-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526409863/mstr-20260930.htm",
+      "sha256": "5f6aacddb374e89be3f15bc2e40bb2fbc5817ad71d40044d2c0113681f1dfe68",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-09-30",
+        "effectiveFrom": "2026-10-16",
+        "ratePct": 12,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-409863",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526409863/mstr-20260930.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-403417": {
+      "accession": "0001193125-26-403417",
+      "filedOn": "2026-09-28",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526403417/mstr-20260914.htm",
+      "sha256": "d0b17d24cc17721a707f0c060db1155b8c53845dfc45cdab642517029362baf6",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-09-27",
+          "holdingsBtc": 847666,
+          "aggregateCostUsd": 63950000000,
+          "averageCostUsd": 75437
+        }
+      ],
+      "usd": {
+        "asOf": "2026-09-27",
+        "usdReserveUsd": 5020000000,
+        "usdCashUsd": 1000000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-09-21",
+          "periodEnd": "2026-09-27",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 1469165
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-09-21",
+          "periodEnd": "2026-09-27",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1534530,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-401636": {
+      "accession": "0001193125-26-401636",
+      "filedOn": "2026-09-25",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526401636/mstr-20260924.htm",
+      "sha256": "4ace7984bafc22f7fb9b0a181d6c44f307d899dc0454c3d73fa9d63e27915529",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-396093": {
+      "accession": "0001193125-26-396093",
+      "filedOn": "2026-09-21",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526396093/mstr-20260914.htm",
+      "sha256": "7f9dcbadf8c2bf092acafebe1eda2da7cb99a7669d3d44047ea9e0a9c16d0dab",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-09-20",
+          "holdingsBtc": 846000,
+          "aggregateCostUsd": 63800000000,
+          "averageCostUsd": 75416
+        }
+      ],
+      "usd": {
+        "asOf": "2026-09-20",
+        "usdReserveUsd": 5040000000,
+        "usdCashUsd": 1050000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-09-14",
+          "periodEnd": "2026-09-20",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1771238,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-389858": {
+      "accession": "0001193125-26-389858",
+      "filedOn": "2026-09-14",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526389858/mstr-20260914.htm",
+      "sha256": "dd12263444145e3fb2cb44e2e25a87d0ff6553920b45e191eb49defa7d217fc2",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-09-13",
+          "holdingsBtc": 845050,
+          "aggregateCostUsd": 63730000000,
+          "averageCostUsd": 75412
+        }
+      ],
+      "usd": {
+        "asOf": "2026-09-13",
+        "usdReserveUsd": 5100000000,
+        "usdCashUsd": 1300000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-09-08",
+          "periodEnd": "2026-09-13",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1420467,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-384402": {
+      "accession": "0001193125-26-384402",
+      "filedOn": "2026-09-08",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526384402/mstr-20260831.htm",
+      "sha256": "3727c5c7b98334620c2c68f957729c072eb3dbee82536cd72c584715151202e7",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-09-07",
+          "holdingsBtc": 845050,
+          "aggregateCostUsd": 63730000000,
+          "averageCostUsd": 75412
+        }
+      ],
+      "usd": {
+        "asOf": "2026-09-07",
+        "usdReserveUsd": 5100000000,
+        "usdCashUsd": 1440000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-08-31",
+          "periodEnd": "2026-09-07",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1810885,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-377583": {
+      "accession": "0001193125-26-377583",
+      "filedOn": "2026-09-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526377583/mstr-20260831.htm",
+      "sha256": "2caca982477308b795504358ed8b07bfccdcc0c59e96d90a403086115a634fb2",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-08-31",
+        "effectiveFrom": "2026-09-16",
+        "ratePct": 12,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-377583",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526377583/mstr-20260831.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-375463": {
+      "accession": "0001193125-26-375463",
+      "filedOn": "2026-08-31",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526375463/mstr-20260831.htm",
+      "sha256": "a09b2ff5d8eee89520ae37118f1bf1f2fbc1555709c6b74bb4995ff1968d3906",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-08-30",
+          "holdingsBtc": 845050,
+          "aggregateCostUsd": 63730000000,
+          "averageCostUsd": 75412
+        }
+      ],
+      "usd": {
+        "asOf": "2026-08-30",
+        "usdReserveUsd": 5100000000,
+        "usdCashUsd": 1610000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-08-24",
+          "periodEnd": "2026-08-30",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 4531421
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-08-24",
+          "periodEnd": "2026-08-30",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1557177,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-361845": {
+      "accession": "0001193125-26-361845",
+      "filedOn": "2026-08-24",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526361845/mstr-20260824.htm",
+      "sha256": "f2f6ec7edc99d439a7962234fbd460fa04c4a1ca26437a663fdbd2eec4af65bb",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-08-23",
+          "holdingsBtc": 840447,
+          "aggregateCostUsd": 63360000000,
+          "averageCostUsd": 75385
+        }
+      ],
+      "usd": {
+        "asOf": "2026-08-23",
+        "usdReserveUsd": 5100000000,
+        "usdCashUsd": 1590000000
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-08-17",
+          "periodEnd": "2026-08-23",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 18261118
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-08-17",
+          "periodEnd": "2026-08-23",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1431212,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-353240": {
+      "accession": "0001193125-26-353240",
+      "filedOn": "2026-08-17",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526353240/mstr-20260817.htm",
+      "sha256": "735676fe4781e13efed0b9efab026d6d392eb9dcdb837528e879b63a5289539f",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-08-16",
+          "holdingsBtc": 840447,
+          "aggregateCostUsd": 63360000000,
+          "averageCostUsd": 75385
+        }
+      ],
+      "usd": {
+        "asOf": "2026-08-16",
+        "usdReserveUsd": 4800000000,
+        "usdCashUsd": null
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-08-10",
+          "periodEnd": "2026-08-16",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 3458866
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-08-10",
+          "periodEnd": "2026-08-16",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1388720,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-341297": {
+      "accession": "0001193125-26-341297",
+      "filedOn": "2026-08-10",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526341297/mstr-20260810.htm",
+      "sha256": "0ab433ef1f6b03577fbf252459e25eb0e96c940d617e154a14aa00bcda1eeb76",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-08-09",
+          "holdingsBtc": 840447,
+          "aggregateCostUsd": 63360000000,
+          "averageCostUsd": 75385
+        }
+      ],
+      "usd": {
+        "asOf": "2026-08-09",
+        "usdReserveUsd": 4650000000,
+        "usdCashUsd": null
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-08-03",
+          "periodEnd": "2026-08-09",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 6585682
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-08-03",
+          "periodEnd": "2026-08-09",
+          "shares": {
+            "STRF": 0,
+            "STRC": 1152020,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-329565": {
+      "accession": "0001193125-26-329565",
+      "filedOn": "2026-08-03",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526329565/mstr-20260803.htm",
+      "sha256": "4c9765a165c6934fdb94bc17ae6a94f7aeeb5d3363929f2adf9e7a126b4b3b2e",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-08-02",
+          "holdingsBtc": 842138,
+          "aggregateCostUsd": 63510000000,
+          "averageCostUsd": 75419
+        }
+      ],
+      "usd": {
+        "asOf": "2026-08-02",
+        "usdReserveUsd": 4000000000,
+        "usdCashUsd": null
+      },
+      "strcRate": {
+        "announcedOn": "2026-07-31",
+        "effectiveFrom": "2026-08-16",
+        "ratePct": 12,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-329565",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526329565/mstr-20260803.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-07-27",
+          "periodEnd": "2026-08-02",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 3011361
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-07-27",
+          "periodEnd": "2026-08-02",
+          "shares": {
+            "STRF": 0,
+            "STRC": 912143,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001050446-26-000036": {
+      "accession": "0001050446-26-000036",
+      "filedOn": "2026-07-31",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000105044626000036/mstr-20260730.htm",
+      "sha256": "8be7c60208db54cfaa1ac1c10159c28f5a2155c08751b0d2f853a6c8c5e3dd23",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001628280-26-051027": {
+      "accession": "0001628280-26-051027",
+      "filedOn": "2026-07-30",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000162828026051027/mstr-20260730.htm",
+      "sha256": "ce09db3ab4362f188499c7d3f724c7477219641e0e7a65b59805d5b3a09e7666",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-316917": {
+      "accession": "0001193125-26-316917",
+      "filedOn": "2026-07-27",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526316917/mstr-20260727.htm",
+      "sha256": "14f4ab24b40650cd6a20078ffeba314e659b720f9a311a2836fc21dfb95a9629",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-07-26",
+          "holdingsBtc": 843775,
+          "aggregateCostUsd": 63690000000,
+          "averageCostUsd": 75476
+        }
+      ],
+      "usd": {
+        "asOf": "2026-07-26",
+        "usdReserveUsd": 3750000000,
+        "usdCashUsd": null
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-07-20",
+          "periodEnd": "2026-07-26",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 5429160
+          }
+        },
+        {
+          "kind": "repurchase",
+          "periodStart": "2026-07-20",
+          "periodEnd": "2026-07-26",
+          "shares": {
+            "STRF": 0,
+            "STRC": 288930,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 0
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-308369": {
+      "accession": "0001193125-26-308369",
+      "filedOn": "2026-07-20",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526308369/mstr-20260720.htm",
+      "sha256": "71ee44c78601ecc3b85e74cfe798f75d519dbf0059bae536a4c19f87a8ef3309",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-07-19",
+          "holdingsBtc": 843775,
+          "aggregateCostUsd": 63690000000,
+          "averageCostUsd": 75476
+        }
+      ],
+      "usd": {
+        "asOf": "2026-07-19",
+        "usdReserveUsd": 3225000000,
+        "usdCashUsd": null
+      },
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-07-13",
+          "periodEnd": "2026-07-19",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 2732318
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-286871": {
+      "accession": "0001193125-26-286871",
+      "filedOn": "2026-06-29",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526286871/mstr-20260629.htm",
+      "sha256": "44f4d216670bb4f2195424d3096fb90e26cea9ada1a86e3cd5f2737d35d1b653",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-06-28",
+          "holdingsBtc": 847363,
+          "aggregateCostUsd": 64100000000,
+          "averageCostUsd": 75651
+        }
+      ],
+      "usd": {
+        "asOf": "2026-06-28",
+        "usdReserveUsd": 2550000000,
+        "usdCashUsd": null
+      },
+      "strcRate": {
+        "announcedOn": "2026-06-29",
+        "effectiveFrom": "2026-07-01",
+        "ratePct": 12,
+        "previousPct": null,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-26-286871",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526286871/mstr-20260629.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-06-22",
+          "periodEnd": "2026-06-28",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 12669017
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-249768": {
+      "accession": "0001193125-26-249768",
+      "filedOn": "2026-06-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526249768/mstr-20260530.htm",
+      "sha256": "edc42155e48c775ed54d9e10875067f614aa2fbd50b3d4ff5c9fc040d641e84f",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-05-31",
+          "holdingsBtc": 843706,
+          "aggregateCostUsd": 63870000000,
+          "averageCostUsd": 75699
+        }
+      ],
+      "usd": {
+        "asOf": "2026-05-31",
+        "usdReserveUsd": 900000000,
+        "usdCashUsd": null
+      },
+      "strcRate": {
+        "announcedOn": "2026-05-31",
+        "effectiveFrom": "2026-06-01",
+        "ratePct": 11.5,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-249768",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526249768/mstr-20260530.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-05-26",
+          "periodEnd": "2026-05-31",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 801994
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-199155": {
+      "accession": "0001193125-26-199155",
+      "filedOn": "2026-05-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526199155/mstr-20250902.htm",
+      "sha256": "2ed93898c5b3dd3c84cc27808560e5b22cabc7722074fc985c84b682366f38c7",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-04-30",
+        "effectiveFrom": "2026-05-01",
+        "ratePct": 11.5,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-199155",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526199155/mstr-20250902.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-135765": {
+      "accession": "0001193125-26-135765",
+      "filedOn": "2026-04-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526135765/mstr-20250902.htm",
+      "sha256": "3234f05c5a72eb22677d6ec80d668566a7e20cbf29fbf6a51e9c327de785617f",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-03-31",
+        "effectiveFrom": "2026-04-01",
+        "ratePct": 11.5,
+        "previousPct": null,
+        "action": "maintain",
+        "conditional": false,
+        "accession": "0001193125-26-135765",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526135765/mstr-20250902.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-130446": {
+      "accession": "0001193125-26-130446",
+      "filedOn": "2026-03-30",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526130446/mstr-20260223.htm",
+      "sha256": "cb7da80870f44eb58908691a685ac7d3aa0befde06b8ed2c9a0dbbbab0226d47",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-03-29",
+          "holdingsBtc": 762099,
+          "aggregateCostUsd": 57690000000,
+          "averageCostUsd": 75694
+        }
+      ],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-084264": {
+      "accession": "0001193125-26-084264",
+      "filedOn": "2026-03-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526084264/mstr-20260228.htm",
+      "sha256": "e06c695ab2cd2ed437dd410c9dddf6f5c7430dc0116291a5c0582c60cc9bea05",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-03-01",
+          "holdingsBtc": 720737,
+          "aggregateCostUsd": 54770000000,
+          "averageCostUsd": 75985
+        }
+      ],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-02-28",
+        "effectiveFrom": "2026-03-01",
+        "ratePct": 11.5,
+        "previousPct": 11.25,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-26-084264",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526084264/mstr-20260228.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-02-23",
+          "periodEnd": "2026-03-01",
+          "shares": {
+            "STRF": 0,
+            "STRC": 71590,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 1730563
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-033573": {
+      "accession": "0001193125-26-033573",
+      "filedOn": "2026-02-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526033573/mstr-20260202.htm",
+      "sha256": "3e5ab9b632b12d4b8ec122dfdb620c92d7babaa88f006615097afb2152ea803a",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-032731": {
+      "accession": "0001193125-26-032731",
+      "filedOn": "2026-02-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526032731/mstr-20260131.htm",
+      "sha256": "a7a10641c74a2c9479f1c53c44aeb78c4da14a00f6319606ef911f8e9b8492d5",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2026-02-01",
+          "holdingsBtc": 713502,
+          "aggregateCostUsd": 54260000000,
+          "averageCostUsd": 76052
+        }
+      ],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2026-01-31",
+        "effectiveFrom": "2026-02-01",
+        "ratePct": 11.25,
+        "previousPct": 11,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-26-032731",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526032731/mstr-20260131.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2026-01-26",
+          "periodEnd": "2026-02-01",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 673527
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-26-000264": {
+      "accession": "0001193125-26-000264",
+      "filedOn": "2026-01-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526000264/mstr-20251117.htm",
+      "sha256": "0fa85ccd8cb82e50f48a561749062ca47ce635962eb050b0279e0701be40cd59",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2025-12-31",
+        "effectiveFrom": "2026-01-01",
+        "ratePct": 11,
+        "previousPct": 10.75,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-26-000264",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526000264/mstr-20251117.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-332296": {
+      "accession": "0001193125-25-332296",
+      "filedOn": "2025-12-29",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525332296/mstr-20251117.htm",
+      "sha256": "3ecebc5f2611006ad7f844bb67d5450ab172789af31cf949f51dbe228024a5b9",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2025-12-28",
+          "holdingsBtc": 672497,
+          "aggregateCostUsd": 50440000000,
+          "averageCostUsd": 74997
+        }
+      ],
+      "usd": null,
+      "strcRate": null,
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2025-12-22",
+          "periodEnd": "2025-12-28",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 663450
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-25-303157": {
+      "accession": "0001193125-25-303157",
+      "filedOn": "2025-12-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525303157/d69948d8k.htm",
+      "sha256": "6c36a295d6db0a16b26156a0d26df948640743c0cae3183006aabf2837fd6440",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2025-11-30",
+          "holdingsBtc": 650000,
+          "aggregateCostUsd": 48380000000,
+          "averageCostUsd": 74436
+        }
+      ],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2025-11-30",
+        "effectiveFrom": "2025-12-01",
+        "ratePct": 10.75,
+        "previousPct": 10.5,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-25-303157",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525303157/d69948d8k.htm"
+      },
+      "flows": [
+        {
+          "kind": "atm",
+          "periodStart": "2025-11-17",
+          "periodEnd": "2025-11-30",
+          "shares": {
+            "STRF": 0,
+            "STRC": 0,
+            "STRK": 0,
+            "STRD": 0,
+            "MSTR": 8214000
+          }
+        }
+      ],
+      "issues": []
+    },
+    "0001193125-25-258690": {
+      "accession": "0001193125-25-258690",
+      "filedOn": "2025-10-30",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525258690/mstr-20251030.htm",
+      "sha256": "5fa947bede203be203b4c8cba2ae44f5e9a06048555dc1e51d6beda6fbba3a11",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2025-10-30",
+        "effectiveFrom": "2025-11-01",
+        "ratePct": 10.5,
+        "previousPct": 10.25,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-25-258690",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525258690/mstr-20251030.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-225904": {
+      "accession": "0001193125-25-225904",
+      "filedOn": "2025-10-01",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525225904/d807448d8k.htm",
+      "sha256": "488c1c00f3bdf54575249fc8934728c2030aac76300c746f5941903da319884c",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-225038": {
+      "accession": "0001193125-25-225038",
+      "filedOn": "2025-09-30",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525225038/d939712d8k.htm",
+      "sha256": "2473424b1b5a107a82d17765d560d1307ea10ed668199efd7cee80b0e2d979de",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2025-09-30",
+        "effectiveFrom": "2025-10-01",
+        "ratePct": 10.25,
+        "previousPct": 10,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-25-225038",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525225038/d939712d8k.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-221772": {
+      "accession": "0001193125-25-221772",
+      "filedOn": "2025-09-29",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525221772/mstr-20250902.htm",
+      "sha256": "7ca26bb7913ec331d4b30407e8f8aa312085404fd673ff66b8df95b63006f2ec",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2025-09-28",
+          "holdingsBtc": 640031,
+          "aggregateCostUsd": 47350000000,
+          "averageCostUsd": 73983
+        }
+      ],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-193487": {
+      "accession": "0001193125-25-193487",
+      "filedOn": "2025-09-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525193487/d80677d8k.htm",
+      "sha256": "8ebad67bc04a9f1dce51924ee736b3573631a7aa6cb57227276bb39cb9e6b52d",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": {
+        "announcedOn": "2025-08-31",
+        "effectiveFrom": "2025-09-01",
+        "ratePct": 10,
+        "previousPct": 9,
+        "action": "increase",
+        "conditional": false,
+        "accession": "0001193125-25-193487",
+        "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525193487/d80677d8k.htm"
+      },
+      "flows": [],
+      "issues": []
+    },
+    "0001050446-25-000008": {
+      "accession": "0001050446-25-000008",
+      "filedOn": "2025-09-02",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000105044625000008/mstr-20250902.htm",
+      "sha256": "96ccf81736e41a76d6490327ed36788724001d5108e9040e3cdb3823867a8a63",
+      "parserVersion": 1,
+      "holdings": [
+        {
+          "asOf": "2025-09-01",
+          "holdingsBtc": 636505,
+          "aggregateCostUsd": 46950000000,
+          "averageCostUsd": 73765
+        }
+      ],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-190363": {
+      "accession": "0001193125-25-190363",
+      "filedOn": "2025-08-28",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525190363/d18414d8k.htm",
+      "sha256": "1cee093c42cdadce316735a87e86cd5518531e709e63471d17e6df8ace7c01cc",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-25-170550": {
+      "accession": "0001193125-25-170550",
+      "filedOn": "2025-07-31",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525170550/d83620d8k.htm",
+      "sha256": "c23a76d70dec65ae7d66b86b5a635dbe98982029e0e7468777d635d6fdd6af1f",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0000950170-25-100916": {
+      "accession": "0000950170-25-100916",
+      "filedOn": "2025-07-31",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000095017025100916/mstr-20250731.htm",
+      "sha256": "5514b42bdefbb844c0833135eb045d345f61b862210b24ec1b4de07bf613cab8",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    }
+  },
+  "secXbrl": {
+    "fetchedAt": "2026-10-21T05:49:01.459Z",
+    "longTermDebt": {
+      "value": 6709928000,
+      "periodEnd": "2026-06-30",
+      "filedOn": "2026-08-03",
+      "form": "10-Q",
+      "accession": "0001050446-26-000044"
+    },
+    "optionsOutstanding": {
+      "value": 3176000,
+      "periodEnd": "2026-06-30",
+      "filedOn": "2026-08-03",
+      "form": "10-Q",
+      "accession": "0001050446-26-000044"
+    }
+  },
+  "requiredSources": [
+    "mstr_sec_index",
+    "mstr_sec_filings",
+    "mstr_mnav_inputs"
+  ]
 }

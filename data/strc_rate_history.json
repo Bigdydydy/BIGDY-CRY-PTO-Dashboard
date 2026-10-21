@@ -1,0 +1,164 @@
+{
+  "months": {
+    "2025-07": {
+      "ratePct": 9,
+      "effectiveFrom": null,
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525193487/d80677d8k.htm",
+      "accession": "0001193125-25-193487",
+      "inferred": true,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2025-08": {
+      "ratePct": 9,
+      "effectiveFrom": null,
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525193487/d80677d8k.htm",
+      "accession": "0001193125-25-193487",
+      "inferred": true,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2025-09": {
+      "ratePct": 10,
+      "effectiveFrom": "2025-09-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525193487/d80677d8k.htm",
+      "accession": "0001193125-25-193487",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2025-10": {
+      "ratePct": 10.25,
+      "effectiveFrom": "2025-10-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525225038/d939712d8k.htm",
+      "accession": "0001193125-25-225038",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2025-11": {
+      "ratePct": 10.5,
+      "effectiveFrom": "2025-11-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525258690/mstr-20251030.htm",
+      "accession": "0001193125-25-258690",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2025-12": {
+      "ratePct": 10.75,
+      "effectiveFrom": "2025-12-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525303157/d69948d8k.htm",
+      "accession": "0001193125-25-303157",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-01": {
+      "ratePct": 11,
+      "effectiveFrom": "2026-01-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526000264/mstr-20251117.htm",
+      "accession": "0001193125-26-000264",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-02": {
+      "ratePct": 11.25,
+      "effectiveFrom": "2026-02-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526032731/mstr-20260131.htm",
+      "accession": "0001193125-26-032731",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-03": {
+      "ratePct": 11.5,
+      "effectiveFrom": "2026-03-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526084264/mstr-20260228.htm",
+      "accession": "0001193125-26-084264",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-04": {
+      "ratePct": 11.5,
+      "effectiveFrom": "2026-04-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526135765/mstr-20250902.htm",
+      "accession": "0001193125-26-135765",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-05": {
+      "ratePct": 11.5,
+      "effectiveFrom": "2026-05-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526199155/mstr-20250902.htm",
+      "accession": "0001193125-26-199155",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-06": {
+      "ratePct": 11.5,
+      "effectiveFrom": "2026-06-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526249768/mstr-20260530.htm",
+      "accession": "0001193125-26-249768",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-07": {
+      "ratePct": 12,
+      "effectiveFrom": "2026-07-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526286871/mstr-20260629.htm",
+      "accession": "0001193125-26-286871",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-08": {
+      "ratePct": 12,
+      "effectiveFrom": "2026-07-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526286871/mstr-20260629.htm",
+      "accession": "0001193125-26-286871",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-09": {
+      "ratePct": 12,
+      "effectiveFrom": "2026-08-16",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526329565/mstr-20260803.htm",
+      "accession": "0001193125-26-329565",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-10": {
+      "ratePct": 12,
+      "effectiveFrom": "2026-09-16",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526377583/mstr-20260831.htm",
+      "accession": "0001193125-26-377583",
+      "inferred": false,
+      "conditional": false,
+      "observedAt": "2026-10-21T05:49:10.056Z"
+    }
+  }
+}
