@@ -53,6 +53,8 @@ jobs:
           git add data/macro_chart.json data/mstr_preferreds_cache.json data/job_health_macro_snapshot.json
           # 披露快照是可选新产物：缺失不阻塞其它部分产物的提交
           if [ -f data/mstr_disclosures.json ]; then git add data/mstr_disclosures.json; fi
+          # STRC 月度股息率历史只能靠逐期采集累积，必须随快照提交才能跨部署保留
+          if [ -f data/strc_rate_history.json ]; then git add data/strc_rate_history.json; fi
           if git diff --cached --quiet; then
             echo "No changes; skipping commit."
             exit 0

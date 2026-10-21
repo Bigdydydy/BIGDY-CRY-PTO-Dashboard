@@ -586,6 +586,34 @@ describe('MstrDisclosuresUI', () => {
     world.UI.applyPayload(p2);
     summary = allText(mdEl(world, '#mstr-disclosure-summary'));
     assert.ok(summary.includes('官方口径 mNAV：输入不足，未计算'));
-    assert.ok(summary.includes('invalid_mstr_price'), 'reason surfaces from the record');
+    assert.ok(summary.includes('MSTR 价格无效'), 'reason surfaces from the record, in plain language');
+  });
+
+  it('non-positive Net BPS renders 不适用 instead of a negative multiple; issue codes are translated', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now(), {
+      officialMnav: {
+        computedAt: '2026-10-03T12:00:00.000Z', priceAsOf: '2026-10-03T11:58:00.000Z',
+        mstrPriceUsd: 300, btcPriceUsd: 1000, btcSource: 'coinbase', mstrSource: 'yahoo',
+        issues: [],
+        result: {
+          mnav: -0.0185, netBtcUsd: -12345678900, netBtcBtc: -12345678.9, netBpsUsd: -16213.4,
+          fdso: 426322075, usdAssetsUsd: 4833000000, claimsUsd: 17163235844,
+          methodologyVersion: '2026-07-23', itmConverts: [], otmConverts: ['Convert 2029'],
+          strkItm: false, strkConversionPrice: 1000,
+          fdsoBreakdown: { basic: 422353257, options: 3106115, rsu: 862703, converts: 0, strk: 0 },
+          inputs: { mstrPriceUsd: 300, btcPriceUsd: 1000, capitalAsOf: '2026-10-19' },
+          issues: ['net_bps_nonpositive', 'strk_strike_fallback', 'unmapped_instrument:Convert 2033']
+        }
+      }
+    });
+    world.UI.applyPayload(p);
+    const summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('官方口径 mNAV：不适用'), 'flagged as not applicable');
+    assert.ok(summary.includes('Net BPS -$16,213.40'), 'negative Net BPS shown with a leading minus');
+    assert.ok(!summary.includes('-0.02×'), 'no negative multiple rendered');
+    assert.ok(!summary.includes('net_bps_nonpositive'), 'raw code not shown');
+    assert.ok(summary.includes('STRK 转股价缺少披露数据'), 'remaining issues translated');
+    assert.ok(summary.includes('未识别的可转债 (仅计入名义本金，未计转股股数)：Convert 2033'), 'parameterised code keeps its argument');
   });
 });

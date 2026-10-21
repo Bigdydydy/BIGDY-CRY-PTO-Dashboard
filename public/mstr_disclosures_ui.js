@@ -77,8 +77,33 @@
     return (v === null || v === undefined || !isFinite(v)) ? '--' : '$' + (v / 1e9).toFixed(2) + 'B';
   }
   function fmtUsd2(v) {
-    return (v === null || v === undefined || !isFinite(v)) ? '--'
-      : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (v === null || v === undefined || !isFinite(v)) return '--';
+    var n = Number(v);
+    return (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // computeOfficialMnav 的问题代码 -> 中文说明；带参数的代码形如 'unmapped_instrument:Convert 2033'
+  var MNAV_ISSUE_TEXT = {
+    net_bps_nonpositive: 'Net BPS ≤ 0，倍数无经济含义',
+    strk_strike_fallback: 'STRK 转股价缺少披露数据，按约 $1,000 近似',
+    stre_fx_missing: 'STRE 缺少官方欧元汇率，按 1:1 计入',
+    fdso_nonpositive: '完全稀释股数异常 (≤ 0)',
+    invalid_mstr_price: 'MSTR 价格无效',
+    invalid_btc_price: 'BTC 价格无效'
+  };
+  var MNAV_ISSUE_PREFIX = {
+    unmapped_instrument: '未识别的可转债 (仅计入名义本金，未计转股股数)',
+    missing_input: '缺少输入'
+  };
+  function describeMnavIssues(codes) {
+    return codes.map(function (code) {
+      if (MNAV_ISSUE_TEXT[code]) return MNAV_ISSUE_TEXT[code];
+      var i = String(code).indexOf(':');
+      if (i > 0 && MNAV_ISSUE_PREFIX[code.slice(0, i)]) {
+        return MNAV_ISSUE_PREFIX[code.slice(0, i)] + '：' + code.slice(i + 1);
+      }
+      return String(code);
+    }).join('；');
   }
   function fmtHmUtc(v) {
     if (!v) return '--';
@@ -231,7 +256,17 @@
     var mnavWrap = lastPayload.officialMnav;
     var mnavRes = mnavWrap && mnavWrap.result;
     var mnavVal = mnavRes && mnavRes.mnav;
-    if (typeof mnavVal === 'number' && isFinite(mnavVal)) {
+    var mnavIssueList = (mnavRes && mnavRes.issues) || (mnavWrap && mnavWrap.issues) || [];
+    // Net BPS <= 0 时 mNAV 数值在数学上有定义但没有经济含义 (负数或无穷大)，不能当倍数展示
+    var netBpsNonPositive = mnavRes && (mnavIssueList.indexOf('net_bps_nonpositive') >= 0
+      || (typeof mnavRes.netBpsUsd === 'number' && mnavRes.netBpsUsd <= 0));
+    if (netBpsNonPositive) {
+      box.appendChild(node('div',
+        '官方口径 mNAV：不适用 — 净债权超过 BTC 储备与美元资产之和 (Net BPS ' +
+        fmtUsd2(mnavRes.netBpsUsd) + ' ≤ 0)，倍数没有经济含义'));
+      var restIssues = mnavIssueList.filter(function (c) { return c !== 'net_bps_nonpositive'; });
+      if (restIssues.length) box.appendChild(node('div', '官方 mNAV 注记: ' + describeMnavIssues(restIssues)));
+    } else if (typeof mnavVal === 'number' && isFinite(mnavVal)) {
       var px = mnavRes.inputs || {};
       var line = '官方口径 mNAV (' + (mnavRes.methodologyVersion || '--') + ' 方法) ' +
         mnavVal.toFixed(2) + '× · Net BPS ' + fmtUsd2(mnavRes.netBpsUsd) +
@@ -240,17 +275,15 @@
         ' (' + (mnavWrap.btcSource || '--') + ', ' + fmtHmUtc(mnavWrap.priceAsOf || mnavWrap.computedAt) + ')' +
         ' · 披露输入推算估计值';
       box.appendChild(node('div', line));
-      var mnavIssues = mnavRes.issues || mnavWrap.issues || [];
-      if (mnavIssues.length) {
-        box.appendChild(node('div', '官方 mNAV 注记: ' + mnavIssues.join('；')));
+      if (mnavIssueList.length) {
+        box.appendChild(node('div', '官方 mNAV 注记: ' + describeMnavIssues(mnavIssueList)));
       }
       box.appendChild(node('div',
         '新旧口径不可比：官方 mNAV 自 2026-07-23 改用 Net BPS/FDSO 方法，' +
         '与旧 EV 口径历史/估算序列不可直接拼接或比较。'));
     } else {
-      var mnavWhy = (mnavWrap && mnavWrap.issues) || (mnavRes && mnavRes.issues) || [];
       box.appendChild(node('div',
-        '官方口径 mNAV：输入不足，未计算' + (mnavWhy.length ? '（' + mnavWhy.join('；') + '）' : '')));
+        '官方口径 mNAV：输入不足，未计算' + (mnavIssueList.length ? '（' + describeMnavIssues(mnavIssueList) + '）' : '')));
     }
     var rc = lastPayload.revisionCount || 0;
     if (rc > 0) box.appendChild(node('div', '历史修订记录 ' + rc + ' 条（保留原始版本）'));

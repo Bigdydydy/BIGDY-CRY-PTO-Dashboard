@@ -3627,21 +3627,28 @@ function renderPreferredsSummary(s, monthly) {
     setText('pref-spread-pct-sub', `高于过去 1 年 ${s.juniorSpreadPercentile1y}% 的交易日`);
   }
 
-  // 指标二依赖手动维护的 STRC 月度股息率
+  // 指标二：STRC 月度股息率由官网 /debt 自动按月记录，手动配置补历史月份
   const m = s.strcLatestRatedMonth;
+  const cov = s.strcRateCoverage || {};
   if (!s.strcRateConfigured || !m) {
-    setText('pref-tbill-val', '待配置');
-    setText('pref-tbill-sub', '在 data/mstr_preferreds.json 填写月度股息率');
-    setText('pref-gap-val', '待配置');
+    const why = cov.officialStatus === 'unavailable'
+      ? '官网股息率暂未采集到'
+      : '尚无股息率记录';
+    setText('pref-tbill-val', '暂无数据');
+    setText('pref-tbill-sub', `${why}；可在 data/mstr_preferreds.json 手动补录`);
+    setText('pref-gap-val', '暂无数据');
     setText('pref-gap-chip', '--', 'mm-chip');
     setText('pref-gap-sub', '需 STRC 月度股息率');
     return;
   }
+  const rateSource = m.rateSource === 'official' ? '官网' : '手动';
   setText('pref-tbill-val', m.spreadOverTbillPct !== null ? `${m.spreadOverTbillPct.toFixed(2)}%` : '--');
-  setText('pref-tbill-sub', `${m.month} 股息率 ${m.ratePct.toFixed(2)}%，T-bill ${m.tbill1mPct?.toFixed(2) ?? '--'}%`);
+  setText('pref-tbill-sub', `${m.month} 股息率 ${m.ratePct.toFixed(2)}% (${rateSource})，T-bill ${m.tbill1mPct?.toFixed(2) ?? '--'}%`);
   setText('pref-gap-val', `${s.hikeFailedMonths} / ${s.hikeMonths}`);
   setText('pref-gap-chip', m.hikeFailed ? '本月触发' : '本月未触发', `mm-chip ${m.hikeFailed ? 'chip-negative' : 'chip-positive'}`);
-  setText('pref-gap-sub', `隐含利率缺口 ${m.impliedGapBp} bp (回到 $100 还需加息)`);
+  const months = (cov.officialMonths || 0) + (cov.manualMonths || 0);
+  const coverage = months < 2 ? ' · 仅 1 个月数据，需至少 2 个月才能判断上调' : ` · 共 ${months} 个月`;
+  setText('pref-gap-sub', `隐含利率缺口 ${m.impliedGapBp} bp${coverage}`);
 }
 
 function renderPreferredsCharts() {

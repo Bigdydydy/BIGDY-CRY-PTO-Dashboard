@@ -40,20 +40,7 @@ async function main() {
     recordStep(JOB, 'macro', { ok: false, error: err });
   }
 
-  try {
-    const pref = await getPreferredsData(true);
-    console.log('[macro_snapshot] preferreds', pref.summary.asOf, 'sources', JSON.stringify(pref.summary.sources));
-    recordStep(JOB, 'preferreds', {
-      ok: allSourcesOk(pref),
-      error: allSourcesOk(pref) ? null : new Error(`preferreds health ${pref.dataHealth?.state || 'missing dataHealth'}`),
-      dataAsOf: pref.summary && pref.summary.asOf ? pref.summary.asOf : null
-    });
-  } catch (err) {
-    // 优先股数据失败不影响宏观快照提交，但心跳必须如实记录
-    console.warn('[macro_snapshot] preferreds failed:', err.message);
-    recordStep(JOB, 'preferreds', { ok: false, error: err });
-  }
-
+  // 披露采集排在优先股之前：优先股构建会读取本轮刚采集的 STRC 官方股息率
   try {
     // Strategy 官方披露采集 (issuer ledger/shares + SEC filing index):
     // the step is ok only when every disclosure source verified this scan.
@@ -71,6 +58,21 @@ async function main() {
   } catch (err) {
     console.warn('[macro_snapshot] mstr_disclosures failed:', err.message);
     recordStep(JOB, 'mstr_disclosures', { ok: false, error: err });
+  }
+
+  try {
+    const pref = await getPreferredsData(true);
+    console.log('[macro_snapshot] preferreds', pref.summary.asOf, 'sources', JSON.stringify(pref.summary.sources),
+      'strc rate', JSON.stringify(pref.summary.strcRateCoverage));
+    recordStep(JOB, 'preferreds', {
+      ok: allSourcesOk(pref),
+      error: allSourcesOk(pref) ? null : new Error(`preferreds health ${pref.dataHealth?.state || 'missing dataHealth'}`),
+      dataAsOf: pref.summary && pref.summary.asOf ? pref.summary.asOf : null
+    });
+  } catch (err) {
+    // 优先股数据失败不影响宏观快照提交，但心跳必须如实记录
+    console.warn('[macro_snapshot] preferreds failed:', err.message);
+    recordStep(JOB, 'preferreds', { ok: false, error: err });
   }
 
   const job = finishJob(JOB);

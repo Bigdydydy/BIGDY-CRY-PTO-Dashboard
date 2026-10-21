@@ -17,8 +17,88 @@ const MAX_FUTURE_MS = 5 * 60 * 1000;
 const isPosNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
   !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v)) && Number(v) > 0;
 
+// STRC 月度股息率历史：由官网 /debt 的 strc_metrics 自动按月记录 (Actions 快照会提交该文件，跨部署累积)
+const STRC_RATE_HISTORY_FILE = path.join(__dirname, '..', 'data', 'strc_rate_history.json');
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 let inMemoryCache = null;
 let lastFetchTime = 0;
+
+function loadStrcRateHistory() {
+  try {
+    if (fs.existsSync(STRC_RATE_HISTORY_FILE)) {
+      const h = JSON.parse(fs.readFileSync(STRC_RATE_HISTORY_FILE, 'utf8'));
+      if (h && h.months && typeof h.months === 'object') return h;
+    }
+  } catch (err) {
+    console.error('[Preferreds] Error reading STRC rate history:', err.message);
+  }
+  return { months: {} };
+}
+
+/**
+ * 从已采集的官方披露 (strategy.com/debt) 读取 STRC 当期股息率并按月归档。
+ * strc_metrics.dividend 是当期年化股息率，next_record_date 是该期的记录日 (月末)，
+ * 所以以记录日所在月份为键。只读取披露服务已保存的状态 (peek)，不触发网络请求。
+ */
+async function recordOfficialStrcRate(history, {
+  // 延迟加载：披露服务依赖较多，避免与本模块形成加载期耦合
+  peek = () => require('./mstr_disclosures').peekMstrDisclosures(),
+  file = STRC_RATE_HISTORY_FILE,
+  now = () => new Date()
+} = {}) {
+  let disc;
+  try {
+    disc = await peek();
+  } catch (err) {
+    return { status: 'unavailable', reason: err.message };
+  }
+  const strc = Array.isArray(disc && disc.preferreds) ? disc.preferreds.find(p => p && p.ticker === 'STRC') : null;
+  const rate = strc ? strc.dividendPct : null;
+  if (!strc || typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0
+      || typeof strc.nextRecordDate !== 'string' || !ISO_DAY.test(strc.nextRecordDate)) {
+    return { status: 'unavailable', reason: 'no STRC dividend in disclosure snapshot' };
+  }
+  const month = strc.nextRecordDate.slice(0, 7);
+  const prev = history.months[month];
+  if (prev && prev.ratePct === rate) return { status: 'unchanged', month };
+  history.months[month] = {
+    ratePct: rate,
+    recordDate: strc.nextRecordDate,
+    source: strc.sourceUrl || 'https://www.strategy.com/debt',
+    capitalAsOf: disc.capital && disc.capital.asOf ? disc.capital.asOf : null,
+    observedAt: now().toISOString(),
+    ...(prev ? { revisedFrom: prev.ratePct } : {})
+  };
+  try {
+    atomicWriteJson(file, history, 2);
+  } catch (err) {
+    console.error('[Preferreds] Failed to save STRC rate history:', err.message);
+  }
+  return { status: prev ? 'revised' : 'recorded', month };
+}
+
+/**
+ * 官方自动记录 + 手动配置合并。手动配置用于回填官方记录开始之前的月份；
+ * 同一月份两者不一致时以官方为准，并在 issues 中注明。
+ */
+function mergeStrcRates(history, manual) {
+  const rates = {};
+  const sourceOf = {};
+  const issues = [];
+  for (const [month, v] of Object.entries(manual || {})) {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) { rates[month] = v; sourceOf[month] = 'manual'; }
+  }
+  for (const [month, rec] of Object.entries(history.months || {})) {
+    if (!rec || typeof rec.ratePct !== 'number') continue;
+    if (sourceOf[month] === 'manual' && rates[month] !== rec.ratePct) {
+      issues.push(`strc_rate_conflict:${month}:manual=${rates[month]},official=${rec.ratePct}`);
+    }
+    rates[month] = rec.ratePct;
+    sourceOf[month] = 'official';
+  }
+  return { rates, sourceOf, issues };
+}
 
 function loadConfig() {
   try {
@@ -116,7 +196,10 @@ async function fetchAndBuildPreferreds() {
   const config = loadConfig();
   const coupons = config.fixedCouponPct || { STRF: 10, STRD: 10 };
   const thresholds = config.spreadThresholdsPct || { watch: 3.5, stress: 4.5 };
-  const strcRates = config.strcMonthlyRatePct || {};
+  const rateHistory = loadStrcRateHistory();
+  const officialRate = await recordOfficialStrcRate(rateHistory);
+  const { rates: strcRates, sourceOf: strcRateSourceOf, issues: strcRateIssues } =
+    mergeStrcRates(rateHistory, config.strcMonthlyRatePct);
 
   // Every required leg must succeed. A failed/malformed leg throws — the
   // caller falls back to the COMPLETE prior payload and never lets a
@@ -208,6 +291,7 @@ async function fetchAndBuildPreferreds() {
     monthly.push({
       month,
       ratePct: rate,
+      rateSource: rate !== null ? strcRateSourceOf[month] : null,
       avgPrice: round(avgPx),
       tbill1mPct: round(tb),
       currentYieldPct: round(currentYield),
@@ -238,6 +322,12 @@ async function fetchAndBuildPreferreds() {
     spreadThresholdsPct: thresholds,
     strcRateConfigured: ratedMonths.length > 0,
     strcLatestRatedMonth: lastRated,
+    strcRateCoverage: {
+      officialMonths: ratedMonths.filter(m => m.rateSource === 'official').length,
+      manualMonths: ratedMonths.filter(m => m.rateSource === 'manual').length,
+      officialStatus: officialRate.status,
+      issues: strcRateIssues
+    },
     hikeFailedMonths: monthly.filter(m => m.hikeFailed).length,
     hikeMonths: monthly.filter(m => m.hiked).length,
     sources,
@@ -350,4 +440,7 @@ async function getPreferredsData(forceRefresh = false) {
   return withDataHealth(inMemoryCache, REQUIRED_IDS);
 }
 
-module.exports = { getPreferredsData };
+module.exports = {
+  getPreferredsData,
+  _internal: { recordOfficialStrcRate, mergeStrcRates }
+};
