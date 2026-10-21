@@ -16,6 +16,8 @@ function stubModule(rel, exportsObj) {
 }
 
 const NOW = Date.now();
+// 磁盘归档的日期相对 NOW 计算：写死日期会在超过 ARCHIVE 策略的 3 天 dataWarn 后把 FALLBACK 变成 STALE
+const ARCHIVE_DATE = new Date(NOW - 86400000).toISOString().slice(0, 10);
 const TRADE = {
   trade_id: 't1', instrument_name: 'BTC-26DEC26-100000-C',
   direction: 'buy', amount: 5, price: 0.02, index_price: 80000, timestamp: NOW
@@ -87,14 +89,14 @@ function loadFetcher(shared = {}) {
       }
       // Real basis_fetcher seeds the archive from disk: FALLBACK, never OK.
       health.seedSource('basis_history', {
-        dataAsOf: '2026-10-18',
+        dataAsOf: ARCHIVE_DATE,
         lastSuccessAt: new Date(Date.now() - 60000).toISOString(),
         source: 'disk'
       });
       return {
         metadata: { feed: { liveOk: s.tpMode === 'live', liveError: s.tpMode === 'stale' ? 'curve stale' : null } },
         current: { timestamp: Date.now(), date: new Date().toISOString().slice(0, 10) },
-        series: [{ date: '2026-10-18' }]
+        series: [{ date: ARCHIVE_DATE }]
       };
     }
   });
