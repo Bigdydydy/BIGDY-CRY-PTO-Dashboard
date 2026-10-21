@@ -38,6 +38,7 @@ const volSurfaceHistory = require('./vol_surface_history');
 const { analyzeDealerExposure } = require('./dealer_engine');
 const optionFlowLedger = require('./option_flow_ledger');
 const dealerHistory = require('./dealer_history');
+const { getMstrDisclosures, POLL_MS: MSTR_DISCLOSURE_POLL_MS } = require('./mstr_disclosures');
 
 /**
  * Coinbase ±200bps 盘口深度 (Module 6 的缓存)，用于对冲流量级对比；最多等 2.5 秒，取不到时返回 null
@@ -1007,6 +1008,21 @@ async function handleApiRequest(req, res, parsedUrl) {
     return;
   }
 
+  // GET /api/mstr-disclosures?force=1 — Strategy 官方披露账本 (issuer ledger /
+  // shares + SEC filing discovery). The payload carries its own persisted,
+  // receipt-bound dataHealth — do NOT rebind via withApiHealth.
+  if (pathname === '/api/mstr-disclosures' && req.method === 'GET') {
+    try {
+      const forceParam = parsedUrl.query?.force === '1';
+      const data = await getMstrDisclosures(forceParam);
+      sendJsonResponse(req, res, 200, { code: 0, ...data });
+    } catch (err) {
+      console.error('[API Error] mstr-disclosures:', err);
+      sendJsonResponse(req, res, 502, { code: -1, error: 'mstr disclosures collection failed' });
+    }
+    return;
+  }
+
   // GET /api/macro-chart
   if (pathname === '/api/macro-chart' && req.method === 'GET') {
     try {
@@ -1847,6 +1863,15 @@ function startServer() {
       console.warn('[Server] Background macro sync error:', e.message);
     }
   }, 300000);
+
+  // Strategy 官方披露采集：轻量 collector，每 5 分钟检查一次，不依赖浏览器是否
+  // 打开 (无 isServerIdle 检查)。宿主休眠时仍然无法运行——此时依赖 GitHub Actions
+  // 的六小时 producer job (macro_snapshot workflow) 与磁盘快照。
+  getMstrDisclosures()
+    .catch(e => console.warn('[Server] Initial MSTR disclosures warning:', e.message));
+  setInterval(() => {
+    getMstrDisclosures().catch(e => console.warn('[Server] MSTR disclosures poll error:', e.message));
+  }, MSTR_DISCLOSURE_POLL_MS).unref();
 }
 
 if (require.main === module) {

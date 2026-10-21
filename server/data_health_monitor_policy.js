@@ -11,7 +11,8 @@ const MONITOR_LIVE_MODULES = Object.freeze([
   'whale_block_trades', 'iv_smile_and_skew', 'coinbase_orderbook_liquidity',
   'gold_btc_correlation', 'ssro_oscillator', 'crypto_mcclellan_breadth',
   'cdri', 'mstr_preferreds', 'etf_linkage', 'flow_force', 'wave_engine',
-  'block_insight', 'option_marks', 'option_oi_history', 'coinbase_liquidity_history'
+  'block_insight', 'option_marks', 'option_oi_history', 'coinbase_liquidity_history',
+  'mstr_disclosures'
 ]);
 
 const SNAPSHOT_CHECKS = Object.freeze([
@@ -77,6 +78,15 @@ const SNAPSHOT_CHECKS = Object.freeze([
     track: 'frontier',
     seriesCountField: 'frontier_n',
     sourcePolicy: 'mcclellan_frontier'
+  },
+  {
+    id: 'mstr_disclosures_snapshot',
+    file: 'mstr_disclosures.json',
+    kind: 'source_metadata',
+    sources: [
+      'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
+      'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'
+    ]
   }
 ]);
 

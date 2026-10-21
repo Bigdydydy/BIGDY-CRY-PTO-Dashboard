@@ -464,6 +464,33 @@ async function getSystemAuditData(doProbe = false) {
       sourceIds: ['block_flow', 'smart_money']
     },
     {
+      id: 'mstr_disclosures',
+      name: 'Strategy 官方披露采集',
+      viewId: 'view-overview',
+      primarySource: 'Strategy 官方 BTC 账本与股数表 + 资本结构页 + 公告索引 + SEC submissions 申报索引 + 官方 mNAV 输入 (Yahoo MSTR / Coinbase BTC)',
+      targetEndpoints: [
+        'https://www.strategy.com/ledger',
+        'https://www.strategy.com/shares',
+        'https://www.strategy.com/debt',
+        'https://www.strategy.com/press',
+        'https://data.sec.gov/submissions/CIK0001050446.json',
+        'https://query1.finance.yahoo.com/v8/finance/chart/MSTR',
+        'https://api.exchange.coinbase.com/products/BTC-USD/ticker'
+      ],
+      timeframe: '事件披露与资本结构；公告/SEC 仅标题级发现，正文未核验；官方 mNAV 按 2026-07-23 方法由披露输入推算',
+      updateInterval: '常驻实例每 5 分钟检查',
+      isRealtime: false,
+      provenanceSignatures: [
+        'STRATEGY_ISSUER_LEDGER',
+        'STRATEGY_REPORTED_SHARES',
+        'STRATEGY_CAPITAL_SNAPSHOT',
+        'STRATEGY_PRESS_INDEX',
+        'SEC_FILING_DISCOVERY_ONLY',
+        'STRATEGY_MNAV_2026_07_23'
+      ],
+      sourceIds: ['mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital', 'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs']
+    },
+    {
       id: 'option_marks',
       name: 'Deribit 期权标记价 (mark IV / forward)',
       viewId: 'view-options',

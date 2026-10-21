@@ -32,7 +32,7 @@ function greenDataDir(dir) {
   const fresh = NOW - 60e3;
   const okStep = () => ({ status: 'ok', lastAttemptAt: iso(fresh), lastSuccessAt: iso(fresh), lastError: null, dataAsOf: null, verifiedSkip: false });
   const jobs = {
-    macro_snapshot: ['macro', 'preferreds'],
+    macro_snapshot: ['macro', 'preferreds', 'mstr_disclosures'],
     liquidity_hourly: ['samples'],
     block_insight_daily: ['option_oi', 'block_trades', 'marks'],
     mcclellan_daily: ['pipeline']
@@ -49,6 +49,9 @@ function greenDataDir(dir) {
     JSON.stringify(srcMeta(['macro', 'fred:DGS1', 'fred:DGS10', 'fred:WALCL', 'fred:WTREGEN', 'fred:RRPONTSYD', 'macro_btc', 'yahoo:MSTR'])));
   fs.writeFileSync(path.join(dir, 'mstr_preferreds_cache.json'),
     JSON.stringify(srcMeta(['preferreds', 'yahoo:STRC', 'yahoo:STRF', 'yahoo:STRD', 'fred:DGS1MO'])));
+  fs.writeFileSync(path.join(dir, 'mstr_disclosures.json'),
+    JSON.stringify(srcMeta(['mstr_official_ledger', 'mstr_official_shares',
+      'mstr_official_capital', 'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'])));
   fs.writeFileSync(path.join(dir, 'coinbase_liquidity_history.json'), JSON.stringify({ samples: [{ ts: fresh, n: 3 }] }));
   fs.writeFileSync(path.join(dir, 'option_oi_history_BTC.json'), JSON.stringify({ snapshots: [{ ts: fresh }] }));
   fs.writeFileSync(path.join(dir, 'block_flow_daily_BTC.json'), JSON.stringify({ days: {} }));

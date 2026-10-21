@@ -11,6 +11,7 @@
  */
 const { fetchAndBuildMacroData } = require('../server/macro_fetcher');
 const { getPreferredsData } = require('../server/mstr_preferreds');
+const { getMstrDisclosures } = require('../server/mstr_disclosures');
 const { beginJob, recordStep, finishJob } = require('../server/pipeline_health');
 
 const JOB = 'macro_snapshot';
@@ -51,6 +52,25 @@ async function main() {
     // 优先股数据失败不影响宏观快照提交，但心跳必须如实记录
     console.warn('[macro_snapshot] preferreds failed:', err.message);
     recordStep(JOB, 'preferreds', { ok: false, error: err });
+  }
+
+  try {
+    // Strategy 官方披露采集 (issuer ledger/shares + SEC filing index):
+    // the step is ok only when every disclosure source verified this scan.
+    const disc = await getMstrDisclosures(true);
+    const ok = allSourcesOk(disc);
+    console.log('[macro_snapshot] mstr_disclosures', disc.lastCompletedAt,
+      'state', disc.dataHealth && disc.dataHealth.state);
+    recordStep(JOB, 'mstr_disclosures', {
+      ok,
+      error: ok ? null : new Error(`mstr disclosures health ${disc.dataHealth?.state || 'missing dataHealth'}`),
+      // lastCompletedAt is the last FULLY accepted scan — a failed scan keeps
+      // the older success-bound timestamp, never stamps a fresh success.
+      dataAsOf: disc.lastCompletedAt || null
+    });
+  } catch (err) {
+    console.warn('[macro_snapshot] mstr_disclosures failed:', err.message);
+    recordStep(JOB, 'mstr_disclosures', { ok: false, error: err });
   }
 
   const job = finishJob(JOB);

@@ -24,7 +24,7 @@ const DEFAULT_DATA_DIR = path.join(__dirname, '..', 'data');
 
 // Expected producer steps per job (fixed contract with the monitor rules).
 const EXPECTED_STEPS = Object.freeze({
-  macro_snapshot: ['macro', 'preferreds'],
+  macro_snapshot: ['macro', 'preferreds', 'mstr_disclosures'],
   liquidity_hourly: ['samples'],
   block_insight_daily: ['option_oi', 'block_trades', 'marks'],
   mcclellan_daily: ['pipeline']

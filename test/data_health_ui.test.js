@@ -326,3 +326,266 @@ describe('DataHealthUI', () => {
     }
   });
 });
+
+// ===========================================================================
+// MstrDisclosuresUI — disclosure ledger truthfulness
+// ===========================================================================
+const MD_UI_SRC = fs.readFileSync(path.join(__dirname, '..', 'public', 'mstr_disclosures_ui.js'), 'utf8');
+const MD_SELS = ['#mstr-disclosures', '#mstr-disclosure-status', '#mstr-disclosure-summary',
+  '#mstr-disclosure-events', '#mstr-disclosure-refresh', '#mstr-disclosure-filings-list',
+  '#mstr-disclosure-announcements'];
+
+function mdPayload(nowMs, overrides = {}) {
+  const iso = new Date(nowMs).toISOString();
+  const srcOk = () => ({ state: 'OK', lastAttemptAt: iso, lastSuccessAt: iso, lastError: null,
+    policy: { fetchWarnMs: 600000, fetchBlockMs: 3600000 } });
+  return {
+    schemaVersion: 1, lastAttemptAt: iso, lastCompletedAt: iso,
+    latest: { id: 'strategy-ledger:blt2', reportedOn: '2026-10-02', holdingsBtc: 1100,
+      averageCostUsd: 50000, aggregateCostUsd: 55000000 },
+    shares: { asOf: '2026-10-01', basicShares: 100000, assumedDilutedShares: 120000,
+      fullyDilutedShares: null },
+    capital: { id: 'strategy-capital:2026-10-02', asOf: '2026-10-02',
+      cashUsd: 4833000000, debtUsd: 6714000000, prefUsd: 13556668500,
+      annualDividendsUsd: 806.613, btcHoldings: 1100, basicShares: 100000 },
+    instruments: [{ id: 'strategy-debt:bltc1', name: 'Convert 2028', notionalUsd: 1010000000,
+      couponPct: 0.625, strikeUsd: 183.19, maturityDate: '2028-09-16' }],
+    preferreds: [
+      { id: 'strategy-pref:STRC', ticker: 'STRC', dividendPct: 12,
+        nextPayoutDate: '2026-11-15', nextRecordDate: '2026-10-31', sharesOutstanding: 85982656 },
+      { id: 'strategy-pref:STRF', ticker: 'STRF', dividendPct: 10,
+        nextPayoutDate: '2026-12-31', nextRecordDate: '2026-12-15', sharesOutstanding: 12839689 }
+    ],
+    announcements: [
+      { id: 'strategy-press:bltp1', uid: 'bltp1',
+        title: 'Strategy Acquires 250 BTC and Repurchases $192 Million of STRC',
+        publishedOn: '2026-10-02', type: 'Press Release',
+        url: 'https://www.strategy.com/press/strategy-acquires-250-btc_10-02-2026',
+        kinds: ['BTC_PURCHASE', 'STRC_REPURCHASE'], issues: [] },
+      { id: 'strategy-press:bltp2', uid: 'bltp2',
+        title: 'Strive Adds $50 Million of STRC to its Corporate Treasury',
+        publishedOn: '2026-10-01', type: 'Press Release',
+        url: 'https://www.strategy.com/press/strive-adds-50m-strc_10-01-2026',
+        kinds: ['OTHER_MENTION'], issues: [] }
+    ],
+    events: [
+      { id: 'strategy-ledger:blt2', reportedOn: '2026-10-02', type: 'BTC_PURCHASE', deltaBtc: 100,
+        transactionAverageUsd: 50000, transactionCashUsd: 5000000, holdingsBtc: 1100,
+        averageCostUsd: 50000, issues: [],
+        sourceUrl: 'https://strategy.com/ledger', documentUrl: 'https://strategy.com/pdfs/x.pdf' },
+      { id: 'strategy-ledger:blt1', reportedOn: '2026-10-01', type: 'BTC_PURCHASE', deltaBtc: 1000,
+        transactionAverageUsd: 50000, transactionCashUsd: 50000000, holdingsBtc: 1000,
+        averageCostUsd: 50000, issues: [],
+        sourceUrl: 'https://strategy.com/ledger',
+        documentUrl: 'https://www.sec.gov/Archives/edgar/data/1050446/x.htm' }
+    ],
+    revisionCount: 0,
+    filings: [{ accession: 'x', form: '8-K', filedOn: '2026-10-02',
+      documentUrl: 'https://www.sec.gov/Archives/edgar/data/1050446/000119312526000001/mstr.htm',
+      status: 'contents_not_verified' }],
+    officialMnav: null,
+    reconciliationIssues: [],
+    coverage: { btc: 'issuer_reported', shares: 'issuer_reported', sec: 'index_only',
+      strc: 'announcements_only', capitalStructure: 'issuer_reported', officialMnav: 'not_computed' },
+    dataHealth: { state: 'OK', summary: '', sources: {
+      mstr_official_ledger: srcOk(), mstr_official_shares: srcOk(),
+      mstr_official_capital: srcOk(), mstr_official_press: srcOk(), mstr_sec_index: srcOk(),
+      mstr_mnav_inputs: srcOk() } },
+    ...overrides
+  };
+}
+
+// Self-contained fake DOM: no elements mounted at eval time, so the module's
+// init() is a no-op and tests drive applyPayload/load explicitly.
+function mdUiWorld(extra = {}) {
+  let nowMs = Date.parse('2026-10-03T12:00:00Z');
+  class FakeDate extends Date { static now() { return nowMs; } }
+  const selectorMap = new Map();
+  const document = {
+    querySelector: sel => (selectorMap.get(sel) || [])[0] || null,
+    querySelectorAll: sel => selectorMap.get(sel) || [],
+    createElement: tag => makeEl(tag)
+  };
+  const sandbox = {
+    document, console, URL, Date: FakeDate, window: {},
+    setInterval: () => 0, clearInterval: () => {},
+    fetch: extra.fetch || (async () => ({ ok: true, json: async () => mdPayload(nowMs) }))
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(MD_UI_SRC, sandbox);
+  const mount = () => { for (const sel of MD_SELS) selectorMap.set(sel, [makeEl('div')]); };
+  mount();
+  return { sandbox, selectorMap, UI: sandbox.window.MstrDisclosuresUI,
+    now: () => nowMs, advance: ms => { nowMs += ms; } };
+}
+const mdEl = (world, sel) => world.selectorMap.get(sel)[0];
+
+describe('MstrDisclosuresUI', () => {
+  it('renders latest facts, newest events, filings links and coverage captions', () => {
+    const world = mdUiWorld();
+    world.UI.applyPayload(mdPayload(world.now()));
+    const eventsEl = mdEl(world, '#mstr-disclosure-events');
+    assert.equal(eventsEl.children.length, 2);
+    const summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('1,100'));
+    assert.ok(summary.includes('55,000,000'));
+    assert.ok(summary.includes('披露日 2026-10-02'));
+    assert.ok(summary.includes('asOf 2026-10-01'));
+    assert.ok(summary.includes('120,000'));
+    assert.ok(!/· FDSO/.test(summary), 'null FDSO stays absent, never shown as ADSO');
+    assert.ok(summary.includes('ADSO 不是 FDSO'));
+    assert.ok(summary.includes('SEC 当前仅发现申报'));
+    // Milestone 2: capital snapshot line + preferred terms + coverage caption
+    assert.ok(summary.includes('资本结构 (asOf 2026-10-02)'));
+    assert.ok(summary.includes('债务 $6.71B'));
+    assert.ok(summary.includes('优先股 $13.56B'));
+    assert.ok(summary.includes('美元资产 $4.83B'));
+    assert.ok(summary.includes('年化优先股股息 $807M'));
+    assert.ok(summary.includes('STRC 12.0%'));
+    assert.ok(summary.includes('下次派息 2026-11-15'));
+    assert.ok(summary.includes('85,982,656 股'));
+    assert.ok(summary.includes('资本结构 已接入官方快照'));
+    assert.ok(summary.includes('STRC 仅公告发现'));
+    const announcements = mdEl(world, '#mstr-disclosure-announcements').children;
+    assert.equal(announcements.length, 2);
+    const chips = el => el.children.filter(c => (c.className || '').includes('md-kind')).map(c => c.textContent);
+    assert.deepEqual(chips(announcements[0]), ['BTC买入', 'STRC回购']);
+    assert.deepEqual(chips(announcements[1]), ['提及']);
+    assert.ok(allText(announcements[0]).includes('2026-10-02'));
+    const annLink = announcements[0].children.find(c => c.tagName === 'A');
+    assert.ok(annLink._attrs.href.startsWith('https://www.strategy.com/press/'));
+    const filings = mdEl(world, '#mstr-disclosure-filings-list').children;
+    assert.equal(filings.length, 1);
+    assert.ok(allText(filings[0]).includes('申报已发现 · 正文待核验'));
+    const link = filings[0].children.find(c => c.tagName === 'A');
+    assert.ok(link._attrs.href.includes('sec.gov/Archives'));
+    const status = allText(mdEl(world, '#mstr-disclosure-status'));
+    assert.ok(status.includes('已检查'));
+  });
+
+  it('fetch failure keeps rows and says reading failed with old dates', async () => {
+    const world = mdUiWorld({ fetch: async () => { throw new Error('boom'); } });
+    world.UI.applyPayload(mdPayload(world.now()));
+    await world.UI.load();
+    const eventsEl = mdEl(world, '#mstr-disclosure-events');
+    assert.equal(eventsEl.children.length, 2, 'rows survive a failed fetch');
+    const status = allText(mdEl(world, '#mstr-disclosure-status'));
+    assert.ok(status.includes('读取失败'));
+    assert.ok(status.includes('保留上次披露'));
+    assert.ok(status.includes(new Date(world.now()).toISOString().slice(0, 10)),
+      'original receipt date retained, never fresh now');
+  });
+
+  it('aging receipt changes status to stale without a refetch', () => {
+    const world = mdUiWorld();
+    world.UI.applyPayload(mdPayload(world.now()));
+    world.advance(700000); // past fetchWarnMs (600s)
+    world.UI.renderStatus();
+    const status = allText(mdEl(world, '#mstr-disclosure-status'));
+    assert.ok(status.includes('STALE'), 'aged success receipt demotes status to STALE');
+    assert.ok(!status.startsWith('已检查'));
+  });
+
+  it('unsafe evidence links are never rendered as anchors', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now());
+    p.events[0].documentUrl = 'javascript:alert(1)';
+    p.events[0].sourceUrl = 'javascript:alert(1)';
+    world.UI.applyPayload(p);
+    const rows = mdEl(world, '#mstr-disclosure-events').children;
+    const td = rows[0].children[5];
+    assert.ok(allText(td).includes('证据链接不可用'));
+    assert.ok(!td.children.some(c => c.tagName === 'A'), 'no anchor emitted for unsafe URLs');
+  });
+
+  it('historical cost conflicts flag the affected row and warn in status', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now());
+    p.events[1].issues = ['reported_cost_does_not_reconcile'];
+    world.UI.applyPayload(p);
+    const rows = mdEl(world, '#mstr-disclosure-events').children;
+    assert.ok(rows[1].className.includes('md-row-flagged'));
+    const status = allText(mdEl(world, '#mstr-disclosure-status'));
+    assert.ok(status.includes('历史成本对账差异'));
+  });
+
+  it('announcement links follow the same HTTPS allowlist; unsafe URLs never render as anchors', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now());
+    p.announcements[0].url = 'javascript:alert(1)';
+    world.UI.applyPayload(p);
+    const li = mdEl(world, '#mstr-disclosure-announcements').children[0];
+    assert.ok(allText(li).includes('证据链接不可用'));
+    assert.ok(!li.children.some(c => c.tagName === 'A'), 'no anchor emitted for unsafe URLs');
+  });
+
+  it('missing capital or empty announcements render honest fallbacks, never fabricated lines', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now(), { capital: null, preferreds: [], announcements: [] });
+    world.UI.applyPayload(p);
+    const summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(!summary.includes('资本结构 (asOf'), 'no capital snapshot line when capital absent');
+    assert.ok(summary.includes('资本结构 官方快照不可用'), 'absence is labelled, never hidden');
+    const list = mdEl(world, '#mstr-disclosure-announcements');
+    assert.equal(list.children.length, 1);
+    assert.ok(allText(list).includes('尚无官方公告发现记录'));
+  });
+
+  it('renders the official mNAV line with methodology version, inputs and estimate label', () => {
+    const world = mdUiWorld();
+    const p = mdPayload(world.now(), {
+      officialMnav: {
+        computedAt: '2026-10-03T12:00:00.000Z',
+        priceAsOf: '2026-10-03T11:58:00.000Z',
+        mstrPriceUsd: 300, btcPriceUsd: 100000,
+        btcSource: 'coinbase', mstrSource: 'yahoo',
+        issues: [],
+        result: {
+          mnav: 1.8354, netBtcUsd: 72521464156, netBtcBtc: 725214.6416,
+          netBpsUsd: 163.45, fdso: 443686678, usdAssetsUsd: 4833000000,
+          claimsUsd: 17163235844, methodologyVersion: '2026-07-23',
+          itmConverts: ['Convert 2028', 'Convert 2030 A', 'Convert 2031', 'Convert 2032'],
+          otmConverts: ['Convert 2029', 'Convert 2030 B'], strkItm: false,
+          strkConversionPrice: 1000.0531,
+          fdsoBreakdown: { basic: 422353257, options: 3106115, rsu: 862703, converts: 17364603, strk: 0 },
+          inputs: { mstrPriceUsd: 300, btcPriceUsd: 100000, capitalAsOf: '2026-10-19' },
+          issues: []
+        }
+      },
+      coverage: { ...mdPayload(world.now()).coverage, officialMnav: 'computed' }
+    });
+    world.UI.applyPayload(p);
+    const summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('官方口径 mNAV (2026-07-23 方法)'), 'methodology version shown');
+    assert.ok(summary.includes('1.84×'));
+    assert.ok(summary.includes('Net BPS $163.45'));
+    assert.ok(summary.includes('FDSO 443.7M'));
+    assert.ok(summary.includes('MSTR $300.00'), 'share price input shown');
+    assert.ok(summary.includes('BTC $100,000.00'), 'BTC price input shown');
+    assert.ok(summary.includes('coinbase'), 'price source labelled');
+    assert.ok(summary.includes('11:58 UTC'), 'price receipt time shown');
+    assert.ok(summary.includes('披露输入推算估计值'), 'values labelled as derived estimates');
+    assert.ok(summary.includes('新旧口径不可比'), 'new/old methodology incomparability flagged');
+  });
+
+  it('absent or uncomputed official mNAV renders the honest 未计算 line with reasons', () => {
+    const world = mdUiWorld();
+    world.UI.applyPayload(mdPayload(world.now())); // officialMnav: null
+    let summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('官方口径 mNAV：输入不足，未计算'));
+    assert.ok(!summary.includes('Net BPS $'), 'no fabricated value line');
+
+    const p2 = mdPayload(world.now(), {
+      officialMnav: {
+        computedAt: '2026-10-03T12:00:00.000Z', priceAsOf: null,
+        mstrPriceUsd: null, btcPriceUsd: 100000,
+        btcSource: 'coinbase', mstrSource: 'yahoo',
+        issues: ['invalid_mstr_price'], result: null
+      }
+    });
+    world.UI.applyPayload(p2);
+    summary = allText(mdEl(world, '#mstr-disclosure-summary'));
+    assert.ok(summary.includes('官方口径 mNAV：输入不足，未计算'));
+    assert.ok(summary.includes('invalid_mstr_price'), 'reason surfaces from the record');
+  });
+});

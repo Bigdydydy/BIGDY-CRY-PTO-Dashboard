@@ -2943,9 +2943,9 @@ function renderMacroSummary(summary) {
 
   if (elMacroMstrSub && summary.mstrCostSource) {
     const sourceName = {
-      sec: 'SEC 8-K 公告',
-      bitcointreasuries: 'bitcointreasuries 实时披露',
-      coinglass: 'Coinglass 估算（未经 SEC 核准）'
+      sec: '第三方历史整理（附 SEC 链接）',
+      bitcointreasuries: 'BitcoinTreasuries 汇总',
+      coinglass: 'Coinglass 汇总（未与官方公告对账）'
     }[summary.mstrCostSource] || summary.mstrCostSource;
     elMacroMstrSub.textContent = `${sourceName} · 截至 ${summary.mstrCostAsOf}`;
   }
@@ -3084,7 +3084,7 @@ function renderMacroSummary(summary) {
   }
 
   if (elMacroMnavSub && summary.minMnav !== null && summary.maxMnav !== null) {
-    let sub = `历史全域: ${summary.minMnav.toFixed(2)}× ~ ${summary.maxMnav.toFixed(2)}× (EV mNAV)`;
+    let sub = `旧口径历史/模型估算；不可与当前官方 mNAV 直接比较 · 历史全域: ${summary.minMnav.toFixed(2)}× ~ ${summary.maxMnav.toFixed(2)}×`;
     if (summary.mnavEstimated && summary.mnavAnchorDate) {
       const basis = summary.mnavBasis === 'ev' ? '含固定债权' : '纯股权口径';
       sub = `${summary.mnavAnchorDate} 后为股价外推估算 (${basis}，含增发稀释) · ${sub}`;
@@ -3303,7 +3303,7 @@ function renderMacroChart() {
       hidden: !visibilityStates[5]
     },
     {
-      label: 'MSTR mNAV (EV 倍数)',
+      label: 'EV / BTC 市值（旧口径参考）',
       data: mnavs,
       borderColor: '#6366f1',
       backgroundColor: 'transparent',
@@ -3507,7 +3507,7 @@ function renderMacroChart() {
             },
             title: {
               display: true,
-              text: 'MSTR mNAV (倍数)',
+              text: 'EV / BTC 市值（倍数）',
               color: colors.isLight ? '#4f46e5' : '#818cf8',
               font: { family: 'Inter', size: 10, weight: '500' }
             },

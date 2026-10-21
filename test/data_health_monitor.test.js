@@ -32,7 +32,7 @@ function sourceOk() {
 function greenInputs() {
   const fresh = NOW - 60e3;
   const jobs = {
-    macro_snapshot: { ...okJob(['macro', 'preferreds']), id: 'macro_snapshot' },
+    macro_snapshot: { ...okJob(['macro', 'preferreds', 'mstr_disclosures']), id: 'macro_snapshot' },
     liquidity_hourly: { ...okJob(['samples']), id: 'liquidity_hourly' },
     block_insight_daily: { ...okJob(['option_oi', 'block_trades', 'marks']), id: 'block_insight_daily' },
     mcclellan_daily: { ...okJob(['pipeline']), id: 'mcclellan_daily' }
@@ -41,6 +41,8 @@ function greenInputs() {
   const snapshots = {
     'macro_chart.json': srcMeta(['macro', 'fred:DGS1', 'fred:DGS10', 'fred:WALCL', 'fred:WTREGEN', 'fred:RRPONTSYD', 'macro_btc', 'yahoo:MSTR']),
     'mstr_preferreds_cache.json': srcMeta(['preferreds', 'yahoo:STRC', 'yahoo:STRF', 'yahoo:STRD', 'fred:DGS1MO']),
+    'mstr_disclosures.json': srcMeta(['mstr_official_ledger', 'mstr_official_shares',
+      'mstr_official_capital', 'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs']),
     'coinbase_liquidity_history.json': { samples: [{ ts: fresh, n: 3, d10: 1 }] },
     'option_oi_history_BTC.json': { snapshots: [{ ts: fresh }] },
     'block_flow_daily_BTC.json': { days: {} },

@@ -378,7 +378,7 @@
       <div class="card-header">
         <div class="card-title-group">
           <span class="card-module-tag">00 MACRO &amp; ON-CHAIN COST</span>
-          <h2>美债收益率曲线与 MicroStrategy 链上持仓成本实时全景</h2>
+          <h2>美债收益率曲线与 MicroStrategy 持仓成本与披露全景</h2>
           <span class="data-freshness" id="macro-freshness">数据加载中</span>
         </div>
         <div class="view-switch timeframe-switch" id="macro-timeframe-switch">
@@ -447,7 +447,7 @@
           </div>
 
           <div class="macro-metric-card" id="card-metric-mnav">
-            <span class="mm-label">MSTR mNAV (EV 倍数)</span>
+            <span class="mm-label">EV / BTC 市值（旧口径参考）</span>
             <div class="mm-val-wrap">
               <span class="mm-val text-indigo" id="macro-mnav-val">--×</span>
               <span class="mm-chip" id="macro-mnav-chip">--</span>
@@ -504,9 +504,9 @@
               <span class="legend-name">MSTR 30D 平均净增持</span>
               <span class="legend-axis-tag tag-velocity">右轴2 BTC/d</span>
             </button>
-            <button class="legend-pill active" data-dataset="6" id="legend-btn-mnav" title="点击隐藏/显示 MSTR mNAV (EV 倍数)">
+            <button class="legend-pill active" data-dataset="6" id="legend-btn-mnav" title="点击隐藏/显示 EV / BTC 市值（旧口径参考）">
               <span class="legend-color-dot" style="background-color: #6366f1;"></span>
-              <span class="legend-name">MSTR mNAV (EV 倍数)</span>
+              <span class="legend-name">EV / BTC 市值（旧口径参考）</span>
               <span class="legend-axis-tag tag-mnav">右轴3 倍数</span>
             </button>
             <button class="legend-pill active" data-dataset="7" id="legend-btn-netliq" title="点击隐藏/显示 FED 净流动性 (WALCL - TGA - RRP)">
@@ -526,6 +526,39 @@
         <div class="macro-chart-canvas-wrapper">
           <canvas id="macro-chart-canvas"></canvas>
         </div>
+
+        <!-- Strategy 官方披露账本：issuer BTC 账本 + 股数表 + SEC 申报发现 -->
+        <section id="mstr-disclosures" class="pref-section" aria-labelledby="mstr-disclosures-title">
+          <div class="pref-section-head">
+            <span class="pref-section-title" id="mstr-disclosures-title">Strategy 官方披露账本</span>
+            <span class="pref-section-asof" id="mstr-disclosure-status" role="status" aria-live="polite">未加载</span>
+            <button type="button" id="mstr-disclosure-refresh" class="switch-btn">重新检查披露</button>
+          </div>
+          <div id="mstr-disclosure-summary"></div>
+          <div class="md-events-wrap">
+            <table class="md-events-table">
+              <thead>
+                <tr>
+                  <th>披露日期</th>
+                  <th>买入/卖出 BTC</th>
+                  <th>交易均价 $</th>
+                  <th>报告持仓 BTC</th>
+                  <th>报告持仓均价 $</th>
+                  <th>证据</th>
+                </tr>
+              </thead>
+              <tbody id="mstr-disclosure-events"></tbody>
+            </table>
+          </div>
+          <details id="mstr-disclosure-filings">
+            <summary>最近 SEC 申报发现（仅索引，正文未核验）</summary>
+            <ul id="mstr-disclosure-filings-list"></ul>
+          </details>
+          <details id="mstr-disclosure-press">
+            <summary>官方公告发现（标题级，正文未核验）</summary>
+            <ul id="mstr-disclosure-announcements"></ul>
+          </details>
+        </section>
 
         <!-- MSTR 融资压力：STRC 平价锚定 + 优先股分层利差 -->
         <div class="pref-section" id="mstr-pref-section">
@@ -3313,5 +3346,7 @@
   <!-- mcclellan_structure 必须先于 app.js：Module 1-B 结构宽度面板由 app.js 调用其 window 全局 -->
   <script src="/mcclellan_structure.js"></script>
   <script src="/app.js?v=20261020_1"></script>
+  <!-- Strategy 官方披露账本面板：独立加载，不影响既有渲染管线 -->
+  <script src="/mstr_disclosures_ui.js" defer></script>
 </body>
 </html>

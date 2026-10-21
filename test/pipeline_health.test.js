@@ -27,6 +27,7 @@ describe('pipeline_health', () => {
     ph.beginJob('macro_snapshot', { now: NOW, dataDir: d });
     ph.recordStep('macro_snapshot', 'macro', { ok: true, now: NOW + 1000, dataAsOf: '2026-10-18', dataDir: d });
     ph.recordStep('macro_snapshot', 'preferreds', { ok: true, now: NOW + 2000, dataDir: d });
+    ph.recordStep('macro_snapshot', 'mstr_disclosures', { ok: true, now: NOW + 2500, dataDir: d });
     const rec = ph.finishJob('macro_snapshot', { now: NOW + 3000, dataDir: d });
     assert.equal(rec.status, 'ok');
     assert.equal(rec.lastSuccessAt, new Date(NOW + 3000).toISOString());
@@ -43,6 +44,7 @@ describe('pipeline_health', () => {
     ph.beginJob('macro_snapshot', { now: NOW, dataDir: d });
     ph.recordStep('macro_snapshot', 'macro', { ok: true, now: NOW, dataDir: d });
     ph.recordStep('macro_snapshot', 'preferreds', { ok: true, now: NOW, dataDir: d });
+    ph.recordStep('macro_snapshot', 'mstr_disclosures', { ok: true, now: NOW, dataDir: d });
     ph.finishJob('macro_snapshot', { now: NOW + 500, dataDir: d });
     const t0Success = new Date(NOW + 500).toISOString();
     const step0Success = new Date(NOW).toISOString(); // each step keeps its own receipt
@@ -52,6 +54,7 @@ describe('pipeline_health', () => {
     ph.beginJob('macro_snapshot', { now: NOW2, dataDir: d });
     ph.recordStep('macro_snapshot', 'macro', { ok: true, now: NOW2, dataDir: d });
     ph.recordStep('macro_snapshot', 'preferreds', { ok: false, error: new Error('yahoo down'), now: NOW2 + 10, dataDir: d });
+    ph.recordStep('macro_snapshot', 'mstr_disclosures', { ok: true, now: NOW2 + 15, dataDir: d });
     const rec = ph.finishJob('macro_snapshot', { now: NOW2 + 20, dataDir: d });
     assert.equal(rec.status, 'partial');
     assert.equal(rec.lastSuccessAt, t0Success, 'job receipt must not advance on a partial run');

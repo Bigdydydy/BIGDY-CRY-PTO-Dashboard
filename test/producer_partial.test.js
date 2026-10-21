@@ -59,6 +59,10 @@ describe('macro_snapshot CLI (mocked substeps)', () => {
       },
       [srv('mstr_preferreds.js')]: {
         getPreferredsData: async () => { throw new Error('yahoo down'); }
+      },
+      [srv('mstr_disclosures.js')]: {
+        getMstrDisclosures: async () => ({ lastCompletedAt: '2026-10-17T00:00:00.000Z', dataHealth: okHealth }),
+        peekMstrDisclosures: async () => null
       }
     });
 
@@ -71,6 +75,7 @@ describe('macro_snapshot CLI (mocked substeps)', () => {
     assert.equal(hb.status, 'partial');
     assert.equal(hb.steps.macro.status, 'ok');
     assert.equal(hb.steps.preferreds.status, 'failed');
+    assert.equal(hb.steps.mstr_disclosures.status, 'ok');
     assert.match(hb.steps.preferreds.lastError, /yahoo down/);
     assert.equal(hb.lastSuccessAt, null, 'partial run must not advance the job receipt');
     assert.equal(process.exitCode, 1);
@@ -89,6 +94,10 @@ describe('macro_snapshot CLI (mocked substeps)', () => {
           summary: { asOf: '2026-10-17', sources: {} },
           dataHealth: okHealth
         })
+      },
+      [srv('mstr_disclosures.js')]: {
+        getMstrDisclosures: async () => ({ lastCompletedAt: '2026-10-17T00:00:00.000Z', dataHealth: okHealth }),
+        peekMstrDisclosures: async () => null
       }
     });
 

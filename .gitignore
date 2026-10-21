@@ -39,3 +39,6 @@ data/term_premium_history.health.json
 
 # 本地服务的线上兜底网址 (server/upstream_mirror.js)，每台机器各自配置
 upstream.local.json
+
+# MSTR 官方披露采集的原始证据体 (体量大、由 hash 命名，不随归档提交；Actions 侧以 artifact 保留 14 天)
+data/mstr_disclosure_evidence/

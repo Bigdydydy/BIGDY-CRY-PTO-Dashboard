@@ -44,6 +44,17 @@ const SOURCE_POLICIES = Object.freeze({
   macro_btc: DAILY_LIVE,
   mstr_cost: policy(30 * MINUTE, 6 * HOUR, 30 * MINUTE, 6 * HOUR),
   mstr_treasury: policy(30 * MINUTE, 6 * HOUR, 30 * MINUTE, 6 * HOUR),
+  // Official disclosure discovery (issuer ledger/shares/capital/press + SEC
+  // index): fetch windows govern the 5-minute runtime collector; data
+  // windows allow the six-hour Actions producer cadence. Receipt clocks only.
+  mstr_official_ledger: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  mstr_official_shares: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  mstr_official_capital: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  mstr_official_press: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  mstr_sec_index: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
+  // Official-mNAV market inputs (Yahoo MSTR + Coinbase BTC): same cadence —
+  // the price leg rides the same 5-minute collector and 6-hour producer.
+  mstr_mnav_inputs: policy(10 * MINUTE, HOUR, 8 * HOUR, DAY),
   ssro_stable: DAILY_LIVE,
   ssro_quote: LIVE,
   etf_oi: policy(12 * HOUR, 3 * DAY, 3 * DAY, 7 * DAY),
