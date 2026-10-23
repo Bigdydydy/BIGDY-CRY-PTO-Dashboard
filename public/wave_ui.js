@@ -1366,13 +1366,22 @@ self.onmessage = function (e) {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.structural.price, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `计数否定位${tag}` }));
       }
       if (showMonitoring && inv.leg && (v === 'VALID' || v === 'DOUBT')) {
-        userPriceLines.push(candleSeries.createPriceLine({ price: inv.leg.price, color: '#fb923c', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `本段防线${tag}` }));
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.leg.price, color: '#fb923c', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `${inv.leg.kind === 'continuation' ? '延续线' : '本段防线'}${tag}` }));
+      }
+      if (showMonitoring && inv.ceiling && (v === 'VALID' || v === 'DOUBT')) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.ceiling.price, color: '#ef4444', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `顺势否定位${tag}` }));
+      }
+      if (showMonitoring && inv.warn && (v === 'VALID' || v === 'DOUBT')) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.warn.price, color: '#eab308', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: `警戒位${tag}` }));
       }
       if (showMonitoring && inv.monitor && v !== 'INVALID') {
-        userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `监测点(${inv.monitor.source || sel.timeframe})` }));
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.monitor.price, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: `柳氏监测点(${inv.monitor.source || sel.timeframe})` }));
       }
       if (showMonitoring && inv.completion) {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.completion.price, color: '#0ea5e9', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: inv.completion.broken ? '完成确认位（已越过）' : '完成确认位' }));
+      }
+      if (showMonitoring && inv.completionLiu) {
+        userPriceLines.push(candleSeries.createPriceLine({ price: inv.completionLiu.price, color: '#7dd3fc', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: inv.completionLiu.broken ? '柳氏确认位（已越过）' : '柳氏确认位' }));
       }
       if (showMonitoring && inv.diagLimit && v !== 'INVALID') {
         userPriceLines.push(candleSeries.createPriceLine({ price: inv.diagLimit.price, color: '#a855f7', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: inv.diagLimit.expandingByLength ? '楔形浪4分歧位' : '楔形浪4上限' }));
@@ -1520,14 +1529,17 @@ self.onmessage = function (e) {
 
     const inv = r.invalidation || {};
     const lvRows = [];
-    if (inv.monitor) lvRows.push(['监测点', inv.monitor.price, inv.monitor.text]);
-    if (inv.confirm) lvRows.push([inv.confirm.crossed ? '确认位（已越过）' : '确认位', inv.confirm.price, inv.confirm.text]);
-    if (inv.leg) lvRows.push(['本段防线', inv.leg.price, inv.leg.text]);
+    if (inv.monitor) lvRows.push(['监测点（柳氏）', inv.monitor.price, inv.monitor.text]);
+    if (inv.confirm) lvRows.push([inv.confirm.crossed ? '确认位（柳氏，已越过）' : '确认位（柳氏）', inv.confirm.price, inv.confirm.text]);
+    if (inv.leg) lvRows.push([inv.leg.kind === 'continuation' ? '延续线' : '本段防线', inv.leg.price, inv.leg.text]);
     if (inv.structural) lvRows.push(['计数否定位', inv.structural.price, inv.structural.text]);
+    if (inv.ceiling) lvRows.push(['顺势否定位', inv.ceiling.price, inv.ceiling.text]);
+    if (inv.warn) lvRows.push(['警戒位', inv.warn.price, inv.warn.text]);
     if (inv.secondary) lvRows.push(['次级防线', inv.secondary.price, inv.secondary.text]);
     if (inv.channel) lvRows.push(['2-4 通道线', inv.channel.price, inv.channel.text]);
     if (inv.diagLimit) lvRows.push([inv.diagLimit.expandingByLength ? '楔形浪4分歧位' : '楔形浪4上限', inv.diagLimit.price, inv.diagLimit.text]);
     if (inv.completion) lvRows.push([inv.completion.broken ? '完成确认位（已越过）' : '完成确认位', inv.completion.price, inv.completion.text]);
+    if (inv.completionLiu) lvRows.push([inv.completionLiu.broken ? '柳氏确认位（已越过）' : '柳氏确认位', inv.completionLiu.price, inv.completionLiu.text]);
     (r.targets || []).slice(0, 4).forEach(t => lvRows.push(['目标', t.price, t.label]));
     const lvHtml = lvRows.length ? `
       <div class="liu-signal-row">
