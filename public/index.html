@@ -1503,6 +1503,100 @@
         </div>
       </div>
     </section>
+
+    <!-- Module 2-D: Leverage & capital-flow normalization -->
+    <section class="bento-card el-card" id="module-leverage-norm">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">LEVERAGE NORMALIZATION</span>
+          <h2>杠杆与资金归一化</h2>
+          <span class="card-subtitle-inline">把随币价与交易所覆盖一起涨跌的美元总量，换算成可以跨周期比较的比例</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <div class="btn-group-segmented" id="ln-range-selector">
+              <button class="timeframe-btn" data-range="365">1Y</button>
+              <button class="timeframe-btn active" data-range="730">2Y</button>
+              <button class="timeframe-btn" data-range="all">全部</button>
+            </div>
+            <span class="tz-badge" id="ln-update-time">加载中...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body el-body">
+        <div class="el-status" id="ln-status">正在拉取 CoinGlass OI、资金费率与 ETF 成交额…</div>
+
+        <div class="el-intro">
+          <p><strong>为什么要归一化：</strong>美元口径的 OI、资金费与 ETF 流量会随币价和交易所覆盖范围一起放大缩小，直接比大小会把“币价跌了”误读成“有人平仓”，把“新纳入一家交易所”误读成“新增杠杆”。这里每个指标都除以它作用的底数：资金费 × 永续 OI 得到多头实际付出的美元；OI 同时按美元和按币计，差额就是币价的贡献；ETF 净流入除以成交额，区分新钱进入与单纯换手；期权 OI 除以期货 OI，看风险有多少以对冲形式持有。</p>
+          <details class="el-glossary">
+            <summary>口径说明：链式拼接、永续 OI、20 日窗口、90 日均值</summary>
+            <dl>
+              <dt>链式拼接</dt>
+              <dd>CoinGlass 的场所覆盖逐年扩大（MEXC / Bitunix / WhiteBIT 2025-03 纳入，Aster 2025-09，Lighter 2025-10），原始加总在纳入当天跳升。每日变化只用前后两日都有数据的场所计算，再以最新一日全场所合计为锚往回推，消除覆盖变化造成的假跳变。悬停可看当日原始合计与场所数。</dd>
+              <dt>30 日资金溢价</dt>
+              <dd>每次结算的全市场 OI 加权费率 × 当日永续 OI，按日加总后滚动 30 天求和：多头付给空头的美元。为负表示空头在付费持仓，回补时会变成被动买盘。永续 OI 以期货 OI 剔除 CME 近似。</dd>
+              <dt>币价贡献</dt>
+              <dd>美元口径变化 = (1 + 按币计变化) × (1 + 币价贡献) − 1。按币计变化才是持仓真实增减。</dd>
+              <dt>ETF 流入 ÷ 成交额</dt>
+              <dd>20 个交易日（约 4 周）净流入 ÷ 同期成交额（成交量 × 收盘价）。基金可以成交很大却几乎没有净申购；比值接近 0 是换手，±5% 以上才算流入或赎回主导。</dd>
+              <dt>期权 ÷ 期货（90 日均值）</dt>
+              <dd>两边都按币计后相除。期权 OI 在每个季度交割前堆高、交割后骤降，单日比值会大幅跳动，结论用 90 日（一个季度周期）均值。</dd>
+            </dl>
+          </details>
+        </div>
+
+        <div class="el-kpi-grid">
+          <div class="el-kpi"><span class="el-kpi-lbl">① 30 日资金溢价</span><span class="el-kpi-val" id="ln-kpi-premium">--</span><span class="el-kpi-sub" id="ln-kpi-premium-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">② 期货 OI（按币计）</span><span class="el-kpi-val" id="ln-kpi-oibtc">--</span><span class="el-kpi-sub" id="ln-kpi-oibtc-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">② 距一年高点 美元 / 按币</span><span class="el-kpi-val" id="ln-kpi-dd">--</span><span class="el-kpi-sub" id="ln-kpi-dd-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">② CME / Hyperliquid 份额</span><span class="el-kpi-val" id="ln-kpi-share">--</span><span class="el-kpi-sub" id="ln-kpi-share-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">③ ETF 净流入 ÷ 成交额 (20 日)</span><span class="el-kpi-val" id="ln-kpi-etf">--</span><span class="el-kpi-sub" id="ln-kpi-etf-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">④ 期权 ÷ 期货 OI (90 日均)</span><span class="el-kpi-val" id="ln-kpi-ratio">--</span><span class="el-kpi-sub" id="ln-kpi-ratio-sub">--</span></div>
+        </div>
+
+        <!-- ① Funding premium -->
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>① 永续资金溢价：多头付给空头的美元（30 日滚动和）</span></div>
+          </div>
+          <p class="ln-headline" id="ln-headline-funding">--</p>
+          <div id="ln-funding-echarts" class="el-chart"></div>
+        </div>
+
+        <!-- ② OI in USD vs BTC + venue shares -->
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>② 期货 OI：美元口径 vs 按币计（下图：CME / Binance / Hyperliquid 份额）</span></div>
+          </div>
+          <p class="ln-headline" id="ln-headline-oi">--</p>
+          <div id="ln-oi-echarts" class="el-chart el-chart-tall"></div>
+        </div>
+
+        <div class="el-two-col">
+          <!-- ③ ETF flow / volume -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title"><span>③ ETF 净流入 ÷ 成交额（20 个交易日）</span></div>
+            </div>
+            <p class="ln-headline" id="ln-headline-etf">--</p>
+            <div id="ln-etf-echarts" class="el-chart"></div>
+          </div>
+          <!-- ④ Options / futures OI -->
+          <div class="tp-chart-panel">
+            <div class="tp-chart-header">
+              <div class="tp-chart-title"><span>④ 期权 OI ÷ 期货 OI（按币计）</span></div>
+            </div>
+            <p class="ln-headline" id="ln-headline-options">--</p>
+            <div id="ln-ratio-echarts" class="el-chart"></div>
+          </div>
+        </div>
+
+        <div class="tp-data-audit-strip">
+          <div class="tp-audit-left" id="ln-caveats"></div>
+        </div>
+      </div>
+    </section>
   </div> <!-- /#view-term-premium -->
 
   <!-- View 3: 期权微观结构量化套件 -->

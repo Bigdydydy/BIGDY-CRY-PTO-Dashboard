@@ -30,6 +30,7 @@ const { getGoldCorrelationData } = require('./gold_fetcher');
 const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { getEtfLinkageData } = require('./etf_linkage_engine');
+const leverageNorm = require('./leverage_norm');
 const { getTermCurve } = require('./term_curve');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
@@ -1012,6 +1013,19 @@ async function handleApiRequest(req, res, parsedUrl) {
       sendJsonResponse(req, res, 200, { code: 0, ...withApiHealth(data, ['etf', 'cot', 'etf_oi']) });
     } catch (err) {
       console.error('[API Error] etf-linkage:', err.message);
+      sendJsonResponse(req, res, 502, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/leverage-norm — funding × OI, OI in coin terms, ETF flow / volume, options / futures OI (Module 2-D)
+  if (pathname === '/api/leverage-norm' && req.method === 'GET') {
+    try {
+      const force = parsedUrl.query?.force === '1';
+      const data = await leverageNorm.getLeverageNormData(force);
+      sendJsonResponse(req, res, 200, { code: 0, ...withApiHealth(data, leverageNorm.REQUIRED_IDS) });
+    } catch (err) {
+      console.error('[API Error] leverage-norm:', err.message);
       sendJsonResponse(req, res, 502, { code: -1, error: err.message });
     }
     return;

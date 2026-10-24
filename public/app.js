@@ -115,6 +115,7 @@ function reloadAllChartsForTheme() {
     termPremiumChartInstance = null;
   }
   if (typeof disposeEtfLinkageCharts === 'function') disposeEtfLinkageCharts();
+  if (typeof disposeLeverageNormCharts === 'function') disposeLeverageNormCharts();
   if (typeof termCurveChartInstance !== 'undefined' && termCurveChartInstance) {
     try { termCurveChartInstance.dispose(); } catch (e) {}
     termCurveChartInstance = null;
@@ -185,6 +186,9 @@ function reloadAllChartsForTheme() {
   }
   if (typeof renderEtfLinkage === 'function' && typeof rawEtfLinkageData !== 'undefined' && rawEtfLinkageData) {
     renderEtfLinkage();
+  }
+  if (typeof renderLeverageNorm === 'function' && typeof rawLeverageNorm !== 'undefined' && rawLeverageNorm) {
+    renderLeverageNorm();
   }
   if (typeof renderTermCurveChart === 'function' && typeof rawTermCurve !== 'undefined' && rawTermCurve) {
     renderTermCurveChart();
@@ -5315,6 +5319,341 @@ function initEtfLinkageEvents() {
 }
 
 // ============================================================================
+// Module 2-D: Leverage & capital-flow normalization Controller
+// ============================================================================
+
+let rawLeverageNorm = null;
+let lnFundingChartInstance = null;
+let lnOiChartInstance = null;
+let lnEtfChartInstance = null;
+let lnRatioChartInstance = null;
+let lnRange = '730';
+
+function lnFmtPct(v, d = 1) {
+  return v == null || !isFinite(v) ? '--' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)}%`;
+}
+
+/** Rows inside the selected range, counted back from the series' own last date */
+function lnSlice(rows) {
+  if (!rows?.length || lnRange === 'all') return rows || [];
+  const cutoff = new Date(Date.parse(rows[rows.length - 1].date) - Number(lnRange) * 86400000).toISOString().slice(0, 10);
+  return rows.filter(r => r.date > cutoff);
+}
+
+async function loadLeverageNorm(force = false) {
+  const status = document.getElementById('ln-status');
+  try {
+    const resp = await fetch(`/api/leverage-norm${force ? '?force=1' : ''}`);
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    dhUpdate('leverage', json.dataHealth);
+    rawLeverageNorm = json;
+    if (status) {
+      const notes = [];
+      if (json.stale) notes.push('⚠ 上游数据暂不可用，显示最近一次缓存结果');
+      if (json.etfError) notes.push(`ETF 面板${json.etf?.stale ? '沿用上一次结果' : '暂不可用'}：${json.etfError}`);
+      status.textContent = notes.join(' · ');
+      status.classList.toggle('error', notes.length > 0);
+    }
+    renderLeverageNorm();
+  } catch (err) {
+    dhFail('leverage', err);
+    console.error('[Leverage Norm] Failed to load:', err);
+    if (status) {
+      status.textContent = `归一化数据加载失败：${err.message}`;
+      status.classList.add('error');
+    }
+  }
+}
+
+function renderLeverageNorm() {
+  const d = rawLeverageNorm;
+  if (!d) return;
+  const setText = (id, text, color) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (color !== undefined) el.style.color = color || '';
+  };
+  const s = d.summary || {};
+  const fr = d.freshness || {};
+  const short = v => (v ? v.slice(5) : '--');
+  setText('ln-update-time', `OI 截至 ${short(fr.oiLatest)} · 资金费截至 ${short(fr.fundingLatest)} · ETF 截至 ${short(fr.etfLatest)} · 生成 ${formatUTC8(d.generatedAt, false)}`);
+
+  // KPIs
+  const f = s.funding;
+  setText('ln-kpi-premium', f ? elFmtUsd(f.premium30dUsd) : '--', f ? (f.premium30dUsd >= 0 ? '#10b981' : '#f43f5e') : '');
+  setText('ln-kpi-premium-sub', f ? `${f.longsPay ? '多头付费' : '空头付费'}连续 ${f.streakDays} 天 · 分位 ${elFmtShare(f.percentile)} · 年化 ${elFmtNum(f.fundingApr30d)}%` : '--');
+  const o = s.oi;
+  setText('ln-kpi-oibtc', o ? elFmtBtc(o.futOiBtc, false) : '--');
+  setText('ln-kpi-oibtc-sub', o ? `30 日 ${lnFmtPct(o.btc30)} · 美元 ${lnFmtPct(o.usd30)} · 币价 ${lnFmtPct(o.priceEffect30)}` : '--');
+  setText('ln-kpi-dd', o ? `${lnFmtPct(o.drawdownUsd, 0)} / ${lnFmtPct(o.drawdownBtc, 0)}` : '--');
+  setText('ln-kpi-dd-sub', o ? `美元高点 ${elFmtUsd(o.peakUsd?.value, false)} @ ${o.peakUsd?.date || '--'}` : '--');
+  setText('ln-kpi-share', o ? `${elFmtShare(o.cmeShare)} / ${elFmtShare(o.hyperliquidShare)}` : '--');
+  setText('ln-kpi-share-sub', o ? `一年前 ${elFmtShare(o.cmeShare1y)} / ${elFmtShare(o.hyperliquidShare1y)} · ${o.futVenues} 个场所` : '--');
+  const e = s.etf;
+  const etfColor = { INFLOW: '#10b981', OUTFLOW: '#f43f5e', TURNOVER: '' };
+  setText('ln-kpi-etf', e ? lnFmtPct(e.ratio20) : '--', e ? etfColor[e.regime] : '');
+  setText('ln-kpi-etf-sub', e ? `${e.regimeLabel} · 均值 ${lnFmtPct(e.mean)} · 分位 ${elFmtShare(e.percentile)}` : (d.etfError ? 'ETF 数据暂不可用' : '--'));
+  const op = s.options;
+  setText('ln-kpi-ratio', op ? elFmtNum(op.ratio90d) : '--');
+  setText('ln-kpi-ratio-sub', op ? `一年前 ${elFmtNum(op.ratio90d1y)} · 当日 ${elFmtNum(op.ratio)}` : '--');
+
+  // Each chart opens with its conclusion
+  setText('ln-headline-funding', f?.headline || '--');
+  setText('ln-headline-oi', o?.headline || '--');
+  setText('ln-headline-etf', e?.headline || (d.etfError ? `ETF 数据暂不可用：${d.etfError}` : '--'));
+  setText('ln-headline-options', op?.headline || '--');
+
+  const cav = document.getElementById('ln-caveats');
+  if (cav && d.metadata) {
+    const src = d.metadata.sources || {};
+    const missing = d.etf?.tickers?.missing || [];
+    cav.innerHTML = [
+      `<span><strong class="text-cyan">数据:</strong> ${escapeHtml(src.oi || '')} · ${escapeHtml(src.funding || '')} · ${escapeHtml(src.etf || '')}</span>`,
+      ...(d.metadata.method || []).map(t => `<span>· ${escapeHtml(t)}</span>`),
+      ...(d.metadata.caveats || []).map(t => `<span>· ${escapeHtml(t)}</span>`),
+      ...(missing.length ? [`<span>· 本次缺成交额、已剔除的 ETF：${escapeHtml(missing.join(', '))}</span>`] : [])
+    ].join('');
+  }
+
+  renderLnFundingChart();
+  renderLnOiChart();
+  renderLnEtfChart();
+  renderLnRatioChart();
+}
+
+function renderLnFundingChart() {
+  const d = rawLeverageNorm;
+  if (!d?.funding?.length) return;
+  lnFundingChartInstance = elInitChart(lnFundingChartInstance, 'ln-funding-echarts');
+  if (!lnFundingChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const rows = lnSlice(d.funding.filter(r => r.premium30dUsd != null));
+  const priceBy = new Map((d.oi || []).map(r => [r.date, r.price]));
+  lnFundingChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 64, right: 64, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['30 日资金溢价', 'BTC 价格'] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const r = rows[params[0].dataIndex];
+        if (!r) return '';
+        const who = r.premium30dUsd >= 0 ? '多头 → 空头' : '空头 → 多头';
+        return `<div style="font-weight:600;margin-bottom:4px;">${r.date}</div>
+          <div>30 日资金溢价（${who}）: <b>${elFmtUsd(r.premium30dUsd)}</b></div>
+          <div>30 日年化资金费: ${elFmtNum(r.fundingApr30d)}%</div>
+          <div>当日支付: ${elFmtUsd(r.fundingUsd)}</div>
+          <div>BTC $${priceBy.get(r.date) ? priceBy.get(r.date).toLocaleString('en-US') : '--'}</div>`;
+      }
+    },
+    xAxis: { type: 'category', data: rows.map(r => r.date), ...common, splitLine: { show: false } },
+    yAxis: [
+      { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: v => elFmtUsd(v, false) } },
+      { type: 'value', position: 'right', scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, color: '#94a3b8', formatter: v => `$${Math.round(v / 1000)}k` } }
+    ],
+    series: [
+      {
+        name: '30 日资金溢价', type: 'bar', barCategoryGap: '10%',
+        data: rows.map(r => ({ value: r.premium30dUsd, itemStyle: { color: r.premium30dUsd >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(244,63,94,0.8)' } })),
+        itemStyle: { color: '#10b981' },
+        markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0, lineStyle: { color: colors.gridLineStrong, type: 'dashed' }, label: { show: false } }] }
+      },
+      {
+        name: 'BTC 价格', type: 'line', yAxisIndex: 1, showSymbol: false, z: 1,
+        data: rows.map(r => priceBy.get(r.date) ?? null), lineStyle: { width: 1.2, color: '#94a3b8', opacity: 0.8 }, itemStyle: { color: '#94a3b8' }
+      }
+    ]
+  }, true);
+}
+
+function renderLnOiChart() {
+  const d = rawLeverageNorm;
+  if (!d?.oi?.length) return;
+  lnOiChartInstance = elInitChart(lnOiChartInstance, 'ln-oi-echarts');
+  if (!lnOiChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const rows = lnSlice(d.oi);
+  const dates = rows.map(r => r.date);
+  const shareLine = (name, field, color) => ({
+    name, type: 'line', xAxisIndex: 1, yAxisIndex: 2, showSymbol: false, connectNulls: false,
+    data: rows.map(r => (r[field] == null ? null : r[field] * 100)), lineStyle: { width: 1.4, color }, itemStyle: { color }
+  });
+  lnOiChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: [
+      { left: 64, right: 72, top: 30, height: '56%' },
+      { left: 64, right: 72, top: '74%', height: '18%' }
+    ],
+    legend: {
+      top: 0,
+      textStyle: { color: colors.textSecondary, fontSize: 11 },
+      data: ['期货 OI (USD)', '期货 OI (BTC)', 'CME 份额', 'Binance 份额', 'Hyperliquid 份额']
+    },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const r = rows[params[0].dataIndex];
+        if (!r) return '';
+        return `<div style="font-weight:600;margin-bottom:4px;">${r.date}</div>
+          <div>期货 OI: <b>${elFmtUsd(r.futOiUsd, false)}</b> · <b>${elFmtBtc(r.futOiBtc, false)}</b></div>
+          <div style="color:${colors.textSecondary};">当日原始合计 ${elFmtUsd(r.futOiUsdRaw, false)}（${r.futVenues} 个场所）</div>
+          <div>永续 OI（剔除 CME）: ${elFmtUsd(r.perpOiUsd, false)}</div>
+          <div>份额 CME ${elFmtShare(r.cmeShare)} · Binance ${elFmtShare(r.binanceShare)} · Hyperliquid ${elFmtShare(r.hyperliquidShare)}</div>
+          <div>BTC $${r.price ? r.price.toLocaleString('en-US') : '--'}</div>`;
+      }
+    },
+    xAxis: [
+      { type: 'category', gridIndex: 0, data: dates, ...common, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: 'category', gridIndex: 1, data: dates, ...common, splitLine: { show: false } }
+    ],
+    yAxis: [
+      { type: 'value', gridIndex: 0, scale: true, ...common, axisLabel: { ...common.axisLabel, color: '#f59e0b', formatter: v => `$${(v / 1e9).toFixed(0)}B` } },
+      { type: 'value', gridIndex: 0, position: 'right', scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, color: '#38bdf8', formatter: v => `${Math.round(v / 1000)}k` } },
+      { type: 'value', gridIndex: 1, min: 0, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}%' } }
+    ],
+    series: [
+      { name: '期货 OI (USD)', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, data: rows.map(r => r.futOiUsd), lineStyle: { width: 1.8, color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
+      { name: '期货 OI (BTC)', type: 'line', xAxisIndex: 0, yAxisIndex: 1, showSymbol: false, data: rows.map(r => r.futOiBtc), lineStyle: { width: 2.2, color: '#38bdf8' }, itemStyle: { color: '#38bdf8' } },
+      shareLine('CME 份额', 'cmeShare', '#f97316'),
+      shareLine('Binance 份额', 'binanceShare', '#eab308'),
+      shareLine('Hyperliquid 份额', 'hyperliquidShare', '#10b981')
+    ]
+  }, true);
+}
+
+function renderLnEtfChart() {
+  const d = rawLeverageNorm;
+  const el = document.getElementById('ln-etf-echarts');
+  if (!d?.etf?.rows?.length) {
+    if (lnEtfChartInstance) { lnEtfChartInstance.dispose(); lnEtfChartInstance = null; }
+    return;
+  }
+  lnEtfChartInstance = elInitChart(lnEtfChartInstance, 'ln-etf-echarts');
+  if (!lnEtfChartInstance || !el) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const rows = lnSlice(d.etf.rows.filter(r => r.ratio20 != null));
+  const priceBy = new Map((d.oi || []).map(r => [r.date, r.price]));
+  const band = { lineStyle: { color: 'rgba(148,163,184,0.5)', type: 'dashed' }, label: { show: false } };
+  lnEtfChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 52, right: 56, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['净流入 ÷ 成交额', 'BTC 价格'] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const r = rows[params[0].dataIndex];
+        if (!r) return '';
+        return `<div style="font-weight:600;margin-bottom:4px;">截至 ${r.date}（20 个交易日）</div>
+          <div>净流入 ÷ 成交额: <b>${lnFmtPct(r.ratio20)}</b></div>
+          <div>净流入 ${elFmtUsd(r.flow20Usd)} · 成交额 ${elFmtUsd(r.volume20Usd, false)}</div>
+          <div>当日净流入 ${elFmtUsd(r.flowUsd)} · 当日成交额 ${elFmtUsd(r.volumeUsd, false)}</div>
+          <div>BTC $${priceBy.get(r.date) ? priceBy.get(r.date).toLocaleString('en-US') : '--'}</div>`;
+      }
+    },
+    xAxis: { type: 'category', data: rows.map(r => r.date), ...common, splitLine: { show: false } },
+    yAxis: [
+      { type: 'value', ...common, axisLabel: { ...common.axisLabel, formatter: v => `${Math.round(v * 100)}%` } },
+      { type: 'value', position: 'right', scale: true, ...common, splitLine: { show: false }, axisLabel: { ...common.axisLabel, color: '#94a3b8', formatter: v => `$${Math.round(v / 1000)}k` } }
+    ],
+    series: [
+      {
+        name: '净流入 ÷ 成交额', type: 'line', showSymbol: false, data: rows.map(r => r.ratio20),
+        lineStyle: { width: 1.8, color: '#a855f7' }, itemStyle: { color: '#a855f7' },
+        areaStyle: { color: 'rgba(168,85,247,0.08)' },
+        markLine: {
+          silent: true, symbol: 'none',
+          data: [
+            { yAxis: 0, lineStyle: { color: colors.gridLineStrong, type: 'solid' }, label: { show: false } },
+            { yAxis: 0.05, ...band },
+            { yAxis: -0.05, ...band }
+          ]
+        }
+      },
+      {
+        name: 'BTC 价格', type: 'line', yAxisIndex: 1, showSymbol: false, z: 1,
+        data: rows.map(r => priceBy.get(r.date) ?? null), lineStyle: { width: 1.2, color: '#94a3b8', opacity: 0.8 }, itemStyle: { color: '#94a3b8' }
+      }
+    ]
+  }, true);
+}
+
+function renderLnRatioChart() {
+  const d = rawLeverageNorm;
+  if (!d?.oi?.length) return;
+  lnRatioChartInstance = elInitChart(lnRatioChartInstance, 'ln-ratio-echarts');
+  if (!lnRatioChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const rows = lnSlice(d.oi.filter(r => r.optFutRatio != null));
+  lnRatioChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 48, right: 16, top: 34, bottom: 28 },
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['90 日均值', '当日'] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const r = rows[params[0].dataIndex];
+        if (!r) return '';
+        return `<div style="font-weight:600;margin-bottom:4px;">${r.date}</div>
+          <div>期权 ÷ 期货 90 日均值: <b>${elFmtNum(r.optFutRatio90d)}</b></div>
+          <div>当日: ${elFmtNum(r.optFutRatio)}</div>
+          <div>期权 OI ${elFmtBtc(r.optOiBtc, false)} · 期货 OI ${elFmtBtc(r.futOiBtc, false)}</div>`;
+      }
+    },
+    xAxis: { type: 'category', data: rows.map(r => r.date), ...common, splitLine: { show: false } },
+    yAxis: { type: 'value', scale: true, ...common },
+    series: [
+      {
+        name: '90 日均值', type: 'line', showSymbol: false, data: rows.map(r => r.optFutRatio90d),
+        lineStyle: { width: 2.2, color: '#38bdf8' }, itemStyle: { color: '#38bdf8' },
+        markLine: { silent: true, symbol: 'none', data: [{ yAxis: 1, lineStyle: { color: 'rgba(245,158,11,0.6)', type: 'dashed' }, label: { show: true, position: 'insideEndTop', color: '#f59e0b', fontSize: 10, formatter: '期权 = 期货' } }] }
+      },
+      { name: '当日', type: 'line', showSymbol: false, data: rows.map(r => r.optFutRatio), lineStyle: { width: 1, color: '#64748b', opacity: 0.7 }, itemStyle: { color: '#64748b' } }
+    ]
+  }, true);
+}
+
+function disposeLeverageNormCharts() {
+  [lnFundingChartInstance, lnOiChartInstance, lnEtfChartInstance, lnRatioChartInstance].forEach(ch => {
+    if (ch) { try { ch.dispose(); } catch (e) {} }
+  });
+  lnFundingChartInstance = lnOiChartInstance = lnEtfChartInstance = lnRatioChartInstance = null;
+}
+
+function resizeLeverageNormCharts() {
+  [lnFundingChartInstance, lnOiChartInstance, lnEtfChartInstance, lnRatioChartInstance].forEach(ch => {
+    if (ch) ch.resize();
+  });
+}
+
+function initLeverageNormEvents() {
+  const seg = document.getElementById('ln-range-selector');
+  if (seg) {
+    seg.addEventListener('click', e => {
+      const btn = e.target.closest('.timeframe-btn');
+      if (!btn || btn.dataset.range === lnRange) return;
+      lnRange = btn.dataset.range;
+      seg.querySelectorAll('.timeframe-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderLnFundingChart();
+      renderLnOiChart();
+      renderLnEtfChart();
+      renderLnRatioChart();
+    });
+  }
+  window.addEventListener('resize', resizeLeverageNormCharts);
+}
+
+// ============================================================================
 // Module 2-C: Cross-sectional term structure (Deribit basis vs Treasury curve)
 // ============================================================================
 
@@ -7276,7 +7615,8 @@ const NAV_TREE = {
   ],
   'view-term-premium': [
     { id: 'module-term-premium', label: '基差期限结构与溢价' },
-    { id: 'module-etf-linkage', label: 'ETF × 套利资金联动' }
+    { id: 'module-etf-linkage', label: 'ETF × 套利资金联动' },
+    { id: 'module-leverage-norm', label: '杠杆与资金归一化' }
   ],
   'view-options': [
     { id: 'module-atm-iv', label: 'ATM IV 期限结构' },
@@ -7413,6 +7753,7 @@ function switchView(viewId, updateHash = true, moduleId = null) {
       dealerHistoryChartInstance?.resize();
     }
     resizeEtfLinkageCharts();
+    resizeLeverageNormCharts();
     if (termCurveChartInstance) {
       termCurveChartInstance.resize();
     } else if (typeof rawTermCurve !== 'undefined' && rawTermCurve && (viewId === 'view-term-premium' || viewId === 'view-all')) {
@@ -8550,6 +8891,7 @@ initMacroChartEvents();
 initCdriEvents();
 initTermPremiumEvents();
 initEtfLinkageEvents();
+initLeverageNormEvents();
 initTermCurveEvents();
 initSsroEvents();
 initFlowForceEvents();
@@ -8559,6 +8901,7 @@ initMcClellanEvents();
 initNavigation();
 loadMarketData(false);
 loadEtfLinkageData(false);
+loadLeverageNorm(false);
 loadTermCurve(false);
 fetchCoinbaseLiquidityData(false);
 fetchCbLiquidityHistory(false);

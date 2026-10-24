@@ -4,7 +4,7 @@
 [![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Architecture: Zero-Dependency](https://img.shields.io/badge/Architecture-Zero--Dependency-blue.svg)]()
-[![Tests: node:test](https://img.shields.io/badge/Tests-630%20Passing-brightgreen.svg)]()
+[![Tests: node:test](https://img.shields.io/badge/Tests-637%20Passing-brightgreen.svg)]()
 
 BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商的数字资产全景投研决策终端。系统以纯原生 Node.js（零外部 npm 运行时依赖）构建，整合了 Deribit 期权曲面、CoinGlass 衍生品、St. Louis FRED 宏观流动性、Coinbase L2 订单簿、Strategy (MSTR) 官方披露与 SEC EDGAR 申报，深度融合 Sheldon Natenberg《期权波动率与定价》与 Colin Bennett《波动率交易》等经典量化工程方法论。
 
@@ -18,6 +18,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
   - [MSTR 官方披露账本与 SEC 8-K 回退链路](#mstr-官方披露账本与-sec-8-k-回退链路)
   - [加密麦克莱伦市场宽度振荡器 (Module 1-B)](#加密麦克莱伦市场宽度振荡器-module-1-b)
   - [期现基差期限结构与 ETF × 套利资金联动 (Module 2)](#期现基差期限结构与-etf--套利资金联动-module-2)
+  - [杠杆与资金归一化 (Module 2-D)](#杠杆与资金归一化-module-2-d)
   - [期权套件：ATM IV · Smile · 25Δ Skew (Cards 01/04/05)](#期权套件atm-iv--smile--25δ-skew-cards-010405)
   - [GEX 钉盘与做市商全链敞口 (Cards 02/02B)](#gex-钉盘与做市商全链敞口-cards-0202b)
   - [大宗交易与机构冰山拆单 (Card 03)](#大宗交易与机构冰山拆单-card-03)
@@ -65,6 +66,15 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **真实期限点曲线**：只用实际交易的期限——0D 全市场永续资金费率（CoinGlass 按持仓量加权；Deribit 永续有抑制机制仅作对照）、Deribit 当季/次季季度合约；当季距交割 <7 天剔除，90D/180D 恒定期限仅在相邻真实点间线性插值不做外推。每日 08:00 UTC 快照归档，最新点为实时盘口。
 - **期限利差与套利评分**：期限斜率、短端利差、跨期斜率；FRED 3M 美债对齐，机构门槛 = 美债 + 3.5%；评分 0-100（60% 套利夏普 + 25% 期限结构 + 15% 基差动量）。
 - **ETF × 套利资金联动验证**（CoinGlass ETF 流量 + CFTC TFF + OI，按 COT 周二对齐）：ΔCME 杠杆基金净空头对 ETF 周流入的 β（全样本+12 周滚动）、高低基差分组回归、领先滞后相关、平仓事件与流入拆分；附 Binance 期货 + Deribit 期权离岸对冲持仓。
+
+### 杠杆与资金归一化 (Module 2-D)
+> `server/leverage_norm.js`。美元总量随币价与交易所覆盖一起涨跌，不能跨周期直接比；每个指标除以它作用的底数，每张图以一句结论开头。
+
+- **覆盖校正（链式拼接）**：CoinGlass 全场所期货 OI 的覆盖逐年扩大（MEXC/Bitunix/WhiteBIT 2025-03、Aster 2025-09 等纳入当天原始加总跳升）；每日变化只用前后两日都有数据的场所，以最新一日全场所合计为锚，悬停可看原始合计与场所数。
+- **30 日资金溢价**：全市场 OI 加权资金费（8h 结算）× 当日永续 OI（期货 OI 剔除 CME 近似），按日加总滚动 30 天：多头付给空头的美元；含空头付费连续天数与历史分位。
+- **OI 按币计**：美元口径与按币计并列，30 日变化拆成持仓真实增减与币价贡献；距一年高点回撤；CME / Binance / Hyperliquid 份额。
+- **ETF 净流入 ÷ 成交额**：20 个交易日净流入 ÷ 同期成交额（Yahoo 成交量 × 收盘价），区分新钱流入与换手；缺成交额的小基金从分子分母同时剔除，核心基金（IBIT/FBTC/GBTC）缺失则该面板沿用上次结果并标注。
+- **期权 ÷ 期货 OI**：两边按币计相除；期权 OI 在季度交割前堆高、交割后骤降，结论用 90 日均值。
 
 ### 期权套件：ATM IV · Smile · 25Δ Skew (Cards 01/04/05)
 - **ATM IV 期限结构与历史分位**：365 日历年化的时间平方根法则（日 σ/√365、周 σ/√52）；DVOL 730 日滚动分位；隐含 vs 已实现 VRP；Bennett 跳空波动率拆分的事件溢价。
@@ -195,6 +205,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 │   ├── analytics_engine.js  #   期权分析：Black-76 Greeks、Smile 两翼、25Δ Skew、时段归类
 │   ├── dealer_engine.js     #   做市商敞口全链重估、5档期限矩阵、交割断崖模拟
 │   ├── block_insight.js     #   Module 4B 大宗资金深度研判与家族分类
+│   ├── leverage_norm.js     #   Module 2-D 杠杆与资金归一化（链式拼接 OI、资金溢价、ETF 换手）
 │   ├── mstr_disclosures.js  #   MSTR 五源披露采集（证据哈希+修订历史+路径感知健康）
 │   ├── mstr_sec_model.js    #   SEC 8-K 正文解析与资本结构滚动推导
 │   ├── mstr_mnav.js         #   官方口径 mNAV（2026-07-23 版本化方法论）
@@ -208,7 +219,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 ├── scripts/                 # 定时任务入口与工具（macro_snapshot、option_flow_ledger…）
 │   ├── crypto_mcclellan/    #   McClellan Python 计量管线
 │   └── run_tests.js         #   测试运行器（沙箱副本，不写污染仓库）
-├── test/                    # 63 个测试文件 / 630 个用例（node:test，离线运行）
+├── test/                    # 48 个测试文件 / 637 个用例（node:test，离线运行）
 ├── .github/workflows/       # 6 条定时数据管线 + 健康巡检
 ├── docs/                    # data_resilience / mstr_disclosures / module8_wave_v3 / crypto_breadth
 ├── analyst_agent/           # 本地自用宏观评论 Agent（双视角方法论，不对外部署）
@@ -252,6 +263,7 @@ npm start          # 默认端口 3000 → http://localhost:3000
 | `/api/term-curve` | `GET` | Gzip + ETag | Deribit 期货期限曲线（真实合约点） |
 | `/api/term-premium` | `GET` | Gzip + ETag | 基差期限结构、利差与套利评分历史 |
 | `/api/etf-linkage` | `GET` | Gzip + ETag，`?force=1` | ETF 资金 × CME 空头 × 基差联动验证 |
+| `/api/leverage-norm` | `GET` | Gzip + ETag，`?force=1` | 30 日资金溢价、OI 按币计（链式拼接）、ETF 流入÷成交额、期权÷期货 OI |
 | `/api/mstr-preferreds` | `GET` | Gzip + ETag | STRC/STRF/STRK/STRD/STRE 优先股定价与股息率 |
 | `/api/mstr-disclosures` | `GET` | Gzip + ETag | MSTR 官方披露账本、资本结构、官方 mNAV |
 | `/api/macro-chart` | `GET` | Gzip + ETag | 美债收益率、FED 净流动性、MSTR 成本 |
@@ -283,7 +295,7 @@ python scripts/crypto_mcclellan/export_to_json.py
 基于 Node.js 原生 `node:test` + `node:assert/strict`，无需 Jest/Mocha，完全离线运行。
 
 ```bash
-npm test    # 63 个测试文件 / 630 个用例（test/ 复制到沙箱执行，不写污染仓库）
+npm test    # 48 个测试文件 / 637 个用例（test/ 复制到沙箱执行，不写污染仓库）
 ```
 
 覆盖：Black-76 Greeks 与远期定价、Smile 两翼与 wingRegime 分类、期限矩阵与交割断崖、时段归类、冰山聚合、GEX/做市商敞口三口径敏感性、MSTR 披露账本（修订合并/证据哈希/SEC 回退/官方 mNAV）、RAMO 与四象限体制、数据源健康状态机与时钟口径、ETag/Gzip 协商缓存、波浪规则引擎等。
