@@ -6769,7 +6769,8 @@ body {
 
 @media (max-width: 1024px) {
   .el-two-col {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a chart canvas sized at a wider viewport must not hold the track open */
+    grid-template-columns: minmax(0, 1fr);
   }
   .el-chart-tall {
     height: 460px;
@@ -6810,6 +6811,15 @@ body {
 }
 
 .el-intro strong {
+  color: var(--text-primary);
+}
+
+/* Module 2-D: each chart opens with its conclusion as a sentence */
+.ln-headline {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.55;
   color: var(--text-primary);
 }
 

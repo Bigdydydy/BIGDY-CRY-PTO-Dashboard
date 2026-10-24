@@ -442,6 +442,25 @@ async function getSystemAuditData(doProbe = false) {
       ancillaryIds: ['basis_live', 'basis_history']
     },
     {
+      id: 'leverage_norm',
+      name: '杠杆与资金归一化 (资金费×OI / OI 按币计 / ETF 流入÷成交额 / 期权÷期货)',
+      viewId: 'view-term-premium',
+      primarySource: 'CoinGlass 全场所期货/期权 OI 与 OI 加权资金费率 + CoinGlass ETF 流量 × Yahoo ETF 日成交额',
+      targetEndpoints: [
+        'https://capi.coinglass.com/api/openInterest/v3/chart',
+        'https://capi.coinglass.com/api/option/oi/history',
+        'https://capi.coinglass.com/api/priceAndIndicator?index=avg_fr_kline',
+        'https://capi.coinglass.com/api/etf/flow',
+        'https://query1.finance.yahoo.com/v8/finance/chart/IBIT'
+      ],
+      timeframe: '日频：OI 2020 起，资金费约 1000 天，ETF 2024-01 起',
+      updateInterval: '1h 缓存 / 按需刷新',
+      isRealtime: false,
+      provenanceSignatures: ['CHAIN_LINKED_ALL_VENUE_OI', 'FUNDING_X_PERP_OI_30D_USD', 'ETF_FLOW_TO_DOLLAR_VOLUME_20D'],
+      sourceIds: ['lev_oi', 'lev_funding'],
+      ancillaryIds: ['lev_etf_flow', 'etf_volume']
+    },
+    {
       id: 'flow_force',
       name: '多场所资金流向力度 (Flow Force)',
       viewId: 'view-ssro',

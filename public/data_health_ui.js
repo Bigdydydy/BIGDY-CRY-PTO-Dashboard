@@ -51,6 +51,7 @@
     { id: 'options.blockTrades', card: '#module-block-trades',      live: ['#block-narrative-box', '#module-block-trades .flow-summary-bar'] },
     { id: 'term_premium',        card: '#module-term-premium',      live: ['#tp-header-regime-pill', '#tp-header-score-pill', '#tp-header-excess-pill', '#tp-regime-tag', '#tp-score-value', '#tp-score-tier', '#tp-excess-val', '#tp-sharpe-val', '#tp-insights-summary', '#tp-insights-list'] },
     { id: 'etf',                 card: '#module-etf-linkage',       live: ['#el-verdict-pill', '#el-verdict-count', '#el-verdict-summary', '#el-check-list', '#el-status', '#module-etf-linkage .el-kpi'] },
+    { id: 'leverage',            card: '#module-leverage-norm',     live: ['#module-leverage-norm .el-kpi', '#ln-headline-funding', '#ln-headline-oi', '#ln-headline-etf', '#ln-headline-options'] },
     { id: 'macro',               card: '#module-macro-chart',       live: ['#module-macro-chart > .card-body > .macro-metrics-row'] },
     { id: 'preferreds',          card: '#mstr-pref-section',        live: ['#mstr-pref-section .macro-metrics-row'] },
     { id: 'cdri',                card: '#module-cdri',              live: ['#cdri-header-score-pill', '#cdri-gauge-svg', '#cdri-gauge-score', '#cdri-gauge-badge'] },

@@ -42,3 +42,6 @@ upstream.local.json
 
 # MSTR 官方披露采集的原始证据体 (体量大、由 hash 命名，不随归档提交；Actions 侧以 artifact 保留 14 天)
 data/mstr_disclosure_evidence/
+
+# Module 2-D 杠杆与资金归一化的运行期构建缓存 (服务器按需重建，1h TTL)
+data/leverage_norm.json

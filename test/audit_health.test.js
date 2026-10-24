@@ -10,7 +10,7 @@ const EXPECTED_MODULES = [
   'gold_btc_correlation', 'ssro_oscillator', 'crypto_mcclellan_breadth',
   'cdri', 'mstr_preferreds', 'etf_linkage', 'flow_force', 'wave_engine',
   'block_insight', 'option_marks', 'option_oi_history', 'coinbase_liquidity_history',
-  'mstr_disclosures'
+  'mstr_disclosures', 'leverage_norm'
 ];
 
 // All gating source ids needed to make every module ONLINE — these now match
@@ -25,7 +25,8 @@ const ALL_OK_IDS = [
   'etf', 'cot', 'etf_oi', 'block_flow', 'smart_money', 'option_marks',
   'oi_history', 'liquidity_history', 'wave:1h', 'flow:1h',
   'mstr_official_ledger', 'mstr_official_shares', 'mstr_official_capital',
-  'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs'
+  'mstr_official_press', 'mstr_sec_index', 'mstr_mnav_inputs',
+  'lev_oi', 'lev_funding'
 ];
 
 function blockAllNetwork(t) {
@@ -48,7 +49,7 @@ test('default audit performs zero network I/O and zero upstream getter calls', a
 test('cold registry: nothing is ONLINE/FRESH just for existing; overall is UNKNOWN', async (t) => {
   blockAllNetwork(t);
   const report = await audit.getSystemAuditData(false);
-  assert.equal(report.modulesCount, 20);
+  assert.equal(report.modulesCount, 21);
   for (const id of EXPECTED_MODULES) {
     const mod = report.modules[id];
     assert.ok(mod, `module ${id} present`);
@@ -90,7 +91,7 @@ test('probe is opt-in, verifies payload shape, and failures downgrade overall', 
   for (const id of ALL_OK_IDS) health.recordSuccess(id, { dataAsOf: Date.now(), source: 'test' });
   let report = await audit.getSystemAuditData(false);
   assert.equal(report.overallHealth, 'HEALTHY');
-  assert.equal(report.onlineModulesCount, 20);
+  assert.equal(report.onlineModulesCount, 21);
 
   // probe with all endpoints unreachable -> downgrade to at least DEGRADED
   let calls = 0;

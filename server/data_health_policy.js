@@ -59,7 +59,13 @@ const SOURCE_POLICIES = Object.freeze({
   ssro_stable: DAILY_LIVE,
   ssro_quote: LIVE,
   etf_oi: policy(12 * HOUR, 3 * DAY, 3 * DAY, 7 * DAY),
-  coinbase_candles: DAILY_LIVE
+  coinbase_candles: DAILY_LIVE,
+  // Module 2-D leverage normalization: daily CoinGlass OI / funding (1h build
+  // cache, refreshed on demand) and ETF flows × Yahoo dollar volume.
+  lev_oi: policy(6 * HOUR, 2 * DAY, 2 * DAY, 5 * DAY),
+  lev_funding: policy(6 * HOUR, 2 * DAY, 2 * DAY, 5 * DAY),
+  lev_etf_flow: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY),
+  etf_volume: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY)
 });
 
 // A forming candle is dated by its opening time. Its allowed data age includes
