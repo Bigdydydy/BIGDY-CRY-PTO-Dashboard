@@ -1,30 +1,30 @@
 {
   "id": "macro_snapshot",
   "status": "ok",
-  "lastAttemptAt": "2026-10-25T16:37:09.250Z",
-  "lastSuccessAt": "2026-10-25T16:37:11.717Z",
+  "lastAttemptAt": "2026-10-25T20:59:38.111Z",
+  "lastSuccessAt": "2026-10-25T20:59:39.946Z",
   "lastError": null,
   "steps": {
     "macro": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T16:37:11.259Z",
-      "lastSuccessAt": "2026-10-25T16:37:11.259Z",
+      "lastAttemptAt": "2026-10-25T20:59:39.535Z",
+      "lastSuccessAt": "2026-10-25T20:59:39.535Z",
       "lastError": null,
       "dataAsOf": "2026-10-25T00:00:00.000Z",
       "verifiedSkip": false
     },
     "mstr_disclosures": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T16:37:11.617Z",
-      "lastSuccessAt": "2026-10-25T16:37:11.617Z",
+      "lastAttemptAt": "2026-10-25T20:59:39.840Z",
+      "lastSuccessAt": "2026-10-25T20:59:39.840Z",
       "lastError": null,
-      "dataAsOf": "2026-10-25T16:37:11.615Z",
+      "dataAsOf": "2026-10-25T20:59:39.838Z",
       "verifiedSkip": false
     },
     "preferreds": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T16:37:11.717Z",
-      "lastSuccessAt": "2026-10-25T16:37:11.717Z",
+      "lastAttemptAt": "2026-10-25T20:59:39.946Z",
+      "lastSuccessAt": "2026-10-25T20:59:39.946Z",
       "lastError": null,
       "dataAsOf": "2026-10-23T00:00:00.000Z",
       "verifiedSkip": false
