@@ -31,15 +31,20 @@ function signalsFor(bars, thr) {
 }
 
 describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正', () => {
-  it('浪5极限: 浪3短于浪1时 = 浪4终点 + 浪3长度 (浪3不能最短)', () => {
+  it('浪5极限: 浪3短于浪1时 = 浪4终点 + 浪3长度 (浪3不能最短)，作为顺势计数否定位而非目标', () => {
     const g = _internal.mkGeom([
       P(0, 100, 'low'), P(10, 300, 'high'), P(20, 200, 'low'),
       P(30, 350, 'high'), P(40, 320, 'low'), { idx: 50, time: 50, price: 380, type: 'high', open: true }
     ]);
     const lv = _internal.buildLevels('IMPULSE', g, 'RUNNING', {});
-    const lim = lv.targets.find(t => /浪5极限/.test(t.label));
-    assert.ok(lim, '应给出浪5极限');
+    const lim = lv.ceilingPivot;
+    assert.ok(lim && /浪5极限/.test(lim.levelName), '应给出浪5极限');
     assert.strictEqual(lim.price, 320 + 150);
+    assert.ok(/P39/.test(lim.description));
+    assert.ok(!lv.targets.some(t => /浪5极限/.test(t.label)), '浪5极限不再列为目标');
+    const done = _internal.buildLevels('IMPULSE', g, 'COMPLETED', {});
+    assert.strictEqual(done.ceilingPivot.price, 470, '已完成时浪5 延伸仍受此限');
+    assert.strictEqual(done.monitoringPivot.kind, 'continuation');
     assert.ok(!lv.targets.some(t => /0\.382×浪3/.test(t.label)), '旧的0.382×浪3上限已移除');
   });
 
@@ -71,7 +76,7 @@ describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正
     assert.strictEqual(sig.direction, 'BULLISH');
     assert.ok(Math.abs(sig.largestCounterMove.innerMax - 11) < 1.5, `内部最大回撤 ${sig.largestCounterMove.innerMax}`);
     assert.strictEqual(sig.largestCounterMove.exceeded, true);
-    assert.ok(/小级别见顶/.test(sig.largestCounterMove.text));
+    assert.ok(/可假设已结束/.test(sig.largestCounterMove.text) && /P93/.test(sig.largestCounterMove.text), sig.largestCounterMove.text);
     assert.ok(sig.eatBack.ratio > 0.79 && sig.eatBack.ratio < 0.82);
     assert.ok(/0\.7/.test(sig.eatBack.verdict), sig.eatBack.verdict);
     assert.strictEqual(sig.partsProjector.find(r => r.pattern === '平台形').reachedMin, true);
@@ -208,5 +213,63 @@ describe('Module 8 v3: 柳玉冬实战信号层 / 级别阶梯 / 目标位修正
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('Module 8: 监测点与手稿核对 (2026-10-23)', () => {
+  const L = (type, pts, status) => _internal.buildLevels(type, _internal.mkGeom(pts), status, {});
+  const O = (idx, price, type) => ({ idx, time: idx, price, type, open: true });
+
+  it('平台形 c 浪: 不用单锯齿的 0.9×b，改按与 a 浪重叠 (P200)、上限 2×max(a,b) 与 3×a (P201)', () => {
+    const lv = L('FLAT', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 510, 'high'), O(30, 450, 'low')], 'RUNNING');
+    assert.ok(!lv.targets.some(t => /0\.9×b/.test(t.label)), lv.targets.map(t => t.label).join(' / '));
+    const ov = lv.targets.find(t => /与a浪重叠/.test(t.label));
+    assert.ok(ov && ov.price === 500);
+    assert.strictEqual(lv.ceilingPivot.price, 510 - Math.min(2 * 110, 3 * 100));
+    assert.ok(/P201/.test(lv.ceilingPivot.description));
+  });
+
+  it('单锯齿 c 浪: 1.618×a 警戒位 (P145/P192)，5×a、5×b 顺势上限 (P143)', () => {
+    const lv = L('ZIGZAG', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 450, 'high'), O(30, 420, 'low')], 'RUNNING');
+    assert.ok(Math.abs(lv.warnPivot.price - (450 - 161.8)) < 1e-6);
+    assert.ok(/P145/.test(lv.warnPivot.description));
+    assert.strictEqual(lv.ceilingPivot.price, 450 - 5 * 50);
+  });
+
+  it('已完成计数的终点是延续线，单锯齿 / 双锯齿用 0-b、0-x 通道线确认完成 (P72、P189、P360)', () => {
+    const zz = L('ZIGZAG', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 450, 'high'), P(30, 350, 'low')], 'COMPLETED');
+    assert.strictEqual(zz.monitoringPivot.kind, 'continuation');
+    assert.ok(/0-b通道线/.test(zz.secondaryPivot.levelName) && /P189/.test(zz.secondaryPivot.description));
+    const dz = L('DOUBLE_ZIGZAG', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 450, 'high'), P(30, 330, 'low')], 'COMPLETED');
+    assert.strictEqual(dz.monitoringPivot.kind, 'continuation');
+    assert.ok(/0-x通道线/.test(dz.secondaryPivot.levelName) && /P360/.test(dz.secondaryPivot.description));
+    // 0-x 线在 x 之后按斜率外推 (最后拐点处)
+    assert.ok(Math.abs(dz.secondaryPivot.price - (500 - 50 / 20 * 30)) < 1e-6);
+  });
+
+  it('补齐最低要求: 双锯齿 y 长于 x (P347)、三角形 c≥0.5b / d≥0.5c / e≥0.25d (P263)、xx≥0.2y (P348)', () => {
+    const y = L('DOUBLE_ZIGZAG', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 495, 'high'), O(30, 450, 'low')], 'RUNNING');
+    assert.ok(y.targets.some(t => /长于x浪/.test(t.label) && t.price === 400), y.targets.map(t => t.label).join(' / '));
+    assert.strictEqual(y.ceilingPivot.price, 495 - 500);
+    const c = L('TRIANGLE', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 480, 'high'), O(30, 430, 'low')], 'RUNNING');
+    assert.ok(c.targets.some(t => /0\.5×b浪\(P263\)/.test(t.label) && t.price === 440));
+    const d = L('TRIANGLE', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 480, 'high'), P(30, 420, 'low'), O(40, 450, 'high')], 'RUNNING');
+    assert.ok(d.targets.some(t => /d浪最低要求/.test(t.label) && t.price === 450));
+    const e = L('TRIANGLE', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 480, 'high'), P(30, 420, 'low'), P(40, 460, 'high'), O(50, 440, 'low')], 'RUNNING');
+    assert.ok(e.targets.some(t => /e浪最低要求/.test(t.label) && t.price === 450));
+    const xx = L('TRIPLE_ZIGZAG', [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 450, 'high'), P(30, 350, 'low'), O(40, 380, 'high')], 'RUNNING');
+    assert.ok(xx.targets.some(t => /xx浪最低要求: 0\.2×y浪\(P348\)/.test(t.label)));
+  });
+
+  it('页码: 三角形各价位引对手稿页 (P263 / P289 / P327-329 / P340)，不再引 P345 / P349 / P352', () => {
+    const tri = [P(0, 500, 'high'), P(10, 400, 'low'), P(20, 480, 'high'), P(30, 420, 'low'), P(40, 460, 'high'), P(50, 440, 'low')];
+    const run = L('TRIANGLE', tri.slice(0, 5).concat([O(50, 440, 'low')]), 'RUNNING');
+    const done = L('TRIANGLE', tri, 'COMPLETED');
+    const txt = JSON.stringify([run, done]);
+    assert.ok(!/P345|P349|P352/.test(txt), txt);
+    assert.ok(/P263/.test(run.secondaryPivot.description));
+    assert.ok(/P340/.test(done.monitoringPivot.description) && done.monitoringPivot.kind === 'continuation');
+    assert.ok(/P327/.test(done.secondaryPivot.description));
+    assert.ok(done.targets.some(t => /P289/.test(t.label)));
   });
 });

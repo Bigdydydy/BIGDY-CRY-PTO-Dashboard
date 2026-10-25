@@ -458,19 +458,33 @@ describe('Module 8: 多级别画浪 (母浪 + 子浪整体评估)', () => {
     assert.ok(prim.conditions.some(c => /起点/.test(c)), prim.conditions.join(' / '));
   });
 
-  it('完成确认位: 推动浪完成后调整低点反弹收回 ≥0.382，跌破即确认完成', () => {
+  it('完成确认位: 手稿 P93 回撤超过五浪内部最大回撤 / P72 跌破 2-4 通道线；柳氏绿点单列', () => {
     const run = tail => {
       const v = [96, 100, 110, 105, 122, 116, 130].concat(tail);
       const bars = build(v);
       return E.evaluateUserCount(bars['1h'], 'TEST', { tool: 'IMPULSE', timeframe: '1h', subBars: { '15m': bars['15m'] }, points: [1, 2, 3, 4, 5, 6].map(k => pt(v, k, 3600)) });
     };
     const before = run([122, 127, 124]);
-    assert.ok(before.invalidation.completion, '应给出完成确认位');
-    assert.ok(Math.abs(before.invalidation.completion.price - 122) < 0.1, before.invalidation.completion.text);
-    assert.strictEqual(before.invalidation.completion.broken, false);
+    const c = before.invalidation.completion;
+    assert.ok(c, '应给出手稿完成确认位');
+    assert.match(c.text, /手稿P93/);
+    assert.match(c.text, /P72-73/);
+    // 130 之后跌到 122 (8) 已超过五浪内部最大回撤 (浪4 122→116 约 6)
+    assert.strictEqual(c.broken, true, c.text);
+    assert.ok(c.price > 122 && c.price < 125, c.text);
+    assert.ok(c.channel && isFinite(c.channel.price));
+    // 已完成的推动浪: 浪5 终点是延续线，不是计数否定位
+    assert.strictEqual(before.invalidation.leg.kind, 'continuation');
+    assert.ok(Math.abs(before.invalidation.leg.price - 130) < 0.5);
+    assert.ok(!before.invalidation.structural, JSON.stringify(before.invalidation.structural));
+    const liu = before.invalidation.completionLiu;
+    assert.ok(liu, '应给出柳氏完成确认位');
+    assert.ok(Math.abs(liu.price - 122) < 0.1, liu.text);
+    assert.strictEqual(liu.broken, false);
+    assert.match(liu.text, /柳氏/);
     const after = run([122, 127, 119, 121]);
-    assert.strictEqual(after.invalidation.completion.broken, true, after.invalidation.completion.text);
-    assert.match(after.invalidation.completion.text, /确认.*已结束/);
+    assert.strictEqual(after.invalidation.completionLiu.broken, true, after.invalidation.completionLiu.text);
+    assert.match(after.invalidation.completionLiu.text, /确认.*已结束/);
   });
 
   it('升一级重数: 小级别计数被走势证伪时，起点不变、按大一级重新取三个转折', () => {
