@@ -38,7 +38,14 @@ function extractFunction(src, name) {
   const re = new RegExp(`function ${name}\\s*\\(`);
   const m = re.exec(src);
   if (!m) throw new Error(`helper function ${name} not found in app.js`);
-  const open = src.indexOf('{', m.index);
+  // Body starts after the parameter list, which may hold a destructured `{ ... } = {}`
+  let parens = 0;
+  let close = m.index + m[0].length - 1;
+  for (; close < src.length; close++) {
+    if (src[close] === '(') parens++;
+    else if (src[close] === ')' && !--parens) break;
+  }
+  const open = src.indexOf('{', close);
   let depth = 0;
   for (let i = open; i < src.length; i++) {
     if (src[i] === '{') depth++;
@@ -64,7 +71,7 @@ const PRELUDE = [
   'let currentMarketData = null;',
   'function closeModal() {}',
   ...['scheduleDhRetick', 'dhUpdate', 'dhFail', 'escapeHtml', 'getAppTheme',
-      'getEchartsTheme', 'getChartThemeColors', 'formatUTC8',
+      'getEchartsTheme', 'getChartThemeColors', 'timeZoomSlider', 'formatUTC8',
       'formatUTC8TimeOnly', 'formatTimeWindowUTC8']
     .map(n => extractFunction(APP_SRC, n))
 ].join('\n');

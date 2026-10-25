@@ -199,8 +199,13 @@
     return out;
   }
 
-  function buildChartOption(structure, colors) {
+  /**
+   * opts.zoomSlider(cfg) returns the app's shared time-window slider component for
+   * cfg = { xAxisIndex, win }; without it (Node tests) the chart has no slider.
+   */
+  function buildChartOption(structure, colors, opts) {
     const c = colors || {};
+    const zoomSlider = opts && typeof opts.zoomSlider === 'function' ? opts.zoomSlider : null;
     const rows = expandCalendarRows(structure && structure.series);
     const dates = rows.map(r => r.date);
     const vals = k => rows.map(r => (isNum(r[k]) ? r[k] : null));
@@ -248,8 +253,9 @@
       grid: [
         { left: 60, right: 20, top: '8%', height: '30%' },
         { left: 60, right: 20, top: '44%', height: '22%' },
-        { left: 60, right: 20, top: '72%', height: '18%' }
+        { left: 60, right: 20, top: '70%', height: '16%' }
       ],
+      dataZoom: zoomSlider ? [zoomSlider({ xAxisIndex: [0, 1, 2], win: opts.win || null })] : [],
       xAxis: [0, 1, 2].map(i => ({
         type: 'category', data: dates, gridIndex: i,
         axisLine: { lineStyle: { color: c.axisLine } },
@@ -305,6 +311,7 @@
    *   deps.echarts    echarts global when present; chart is skipped without it
    *   deps.colors     getChartThemeColors() result from app.js
    *   deps.marketData currentMarketData from app.js for the guarded IV label
+   *   deps.zoomSlider timeZoomSlider bound to the theme colors (optional)
    *   deps.document   document override for tests
    */
   function render(opts) {
@@ -346,7 +353,10 @@
     if (!chartInst) {
       chartInst = echarts.init(dom, deps.echartsTheme || null);
     }
-    chartInst.setOption(buildChartOption(structure, deps.colors), true);
+    // Keep the user's slider window across refreshes (the notMerge setOption would reset it)
+    const kept = chartInst.getOption ? ((chartInst.getOption() || {}).dataZoom || [])[0] : null;
+    const win = kept && kept.start != null && kept.end != null ? { start: kept.start, end: kept.end } : null;
+    chartInst.setOption(buildChartOption(structure, deps.colors, { zoomSlider: deps.zoomSlider, win }), true);
   }
 
   function resize() {

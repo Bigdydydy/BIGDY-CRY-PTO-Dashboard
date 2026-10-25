@@ -92,6 +92,61 @@ function getChartThemeColors() {
 }
 
 /**
+ * Time-window slider under a long time-series chart (drag the handles to zoom, the band to pan).
+ * Slider only: an 'inside' dataZoom swallows wheel events, so the page would stop scrolling while
+ * the cursor is over the chart. `win` is { start, end } in percent of the x extent.
+ */
+function timeZoomSlider(colors, { xAxisIndex = 0, bottom = 6, win, labelFormatter } = {}) {
+  const accent = '#38bdf8';
+  return {
+    type: 'slider',
+    xAxisIndex,
+    bottom,
+    height: 18,
+    start: win?.start ?? 0,
+    end: win?.end ?? 100,
+    brushSelect: false,
+    borderColor: colors.axisLine,
+    backgroundColor: 'transparent',
+    fillerColor: colors.isLight ? 'rgba(56, 189, 248, 0.14)' : 'rgba(56, 189, 248, 0.10)',
+    dataBackground: {
+      lineStyle: { color: colors.tickColor, opacity: 0.5, width: 0.8 },
+      areaStyle: { color: colors.tickColor, opacity: 0.08 }
+    },
+    selectedDataBackground: {
+      lineStyle: { color: accent, opacity: 0.8, width: 0.8 },
+      areaStyle: { color: accent, opacity: 0.12 }
+    },
+    handleStyle: { color: accent, borderColor: accent },
+    moveHandleStyle: { color: colors.tickColor, opacity: 0.35 },
+    emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent, opacity: 0.7 } },
+    textStyle: { color: colors.tickColor, fontFamily: 'JetBrains Mono', fontSize: 10 },
+    ...(labelFormatter ? { labelFormatter } : {})
+  };
+}
+
+/** The window a chart's slider shows now, so a notMerge re-render (unit toggle, refresh) keeps it */
+function keptZoomWindow(chart) {
+  const z = chart?.getOption?.()?.dataZoom?.[0];
+  return z && z.start != null && z.end != null ? { start: z.start, end: z.end } : null;
+}
+
+/** Window showing the last `count` of `n` category points; 'all' / null shows everything */
+function recentZoomWindow(n, count) {
+  const c = Number(count);
+  if (!c || n < 2 || c >= n) return { start: 0, end: 100 };
+  return { start: ((n - c) / (n - 1)) * 100, end: 100 };
+}
+
+/** Window covering the last `days` calendar days of rows sorted by ISO `date` */
+function recentDaysZoomWindow(rows, days, dateOf = r => r.date) {
+  if (!rows?.length || !Number(days)) return { start: 0, end: 100 };
+  const cutoff = new Date(Date.parse(dateOf(rows[rows.length - 1])) - Number(days) * 86400000).toISOString().slice(0, 10);
+  const idx = rows.findIndex(r => dateOf(r) > cutoff);
+  return recentZoomWindow(rows.length, rows.length - Math.max(idx, 0));
+}
+
+/**
  * Synchronize UI state across all theme switcher pills on page
  */
 function syncThemeSwitchers(theme) {
@@ -116,6 +171,7 @@ function reloadAllChartsForTheme() {
   }
   if (typeof disposeEtfLinkageCharts === 'function') disposeEtfLinkageCharts();
   if (typeof disposeLeverageNormCharts === 'function') disposeLeverageNormCharts();
+  if (typeof disposePreferredsCharts === 'function') disposePreferredsCharts();
   if (typeof termCurveChartInstance !== 'undefined' && termCurveChartInstance) {
     try { termCurveChartInstance.dispose(); } catch (e) {}
     termCurveChartInstance = null;
@@ -1214,10 +1270,13 @@ function renderDealerHistoryChart() {
   const common = elAxisCommon(colors);
   const days = rows.map(r => (r.live ? `${r.day} 实时` : r.day));
   const usdFmt = v => (v === null || v === undefined ? '--' : `${v >= 0 ? '+' : '-'}$${Math.abs(v / 1e6).toFixed(1)}M`);
+  // Opens on the last ~4 months once the archive outgrows that; the slider reaches back to the start
+  const win = keptZoomWindow(dealerHistoryChartInstance) || recentZoomWindow(rows.length, 120);
   dealerHistoryChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 64, right: 64, top: 34, bottom: 28 },
+    grid: { left: 64, right: 64, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
     tooltip: { ...elTooltipBase(colors) },
     xAxis: { type: 'category', data: days, ...common, splitLine: { show: false } },
@@ -2285,7 +2344,7 @@ function renderPnLChart(s, view, resetChart) {
     dataZoom: [
       // Slider only: an 'inside' dataZoom swallows wheel events (even with zoomOnMouseWheel: 'ctrl'),
       // which would stop the modal body from scrolling while the cursor is over the chart
-      { type: 'slider', xAxisIndex: 0, filterMode: 'filter', height: 18, bottom: 12, labelFormatter: val => `$${Math.round(val).toLocaleString()}` }
+      timeZoomSlider(themeColors, { bottom: 12, labelFormatter: val => `$${Math.round(val).toLocaleString()}` })
     ],
     visualMap: {
       show: false,
@@ -3754,81 +3813,88 @@ function renderPreferredsSummary(s, monthly) {
 }
 
 function renderPreferredsCharts() {
-  if (!rawPrefData || typeof Chart === 'undefined') return;
-  const strcCanvas = document.getElementById('pref-strc-canvas');
-  const spreadCanvas = document.getElementById('pref-spread-canvas');
-  if (!strcCanvas || !spreadCanvas) return;
+  if (!rawPrefData || typeof echarts === 'undefined') return;
+  const strcDom = document.getElementById('pref-strc-echarts');
+  const spreadDom = document.getElementById('pref-spread-echarts');
+  if (!strcDom || !spreadDom) return;
+  // Canvas charts don't follow their box on their own; the two-column grid collapses at 1180px
+  const initPref = dom => {
+    const chart = echarts.init(dom, getEchartsTheme());
+    if (window.ResizeObserver) new ResizeObserver(() => { if (!chart.isDisposed()) chart.resize(); }).observe(dom);
+    return chart;
+  };
+  if (!prefStrcChart) prefStrcChart = initPref(strcDom);
+  if (!prefSpreadChart) prefSpreadChart = initPref(spreadDom);
+  // Shared group: dragging one slider (or hovering one chart) moves the other
+  prefStrcChart.group = prefSpreadChart.group = 'mstr-preferreds';
+  echarts.connect('mstr-preferreds');
 
   const points = rawPrefData.points;
   const t = rawPrefData.summary.spreadThresholdsPct;
   const labels = points.map(p => p.date);
   const colors = getChartThemeColors();
-  const flat = (v) => points.map(() => v);
+  const common = elAxisCommon(colors);
   const refLine = (label, v, color) => ({
-    label, data: flat(v), borderColor: color, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, isRef: true
+    yAxis: v,
+    lineStyle: { color, width: 1, type: 'dashed' },
+    label: { show: true, position: 'insideEndTop', formatter: label, color, fontSize: 10 }
   });
-  const baseOptions = (title, yTick, tooltipLabel) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 300 },
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        display: true,
-        labels: { color: colors.textSecondary, boxWidth: 12, font: { family: 'Inter', size: 10 } }
-      },
-      title: { display: true, text: title, color: colors.textPrimary, font: { family: 'Inter', size: 11, weight: '600' } },
-      tooltip: {
-        backgroundColor: colors.tooltipBg,
-        borderColor: colors.tooltipBorder,
-        borderWidth: 1,
-        titleColor: colors.tooltipTitle,
-        bodyColor: colors.tooltipBody,
-        bodyFont: { family: 'JetBrains Mono', size: 11 },
-        filter: (item) => !item.dataset.isRef && item.parsed.y !== null,
-        callbacks: { label: tooltipLabel }
+  const baseOption = (chart, title, yFmt, tooltipBody, legend) => ({
+    backgroundColor: 'transparent',
+    animation: false,
+    title: { text: title, left: 'center', top: 0, textStyle: { color: colors.textPrimary, fontFamily: 'Inter', fontSize: 11, fontWeight: 600 } },
+    legend: { top: 18, data: legend, itemWidth: 12, itemHeight: 8, textStyle: { color: colors.textSecondary, fontSize: 10 } },
+    grid: { left: 52, right: 16, top: 48, bottom: 54 },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const p = points[params[0]?.dataIndex];
+        return p ? `<div style="font-weight:600;margin-bottom:4px;">${p.date}</div>${tooltipBody(p)}` : '';
       }
     },
-    scales: {
-      x: { grid: { display: false }, ticks: { color: colors.tickColor, maxTicksLimit: 8, maxRotation: 0, font: { family: 'JetBrains Mono', size: 10 } } },
-      y: { grid: { color: colors.gridLine }, ticks: { color: colors.tickColor, callback: yTick, font: { family: 'JetBrains Mono', size: 10 } } }
-    }
+    xAxis: { type: 'category', data: labels, boundaryGap: false, ...common, splitLine: { show: false } },
+    yAxis: { type: 'value', scale: true, ...common, axisLabel: { ...common.axisLabel, formatter: yFmt } },
+    dataZoom: [timeZoomSlider(colors, { win: keptZoomWindow(chart) })]
   });
 
-  if (prefStrcChart) prefStrcChart.destroy();
-  prefStrcChart = new Chart(strcCanvas.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: 'STRC 收盘', data: points.map(p => p.strcClose), borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-        { label: '20D VWAP', data: points.map(p => p.strcVwap20), borderColor: '#a1a1aa', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0 },
-        refLine('$99 警戒', 99, '#f43f5e')
-      ]
-    },
-    options: baseOptions('STRC 平价偏离', v => `$${v}`, (c) => {
-      const p = points[c.dataIndex];
-      const streak = c.datasetIndex === 0 && p.belowParStreak > 0 ? ` · 连续 ${p.belowParStreak} 天 <$99` : '';
-      return ` ${c.dataset.label}: $${c.parsed.y.toFixed(2)}${streak}`;
-    })
-  });
+  prefStrcChart.setOption({
+    ...baseOption(prefStrcChart, 'STRC 平价偏离', v => `$${v}`, p => {
+      const streak = p.belowParStreak > 0 ? ` · 连续 ${p.belowParStreak} 天 &lt;$99` : '';
+      return `<div>STRC 收盘: <b>$${p.strcClose.toFixed(2)}</b>${streak}</div>
+        <div>20D VWAP: ${p.strcVwap20 != null ? `$${p.strcVwap20.toFixed(2)}` : '--'}</div>`;
+    }, ['STRC 收盘', '20D VWAP']),
+    series: [
+      {
+        name: 'STRC 收盘', type: 'line', showSymbol: false, smooth: 0.1, data: points.map(p => p.strcClose),
+        lineStyle: { width: 2, color: '#3b82f6' }, itemStyle: { color: '#3b82f6' },
+        markLine: { silent: true, symbol: 'none', data: [refLine('$99 警戒', 99, '#f43f5e')] }
+      },
+      {
+        name: '20D VWAP', type: 'line', showSymbol: false, data: points.map(p => p.strcVwap20),
+        lineStyle: { width: 1.5, color: '#a1a1aa', type: [5, 4] }, itemStyle: { color: '#a1a1aa' }
+      }
+    ]
+  }, true);
 
-  if (prefSpreadChart) prefSpreadChart.destroy();
-  prefSpreadChart = new Chart(spreadCanvas.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: 'STRD − STRF 利差', data: points.map(p => p.juniorSpread), borderColor: '#8b5cf6', borderWidth: 2, pointRadius: 0, tension: 0.1, spanGaps: true },
-        refLine(`留意 ${t.watch}%`, t.watch, '#f59e0b'),
-        refLine(`压力 ${t.stress}%`, t.stress, '#f43f5e')
-      ]
-    },
-    options: baseOptions('优先股分层利差 (领先 STRC 约 1–2 周)', v => `${v}%`, (c) => {
-      const p = points[c.dataIndex];
-      return ` 利差 ${c.parsed.y.toFixed(2)}% · STRD $${p.strdClose ?? '--'} / STRF $${p.strfClose ?? '--'} · STRC $${p.strcClose}`;
-    })
+  prefSpreadChart.setOption({
+    ...baseOption(prefSpreadChart, '优先股分层利差 (领先 STRC 约 1–2 周)', v => `${v}%`, p => (p.juniorSpread == null ? '<div>利差 --</div>'
+      : `<div>利差 <b>${p.juniorSpread.toFixed(2)}%</b></div>
+        <div>STRD $${p.strdClose ?? '--'} / STRF $${p.strfClose ?? '--'} · STRC $${p.strcClose}</div>`), ['STRD − STRF 利差']),
+    series: [
+      {
+        name: 'STRD − STRF 利差', type: 'line', showSymbol: false, smooth: 0.1, connectNulls: true, data: points.map(p => p.juniorSpread),
+        lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' },
+        markLine: { silent: true, symbol: 'none', data: [refLine(`留意 ${t.watch}%`, t.watch, '#f59e0b'), refLine(`压力 ${t.stress}%`, t.stress, '#f43f5e')] }
+      }
+    ]
+  }, true);
+}
+
+function disposePreferredsCharts() {
+  [prefStrcChart, prefSpreadChart].forEach(ch => {
+    if (ch) { try { ch.dispose(); } catch (e) {} }
   });
+  prefStrcChart = prefSpreadChart = null;
 }
 
 /**
@@ -3884,6 +3950,7 @@ function initMacroChartEvents() {
 let rawCdriData = null;
 let cdriChartInstance = null;
 let currentCdriTimeframe = 'all'; // '30', '90', '180', '365', 'all'
+let cdriZoomReset = false; // set while a timeframe preset re-renders, so the slider jumps to it
 let isCdriBtcVisible = true;
 
 // DOM Elements
@@ -4019,26 +4086,12 @@ function renderCdriMetrics(data) {
 }
 
 /**
- * Filter CDRI history data by selected timeframe
+ * Full CDRI history; the selected timeframe only moves the slider window
  */
-function getFilteredCdriPoints() {
+function getCdriPoints() {
   if (!rawCdriData || !rawCdriData.history) return { dates: [], values: [], prices: [] };
   const h = rawCdriData.history;
-  const total = h.dates.length;
-  if (!total) return { dates: [], values: [], prices: [] };
-
-  let sliceCount = total;
-  if (currentCdriTimeframe === '30') sliceCount = Math.min(30, total);
-  else if (currentCdriTimeframe === '90') sliceCount = Math.min(90, total);
-  else if (currentCdriTimeframe === '180') sliceCount = Math.min(180, total);
-  else if (currentCdriTimeframe === '365') sliceCount = Math.min(365, total);
-
-  const startIdx = total - sliceCount;
-  return {
-    dates: h.dates.slice(startIdx),
-    values: h.valueList.slice(startIdx),
-    prices: h.priceList.slice(startIdx)
-  };
+  return { dates: h.dates || [], values: h.valueList || [], prices: h.priceList || [] };
 }
 
 /**
@@ -4057,10 +4110,11 @@ function renderCdriChart() {
     }
   }
 
-  const { dates, values, prices } = getFilteredCdriPoints();
+  const { dates, values, prices } = getCdriPoints();
   if (!dates.length) return;
 
   const colors = getChartThemeColors();
+  const win = (!cdriZoomReset && keptZoomWindow(cdriChartInstance)) || recentZoomWindow(dates.length, currentCdriTimeframe);
 
   const option = {
     backgroundColor: 'transparent',
@@ -4174,30 +4228,7 @@ function renderCdriChart() {
       ],
       outOfRange: { color: '#999' }
     },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 0,
-        end: 100
-      },
-      {
-        type: 'slider',
-        bottom: '2%',
-        height: 18,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        backgroundColor: 'rgba(0, 0, 0, 0.25)',
-        fillerColor: 'rgba(255, 255, 255, 0.08)',
-        handleStyle: {
-          color: '#38bdf8',
-          borderColor: '#0284c7'
-        },
-        textStyle: {
-          color: '#71717a',
-          fontFamily: 'JetBrains Mono',
-          fontSize: 10
-        }
-      }
-    ],
+    dataZoom: [timeZoomSlider(colors, { bottom: '2%', win })],
     series: [
       {
         name: 'CDRI',
@@ -4272,7 +4303,8 @@ function initCdriEvents() {
       currentCdriTimeframe = days;
       cdriTimeframeSelector.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderCdriChart();
+      cdriZoomReset = true;
+      try { renderCdriChart(); } finally { cdriZoomReset = false; }
     });
   }
 
@@ -4313,6 +4345,7 @@ function initCdriEvents() {
 let currentTermPremiumData = null;
 let termPremiumChartInstance = null;
 let currentTpTimeframe = 'all'; // '30', '90', '180', '365', 'all'
+let tpZoomReset = false; // set while a timeframe preset re-renders, so the slider jumps to it
 let tpVisibleSeries = {
   spreadTerm: true,
   spreadShort: true,
@@ -4594,8 +4627,9 @@ function renderTermPremiumChart() {
 
   const colors = getChartThemeColors();
 
-  let sliced = rawSeries;
-  if (currentTpTimeframe !== 'all') sliced = rawSeries.slice(-Number(currentTpTimeframe));
+  // The full history stays loaded; the timeframe preset only moves the slider window
+  const sliced = rawSeries;
+  const win = (!tpZoomReset && keptZoomWindow(termPremiumChartInstance)) || recentZoomWindow(sliced.length, currentTpTimeframe);
 
   const dates = sliced.map(s => (s.isLive ? `${s.date} 实时` : s.date));
   const pick = key => sliced.map(s => (s[key] != null ? s[key] : null));
@@ -4685,8 +4719,9 @@ function renderTermPremiumChart() {
     animation: false,
     grid: [
       { left: 64, right: tpGridRight, top: '6%', height: '42%' },
-      { left: 64, right: tpGridRight, top: '55%', height: '39%' }
+      { left: 64, right: tpGridRight, top: '55%', height: '35%' }
     ],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win })],
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
       label: { backgroundColor: colors.axisPointerBg, fontFamily: 'JetBrains Mono', fontSize: 11 }
@@ -4796,7 +4831,8 @@ function initTermPremiumEvents() {
       currentTpTimeframe = days;
       tpTimeframeSelector.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderTermPremiumChart();
+      tpZoomReset = true;
+      try { renderTermPremiumChart(); } finally { tpZoomReset = false; }
     });
   }
 
@@ -5045,13 +5081,15 @@ function renderElWeeklyChart() {
       <div style="color:${colors.textSecondary};">本周暂不计入 β、R² 与各项检验</div>`;
   };
 
+  const win = keptZoomWindow(elWeeklyChartInstance);
   elWeeklyChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
     grid: [
-      { left: 64, right: 108, top: 30, height: '52%' },
-      { left: 64, right: 108, top: '72%', height: '20%' }
+      { left: 64, right: 108, top: 30, height: '50%' },
+      { left: 64, right: 108, top: '69%', height: '18%' }
     ],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win })],
     legend: {
       top: 0,
       textStyle: { color: colors.textSecondary, fontSize: 11 },
@@ -5198,10 +5236,12 @@ function renderElDecompChart() {
   const colors = getChartThemeColors();
   const rows = d.decomposition;
   const common = elAxisCommon(colors);
+  const win = keptZoomWindow(elDecompChartInstance);
   elDecompChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 60, right: 16, top: 34, bottom: 28 },
+    grid: { left: 60, right: 16, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
     tooltip: {
       ...elTooltipBase(colors),
@@ -5269,10 +5309,12 @@ function renderElOiChart() {
   if (elShowCmeOi) {
     series.push({ name: 'CME 期货 OI', type: 'line', showSymbol: false, data: field('cmeFutOi'), lineStyle: { width: 1.4, color: '#f97316', type: 'dashed' }, itemStyle: { color: '#f97316' } });
   }
+  const win = keptZoomWindow(elOiChartInstance);
   elOiChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 64, right: 16, top: 34, bottom: 28 },
+    grid: { left: 64, right: 16, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 } },
     tooltip: { ...elTooltipBase(colors), valueFormatter: fmtVal },
     xAxis: { type: 'category', data: rows.map(r => r.date), ...common, splitLine: { show: false } },
@@ -5328,16 +5370,15 @@ let lnOiChartInstance = null;
 let lnEtfChartInstance = null;
 let lnRatioChartInstance = null;
 let lnRange = '730';
+let lnZoomReset = false;
 
 function lnFmtPct(v, d = 1) {
   return v == null || !isFinite(v) ? '--' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)}%`;
 }
 
-/** Rows inside the selected range, counted back from the series' own last date */
-function lnSlice(rows) {
-  if (!rows?.length || lnRange === 'all') return rows || [];
-  const cutoff = new Date(Date.parse(rows[rows.length - 1].date) - Number(lnRange) * 86400000).toISOString().slice(0, 10);
-  return rows.filter(r => r.date > cutoff);
+/** The user's current slider window, else the selected range counted back from the series' own last date */
+function lnZoomWindow(chart, rows) {
+  return (!lnZoomReset && keptZoomWindow(chart)) || recentDaysZoomWindow(rows, lnRange);
 }
 
 async function loadLeverageNorm(force = false) {
@@ -5430,12 +5471,14 @@ function renderLnFundingChart() {
   if (!lnFundingChartInstance) return;
   const colors = getChartThemeColors();
   const common = elAxisCommon(colors);
-  const rows = lnSlice(d.funding.filter(r => r.premium30dUsd != null));
+  const rows = d.funding.filter(r => r.premium30dUsd != null);
   const priceBy = new Map((d.oi || []).map(r => [r.date, r.price]));
+  const win = lnZoomWindow(lnFundingChartInstance, rows);
   lnFundingChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 64, right: 64, top: 34, bottom: 28 },
+    grid: { left: 64, right: 64, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['30 日资金溢价', 'BTC 价格'] },
     tooltip: {
       ...elTooltipBase(colors),
@@ -5477,8 +5520,9 @@ function renderLnOiChart() {
   if (!lnOiChartInstance) return;
   const colors = getChartThemeColors();
   const common = elAxisCommon(colors);
-  const rows = lnSlice(d.oi);
+  const rows = d.oi;
   const dates = rows.map(r => r.date);
+  const win = lnZoomWindow(lnOiChartInstance, rows);
   const shareLine = (name, field, color) => ({
     name, type: 'line', xAxisIndex: 1, yAxisIndex: 2, showSymbol: false, connectNulls: false,
     data: rows.map(r => (r[field] == null ? null : r[field] * 100)), lineStyle: { width: 1.4, color }, itemStyle: { color }
@@ -5487,9 +5531,10 @@ function renderLnOiChart() {
     backgroundColor: 'transparent',
     animation: false,
     grid: [
-      { left: 64, right: 72, top: 30, height: '56%' },
-      { left: 64, right: 72, top: '74%', height: '18%' }
+      { left: 64, right: 72, top: 30, height: '54%' },
+      { left: 64, right: 72, top: '71%', height: '16%' }
     ],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win })],
     legend: {
       top: 0,
       textStyle: { color: colors.textSecondary, fontSize: 11 },
@@ -5539,13 +5584,15 @@ function renderLnEtfChart() {
   if (!lnEtfChartInstance || !el) return;
   const colors = getChartThemeColors();
   const common = elAxisCommon(colors);
-  const rows = lnSlice(d.etf.rows.filter(r => r.ratio20 != null));
+  const rows = d.etf.rows.filter(r => r.ratio20 != null);
   const priceBy = new Map((d.oi || []).map(r => [r.date, r.price]));
   const band = { lineStyle: { color: 'rgba(148,163,184,0.5)', type: 'dashed' }, label: { show: false } };
+  const win = lnZoomWindow(lnEtfChartInstance, rows);
   lnEtfChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 52, right: 56, top: 34, bottom: 28 },
+    grid: { left: 52, right: 56, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['净流入 ÷ 成交额', 'BTC 价格'] },
     tooltip: {
       ...elTooltipBase(colors),
@@ -5593,11 +5640,13 @@ function renderLnRatioChart() {
   if (!lnRatioChartInstance) return;
   const colors = getChartThemeColors();
   const common = elAxisCommon(colors);
-  const rows = lnSlice(d.oi.filter(r => r.optFutRatio != null));
+  const rows = d.oi.filter(r => r.optFutRatio != null);
+  const win = lnZoomWindow(lnRatioChartInstance, rows);
   lnRatioChartInstance.setOption({
     backgroundColor: 'transparent',
     animation: false,
-    grid: { left: 48, right: 16, top: 34, bottom: 28 },
+    grid: { left: 48, right: 16, top: 34, bottom: 54 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['90 日均值', '当日'] },
     tooltip: {
       ...elTooltipBase(colors),
@@ -5644,10 +5693,16 @@ function initLeverageNormEvents() {
       if (!btn || btn.dataset.range === lnRange) return;
       lnRange = btn.dataset.range;
       seg.querySelectorAll('.timeframe-btn').forEach(b => b.classList.toggle('active', b === btn));
-      renderLnFundingChart();
-      renderLnOiChart();
-      renderLnEtfChart();
-      renderLnRatioChart();
+      // Presets move each slider to the range; the full series stays loaded for dragging back
+      lnZoomReset = true;
+      try {
+        renderLnFundingChart();
+        renderLnOiChart();
+        renderLnEtfChart();
+        renderLnRatioChart();
+      } finally {
+        lnZoomReset = false;
+      }
     });
   }
   window.addEventListener('resize', resizeLeverageNormCharts);
@@ -5942,6 +5997,7 @@ function initTermCurveEvents() {
 let rawSsroData = null;
 let ssroChartInstance = null;
 let ssroTimeframe = 'all'; // '3m' | '6m' | '1y' | '3y' | 'all'
+let ssroZoomReset = false; // set while a timeframe preset re-renders, so the slider jumps to it
 let ssroLen = 200; // 200 (macro) or 50 (tactical)
 
 /**
@@ -6056,16 +6112,10 @@ function renderSsroChart() {
     ssroChartInstance = echarts.init(dom, getEchartsTheme());
   }
 
-  let filtered = [...rawSsroData.points];
-  if (ssroTimeframe === '3m') {
-    filtered = filtered.slice(-90);
-  } else if (ssroTimeframe === '6m') {
-    filtered = filtered.slice(-180);
-  } else if (ssroTimeframe === '1y') {
-    filtered = filtered.slice(-365);
-  } else if (ssroTimeframe === '3y') {
-    filtered = filtered.slice(-1095);
-  }
+  // The full history stays loaded; the timeframe preset only moves the slider window
+  const filtered = rawSsroData.points;
+  const presetDays = { '3m': 90, '6m': 180, '1y': 365, '3y': 1095 }[ssroTimeframe];
+  const win = (!ssroZoomReset && keptZoomWindow(ssroChartInstance)) || recentZoomWindow(filtered.length, presetDays);
 
   const dates = filtered.map(p => p.date);
   const ssroVals = filtered.map(p => ssroLen === 200 ? p.ssro200 : p.ssro50);
@@ -6137,7 +6187,8 @@ function renderSsroChart() {
       link: [{ xAxisIndex: 'all' }]
     },
     // BTC 价格已由上方 TradingView 图表承担，这里只画 SSRO 震荡指标 (日线)
-    grid: { left: 65, right: 35, top: 16, bottom: 30 },
+    grid: { left: 65, right: 35, top: 16, bottom: 56 },
+    dataZoom: [timeZoomSlider(colors, { win })],
     xAxis: {
       type: 'category',
       data: dates,
@@ -6221,7 +6272,8 @@ function initSsroEvents() {
         tfSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         ssroTimeframe = btn.dataset.range || 'all';
-        renderSsroChart();
+        ssroZoomReset = true;
+        try { renderSsroChart(); } finally { ssroZoomReset = false; }
       });
     });
   }
@@ -7102,6 +7154,7 @@ function renderCbSlippageChart(data) {
 let rawCbHistory = null;
 let cbHistoryChartInstance = null;
 let cbHistoryRange = '30d';
+let cbHistoryZoomRange = null; // range the chart's current slider window belongs to
 let cbHistoryLastFetch = 0;
 const CB_HISTORY_REFRESH_MS = 5 * 60 * 1000;
 
@@ -7477,7 +7530,7 @@ function renderCbHistoryChart(data) {
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     grid: [
       { left: 56, right: 56, top: gridTop, height: '50%' },
-      { left: 56, right: 56, top: '70%', bottom: 40 }
+      { left: 56, right: 56, top: '70%', bottom: 48 }
     ],
     xAxis: [0, 1].map(i => ({
       type: 'time',
@@ -7504,10 +7557,8 @@ function renderCbHistoryChart(data) {
         splitLine: { lineStyle: { color: colors.gridLine } }
       }
     ],
-    dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1] },
-      { type: 'slider', xAxisIndex: [0, 1], height: 14, bottom: 6, borderColor: 'transparent', textStyle: { color: colors.tickColor, fontSize: 9 } }
-    ],
+    // A new range is a new fetch, so the window only carries over hourly refreshes of the same range
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win: cbHistoryZoomRange === cbHistoryRange ? keptZoomWindow(cbHistoryChartInstance) : null })],
     series: [
       sessionShade(0),
       sessionShade(1),
@@ -7547,6 +7598,7 @@ function renderCbHistoryChart(data) {
   };
 
   cbHistoryChartInstance.setOption(option, true);
+  cbHistoryZoomRange = cbHistoryRange;
 }
 
 function initCbHistoryEvents() {
@@ -7944,6 +7996,7 @@ function toggleNavGroup(view) {
 let rawGoldData = null;
 let goldChartInstance = null;
 let currentGoldTimeframe = 'all';
+let goldZoomReset = false; // set while a timeframe preset re-renders, so the slider jumps to it
 const goldVisibleSeries = {
   ratio: true,
   corr: true,
@@ -8110,11 +8163,9 @@ function renderGoldChart() {
   }
 
   const colors = getChartThemeColors();
-  let seriesData = rawGoldData.series;
-  if (currentGoldTimeframe === '30') seriesData = seriesData.slice(-30);
-  else if (currentGoldTimeframe === '90') seriesData = seriesData.slice(-90);
-  else if (currentGoldTimeframe === '180') seriesData = seriesData.slice(-180);
-  else if (currentGoldTimeframe === '365') seriesData = seriesData.slice(-365);
+  // The full history stays loaded; the timeframe preset only moves the slider window
+  const seriesData = rawGoldData.series;
+  const win = (!goldZoomReset && keptZoomWindow(goldChartInstance)) || recentZoomWindow(seriesData.length, currentGoldTimeframe);
 
   const dates = seriesData.map(s => s.date);
   const ratioData = seriesData.map(s => s.btcGoldRatio);
@@ -8241,8 +8292,9 @@ function renderGoldChart() {
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     grid: [
       { left: '4%', right: '4%', top: '5%', height: '54%' },
-      { left: '4%', right: '4%', top: '69%', height: '24%' }
+      { left: '4%', right: '4%', top: '67%', height: '22%' }
     ],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win })],
     xAxis: [
       {
         type: 'category',
@@ -8316,7 +8368,8 @@ function initGoldCorrelationEvents() {
       goldTimeframeSelector.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentGoldTimeframe = btn.dataset.days;
-      renderGoldChart();
+      goldZoomReset = true;
+      try { renderGoldChart(); } finally { goldZoomReset = false; }
     });
   }
 
@@ -8352,6 +8405,7 @@ let rawMcClellanData = null;
 let mcclellanChartInstance = null;
 let isMcClellanLoading = false;
 let mcclellanActiveTimeframe = '1y';
+let mcclellanZoomReset = false; // set while a timeframe preset re-renders, so the slider jumps to it
 let mcclellanActiveTrack = 'core';
 
 const MC_TRACKS = {
@@ -8536,18 +8590,19 @@ function renderMcClellanStructure() {
         echarts: typeof echarts !== 'undefined' ? echarts : null,
         echartsTheme: typeof getEchartsTheme === 'function' ? getEchartsTheme() : null,
         colors: getChartThemeColors(),
-        marketData: currentMarketData
+        marketData: currentMarketData,
+        zoomSlider: cfg => timeZoomSlider(getChartThemeColors(), cfg)
       }
     });
   }
 }
 
-function mcFilterSeries(series) {
-  if (mcclellanActiveTimeframe === 'all' || !series.length) return series;
-  const days = { '90d': 90, '180d': 180, '1y': 365 }[mcclellanActiveTimeframe] || 365;
-  const last = new Date(`${series[series.length - 1].date}T00:00:00Z`);
-  const cutoff = new Date(last.getTime() - days * 86400000).toISOString().slice(0, 10);
-  return series.filter(d => d.date > cutoff);
+/** The user's slider window, else the selected range counted back from the last date */
+function mcZoomWindow(series) {
+  const kept = !mcclellanZoomReset && keptZoomWindow(mcclellanChartInstance);
+  if (kept) return kept;
+  if (mcclellanActiveTimeframe === 'all') return { start: 0, end: 100 };
+  return recentDaysZoomWindow(series, { '90d': 90, '180d': 180, '1y': 365 }[mcclellanActiveTimeframe] || 365);
 }
 
 /**
@@ -8564,8 +8619,10 @@ function renderMcClellanCharts() {
 
   const colors = getChartThemeColors();
   const data = rawMcClellanData;
-  const rows = mcFilterSeries(data.series);
+  // The full history stays loaded; the timeframe preset only moves the slider window
+  const rows = data.series;
   const dates = rows.map(d => d.date);
+  const win = mcZoomWindow(rows);
   const track = mcclellanActiveTrack;
   const tracks = track === 'compare' ? ['core', 'frontier'] : [track];
   const core = data.current?.core || {};
@@ -8751,7 +8808,7 @@ function renderMcClellanCharts() {
     grid: [
       { left: 60, right: showAnchor ? 52 : 20, top: '7%', height: '27%' },
       { left: 60, right: showAnchor ? 52 : 20, top: '39%', height: '25%' },
-      { left: 60, right: showAnchor ? 52 : 20, top: '69%', height: '17%' }
+      { left: 60, right: showAnchor ? 52 : 20, top: '69%', height: '16%' }
     ],
     xAxis: [0, 1, 2].map(i => ({
       type: 'category',
@@ -8787,14 +8844,7 @@ function renderMcClellanCharts() {
         axisLabel: { ...axisLabel, color: '#8b5cf6', formatter: v => `${v}%` }
       }
     ],
-    dataZoom: [{
-      type: 'slider',
-      xAxisIndex: [0, 1, 2],
-      bottom: 8,
-      height: 18,
-      borderColor: colors.axisLine,
-      textStyle: { color: colors.tickColor, fontSize: 10 }
-    }],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1, 2], bottom: 8, win })],
     series
   };
 
@@ -8818,12 +8868,12 @@ function initMcClellanEvents() {
         container.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         apply(btn.dataset[attr]);
-        renderMcClellanCharts();
+        try { renderMcClellanCharts(); } finally { mcclellanZoomReset = false; }
       });
     });
   };
   bindSwitch('mcclellan-track-switch', 'track', v => { mcclellanActiveTrack = v || 'core'; });
-  bindSwitch('mcclellan-timeframe-switch', 'range', v => { mcclellanActiveTimeframe = v || '1y'; });
+  bindSwitch('mcclellan-timeframe-switch', 'range', v => { mcclellanActiveTimeframe = v || '1y'; mcclellanZoomReset = true; });
 
   window.addEventListener('resize', () => {
     if (mcclellanChartInstance) mcclellanChartInstance.resize();
