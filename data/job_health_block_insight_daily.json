@@ -1,30 +1,30 @@
 {
   "id": "block_insight_daily",
   "status": "ok",
-  "lastAttemptAt": "2026-10-25T13:41:06.661Z",
-  "lastSuccessAt": "2026-10-25T13:41:08.412Z",
+  "lastAttemptAt": "2026-10-25T17:37:23.828Z",
+  "lastSuccessAt": "2026-10-25T17:37:25.116Z",
   "lastError": null,
   "steps": {
     "option_oi": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T13:41:06.694Z",
-      "lastSuccessAt": "2026-10-25T13:41:06.694Z",
+      "lastAttemptAt": "2026-10-25T17:37:23.850Z",
+      "lastSuccessAt": "2026-10-25T17:37:23.850Z",
       "lastError": null,
       "dataAsOf": null,
       "verifiedSkip": true
     },
     "block_trades": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T13:41:08.238Z",
-      "lastSuccessAt": "2026-10-25T13:41:08.238Z",
+      "lastAttemptAt": "2026-10-25T17:37:24.929Z",
+      "lastSuccessAt": "2026-10-25T17:37:24.929Z",
       "lastError": null,
       "dataAsOf": "2026-10-24T00:00:00.000Z",
       "verifiedSkip": false
     },
     "marks": {
       "status": "ok",
-      "lastAttemptAt": "2026-10-25T13:41:08.404Z",
-      "lastSuccessAt": "2026-10-25T13:41:08.404Z",
+      "lastAttemptAt": "2026-10-25T17:37:25.111Z",
+      "lastSuccessAt": "2026-10-25T17:37:25.111Z",
       "lastError": null,
       "dataAsOf": "2026-10-25T13:10:24.107Z",
       "verifiedSkip": false
