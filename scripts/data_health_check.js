@@ -54,13 +54,28 @@ function validateLiveUrl(raw) {
  * the report. */
 function classifyLiveFailure(err) {
   if (err && (err.name === 'AbortError' || err.name === 'TimeoutError')) return 'timeout';
+  // fetchWithTimeout aborts with a plain Error('Request timeout of …ms exceeded')
+  if (err && /timeout/i.test(String(err.message || ''))) return 'timeout';
   return 'request failed';
+}
+
+/** The audit endpoint answers 503 for UNKNOWN/CRITICAL on purpose, with the
+ * report as its body: that body is the observation, not a transport error. */
+function looksLikeAuditReport(body) {
+  return !!body && typeof body === 'object' && typeof body.overallHealth === 'string' && !!body.modules;
 }
 
 async function fetchLiveReport(raw, fetcher = fetchWithTimeout) {
   let safe;
   try { safe = validateLiveUrl(raw); }
   catch (e) { return { error: 'live audit URL rejected' }; }
+  // A sleeping Render free instance takes 30–60 s to boot: wake it with the
+  // instant /healthz route first so the audit GET is measured on a running host.
+  try {
+    await fetcher(new URL('/healthz', safe).toString(), {
+      redirect: 'manual', timeout: MONITOR_CONTRACT.liveTimeoutMs, retries: 0
+    });
+  } catch (e) { /* the audit request below reports the failure */ }
   try {
     const resp = await fetcher(safe, {
       headers: { Accept: 'application/json' },
@@ -68,6 +83,12 @@ async function fetchLiveReport(raw, fetcher = fetchWithTimeout) {
       timeout: MONITOR_CONTRACT.liveTimeoutMs,
       retries: MONITOR_CONTRACT.liveRetries
     });
+    if (resp && resp.status === 503) {
+      try {
+        const body = await resp.json();
+        if (looksLikeAuditReport(body)) return { report: body };
+      } catch (e) { /* fall through to the HTTP error */ }
+    }
     if (!resp || !resp.ok) {
       const status = resp && typeof resp.status === 'number' ? `HTTP ${resp.status}` : 'no response';
       return { error: `live audit fetch failed (${status})` };

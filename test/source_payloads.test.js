@@ -122,6 +122,40 @@ test('E/macro FRED leaf: valid CSV, gap rows skipped, malformed/future/non-ascen
   assert.equal(getSourceHealth('fred:DGS1').state, 'OK');
 });
 
+test('E/macro BTC daily: Binance 418 → OKX/Coinbase fallback marked FALLBACK; all venues down → failure', async (t) => {
+  resetHealth();
+  const holder = { spot: 'ok' };
+  installModuleMocks(t, {
+    [HTTP]: {
+      fetchWithTimeout: async () => { throw new Error('unexpected'); },
+      fetchBinanceSpot: async () => fakeResp({}, { ok: false, status: 418 })
+    },
+    [srv('spot_daily.js')]: {
+      VENUES: [{ name: 'Binance' }, { name: 'OKX' }, { name: 'Coinbase' }],
+      fetchSpotDailyCloses: async (symbols, startMs, venues) => {
+        assert.deepEqual(venues.map(v => v.name), ['OKX', 'Coinbase'], 'Binance venues are skipped');
+        if (holder.spot === 'fail') throw new Error('All spot venues failed — offline');
+        return {
+          venue: 'OKX', quote: 'USDT', errors: [], partial: false, coverageStart: daysAgo(3),
+          series: { BTC: [3, 2, 1].map(n => ({ date: daysAgo(n), openTime: Date.parse(daysAgo(n)), close: 60000 + n })) }
+        };
+      }
+    }
+  });
+  const mod = freshRequire('macro_fetcher.js');
+  const map = await mod.fetchBtcDailyPrices(daysAgo(3));
+  assert.equal(map.size, 3);
+  const h = getSourceHealth('macro_btc');
+  assert.equal(h.state, 'FALLBACK');
+  assert.match(h.source, /OKX/);
+  assert.ok(h.issues.some(i => /binance/i.test(i)));
+
+  holder.spot = 'fail';
+  const empty = await mod.fetchBtcDailyPrices(daysAgo(3));
+  assert.equal(empty.size, 0);
+  assert.match(getSourceHealth('macro_btc').lastError || '', /fallback/);
+});
+
 test('E/macro aggregate: full mock build → OK-ish health; failed FRED leg degrades with fallback issues', async (t) => {
   resetHealth();
   const holder = { state: {} };
@@ -197,7 +231,12 @@ function prefHttp(holder) {
 test('F/preferreds: good → STRC malformed fails whole build → all-fail fallback → recovery', async (t) => {
   resetHealth();
   const holder = { state: {} };
-  const { tmpDir } = installModuleMocks(t, { [HTTP]: { fetchWithTimeout: prefHttp(holder) } });
+  // The STRC rate recorder peeks the disclosure service; stub it so the repo's
+  // real 8-K rate schedule never leaks into this "no config" scenario.
+  const { tmpDir } = installModuleMocks(t, {
+    [HTTP]: { fetchWithTimeout: prefHttp(holder) },
+    [srv('mstr_disclosures.js')]: { peekMstrDisclosures: async () => ({}) }
+  });
   const mod = freshRequire('mstr_preferreds.js');
   const cacheFile = path.join(tmpDir, 'mstr_preferreds_cache.json');
 
@@ -404,6 +443,34 @@ test('H/ETF linkage: good → malformed CFTC missing field/contract → all-fail
   holder.state = {};
   const r7 = await mod.getEtfLinkageData(basisSeries, true);
   assert.equal(r7.dataHealth.state, 'OK');
+});
+
+test('H/ETF linkage: OI gaps before the analysis window never reject the source', async (t) => {
+  resetHealth();
+  const withLeadingGap = (vals) => {
+    const p = oiPayload(vals);
+    // CoinGlass has no CME coverage for 2020-02-28 ~ 2020-06-04
+    return { ...p, dateList: [Date.parse('2020-03-02'), ...p.dateList],
+      dataMap: Object.fromEntries(Object.entries(p.dataMap).map(([k, v]) => [k, [k === 'CME' ? null : v[0], ...v]])),
+      priceList: [60000, ...p.priceList] };
+  };
+  const holder = { state: {} };
+  const http = etfHttp(holder);
+  installModuleMocks(t, { [HTTP]: { fetchWithTimeout: async (url, opts) => {
+    if (url.includes('/api/openInterest/v3/chart')) {
+      const coin = url.includes('currency=COIN');
+      const data = withLeadingGap(coin
+        ? { Binance: [10, 11, 12, 13], CME: [20, 21, 22, 23] }
+        : { Binance: [1e6, 1.1e6, 1.2e6, 1.3e6], CME: [2e6, 2.1e6, 2.2e6, 2.3e6] });
+      return fakeResp({ code: 0, data });
+    }
+    return http(url, opts);
+  } } });
+  delete require.cache[srv('cdri_fetcher.js')];
+  const mod = freshRequire('etf_linkage_engine.js');
+  const r = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(getSourceHealth('etf_oi').state, 'OK');
+  assert.equal(r.dataHealth.state, 'OK');
 });
 
 // ===========================================================================

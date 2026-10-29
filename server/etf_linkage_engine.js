@@ -270,7 +270,10 @@ async function fetchCftcBitcoin() {
 }
 
 /** One OI payload leg: dateList and the exchange's values must be equal-length
- * arrays of non-null finite >= 0 numbers. USD and BTC legs never substitute. */
+ * arrays; every value inside the analysis window (date >= START_DATE) must be a
+ * non-null finite >= 0 number. Rows before the window are never used, so their
+ * gaps (CoinGlass has no CME coverage for 2020-02-28 ~ 2020-06-04) must not
+ * reject the source. USD and BTC legs never substitute. */
 function validateOiPayload(payload, exchange, label) {
   if (!payload || !Array.isArray(payload.dateList) || !payload.dateList.length) {
     throw new Error(`OI ${label}: dateList 缺失或为空`);
@@ -279,9 +282,12 @@ function validateOiPayload(payload, exchange, label) {
   if (!Array.isArray(values) || values.length !== payload.dateList.length) {
     throw new Error(`OI ${label}: ${exchange} 值数组缺失或长度不等`);
   }
-  for (const v of values) {
-    if (!isNonNegNum(v)) throw new Error(`OI ${label}: ${exchange} 含 null/非法值`);
-  }
+  values.forEach((v, i) => {
+    const ts = Number(payload.dateList[i]);
+    if (!Number.isFinite(ts)) throw new Error(`OI ${label}: dateList 含非法时间戳`);
+    if (isoDate(ts) < START_DATE) return;
+    if (!isNonNegNum(v)) throw new Error(`OI ${label}: ${exchange} 在 ${isoDate(ts)} 含 null/非法值`);
+  });
 }
 
 /**

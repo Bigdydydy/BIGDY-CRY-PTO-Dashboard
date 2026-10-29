@@ -11,6 +11,9 @@ function policy(fetchWarnMs, fetchBlockMs, dataWarnMs, dataBlockMs) {
 const LIVE = policy(3 * MINUTE, 15 * MINUTE, 3 * MINUTE, 15 * MINUTE);
 const DAILY_LIVE = policy(30 * MINUTE, 6 * HOUR, 3 * DAY, 7 * DAY);
 const ARCHIVE = policy(2 * HOUR, DAY, 3 * DAY, 7 * DAY);
+// A daily 08:00 UTC archive is only re-verified when the next row is due, so a
+// 2h receipt window would flag a perfectly current file STALE ~22h a day.
+const DAILY_ARCHIVE = policy(26 * HOUR, 2 * DAY, 3 * DAY, 7 * DAY);
 
 const SOURCE_POLICIES = Object.freeze({
   greeks_atm: LIVE,
@@ -29,7 +32,7 @@ const SOURCE_POLICIES = Object.freeze({
   gold: DAILY_LIVE,
   coinbase: policy(MINUTE, 5 * MINUTE, MINUTE, 5 * MINUTE),
   basis_live: LIVE,
-  basis_history: ARCHIVE,
+  basis_history: DAILY_ARCHIVE,
   etf: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY),
   cot: policy(12 * HOUR, 3 * DAY, 12 * DAY, 21 * DAY),
   option_marks: policy(MINUTE, 5 * MINUTE, MINUTE, 5 * MINUTE),

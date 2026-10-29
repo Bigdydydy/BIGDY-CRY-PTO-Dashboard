@@ -964,6 +964,31 @@ describe('Phase 2: ECDF Mid-Rank Percentile & Order Book Walk', () => {
     const rWall = processCoinbaseData(wallBook, mockCandles, activeStats);
     assert.equal(rWall.regime.code, 'SELL_WALL_PRESSURE');
   });
+
+  test('pyramid baseline comes from the archive percentiles, legacy constants only when samples are thin', () => {
+    const { processCoinbaseData, pyramidBaselineFromSamples } = require('../server/coinbase_fetcher');
+    const now = Date.now();
+    const rows = Array.from({ length: 100 }, (_, i) => ({ ts: now - i * 3600000, d10: 4, d100: 4 * (6 + (i % 5) * 0.5) }));
+    const b = pyramidBaselineFromSamples(rows, now);
+    assert.equal(b.source, 'archive');
+    assert.equal(b.n, 100);
+    assert.equal(b.median, 7);
+    assert.ok(b.hollowMin > b.median);
+    assert.equal(pyramidBaselineFromSamples(rows.slice(0, 10), now), null, 'too few samples → no archive baseline');
+
+    // 7x is ordinary on Coinbase: with the archive baseline it must not read as a hollow book
+    const book = {
+      bids: [['80000', '1'], ['79960', '2'], ['79300', '12']],
+      asks: [['80010', '1'], ['80040', '2'], ['80700', '12']]
+    };
+    const candles = [[now / 1000, 79000, 81000, 79500, 80000, 100]];
+    for (let i = 1; i <= 34; i++) candles.push([now / 1000 - i * 86400, 79000, 81000, 79500, 80000, 10000]);
+    const r = processCoinbaseData(book, candles, { stats: { volume: '10000' } }, { pyramidBaseline: b });
+    assert.equal(r.pyramidRatios.baselineSource, 'archive');
+    if (r.pyramidRatios.ratio100_10 !== null && r.pyramidRatios.ratio100_10 <= b.hollowMin) {
+      assert.notEqual(r.regime.code, 'HOLLOW_NEAR_END');
+    }
+  });
 });
 
 describe('Module 7: Gold & Bitcoin Correlation & Ratio Engine', () => {

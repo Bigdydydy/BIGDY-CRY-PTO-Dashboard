@@ -438,46 +438,69 @@ async function fetchFredSeries(id) {
  */
 async function fetchBtcDailyPrices(startDateStr = '2020-08-01') {
   recordAttempt('macro_btc', { now: Date.now() });
+  let binanceError;
   try {
-    let start = new Date(startDateStr).getTime();
-    const now = Date.now();
-    const allKlines = [];
-    let truncated = false;
-    while (start < now) {
-      const resp = await fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
-      if (!resp.ok) { truncated = true; break; }
-      const data = await resp.json();
-      if (!Array.isArray(data) || data.length === 0) break;
-      allKlines.push(...data);
-      const lastTime = data[data.length - 1][0];
-      if (lastTime <= start) { truncated = true; break; } // no forward progress
-      start = lastTime + 86400000;
-    }
-    if (truncated) throw new Error('BTC klines pagination truncated before latest data');
-    const map = new Map();
-    // A malformed or future row must fail the whole fetch, not be skipped
-    // into a "successful" but corrupt history.
-    let prevDay = '';
-    for (const k of allKlines) {
-      if (!Array.isArray(k) || k.length < 5 || !Number.isFinite(Number(k[0])) || !isPosNum(k[4])) {
-        throw new Error('BTC kline row malformed: ' + JSON.stringify(k && k.slice ? k.slice(0, 6) : k));
-      }
-      const ms = Number(k[0]);
-      if (ms > now + MAX_FUTURE_MS) throw new Error('BTC kline future row: ' + new Date(ms).toISOString());
-      const dateStr = new Date(ms).toISOString().slice(0, 10);
-      if (dateStr <= prevDay) throw new Error('BTC klines not strictly ascending');
-      prevDay = dateStr;
-      map.set(dateStr, Number(k[4]));
-    }
-    if (!map.size) throw new Error('BTC daily price feed returned no usable rows');
+    const map = await fetchBinanceBtcDaily(startDateStr);
     const maxDate = Array.from(map.keys()).sort().pop();
     recordSuccess('macro_btc', { dataAsOf: maxDate, asOfKind: 'source', source: 'binance/BTCUSDT-1d' });
     return map;
   } catch (err) {
-    console.error('[MacroFetcher] Error fetching Binance BTC prices:', err.message);
-    recordFailure('macro_btc', err);
+    binanceError = err;
+    console.warn('[MacroFetcher] Binance BTC daily unavailable, trying OKX / Coinbase:', err.message);
+  }
+  // Render 的共享出口 IP 常被币安 418：退到 OKX / Coinbase 日线，结果标为 FALLBACK (带 issues)
+  try {
+    const { fetchSpotDailyCloses, VENUES } = require('./spot_daily');
+    const startMs = new Date(startDateStr).getTime();
+    const res = await fetchSpotDailyCloses(['BTC'], startMs, VENUES.filter(v => !v.name.startsWith('Binance')));
+    const map = new Map(res.series.BTC.map(r => [r.date, r.close]));
+    if (!map.size) throw new Error('fallback venue returned no rows');
+    const maxDate = Array.from(map.keys()).sort().pop();
+    const issues = [`binance: ${binanceError.message}`, ...res.errors];
+    if (res.partial) issues.push(`history only from ${res.coverageStart}`);
+    recordSuccess('macro_btc', { dataAsOf: maxDate, asOfKind: 'source', source: `${res.venue}/BTC${res.quote}-1d`, issues });
+    return map;
+  } catch (err) {
+    console.error('[MacroFetcher] Error fetching BTC daily prices:', binanceError.message, '|', err.message);
+    recordFailure('macro_btc', new Error(`${binanceError.message}; fallback: ${err.message}`));
     return new Map();
   }
+}
+
+/** 币安 BTCUSDT 日线 (分页拼接)；任何截断、坏行或未来行都整体抛错 */
+async function fetchBinanceBtcDaily(startDateStr) {
+  let start = new Date(startDateStr).getTime();
+  const now = Date.now();
+  const allKlines = [];
+  let truncated = false;
+  while (start < now) {
+    const resp = await fetchBinanceSpot('/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=' + start + '&limit=1000');
+    if (!resp.ok) { truncated = true; break; }
+    const data = await resp.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    allKlines.push(...data);
+    const lastTime = data[data.length - 1][0];
+    if (lastTime <= start) { truncated = true; break; } // no forward progress
+    start = lastTime + 86400000;
+  }
+  if (truncated) throw new Error('BTC klines pagination truncated before latest data');
+  const map = new Map();
+  // A malformed or future row must fail the whole fetch, not be skipped
+  // into a "successful" but corrupt history.
+  let prevDay = '';
+  for (const k of allKlines) {
+    if (!Array.isArray(k) || k.length < 5 || !Number.isFinite(Number(k[0])) || !isPosNum(k[4])) {
+      throw new Error('BTC kline row malformed: ' + JSON.stringify(k && k.slice ? k.slice(0, 6) : k));
+    }
+    const ms = Number(k[0]);
+    if (ms > now + MAX_FUTURE_MS) throw new Error('BTC kline future row: ' + new Date(ms).toISOString());
+    const dateStr = new Date(ms).toISOString().slice(0, 10);
+    if (dateStr <= prevDay) throw new Error('BTC klines not strictly ascending');
+    prevDay = dateStr;
+    map.set(dateStr, Number(k[4]));
+  }
+  if (!map.size) throw new Error('BTC daily price feed returned no usable rows');
+  return map;
 }
 
 /**
@@ -992,6 +1015,7 @@ module.exports = {
   getMacroChartData,
   fetchAndBuildMacroData,
   fetchFredSeries,
+  fetchBtcDailyPrices,
   classifyYieldCurveRegime,
   summarizeYieldCurve
 };

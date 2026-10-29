@@ -48,7 +48,6 @@ function readCachedSeries() {
   }
 }
 const GOLD_ABOVE_GROUND_OZ = 6.832e9; // Approx 6.832B troy oz for ~212,500 tonnes of global above-ground gold
-const GOLD_GLOBAL_MARKET_CAP_USD = 18.5e12; // Static reference benchmark (~$18.5T)
 const BTC_CIRCULATING_SUPPLY = 19.8e6; // Approx 19.8M circulating BTC in 2026
 
 let inMemoryCache = null;
@@ -378,7 +377,6 @@ module.exports = {
   calculatePearsonCorrelation,
   calculateRollingPearsonCorrelation,
   classifyCorrelationRegime,
-  GOLD_GLOBAL_MARKET_CAP_USD,
   GOLD_ABOVE_GROUND_OZ,
   BTC_CIRCULATING_SUPPLY
 };

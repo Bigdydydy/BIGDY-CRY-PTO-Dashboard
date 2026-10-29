@@ -1036,7 +1036,10 @@ function renderDealerExposure(data) {
     setTextIfPresent('dealer-realized-sub', '缺少 24 小时现货/DVOL 数据');
   }
   const depth = data.depth;
-  if (depth) {
+  if (depth && !(depth.downsideSellUsd > 0)) {
+    setTextIfPresent('dealer-depth', '--');
+    setTextIfPresent('dealer-depth-sub', `下行情景做市商为买方，不消耗 ${depth.venue} 买盘`);
+  } else if (depth) {
     setTextIfPresent('dealer-depth', `${depth.downsideRatioPct}%`);
     setTextIfPresent('dealer-depth-sub', `卖出 ${usdM(-depth.downsideSellUsd)} / ${depth.venue} ${depth.band} 买盘 ${usdM(depth.bidUsd)} · 量级参考`);
   } else {
@@ -1106,18 +1109,29 @@ function renderDealerExposure(data) {
       flowNote.textContent = `${sens.flowRobust ? '✅ 订单流口径内部同号' : '⚠️ 订单流口径内部随折扣系数变号'}。OI 封顶自检：${cap.flowInstruments} 个有成交的合约中 ${cap.overCapInstruments} 个累计净额超过 OI（占其 Gamma ${cap.overCapGammaShare}%，超出量占净额 ${cap.overshootPct}%）。成交构成：屏幕 ${mix.screen}% / 大宗 ${mix.block}% / 强平 ${mix.liq}%。`;
     }
   }
-  setSigned('dealer-dex', ex.dexUsd);
+  // 磁贴、翻转位与压力情景统一用主口径 (台账可用时为全成交校正)，惯例口径只在敏感性表中对照
+  const isFlowPrimary = data.primaryBasis === 'flow_adjusted';
+  const px = isFlowPrimary && data.primaryExposures ? data.primaryExposures : ex;
+  setSigned('dealer-dex', px.dexUsd);
   const syntheticShare = ex.dexBtc ? Math.round(ex.syntheticForwardBtc / Math.abs(ex.dexBtc) * 100) : 0;
-  setTextIfPresent('dealer-dex-sub', `含 ${syntheticShare}% 合成多头假设 · 币本位会计 Δ*(Δ−V/F) ${usdM(ex.dexPremAdjUsd)}`);
-  setSigned('dealer-gex', ex.gexUsd);
-  setSigned('dealer-vex', ex.vexUsd);
-  setSigned('dealer-cex', ex.cexUsd);
+  setTextIfPresent('dealer-dex-sub', isFlowPrimary
+    ? `${basisLabel} · 惯例口径 ${usdM(ex.dexUsd)}（含 ${syntheticShare}% 合成多头假设）`
+    : `含 ${syntheticShare}% 合成多头假设 · 币本位会计 Δ*(Δ−V/F) ${usdM(ex.dexPremAdjUsd)}`);
+  setSigned('dealer-gex', px.gexUsd);
+  setSigned('dealer-vex', px.vexUsd);
+  setSigned('dealer-cex', px.cexUsd);
+  ['dealer-gex-sub', 'dealer-vex-sub', 'dealer-cex-sub'].forEach(id => setTextIfPresent(id, `做市商 Delta 变化 · ${basisLabel}`));
 
-  const flip = data.gammaFlip;
-  setTextIfPresent('dealer-flip', flip ? `$${Number(flip.price).toLocaleString()}` : '区间内无');
+  const primaryScenario = (sens?.scenarios || []).find(sc => sc.key === (isFlowPrimary ? 'flow_adjusted' : 'convention'));
+  const flip = primaryScenario ? primaryScenario.gammaFlip : data.gammaFlip;
+  setTextIfPresent('dealer-flip', flip ? `${Number(flip.price).toLocaleString()}` : '区间内无');
   setTextIfPresent('dealer-flip-sub', flip
-    ? `距现货 ${flip.distancePct >= 0 ? '+' : ''}${flip.distancePct}% · 下方 ${flip.from > 0 ? '正' : '负'} / 上方 ${flip.to > 0 ? '正' : '负'} Gamma`
-    : '现货 ±20% 内 GEX 不变号');
+    ? `${basisLabel} · 距现货 ${flip.distancePct >= 0 ? '+' : ''}${flip.distancePct}%${flip.from !== undefined ? ` · 下方 ${flip.from > 0 ? '正' : '负'} / 上方 ${flip.to > 0 ? '正' : '负'} Gamma` : ''}`
+    : `${basisLabel} · 现货 ±20% 内 GEX 不变号`);
+
+  setTextIfPresent('dealer-assumption-text', isFlowPrimary
+    ? `主口径为全成交校正：持仓符号按 Deribit 各合约上市以来的累计主动成交净额推断（主动方视为客户），覆盖 OI ${sens?.coverage?.oiShare ?? '--'}%；未覆盖部分仍按惯例（做市商多 Call、空 Put）。Greeks 按 Black-76 与 Deribit 标记 IV 逐合约计算。`
+    : '惯例口径：持仓符号假设做市商多 Call、空 Put，未用成交方向校正；Greeks 按 Black-76 与 Deribit 标记 IV 逐合约计算。');
   setTextIfPresent('dealer-near-label', `近 ${data.nearTermDays || 10} 天到期`);
   setTextIfPresent('dealer-near', `${data.nearTermOiShare}% OI`);
   setTextIfPresent('dealer-near-sub', `净 GEX ${usdM(data.nearTermGexUsd)} / 1%`);
@@ -1171,7 +1185,7 @@ function renderDealerExposure(data) {
   const signedNum = (v, unit) => `${v > 0 ? '+' : ''}${v}${unit}`;
   const stressBody = document.getElementById('dealer-stress-body');
   if (stressBody) {
-    stressBody.innerHTML = (data.stress || []).map(s => `
+    stressBody.innerHTML = ((data.primaryBasis === 'flow_adjusted' && data.primaryStress) || data.stress || []).map(s => `
       <tr>
         <td>${escapeHtml(s.label)}</td>
         <td>${escapeHtml(signedNum(s.spotPct, '%'))}</td>
@@ -6887,9 +6901,17 @@ function renderCoinbaseLiquidity(data) {
 
   // 2. Pyramid Ratios
   const pyr = data.pyramidRatios || {};
+  // 基准来自 Coinbase 自身逐时档案分位 (服务端 baselineSource='archive')；样本不足时为经验值
+  const pyrMedian = Number(pyr.baseline100_10) || 3.1;
+  const pyrHigh = Number(pyr.baselineHigh100_10) || 6.0;
+  const pyrBasisText = pyr.baselineSource === 'archive'
+    ? `近 90 天中位 ${pyrMedian}x · 90% 分位 ${pyrHigh}x`
+    : '经验基准 3.1x（档案样本不足）';
+  const elCbPyrTag = document.getElementById('cb-pyramid-tag');
+  if (elCbPyrTag) elCbPyrTag.textContent = pyr.baselineSource === 'archive' ? `基准: ${pyrMedian}x (档案中位)` : '基准: 3.1x (经验值)';
   if (elCbPyr100_10 && pyr.ratio100_10) {
     elCbPyr100_10.textContent = `${pyr.ratio100_10}x`;
-    elCbPyr100_10.style.color = pyr.ratio100_10 > 6.0 ? '#f59e0b' : '#10b981';
+    elCbPyr100_10.style.color = pyr.ratio100_10 > pyrHigh ? '#f59e0b' : '#10b981';
   }
   if (elCbPyr50_10 && pyr.ratio50_10) {
     elCbPyr50_10.textContent = `${pyr.ratio50_10}x`;
@@ -6899,10 +6921,10 @@ function renderCoinbaseLiquidity(data) {
   }
   if (elCbPyrEvalText && pyr.ratio100_10) {
     const ratioVal = Number(pyr.ratio100_10) || 0;
-    if (ratioVal >= 6.0) {
-      elCbPyrEvalText.innerHTML = `⚠️ <strong>近端薄弱，防线下移</strong>：100bp/10bp 比率达 <strong>${ratioVal}x</strong>（显著偏离 3.1x 基准），做市商挂单大幅后撤至远端，即时缓冲层相对中空。`;
+    if (ratioVal > pyrHigh) {
+      elCbPyrEvalText.innerHTML = `⚠️ <strong>近端薄弱，防线下移</strong>：100bp/10bp 比率达 <strong>${ratioVal}x</strong>，高于常态区间（${pyrBasisText}），做市商挂单后撤至远端，即时缓冲层相对中空。`;
     } else {
-      elCbPyrEvalText.innerHTML = `🟢 <strong>金字塔结构稳健</strong>：阶梯倍数维持在 <strong>${ratioVal}x</strong>（贴合 3.1x 理论中枢），具备良好的逐级缓冲吸收能力。`;
+      elCbPyrEvalText.innerHTML = `🟢 <strong>金字塔结构常态</strong>：阶梯倍数 <strong>${ratioVal}x</strong>，处于常态区间内（${pyrBasisText}）。`;
     }
   }
 

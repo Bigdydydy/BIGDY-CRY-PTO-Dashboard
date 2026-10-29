@@ -58,7 +58,8 @@ HTTP 公共默认值：`fetchWithTimeout` 为 **10s 超时 / retries 1**（总�
 | `fred:*`（日频，含 `DGS1/DGS10/DGS1MO/DGS3MO/RRPONTSYD`）、`yahoo:MSTR` | 30min / 6h | 5d / 14d |
 | `fred:WALCL`, `fred:WTREGEN`（周频）、`macro` 聚合 | 30min / 6h | 10d / 30d |
 | `preferreds`, `yahoo:STRC/STRF/STRD` | 30min / 6h | 5d / 14d |
-| `basis_history`, `oi_history`（ARCHIVE） | 2h / 1d | 3d / 7d |
+| `basis_history`（DAILY_ARCHIVE，每日 08:00 UTC 一行） | 26h / 2d | 3d / 7d |
+| `oi_history`（ARCHIVE） | 2h / 1d | 3d / 7d |
 | `liquidity_history` | 30min / 6h | 3h / 1d |
 | `etf`（COT `cot`） / `etf_oi` | 12h / 3d | 5d/14d（COT 12d/21d；`etf_oi` 3d/7d） |
 | `mcclellan_core`, `mcclellan_frontier`, `mcclellan_anchor` | 2d / 7d | 2d / 7d |
@@ -87,7 +88,7 @@ Producer job 窗口（`JOB_POLICIES`）：`macro_snapshot` 8h/1d；`liquidity_ho
   - `breadth_track`：McClellan 每 track 的 `date`/`ready`/`*_n` 源行。
   - `event_archive`：用 **producer step 回执**判定（事件空窗合法，不是停更）。
 
-监测合约：未来时钟偏差上限 5min；live 检查 15s 超时 / 0 重试；webhook 10s / 0 重试；调度 `49 * * * *`（每小时）；缺心跳或缺 live URL → `UNKNOWN`；warn → `DEGRADED`；超 block → `CRITICAL`。
+监测合约：未来时钟偏差上限 5min；live 检查先 GET `/healthz` 唤醒实例，再取审计报告，各 90s 超时 / 0 重试；审计端点的 503 正文按报告解析（UNKNOWN/CRITICAL 是观测结果，不是传输错误）；webhook 10s / 0 重试；调度 `49 * * * *`（每小时）；缺心跳或缺 live URL → `UNKNOWN`；warn → `DEGRADED`；超 block → `CRITICAL`。
 
 ## 5. producer 心跳语义
 

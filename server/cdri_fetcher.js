@@ -18,6 +18,24 @@ const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const inBand = v => isNum(v) && v >= 0 && v <= 100;
 const cdriTsMs = t => (isNum(t) ? (t > 1e11 ? t : t * 1000) : null);
 
+/**
+ * 近 365 天的最高/最低点。CoinGlass performance 的 yearHigh/yearLow 实为历史极值
+ * (2026 年返回 2022/2024 的日期)，与「年度」标签不符，改由历史序列自算。
+ */
+function trailingYearExtremes(historyRaw, nowMs = Date.now()) {
+  const times = historyRaw.timeList || [];
+  const values = historyRaw.valueList || [];
+  let hi = null, lo = null;
+  times.forEach((t, i) => {
+    const ms = t > 1e11 ? t : t * 1000;
+    const v = Number(values[i]);
+    if (ms < nowMs - 365 * 86400000 || !Number.isFinite(v)) return;
+    if (!hi || v > hi.value) hi = { value: v, ms };
+    if (!lo || v < lo.value) lo = { value: v, ms };
+  });
+  return { hi, lo };
+}
+
 /* CDRI schema validation: a payload failing these is a source failure and
  * never overwrites memory or disk. */
 
@@ -248,8 +266,13 @@ async function doFetchCdriData(forceRefresh = false) {
     const yesterdayRisk = getRiskInfo(perfRaw.yesterday);
     const weekRisk = getRiskInfo(perfRaw.week);
     const monthRisk = getRiskInfo(perfRaw.month);
-    const yearHighRisk = getRiskInfo(perfRaw.yearHigh);
-    const yearLowRisk = getRiskInfo(perfRaw.yearLow);
+    const { hi: yearHi, lo: yearLo } = trailingYearExtremes(historyRaw, now);
+    const yearHigh = yearHi ? yearHi.value : (perfRaw.yearHigh ?? null);
+    const yearHighDate = yearHi ? yearHi.ms : perfRaw.yearHighDate;
+    const yearLow = yearLo ? yearLo.value : (perfRaw.yearLow ?? null);
+    const yearLowDate = yearLo ? yearLo.ms : perfRaw.yearLowDate;
+    const yearHighRisk = getRiskInfo(yearHigh);
+    const yearLowRisk = getRiskInfo(yearLow);
 
     const performance = {
       price: currentScore,
@@ -262,14 +285,20 @@ async function doFetchCdriData(forceRefresh = false) {
       weekRisk,
       month: perfRaw.month ?? null,
       monthRisk,
-      yearHigh: perfRaw.yearHigh ?? null,
-      yearHighDate: perfRaw.yearHighDate,
-      yearHighDateStr: formatUtc8Date(perfRaw.yearHighDate),
+      yearHigh,
+      yearHighDate,
+      yearHighDateStr: formatUtc8Date(yearHighDate),
       yearHighRisk,
-      yearLow: perfRaw.yearLow ?? null,
-      yearLowDate: perfRaw.yearLowDate,
-      yearLowDateStr: formatUtc8Date(perfRaw.yearLowDate),
-      yearLowRisk
+      yearLow,
+      yearLowDate,
+      yearLowDateStr: formatUtc8Date(yearLowDate),
+      yearLowRisk,
+      yearExtremesBasis: yearHi ? 'trailing_365d' : 'provider',
+      // 供参考：CoinGlass 原字段 (历史极值)
+      allTimeHigh: perfRaw.yearHigh ?? null,
+      allTimeHighDateStr: formatUtc8Date(perfRaw.yearHighDate),
+      allTimeLow: perfRaw.yearLow ?? null,
+      allTimeLowDateStr: formatUtc8Date(perfRaw.yearLowDate)
     };
 
     // Process history: timeList is in seconds (or ms)

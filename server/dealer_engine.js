@@ -1017,7 +1017,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     ? `过去 ${rp.hours} 小时现货 ${rp.spotPct >= 0 ? '+' : ''}${rp.spotPct}%、DVOL ${rp.dvolChange >= 0 ? '+' : ''}${rp.dvolChange} 点，按${realized24h.primary ? primaryLabel : '惯例口径'}估计做市商已被动${flowWord(rp.flowUsd)} ${fmtAbsUsdM(rp.flowUsd)}（Gamma ${fmtUsdM(rp.approx.gammaUsd)}、Vanna ${fmtUsdM(rp.approx.vannaUsd)}、Charm ${fmtUsdM(rp.approx.charmUsd)}，OI 视为不变）。`
     : '';
   const depthText = depth
-    ? `对冲流与盘口深度：${primaryLabel}下行情景需卖出 ${fmtAbsUsdM(depth.downsideSellUsd)}，为 ${depth.venue} ${depth.band} 买盘深度的 ${depth.downsideRatioPct}%；上行情景需买入 ${fmtAbsUsdM(depth.upsideBuyUsd)}，为卖盘深度的 ${depth.upsideRatioPct}%（单一现货场所，做市商多在永续/期货上分批对冲，比值只说明量级）。`
+    ? `对冲流与盘口深度：${primaryLabel}${depth.downsideSellUsd > 0 ? `下行情景需卖出 ${fmtAbsUsdM(depth.downsideSellUsd)}，为 ${depth.venue} ${depth.band} 买盘深度的 ${depth.downsideRatioPct}%` : '下行情景做市商为买方，不消耗买盘'}；${depth.upsideBuyUsd > 0 ? `上行情景需买入 ${fmtAbsUsdM(depth.upsideBuyUsd)}，为卖盘深度的 ${depth.upsideRatioPct}%` : '上行情景做市商为卖方，不消耗卖盘'}（单一现货场所，做市商多在永续/期货上分批对冲，比值只说明量级）。`
     : '';
 
   const paragraph = `${alertText}${stateText}${regimeText}${flipText}${realizedText}${depthText}${sensitivityText}${vexText}${rollText}${maturityText}${stressText}${referenceText}${assumptionText}`;

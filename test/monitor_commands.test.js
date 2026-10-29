@@ -195,6 +195,33 @@ describe('scripts/data_health_check runCheck', () => {
     assert.equal(badShape.live.state, 'UNKNOWN');
   });
 
+  test('503 carrying an audit report is evaluated as an observation; /healthz is hit first to wake the host', async () => {
+    const dir = mk();
+    greenDataDir(dir);
+    const urls = [];
+    const report = await runCheck({
+      dataDir: dir, now: NOW, env: { DASHBOARD_HEALTH_URL: 'https://dash.example/api/system/health' },
+      fetcher: async (url) => {
+        urls.push(url);
+        return url.endsWith('/healthz') ? fakeResp('OK') : fakeResp(greenLiveReport(), { ok: false, status: 503 });
+      },
+      summaryPath: null
+    });
+    assert.deepEqual(urls, ['https://dash.example/healthz', 'https://dash.example/api/system/health']);
+    assert.ok(!report.live.error, 'a 503 audit body is not a transport failure');
+  });
+
+  test('fetchWithTimeout-style timeout errors are classified as timeouts', async () => {
+    const dir = mk();
+    greenDataDir(dir);
+    const report = await runCheck({
+      dataDir: dir, now: NOW, env: { DASHBOARD_HEALTH_URL: 'https://dash.example/api/system/health' },
+      fetcher: async () => { throw new Error('Request timeout of 90000ms exceeded'); },
+      summaryPath: null
+    });
+    assert.match(JSON.stringify(report.live), /timeout/);
+  });
+
   test('non-https / credentialed live URL is refused before fetch', async () => {
     const dir = mk();
     greenDataDir(dir);

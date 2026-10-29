@@ -102,7 +102,7 @@ const SNAPSHOT_CHECKS = Object.freeze([
 // Other archive checks use actual observations, never generated_at or file mtime.
 const MONITOR_CONTRACT = Object.freeze({
   maxFutureSkewMs: 5 * 60000,
-  liveTimeoutMs: 15000,
+  liveTimeoutMs: 90000, // Render free instances cold-start in 30–60 s
   liveRetries: 0,
   webhookTimeoutMs: 10000,
   webhookRetries: 0,

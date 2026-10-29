@@ -225,10 +225,43 @@ function extrapolateSlippageBps(observedBps, result, targetUsd) {
   return observedBps * Math.sqrt(targetUsd / result.filledUsd);
 }
 
+// 100/10 bps 金字塔倍数的基准取 Coinbase 自身逐时档案 (近 90 天) 的分位数。
+// 早期写死的 3.1x 远低于实际分布 (中位约 7x)，会让「防线下移」几乎常亮。
+// 档案样本不足时才退回经验常数，并在结果里标注来源。
+const PYRAMID_WINDOW_MS = 90 * 86400000;
+const PYRAMID_MIN_SAMPLES = 72;
+const LEGACY_PYRAMID = { median: 3.1, accumulationMax: 4.5, richMin: 5.0, healthyMax: 5.5, hollowMin: 6.0, source: 'legacy', n: 0 };
+
+function pyramidBaselineFromSamples(samples, now = Date.now()) {
+  const ratios = (samples || [])
+    .filter(r => r && r.ts >= now - PYRAMID_WINDOW_MS && r.d10 > 0 && r.d100 > 0)
+    .map(r => r.d100 / r.d10);
+  if (ratios.length < PYRAMID_MIN_SAMPLES) return null;
+  const q = p => Number(liquidityHistory._internal.quantile(ratios, p).toFixed(2));
+  const median = q(0.5);
+  const p75 = q(0.75);
+  return { median, accumulationMax: median, richMin: p75, healthyMax: p75, hollowMin: q(0.9), source: 'archive', n: ratios.length };
+}
+
+let pyramidBaseline = null;
+let pyramidBaselineAt = 0;
+async function getPyramidBaseline(now = Date.now()) {
+  if (pyramidBaseline && now - pyramidBaselineAt < 3600000) return pyramidBaseline;
+  try {
+    const b = pyramidBaselineFromSamples(await liquidityHistory.getMergedHistory(), now);
+    if (b) { pyramidBaseline = b; pyramidBaselineAt = now; }
+  } catch (err) {
+    console.warn('[CoinbaseFetcher] Pyramid baseline unavailable:', err.message);
+  }
+  return pyramidBaseline;
+}
+
 /**
  * Core quantitative computation engine
+ * @param {{pyramidBaseline?: object}} [opts] 档案分位基准 (缺省时用经验常数)
  */
-function processCoinbaseData(bookData, candleData, tickerStats) {
+function processCoinbaseData(bookData, candleData, tickerStats, opts = {}) {
+  const pyr = opts.pyramidBaseline || LEGACY_PYRAMID;
   const bids = bookData.bids || [];
   const asks = bookData.asks || [];
 
@@ -301,7 +334,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     };
   }
 
-  // 2. Pyramid Ratios (Gold Standard ~3.1x for 100bps/10bps); null when either tier is not covered,
+  // 2. Pyramid Ratios (baseline: archive percentiles, see pyramidBaselineFromSamples); null when either tier is not covered,
   // since a truncated far tier would collapse the ratio towards 1.0x.
   const pyramidRatio = (far, near) => (depthProfile[far].covered && depthProfile[near].covered
     ? parseFloat(((depthProfile[far].totalUsd || 1) / (depthProfile[near].totalUsd || 1)).toFixed(2))
@@ -398,12 +431,12 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
   let regimeSeverity = 'neutral';
   let regimeColor = '#a1a1aa';
 
-  if (pctlPrice >= 75 && (pctlVol24h <= 25 || pctlVol7d <= 30) && bid10Pct < 48.5 && hasPyr && pyramidRatio100_10 > 5.0) {
+  if (pctlPrice >= 75 && (pctlVol24h <= 25 || pctlVol7d <= 30) && bid10Pct < 48.5 && hasPyr && pyramidRatio100_10 > pyr.richMin) {
     regimeCode = 'FALSE_PROSPERITY';
     regimeLabel = '🚨 虚假繁荣 / 贫瘠逼空';
     regimeSeverity = 'critical';
     regimeColor = '#f43f5e';
-  } else if (pctlPrice >= 70 && (pctlVol24h >= 55 || pctlVol7d >= 60) && bid10Pct >= 51.0 && hasPyr && pyramidRatio100_10 <= 5.5) {
+  } else if (pctlPrice >= 70 && (pctlVol24h >= 55 || pctlVol7d >= 60) && bid10Pct >= 51.0 && hasPyr && pyramidRatio100_10 <= pyr.healthyMax) {
     regimeCode = 'HEALTHY_EXPANSION';
     regimeLabel = '🟢 充盈共振 / 稳健主升';
     regimeSeverity = 'success';
@@ -413,7 +446,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     regimeLabel = '⚠️ 顶部分发 / 卖墙重压';
     regimeSeverity = 'warning';
     regimeColor = '#f59e0b';
-  } else if (pctlPrice <= 30 && pctlVol24h <= 35 && bid10Pct >= 51.5 && hasPyr && pyramidRatio100_10 <= 4.5) {
+  } else if (pctlPrice <= 30 && pctlVol24h <= 35 && bid10Pct >= 51.5 && hasPyr && pyramidRatio100_10 <= pyr.accumulationMax) {
     regimeCode = 'ACCUMULATION_BOTTOM';
     regimeLabel = '💎 机构吸筹 / 缩量筑底';
     regimeSeverity = 'success';
@@ -423,7 +456,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     regimeLabel = '🔴 恐慌踩踏 / 流动性击穿';
     regimeSeverity = 'critical';
     regimeColor = '#ef4444';
-  } else if (hasPyr && pyramidRatio100_10 > 6.0) {
+  } else if (hasPyr && pyramidRatio100_10 > pyr.hollowMin) {
     regimeCode = 'HOLLOW_NEAR_END';
     regimeLabel = '⚡ 金字塔形变 / 防线下移';
     regimeSeverity = 'warning';
@@ -441,7 +474,7 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
     `【90天滚动量价分位】Coinbase 现货价格处于 90 天第 ${pctlPrice}% 分位（${pctlPrice >= 75 ? '高位偏热' : (pctlPrice <= 25 ? '低位低估' : '常态中枢')}），真·24h 滚动成交量居第 ${pctlVol24h}% 分位（${pctlVol24h <= 25 ? '极度低迷' : (pctlVol24h >= 70 ? '放量活跃' : '中性温和')}，约 ${cur24hVolBtc.toFixed(0)} ₿），7D 均量居第 ${pctlVol7d}% 分位。`,
     `【大单执行冲击】${sim5m.sell.complete ? '实测' : `可见盘口仅能成交 ${(sim5m.sell.fillRatio * 100).toFixed(0)}%，按平方根冲击模型外推的`} $5M 市价抛售执行滑点为 ${sim5m.sell.slippageBps} bps（${sim5m.sell.complete ? '底价' : '可见最低档'} $${sim5m.sell.worstPrice.toLocaleString()}），比同规模买入滑点${sim5m.penaltyBps >= 0 ? `高出 ${sim5m.penaltyBps} bps` : `低 ${Math.abs(sim5m.penaltyBps)} bps`}，${sim5m.penaltyBps > 0 ? '下行缓冲具备非对称脆弱性。' : '买卖盘滑点结构对称。'}${coverageNote}`,
     hasPyr
-      ? `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（健康基准 ~3.1x），${pyramidRatio100_10 > 5.5 ? '表明做市商防御性挂单向远端撤退，即时缓冲层相对中空。' : '做市商阶梯深度逐级递增，具备良好吸震能力。'}`
+      ? `【金字塔倍数】100 bps 深度与 10 bps 深度比值为 ${pyramidRatio100_10}x（${pyr.source === 'archive' ? `近 90 天 ${pyr.n} 个小时样本中位 ${pyr.median}x、90% 分位 ${pyr.hollowMin}x` : '档案样本不足，暂用经验基准 3.1x'}），${pyramidRatio100_10 > pyr.hollowMin ? '高于常态区间：做市商挂单向远端撤退，即时缓冲层相对中空。' : (pyramidRatio100_10 < pyr.median ? '近端挂单比常态更厚，阶梯缓冲良好。' : '处于常态区间。')}`
       : `【金字塔倍数】L2 快照可见深度未覆盖 ±100 bps${coverageNote}，100/10 bps 深度比无法可靠计算，暂不参与体制判定。`
   ];
 
@@ -471,7 +504,10 @@ function processCoinbaseData(bookData, candleData, tickerStats) {
       ratio100_10: pyramidRatio100_10,
       ratio50_10: pyramidRatio50_10,
       ratio200_100: pyramidRatio200_100,
-      baseline100_10: 3.1
+      baseline100_10: pyr.median,
+      baselineHigh100_10: pyr.hollowMin,
+      baselineSource: pyr.source,
+      baselineSamples: pyr.n
     },
     slippageSimulation,
     percentiles: {
@@ -598,7 +634,9 @@ async function doGetCoinbaseLiquidityData(forceRefresh = false) {
       dataAsOf: new Date(maxCandleSec * 1000).toISOString(), asOfKind: 'source', source: 'coinbase.exchange/candles'
     });
 
-    const result = processCoinbaseData(bookRes.value, candleRes.value, tickRes.value);
+    const result = processCoinbaseData(bookRes.value, candleRes.value, tickRes.value, {
+      pyramidBaseline: await getPyramidBaseline(now)
+    });
 
     const bound = withDataHealth(result, REQUIRED_IDS);
     inMemoryCache = bound;
@@ -646,6 +684,7 @@ module.exports = {
   fetchCoinbaseTickerAndStats,
   calcPercentile,
   walkOrderBook,
-  processCoinbaseData
+  processCoinbaseData,
+  pyramidBaselineFromSamples
 };
 

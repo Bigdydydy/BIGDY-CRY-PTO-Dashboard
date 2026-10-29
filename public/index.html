@@ -944,13 +944,13 @@
             <!-- 3. 52-Week Extrema Card -->
             <div class="cdri-subcard">
               <div class="cdri-subcard-title">
-                <span>年度极值统计</span>
+                <span>近一年极值统计</span>
                 <span class="subcard-tag">High / Low</span>
               </div>
               <div class="cdri-metric-list">
                 <div class="cdri-metric-row">
                   <div class="cdri-extrema-label-group">
-                    <span class="cdri-metric-name">年度最高点</span>
+                    <span class="cdri-metric-name">近一年最高点</span>
                     <span class="cdri-date-tag" id="cdri-year-high-date">(--)</span>
                   </div>
                   <div class="cdri-metric-val-wrap" id="cdri-year-high">
@@ -959,7 +959,7 @@
                 </div>
                 <div class="cdri-metric-row">
                   <div class="cdri-extrema-label-group">
-                    <span class="cdri-metric-name">年度最低点</span>
+                    <span class="cdri-metric-name">近一年最低点</span>
                     <span class="cdri-date-tag" id="cdri-year-low-date">(--)</span>
                   </div>
                   <div class="cdri-metric-val-wrap" id="cdri-year-low">
@@ -1865,7 +1865,7 @@
       <div class="card-header">
         <div class="card-title-group">
           <span class="card-module-tag">02B DEALER</span>
-          <h2>做市商敞口 · 全链自算 (惯例口径)</h2>
+          <h2>做市商敞口 · 全链自算</h2>
         </div>
         <div class="card-badge badge-normal" id="dealer-regime-badge">分析中...</div>
       </div>
@@ -1899,7 +1899,7 @@
 
         <div class="rule-banner">
           <span>⚠️</span>
-          <span id="dealer-assumption-text">持仓符号假设做市商多 Call、空 Put，未用成交方向校正；Greeks 按 Black-76 与 Deribit 标记 IV 逐合约计算。</span>
+          <span id="dealer-assumption-text">持仓符号口径加载中…</span>
         </div>
 
         <div class="metrics-row">
@@ -1911,17 +1911,17 @@
           <div class="metric-pill-box">
             <span class="m-label">GEX · 现货 +1%</span>
             <span class="m-value" id="dealer-gex">--</span>
-            <span class="m-sub">做市商 Delta 变化</span>
+            <span class="m-sub" id="dealer-gex-sub">做市商 Delta 变化</span>
           </div>
           <div class="metric-pill-box">
             <span class="m-label">VEX · IV +1 点</span>
             <span class="m-value" id="dealer-vex">--</span>
-            <span class="m-sub">做市商 Delta 变化</span>
+            <span class="m-sub" id="dealer-vex-sub">做市商 Delta 变化</span>
           </div>
           <div class="metric-pill-box">
             <span class="m-label">CEX · 过 1 天</span>
             <span class="m-value" id="dealer-cex">--</span>
-            <span class="m-sub">做市商 Delta 变化</span>
+            <span class="m-sub" id="dealer-cex-sub">做市商 Delta 变化</span>
           </div>
         </div>
 
@@ -2661,7 +2661,7 @@
             <div class="tp-subcard cb-subcard">
               <div class="tp-subcard-title">
                 <span>金字塔结构倍数检验 (Pyramid Health)</span>
-                <span class="subcard-tag" id="cb-pyramid-tag">基准: 3.1x</span>
+                <span class="subcard-tag" id="cb-pyramid-tag">基准: --</span>
               </div>
               <div class="cb-pyramid-row">
                 <div class="cb-pyr-metric">
@@ -2818,7 +2818,7 @@
           <div class="gold-metric-card">
             <div class="gold-metric-header">
               <span class="gold-metric-label">BTC 占黄金总市值渗透率</span>
-              <span class="gold-metric-tag">$18.5T 基准</span>
+              <span class="gold-metric-tag">实时金价 × 地上存量</span>
             </div>
             <div class="gold-metric-value" id="gold-val-mcap-share">--%</div>
             <div class="gold-metric-sub" id="gold-sub-mcap-share">地上黄金存量: 21.25万吨</div>
@@ -2876,7 +2876,7 @@
             <div class="tp-data-audit-strip">
               <div class="tp-audit-left">
                 <span><strong class="text-cyan">数据基准:</strong> PAXG 伦敦金 1:1 实物现货 + BTC 现货连续日线（币安优先，币安拒绝访问时自动改用 OKX / Coinbase，两条腿同一交易所；悬停徽章查看当前来源）</span>
-                <span><strong class="text-cyan">算法模型:</strong> 对数收益率 30D 滑动窗口皮尔逊相关系数</span>
+                <span><strong class="text-cyan">算法模型:</strong> 日收益率 30D 滑动窗口皮尔逊相关系数</span>
                 <span><strong class="text-cyan">宏观对标:</strong> Newhedge.io Bitcoin vs Gold Correlation</span>
               </div>
               <span id="gold-history-points-badge" class="tp-audit-right">1000+ 连续日线</span>
