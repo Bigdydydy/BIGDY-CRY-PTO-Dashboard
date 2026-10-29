@@ -127,6 +127,17 @@ describe('evaluateMonitoring', () => {
     assert.equal(report.live.state, 'UNKNOWN');
   });
 
+  test('degraded live modules are named in the DEGRADED reason', () => {
+    const g = greenInputs();
+    const [a, b] = MONITOR_LIVE_MODULES;
+    g.live.report.overallHealth = 'DEGRADED';
+    g.live.report.modules[a].healthStatus = 'DEGRADED';
+    g.live.report.modules[b].healthStatus = 'DEGRADED';
+    const report = evaluateMonitoring(g, NOW);
+    assert.equal(report.overallHealth, 'DEGRADED');
+    assert.equal(report.live.reason, `Live sources degraded: ${a}, ${b}`);
+  });
+
   test('legitimate warmup (ready=false) with real source rows stays HEALTHY', () => {
     const g = greenInputs();
     const snap = g.snapshots['crypto_mcclellan.json'];

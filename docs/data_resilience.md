@@ -90,6 +90,8 @@ Producer job 窗口（`JOB_POLICIES`）：`macro_snapshot` 8h/1d；`liquidity_ho
 
 监测合约：未来时钟偏差上限 5min；live 检查先 GET `/healthz` 唤醒实例，再取审计报告，各 90s 超时 / 0 重试；审计端点的 503 正文按报告解析（UNKNOWN/CRITICAL 是观测结果，不是传输错误）；webhook 10s / 0 重试；调度 `49 * * * *`（每小时）；缺心跳或缺 live URL → `UNKNOWN`；warn → `DEGRADED`；超 block → `CRITICAL`。
 
+退出门槛：只有 `CRITICAL` / `UNKNOWN` 让任务失败（并触发 webhook）。`DEGRADED` 是已标注的备用状态（例如 Render 出口被 Binance 拒绝而改用 OKX），只输出 `::warning` 注解并点名降级模块，任务通过——否则结构性降级会让巡检每小时变红，掩盖真正的 CRITICAL。
+
 ## 5. producer 心跳语义
 
 `server/pipeline_health.js`（纯遥测，原子写）：

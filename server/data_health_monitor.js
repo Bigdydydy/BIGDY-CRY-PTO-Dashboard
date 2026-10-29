@@ -143,7 +143,11 @@ function inspectLive(live) {
     return { state: 'HEALTHY' };
   }
   if (report.overallHealth === 'UNKNOWN') return { state: 'UNKNOWN', reason: 'Live sources not yet verified' };
-  return { state: 'DEGRADED', reason: 'Live sources degraded or not yet acquired' };
+  const degraded = Object.entries(report.modules).filter(([, m]) => m.healthStatus === 'DEGRADED').map(([id]) => id);
+  return {
+    state: 'DEGRADED',
+    reason: degraded.length ? `Live sources degraded: ${degraded.join(', ')}` : 'Live sources degraded or not yet acquired'
+  };
 }
 
 // Pure evaluation: callers collect files/HTTP responses. No I/O, refreshes,

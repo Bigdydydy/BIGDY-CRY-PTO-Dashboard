@@ -1,6 +1,7 @@
 /**
  * Monitor command + endpoint tests (offline):
- * - runCheck: report file, exit semantics (non-HEALTHY -> failure), injected
+ * - runCheck: report file, exit semantics (CRITICAL/UNKNOWN -> failure,
+ *   DEGRADED -> warning only), injected
  *   fetcher covering bad bodies, zero-network default, missing heartbeat.
  * - sendAlert: unconfigured webhook never sends; mock POST shape; failures
  *   redact the secret URL.
@@ -18,7 +19,7 @@ const { spawnSync, spawn } = require('child_process');
 
 const { installModuleMocks, srv, freshRequire } = require('./helpers/leaf_env');
 const http = require('http');
-const { runCheck } = require('../scripts/data_health_check');
+const { runCheck, exitCodeFor } = require('../scripts/data_health_check');
 const { sendAlert } = require('../scripts/data_health_alert');
 const { MONITOR_LIVE_MODULES } = require('../server/data_health_monitor_policy');
 
@@ -489,7 +490,15 @@ describe('producer scripts under the offline guard', () => {
     });
   });
 
-  test('data_health_check CLI exits 1 when not everything is HEALTHY', () => {
+  test('exit gate: only CRITICAL / UNKNOWN fail; DEGRADED warns', () => {
+    assert.equal(exitCodeFor('HEALTHY'), 0);
+    assert.equal(exitCodeFor('DEGRADED'), 0);
+    assert.equal(exitCodeFor('CRITICAL'), 1);
+    assert.equal(exitCodeFor('UNKNOWN'), 1);
+    assert.equal(exitCodeFor(undefined), 1);
+  });
+
+  test('data_health_check CLI exits 1 when live coverage is UNKNOWN', () => {
     const out = path.join(SANDBOX, 'scratch-report.json');
     const r = spawnSync(process.execPath, ['scripts/data_health_check.js', '--output', out],
       { cwd: SANDBOX, encoding: 'utf8', timeout: 30000, env: { ...process.env, DASHBOARD_HEALTH_URL: '' } });

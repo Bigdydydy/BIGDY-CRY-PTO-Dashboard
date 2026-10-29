@@ -103,6 +103,12 @@ async function fetchLiveReport(raw, fetcher = fetchWithTimeout) {
   }
 }
 
+/** Gate: only CRITICAL / UNKNOWN fail the job. DEGRADED is a known, labelled
+ * fallback state (e.g. Binance blocking the host) — warn, don't page hourly. */
+function exitCodeFor(overallHealth) {
+  return overallHealth === 'HEALTHY' || overallHealth === 'DEGRADED' ? 0 : 1;
+}
+
 function escapeMd(s) {
   return String(s).replace(/([\\`*_[\]|<>])/g, '\\$1');
 }
@@ -197,11 +203,16 @@ if (require.main === module) {
   const outIdx = process.argv.indexOf('--output');
   const outputPath = outIdx >= 0 ? process.argv[outIdx + 1] : null;
   runCheck({ outputPath }).then(report => {
-    process.exit(report.overallHealth === 'HEALTHY' ? 0 : 1);
+    if (report.overallHealth === 'DEGRADED') {
+      for (const a of report.alerts) {
+        if (a.state === 'DEGRADED') console.log(`::warning title=Data health DEGRADED::${a.id}: ${a.reason}`);
+      }
+    }
+    process.exit(exitCodeFor(report.overallHealth));
   }).catch(err => {
     console.error('[data-health] check failed:', err.message);
     process.exit(1);
   });
 }
 
-module.exports = { runCheck, validateLiveUrl, formatSummary };
+module.exports = { runCheck, validateLiveUrl, formatSummary, exitCodeFor };
