@@ -1065,7 +1065,7 @@ function renderDealerExposure(data) {
     if (cov && cov.source === 'ledger') {
       covText = `全成交校正覆盖 OI ${cov.oiShare}% / Gamma ${cov.gammaShare}%，覆盖部分与惯例一致 ${cov.agreeShare ?? '--'}%（台账截至 ${cov.syncedThrough ? cov.syncedThrough.slice(0, 10) : '--'}${cov.stale ? '，已过期' : ''}）。`;
     } else if (cov) {
-      covText = `台账不可用，退回 30 天大宗校正：覆盖 OI ${cov.oiShare}% / Gamma ${cov.gammaShare}%，覆盖部分与惯例一致 ${cov.agreeShare ?? '--'}%。`;
+      covText = `台账不可用，退回 60 天大宗校正：覆盖 OI ${cov.oiShare}% / Gamma ${cov.gammaShare}%，覆盖部分与惯例一致 ${cov.agreeShare ?? '--'}%。`;
     } else {
       covText = '缺少成交数据，未做订单流校正。';
     }
@@ -1316,7 +1316,7 @@ window.addEventListener('resize', () => {
 function renderBlockTrades(data) {
   if (!data) return;
   if (data.status === 'data_unavailable') {
-    // Pause current conclusions only — the 30-day persistent store and the
+    // Pause current conclusions only — the 60-day persistent store and the
     // last-rendered trade tables stay browsable (do NOT wipe them).
     elBlockNarrativeText.textContent = data.summaryText || '数据过期或不可用，暂停当前研判';
     elWhaleTotalVol.textContent = '--';
@@ -1359,10 +1359,10 @@ function renderBlockTrades(data) {
   if (data.tradeStoreStats) {
     const s = data.tradeStoreStats;
     if (elStoreText) {
-      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${Number(s.totalStored || 0).toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${escapeHtml(s.earliestTimeUTC8)}</strong> ~ <strong>${escapeHtml(s.latestTimeUTC8)}</strong> UTC+8，至多滚动保存 <strong>30 天</strong>，已突破官方 72h 上限）`;
+      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${Number(s.totalStored || 0).toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${escapeHtml(s.earliestTimeUTC8)}</strong> ~ <strong>${escapeHtml(s.latestTimeUTC8)}</strong> UTC+8，至多滚动保存 <strong>${Number(s.retentionDays || 60)} 天</strong>，已突破官方 72h 上限）`;
     }
     if (elStoreSpanBadge) {
-      elStoreSpanBadge.textContent = `已沉淀: ${s.historySpanDays} 天 / 30天`;
+      elStoreSpanBadge.textContent = `已沉淀: ${s.historySpanDays} 天 / ${Number(s.retentionDays || 60)}天`;
     }
   }
 

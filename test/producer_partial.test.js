@@ -27,7 +27,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'be-prod-'));
  * up this test's stubs and the CURRENT fs redirection. */
 function freshScript(t, name) {
   const p = require.resolve(path.join(SCRIPTS_DIR, name));
-  for (const k of [p, srv('pipeline_health.js'), srv('data_health_cache.js')]) {
+  for (const k of [p, srv('pipeline_health.js'), srv('data_health_cache.js'), srv('trade_store.js')]) {
     delete require.cache[k];
   }
   const mod = require(p);
@@ -137,7 +137,7 @@ describe('block_insight_daily CLI (mocked substeps)', () => {
       [srv('block_insight.js')]: BI,
       [srv('data_fetcher.js')]: { fetchBlockTrades: trades },
       [srv('option_marks.js')]: { fetchBookSummaryRows: async () => [{ instrument_name: 'BTC-X', mark_price: 1 }] },
-      [srv('analytics_engine.js')]: { analyzeBlockTrades: () => ({ whaleBlocks: [], icebergClusters: [] }), buildForwardsMap: () => ({}) },
+      [srv('analytics_engine.js')]: { formatUTC8: ts => new Date(ts).toISOString(), analyzeBlockTrades: () => ({ whaleBlocks: [], icebergClusters: [] }), buildForwardsMap: () => ({}) },
       [srv('option_oi_history.js')]: {
         COMMITTED_FILE: path.join(dir, 'oi.json'),
         readHistoryFile: () => [{ ts: Date.now() }],
@@ -172,6 +172,10 @@ describe('block_insight_daily CLI (mocked substeps)', () => {
     assert.equal(hb.steps.marks.status, 'failed');
     assert.match(hb.steps.marks.lastError, /missing mark|no mark|unmarked/i);
     assert.equal(process.exitCode, 1);
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'block_trades_BTC.json'), 'utf8'));
+    assert.equal(raw.retentionDays, 60);
+    assert.equal(raw.trades.length, 1, 'raw legs survive a partial marks failure');
 
     // Daily archive got the successful step's receipt.
     const daily = JSON.parse(fs.readFileSync(dailyFile, 'utf8'));
@@ -238,6 +242,10 @@ describe('block_insight_daily CLI (mocked substeps)', () => {
     assert.equal(hb.steps.marks.status, 'ok');
     assert.equal(hb.steps.option_oi.verifiedSkip, true);
     assert.equal(process.exitCode, 0);
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'block_trades_BTC.json'), 'utf8'));
+    assert.equal(raw.retentionDays, 60);
+    assert.deepEqual(raw.trades, [], 'empty verified polls still persist the retention policy');
+
     // A verified empty window still stamps the archive with the check receipt.
     const daily = JSON.parse(fs.readFileSync(dailyFile, 'utf8'));
     assert.equal(daily.producerHealth.status, 'ok');

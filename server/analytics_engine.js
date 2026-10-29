@@ -2342,7 +2342,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     concentrationText = `大资金名义额${expPart}，${stratPart}。`;
   }
 
-  const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : '过去 30 天历史沉淀'));
+  const rangeLabel = timeRange === '24h' ? '近 24 小时' : (timeRange === '3d' ? '近 3 天 (72小时)' : (timeRange === '7d' ? '近 7 天' : (timeRange === '30d' ? '近 30 天' : '过去 60 天历史沉淀')));
   const M = v => (v / 1e6).toFixed(1);
   const overlapText = overlapUnits.length
     ? `，其中 ${overlapUnits.length} 笔（$${M(whaleInClusterUSD)}M）同属冰山组`

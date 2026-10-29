@@ -3,7 +3,7 @@ const path = require('path');
 const { formatUTC8 } = require('./analytics_engine');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
-const RETENTION_DAYS = 30;
+const RETENTION_DAYS = 60;
 const MAX_RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 // In-memory trade cache by currency
@@ -70,6 +70,7 @@ function saveTradesToDisk(currency = 'BTC', trades = []) {
     try {
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
     } catch (_) {}
+    throw err; // A failed archive write must not be reported as a successful merge.
   }
 }
 
@@ -82,8 +83,8 @@ function getTradeKey(trade) {
 }
 
 /**
- * Merge newly fetched trades with historical 30-day database
- * Automatically prunes trades older than 30 days
+ * Merge newly fetched trades with historical 60-day database
+ * Automatically prunes trades older than 60 days
  */
 function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
   const curKey = currency.toUpperCase();
@@ -115,7 +116,7 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
     }
   }
 
-  // 4. Prune trades older than 30 days (1 month)
+  // 4. Prune trades older than 60 days
   const now = Date.now();
   const cutoffTime = now - MAX_RETENTION_MS;
   const mergedList = [];
@@ -130,11 +131,9 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
   // 5. Sort chronologically descending (newest first)
   mergedList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-  // 6. Update cache & persist to disk if new trades or first time
+  // 6. Persist every verified merge, including empty polls (pruning / policy migration).
+  saveTradesToDisk(curKey, mergedList);
   memoryCache.set(curKey, mergedList);
-  if (newAddedCount > 0 || !fs.existsSync(getStorageFilePath(curKey))) {
-    saveTradesToDisk(curKey, mergedList);
-  }
 
   // 7. Calculate stats
   const earliestTs = mergedList.length > 0 ? mergedList[mergedList.length - 1].timestamp : null;
@@ -162,10 +161,10 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
 /**
  * Filter trades by time window
  * @param {Array} trades 
- * @param {string} windowKey '24h' | '3d' | '7d' | '30d' | 'all'
+ * @param {string} windowKey '24h' | '3d' | '7d' | '30d' | '60d' | 'all'
  */
 function filterTradesByWindow(trades = [], windowKey = 'all') {
-  if (!trades || !trades.length || windowKey === 'all' || windowKey === '30d') {
+  if (!trades || !trades.length || windowKey === 'all') {
     return trades;
   }
 
@@ -178,6 +177,8 @@ function filterTradesByWindow(trades = [], windowKey = 'all') {
     windowMs = 3 * 24 * 60 * 60 * 1000;
   } else if (windowKey === '7d') {
     windowMs = 7 * 24 * 60 * 60 * 1000;
+  } else if (windowKey === '30d') {
+    windowMs = 30 * 24 * 60 * 60 * 1000;
   }
 
   const cutoff = now - windowMs;

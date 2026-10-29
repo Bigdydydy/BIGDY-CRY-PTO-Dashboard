@@ -722,7 +722,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       }
       const allowed = key => analysisHealth[key].analysisAllowed;
 
-      // Filter trades from persistent 30-day store based on user-selected window
+      // Filter trades from persistent 60-day store based on user-selected window
       const activeTrades = filterTradesByWindow(data.blockTrades, timeRangeParam);
 
       // Analyzers run only when every required source is usable — never on
@@ -811,7 +811,7 @@ async function handleApiRequest(req, res, parsedUrl) {
           // 全成交累计净额台账：台账可用时作为主口径 (状态、预警、压力情景)，惯例口径并列对照
           flowLedger,
           gexReference: gexAnalysis.status === 'data_unavailable' ? null : gexAnalysis,
-          // 台账不可用时退回 30 天大宗成交库
+          // 台账不可用时退回 60 天大宗成交库
           blockTrades: data.blockTrades || [],
           // 过去 24 小时现货与 DVOL 变化 (已触发对冲流)
           recent24h: data.dvolStats?.recent24h || null,

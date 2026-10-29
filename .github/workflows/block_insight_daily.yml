@@ -48,7 +48,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json data/job_health_block_insight_daily.json
+          git add data/block_trades_BTC.json data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json data/job_health_block_insight_daily.json
           if git diff --cached --quiet; then
             echo "No changes; skipping commit."
             exit 0

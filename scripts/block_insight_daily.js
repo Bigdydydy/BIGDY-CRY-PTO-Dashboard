@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const BI = require('../server/block_insight');
+const { recordAndMergeTrades } = require('../server/trade_store');
 const { fetchBlockTrades } = require('../server/data_fetcher');
 const { fetchBookSummaryRows } = require('../server/option_marks');
 const { analyzeBlockTrades } = require('../server/analytics_engine');
@@ -74,6 +75,8 @@ async function main() {
   // ---- block_trades ----
   try {
     const trades = await fetchBlockTrades('BTC');
+    // Persist raw legs as well as aggregates across ephemeral CI checkouts.
+    recordAndMergeTrades('BTC', trades);
     if (!trades.length) {
       // A valid empty response is still a successful producer check — the
       // archive's health comes from the check receipt, not the last trade.

@@ -91,7 +91,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - **已触发对冲流与深度对比**：按 24h 现货/波动率变化重估做市商被动对冲量（拆 Gamma/Vanna/Charm），与 Coinbase ±2% 盘口深度对比量级；日度历史档案（`dealer_history.js`）。
 
 ### 大宗交易与机构冰山拆单 (Card 03)
-- **本地持久化 30 天成交流水**：突破交易所 72 小时限制，滚动聚合长周期机构足迹。
+- **本地持久化 60 天成交流水**：突破交易所 72 小时限制，滚动聚合长周期机构足迹。
 - **冰山拆单聚类**：15 分钟滑窗、同合约同方向大单切片聚合。
 - **Black-76 远期定价 Greeks**：大宗交易按**到期远期价 F**（`buildForwardsMap` 汇总 ATM 与 option marks 各到期远期）而非现货 S 计算 Greeks，消除远月 Δ 偏移。
 - **Smile 联动评级**：注入 smileContext（25Δ 偏度、BF、两翼溢价）激活 smileAlphaRating——偏度套利/逆势高抛/顺势追买评级。

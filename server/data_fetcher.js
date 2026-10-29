@@ -389,7 +389,7 @@ function detectDataChanges(accumulatedTrades, newGex, newIvHistory, newSkewChart
     summary: ''
   };
 
-  // 1. Block Trades diff from persistent 30-day store
+  // 1. Block Trades diff from persistent 60-day store
   if (newAddedTrades > 0) {
     changes.blockTrades = true;
     changes.newTradesCount = newAddedTrades;

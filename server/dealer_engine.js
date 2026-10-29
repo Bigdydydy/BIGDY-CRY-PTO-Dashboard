@@ -462,7 +462,7 @@ function unitGexUsd(c, spot) {
 }
 
 /**
- * 大宗校正：30 天大宗成交按合约求客户净买入量 (主动方视为客户)，覆盖部分的做市商符号取客户方向的反面，
+ * 大宗校正：60 天大宗成交按合约求客户净买入量 (主动方视为客户)，覆盖部分的做市商符号取客户方向的反面，
  * 覆盖量封顶为该合约 OI，未覆盖部分沿用惯例符号。
  * 局限：主动方不一定是客户；30 天净卖出可能是平掉旧多头而非新开空头；更早开的持仓无法覆盖。
  */
@@ -650,7 +650,7 @@ const sameSign = list => {
  *   convention       惯例：做市商多 Call、空 Put
  *   otm_call_bought  虚值 Call (行权价高于到期远期价) 改为客户买入、做市商空，其余惯例
  *   flow_adjusted    全成交校正 (台账可用时)，另给屏幕成交折扣系数 0 ~ 1 的敏感性
- *   block_adjusted   台账不可用时退回 30 天大宗校正
+ *   block_adjusted   台账不可用时退回 60 天大宗校正
  * robust：所有口径 (含各折扣系数) 净 GEX 同号；flowRobust：订单流口径内部 (各折扣系数) 同号。
  */
 function signSensitivity(contracts, spot, { ledger = null, blockTrades = null, now = Date.now() } = {}) {
@@ -674,7 +674,7 @@ function signSensitivity(contracts, spot, { ledger = null, blockTrades = null, n
   } else if (Array.isArray(blockTrades) && blockTrades.length) {
     const adj = applyBlockFlow(contracts, blockTrades, spot);
     coverage = { source: 'block_trades', ...adj.coverage };
-    scenarios.push(scenarioOf('block_adjusted', '30 天大宗校正（台账不可用）', adj.contracts, spot));
+    scenarios.push(scenarioOf('block_adjusted', '60 天大宗校正（台账不可用）', adj.contracts, spot));
   }
   const result = {
     scenarios,
@@ -851,7 +851,7 @@ function syntheticForwardBtc(contracts) {
  * @param {{indexPrice:number, marks:Object, timestamp?:number, stale?:boolean}} snapshot option_marks 快照
  * @param {{now?:number, gexReference?:{totalAllGexM?:number}, flowLedger?:Object, blockTrades?:Array}} [opts]
  *   gexReference 为数据源 GEX 分析结果，用于口径对照；flowLedger 为全成交累计净额台账 (符号敏感性的全成交校正)；
- *   blockTrades 为 30 天大宗成交库，台账不可用时退回大宗校正
+ *   blockTrades 为 60 天大宗成交库，台账不可用时退回大宗校正
  *   recent24h  { hours, spotNow, spotThen, dvolNow, dvolThen } 过去 24 小时变化 (已触发对冲流)
  *   depth      { venue, band, bidUsd, askUsd } 现货盘口深度 (对冲流量级对比)
  *   skew       analyze25DeltaSkew 结果 (预警中的偏度条件)
@@ -1002,7 +1002,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
         : `订单流显示客户上市以来累计净买入 Call ${cov.netCallBtc.toFixed(0)} BTC，"虚值 Call 客户买入"情景有现实依据。`)
       + `未被净额覆盖的 OI（${(100 - cov.oiShare).toFixed(1)}%）多为客户之间或做市商之间的对手盘，仍按惯例符号计。`;
   } else if (cov) {
-    coverageText = `成交台账不可用，退回 30 天大宗校正：${cov.tradeCount} 笔大宗成交，覆盖 OI ${cov.oiShare}%、Gamma ${cov.gammaShare}%，覆盖部分与惯例符号一致 ${cov.agreeShare ?? '--'}%。`;
+    coverageText = `成交台账不可用，退回 60 天大宗校正：${cov.tradeCount} 笔大宗成交，覆盖 OI ${cov.oiShare}%、Gamma ${cov.gammaShare}%，覆盖部分与惯例符号一致 ${cov.agreeShare ?? '--'}%。`;
   } else {
     coverageText = '缺少成交台账与大宗成交数据，未做订单流校正。';
   }
