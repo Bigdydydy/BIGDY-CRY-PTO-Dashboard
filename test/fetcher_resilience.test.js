@@ -217,6 +217,7 @@ function ssroHttp(holder) {
     const s = holder.state;
     if (s.fail) return fakeResp({}, { ok: false, status: 503 });
     if (url.includes('stablecoins.llama.fi')) {
+      if (s.llamaTimeout) throw new Error('Request timeout of 30000ms exceeded');
       if (s.llamaEmpty) return fakeResp([]);
       const rows = Array.from({ length: 40 }, (_, i) => ({
         date: String(nowSec() - (39 - i) * 86400),
@@ -291,4 +292,55 @@ test('D/SSRO lifecycle: live quote only when both legs valid; history never fabr
   const r4 = await mod.getSsroData(true);
   assert.equal(r4.points[r4.points.length - 1].date, today);
   assert.equal(r4.dataHealth.state, 'OK');
+});
+
+test('D/SSRO DefiLlama timeout: BTC leg keeps updating on cached stablecoin history, never persisted', async (t) => {
+  resetHealth();
+  const holder = { state: {} };
+  const { tmpDir } = installModuleMocks(t, {
+    [HTTP]: { fetchWithTimeout: ssroHttp(holder) },
+    [SPOT]: ssroSpot
+  });
+  const mod = freshRequire('ssro_fetcher.js');
+  const cacheFile = path.join(tmpDir, 'ssro_chart.json');
+  const today = iso(Date.now());
+
+  await mod.getSsroData(true);
+  const goodBytes = diskBytes(cacheFile);
+
+  holder.state = { llamaTimeout: true, quoteMissing: true };
+  const r = await mod.getSsroData(true);
+  assert.equal(r.points.length, 39, 'built from cached stablecoin history, no fabricated today');
+  assert.equal(getSourceHealth('ssro_stable').state, 'FALLBACK');
+  assert.match(getSourceHealth('ssro_stable').lastError, /timeout/);
+  const ssro = getSourceHealth('ssro');
+  assert.ok(ssro.issues.some(i => /沿用缓存/.test(i)));
+  assert.equal(getSourceHealth('ssro_quote').lastError, 'TradingView 返回缺 BTCUSDT');
+  assert.deepEqual(diskBytes(cacheFile), goodBytes, 'cached-history round is not persisted');
+
+  // Cold process with only the disk file: still builds from disk stablecoin points
+  const cold = freshRequire('ssro_fetcher.js');
+  holder.state = { llamaTimeout: true };
+  const rc = await cold.getSsroData(true);
+  assert.equal(rc.points[rc.points.length - 1].date, today);
+  assert.equal(getSourceHealth('ssro').state, 'FALLBACK');
+});
+
+test('D/SSRO live quote is not stitched onto history that ends before yesterday', async (t) => {
+  resetHealth();
+  const holder = { state: {} };
+  installModuleMocks(t, {
+    [HTTP]: { fetchWithTimeout: ssroHttp(holder) },
+    [SPOT]: {
+      fetchSpotDailyCloses: async () => ({
+        venue: 'TestVenue', quote: 'USDT',
+        series: { BTC: dailyRows(40, 50000).slice(0, 35) },
+        errors: [], partial: false, coverageStart: iso(Date.now() - 40 * 86400000)
+      })
+    }
+  });
+  const mod = freshRequire('ssro_fetcher.js');
+  const r = await mod.getSsroData(true);
+  assert.equal(r.points.length, 34, 'no live point across a multi-day gap');
+  assert.ok(r.points[33].date < iso(Date.now() - 86400000));
 });

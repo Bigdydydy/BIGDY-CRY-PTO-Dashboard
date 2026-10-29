@@ -11,6 +11,9 @@ let lastFetchTime = 0;
 let inflight = null;
 let diskSeeded = false;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+// stablecoincharts/all 约 1.3MB，Render 出口偶尔要 10s 以上才传完
+const DEFILLAMA_TIMEOUT_MS = 30000;
+let lastStableMap = null;
 const REQUIRED_IDS = ['ssro', 'ssro_stable'];
 const ANCILLARY_IDS = ['ssro_quote'];
 
@@ -126,6 +129,8 @@ async function fetchTradingViewQuote() {
       }
     }
 
+    const missing = [!result.stableCap && 'STABLE.C', !result.btcPrice && 'BTCUSDT'].filter(Boolean);
+    if (missing.length) result.error = `TradingView 返回缺 ${missing.join('/')}`;
     return result;
   } catch (err) {
     console.warn('[SSRO] TradingView quote fetch warning:', err.message);
@@ -134,7 +139,8 @@ async function fetchTradingViewQuote() {
       stableChange: null,
       btcPrice: null,
       btcCap: null,
-      time: Date.now()
+      time: Date.now(),
+      error: err.message
     };
   }
 }
@@ -145,7 +151,7 @@ async function fetchTradingViewQuote() {
 async function fetchDefiLlamaStablecoins() {
   recordAttempt('ssro_stable', { now: Date.now() });
   try {
-    const data = await fetchJson('https://stablecoins.llama.fi/stablecoincharts/all');
+    const data = await fetchJson('https://stablecoins.llama.fi/stablecoincharts/all', { timeout: DEFILLAMA_TIMEOUT_MS });
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid DefiLlama payload');
     }
@@ -174,12 +180,25 @@ async function fetchDefiLlamaStablecoins() {
     if (!map.size) throw new Error('DefiLlama payload: 无有效 date/cap 行');
     const maxDate = Array.from(map.keys()).sort().pop();
     recordSuccess('ssro_stable', { dataAsOf: maxDate, asOfKind: 'source', source: 'defillama/stablecoincharts' });
-    return map;
+    lastStableMap = map;
+    return { map, fromCache: false };
   } catch (err) {
     console.error('[SSRO] DefiLlama historical fetch error:', err.message);
     recordFailure('ssro_stable', err);
-    return new Map();
+    const fallback = cachedStableHistory();
+    if (fallback.size) console.warn(`[SSRO] DefiLlama 失败，沿用缓存稳定币历史 ${fallback.size} 天`);
+    return { map: fallback, fromCache: true };
   }
+}
+
+/** 上次成功的稳定币历史：内存优先，其次已验证的磁盘 payload。
+ * 只用于让 BTC 腿继续更新；ssro_stable 的时钟不推进，交集止于缓存最后一天。 */
+function cachedStableHistory() {
+  if (lastStableMap && lastStableMap.size) return lastStableMap;
+  const disk = inMemoryCache || readValidatedDisk();
+  const map = new Map();
+  for (const pt of (disk && disk.points) || []) map.set(pt.date, Number(pt.stableCap));
+  return map;
 }
 
 /**
@@ -261,7 +280,7 @@ function computePineScriptSsro(records, len = 200) {
 async function fetchAndBuildSsroData() {
   console.log('[SSRO] Initiating data ingestion for BTC & STABLE.C...');
 
-  const [tvQuote, stableHistoryMap, btcDailyMap] = await Promise.all([
+  const [tvQuote, { map: stableHistoryMap, fromCache: stableFromCache }, btcDailyMap] = await Promise.all([
     fetchTradingViewQuote(),
     fetchDefiLlamaStablecoins(),
     fetchBtcDaily('2021-01-01')
@@ -276,7 +295,7 @@ async function fetchAndBuildSsroData() {
   if (quoteValid) {
     recordSuccess('ssro_quote', { dataAsOf: new Date().toISOString(), asOfKind: 'received', source: 'tradingview/scan' });
   } else {
-    recordFailure('ssro_quote', new Error('TradingView 报价缺 stableCap 或 btcPrice'));
+    recordFailure('ssro_quote', new Error(tvQuote.error || 'TradingView 报价缺 stableCap 或 btcPrice'));
   }
 
   // Intersect dates
@@ -305,10 +324,11 @@ async function fetchAndBuildSsroData() {
     });
   }
 
-  // 仅在实时报价双腿都有效时，用它更新/追加"今天"；否则保留最后一个真实历史日期，
-  // 绝不拿历史腿的价格冒充今天的报价
-  if (quoteValid) {
-    const todayStr = new Date().toISOString().slice(0, 10);
+  // 仅在实时报价双腿都有效、且历史连到昨天或今天时，用它更新/追加"今天"；
+  // 否则保留最后一个真实历史日期，绝不拿历史腿的价格冒充今天的报价，也不跨缺口拼接
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (quoteValid && rawRecords[rawRecords.length - 1].date >= yesterdayStr) {
     const livePrice = tvQuote.btcPrice;
     const liveStableCap = tvQuote.stableCap;
     const liveSupply = getBtcSupply(todayStr);
@@ -437,18 +457,24 @@ async function fetchAndBuildSsroData() {
 
   recordSuccess('ssro', {
     dataAsOf: latestPoint.date, asOfKind: 'source', source: 'ssro/build',
-    issues: quoteValid ? [] : ['TradingView 实时报价缺失，未注入今日报价']
+    issues: [
+      ...(quoteValid ? [] : ['TradingView 实时报价缺失，未注入今日报价']),
+      ...(stableFromCache ? ['DefiLlama 未更新，稳定币历史沿用缓存'] : [])
+    ]
   });
 
   // Persist AFTER the success is recorded, with required+ancillary health
   // bound in so the next cold start can restore honest clocks (atomic write —
-  // a failed write never corrupts the last good file).
+  // a failed write never corrupts the last good file). A round built on cached
+  // stablecoin history is served but not persisted: disk keeps the last fully live build.
   const bound = withDataHealth(payload, REQUIRED_IDS, ANCILLARY_IDS);
-  try {
-    atomicWriteJson(CACHE_FILE, bound, 2);
-    console.log('[SSRO] Successfully updated cache at:', CACHE_FILE);
-  } catch (e) {
-    console.warn('[SSRO] Failed to write disk cache:', e.message);
+  if (!stableFromCache) {
+    try {
+      atomicWriteJson(CACHE_FILE, bound, 2);
+      console.log('[SSRO] Successfully updated cache at:', CACHE_FILE);
+    } catch (e) {
+      console.warn('[SSRO] Failed to write disk cache:', e.message);
+    }
   }
 
   inMemoryCache = bound;
