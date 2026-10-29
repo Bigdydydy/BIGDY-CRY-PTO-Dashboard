@@ -8,6 +8,28 @@
   "announcements": [],
   "filings": [
     {
+      "id": "sec:0001193125-26-437776",
+      "accession": "0001193125-26-437776",
+      "form": "8-K",
+      "filedOn": "2026-10-29",
+      "acceptedAt": "2026-10-29T20:05:18.000Z",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526437776/mstr-20261028.htm",
+      "source": "sec_submissions",
+      "status": "contents_not_verified",
+      "isAmendment": false
+    },
+    {
+      "id": "sec:0001050446-26-000047",
+      "accession": "0001050446-26-000047",
+      "form": "8-K",
+      "filedOn": "2026-10-29",
+      "acceptedAt": "2026-10-29T20:03:24.000Z",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000105044626000047/mstr-20261026.htm",
+      "source": "sec_submissions",
+      "status": "contents_not_verified",
+      "isAmendment": false
+    },
+    {
       "id": "sec:0001193125-26-435451",
       "accession": "0001193125-26-435451",
       "form": "8-K",
@@ -2969,19 +2991,19 @@
   ],
   "evidence": {},
   "mnav": {
-    "computedAt": "2026-10-29T13:22:51.890Z",
-    "priceAsOf": "2026-10-29T13:22:51.333Z",
-    "mstrPriceUsd": 145.16000366210938,
-    "btcPriceUsd": 80096.94,
+    "computedAt": "2026-10-29T22:52:35.630Z",
+    "priceAsOf": "2026-10-29T22:52:35.925Z",
+    "mstrPriceUsd": 141.6199951171875,
+    "btcPriceUsd": 78801.77,
     "btcSource": "coinbase",
     "mstrSource": "yahoo",
     "capitalSource": "sec",
     "capitalAsOf": "2026-10-25",
     "result": {
-      "mnav": 1.1706,
-      "netBtcUsd": 52865875294,
-      "netBtcBtc": 660023.6575,
-      "netBpsUsd": 124,
+      "mnav": 1.1663,
+      "netBtcUsd": 51766901531,
+      "netBtcBtc": 656925.6189,
+      "netBpsUsd": 121.43,
       "fdso": 426322075,
       "usdAssetsUsd": 5072400000,
       "claimsUsd": 20170139944,
@@ -3005,8 +3027,8 @@
         "strk": 0
       },
       "inputs": {
-        "mstrPriceUsd": 145.16000366210938,
-        "btcPriceUsd": 80096.94,
+        "mstrPriceUsd": 141.6199951171875,
+        "btcPriceUsd": 78801.77,
         "capitalAsOf": "2026-10-25"
       },
       "issues": []
@@ -3016,53 +3038,53 @@
   "dataHealth": {
     "sources": {
       "mstr_official_ledger": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 32,
+        "consecutiveFailures": 33,
         "issues": [],
         "available": false
       },
       "mstr_official_shares": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 32,
+        "consecutiveFailures": 33,
         "issues": [],
         "available": false
       },
       "mstr_official_capital": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 32,
+        "consecutiveFailures": 33,
         "issues": [],
         "available": false
       },
       "mstr_official_press": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 32,
+        "consecutiveFailures": 33,
         "issues": [],
         "available": false
       },
       "mstr_sec_index": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
-        "lastSuccessAt": "2026-10-29T13:22:51.890Z",
-        "dataAsOf": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
+        "lastSuccessAt": "2026-10-29T22:52:35.630Z",
+        "dataAsOf": "2026-10-29T22:52:35.630Z",
         "asOfKind": "received",
         "source": "https://data.sec.gov/submissions/CIK0001050446.json",
         "lastError": null,
@@ -3071,9 +3093,9 @@
         "available": true
       },
       "mstr_mnav_inputs": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
-        "lastSuccessAt": "2026-10-29T13:22:51.890Z",
-        "dataAsOf": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
+        "lastSuccessAt": "2026-10-29T22:52:35.630Z",
+        "dataAsOf": "2026-10-29T22:52:35.630Z",
         "asOfKind": "received",
         "source": "yahoo+coinbase",
         "lastError": null,
@@ -3082,9 +3104,9 @@
         "available": true
       },
       "mstr_sec_filings": {
-        "lastAttemptAt": "2026-10-29T13:22:51.890Z",
-        "lastSuccessAt": "2026-10-29T13:22:51.890Z",
-        "dataAsOf": "2026-10-29T13:22:51.890Z",
+        "lastAttemptAt": "2026-10-29T22:52:35.630Z",
+        "lastSuccessAt": "2026-10-29T22:52:35.630Z",
+        "dataAsOf": "2026-10-29T22:52:35.630Z",
         "asOfKind": "received",
         "source": "https://data.sec.gov/submissions/CIK0001050446.json",
         "lastError": null,
@@ -3094,8 +3116,8 @@
       }
     }
   },
-  "lastAttemptAt": "2026-10-29T13:22:51.890Z",
-  "lastCompletedAt": "2026-10-29T13:22:52.677Z",
+  "lastAttemptAt": "2026-10-29T22:52:35.630Z",
+  "lastCompletedAt": "2026-10-29T22:52:36.635Z",
   "secDocs": {
     "0001193125-26-424688": {
       "accession": "0001193125-26-424688",
@@ -4383,6 +4405,30 @@
       "filedOn": "2026-10-28",
       "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526435451/mstr-20261028.htm",
       "sha256": "a5e05b6a50d36ae524c9201522303e5065fce7481eca62341075c5377ff4d0de",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001193125-26-437776": {
+      "accession": "0001193125-26-437776",
+      "filedOn": "2026-10-29",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526437776/mstr-20261028.htm",
+      "sha256": "2a0a5bb92d6cdea6be39c32a396279145df4ce09578d8f710d3f938530649c60",
+      "parserVersion": 1,
+      "holdings": [],
+      "usd": null,
+      "strcRate": null,
+      "flows": [],
+      "issues": []
+    },
+    "0001050446-26-000047": {
+      "accession": "0001050446-26-000047",
+      "filedOn": "2026-10-29",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000105044626000047/mstr-20261026.htm",
+      "sha256": "4b98ee8386b00510be500284d9d72d2de889db34b2b0d8dfa8c85435e22eae48",
       "parserVersion": 1,
       "holdings": [],
       "usd": null,
