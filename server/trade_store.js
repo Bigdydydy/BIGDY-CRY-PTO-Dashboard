@@ -6,6 +6,9 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const RETENTION_DAYS = 60;
 const MAX_RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
+// Currencies whose archive was written by this process (see recordAndMergeTrades step 6)
+const persistedThisProcess = new Set();
+
 // In-memory trade cache by currency
 const memoryCache = new Map();
 
@@ -104,6 +107,7 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
 
   // 3. Merge new trades
   let newAddedCount = 0;
+  let enrichedCount = 0;
   for (const t of newTrades) {
     const key = getTradeKey(t);
     if (!tradeMap.has(key)) {
@@ -112,6 +116,7 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
     } else {
       // Update with any richer fields if present
       const old = tradeMap.get(key);
+      if (Object.keys(t).some(k => old[k] !== t[k] && JSON.stringify(old[k]) !== JSON.stringify(t[k]))) enrichedCount++;
       tradeMap.set(key, { ...old, ...t });
     }
   }
@@ -131,8 +136,15 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
   // 5. Sort chronologically descending (newest first)
   mergedList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-  // 6. Persist every verified merge, including empty polls (pruning / policy migration).
-  saveTradesToDisk(curKey, mergedList);
+  // 6. Persist the first verified merge of this process (retention-policy
+  // migration, even for an empty poll), then only when the archive actually
+  // changed (new legs, richer duplicates, pruning) — the 60-day file is
+  // several MB and polls run every 30 s.
+  const pruned = mergedList.length < tradeMap.size;
+  if (!persistedThisProcess.has(curKey) || newAddedCount > 0 || enrichedCount > 0 || pruned) {
+    saveTradesToDisk(curKey, mergedList);
+    persistedThisProcess.add(curKey);
+  }
   memoryCache.set(curKey, mergedList);
 
   // 7. Calculate stats

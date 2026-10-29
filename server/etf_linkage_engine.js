@@ -48,6 +48,9 @@ const isNonNegNum = v => isFiniteNum(v) && Number(v) >= 0;
 let memoryCache = null;
 let memoryCacheTime = 0;
 let inflight = null;
+// 构建失败后的冷却：期间直接返回旧缓存，不再每个请求都重跑整套 CoinGlass/CFTC 拉取
+const FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
+let lastFailureAt = 0;
 let diskSeeded = false;
 
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
@@ -761,8 +764,16 @@ async function doGetEtfLinkageData(basisSeries, force = false) {
       return withDataHealth(disk, REQUIRED_IDS, ANCILLARY_IDS);
     }
   }
+  if (!force && now - lastFailureAt < FAILURE_COOLDOWN_MS) {
+    const disk = memoryCache || readDiskCache();
+    if (disk) {
+      seedDiskOnce(disk);
+      return withDataHealth({ ...disk, stale: true }, REQUIRED_IDS, ANCILLARY_IDS);
+    }
+  }
   try {
     const data = await buildEtfLinkage(basisSeries);
+    lastFailureAt = 0;
     // Bind the accepted payload to its own health snapshot: a later sibling
     // fetch must never rejuvenate this copy's per-source clocks.
     const bound = withDataHealth(data, REQUIRED_IDS, ANCILLARY_IDS);
@@ -775,7 +786,8 @@ async function doGetEtfLinkageData(basisSeries, force = false) {
     }
     return bound;
   } catch (err) {
-    console.error('[EtfLinkage] Build failed, using stale cache:', err.message);
+    lastFailureAt = now;
+    console.error('[EtfLinkage] Build failed, using stale cache (retry after cooldown):', err.message);
     const disk = memoryCache || readDiskCache();
     if (disk) {
       seedDiskOnce(disk);

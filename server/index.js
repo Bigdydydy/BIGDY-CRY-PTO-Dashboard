@@ -115,6 +115,12 @@ const VOL_SURFACE_REQUIRED = [
 
 const DATA_UNAVAILABLE_TEXT = '数据过期或不可用，暂停当前研判';
 
+// /api/market-data 的整份结果按输入签名缓存：同一轮刷新内的重复请求 (多标签页、
+// 多访客、30 秒轮询) 共用一次全链计算与一次 gzip。签名覆盖刷新回执、数据版本、
+// 查询参数、Deribit 快照时间与各分析的健康状态；最长 60 秒强制重算。
+const MARKET_DATA_CACHE_MS = 60000;
+const marketDataCache = new Map(); // `${threshold}|${timeRange}` → { sig, at, entry }
+
 /**
  * Truthful replacement for a blocked analysis: the analyzer is never called,
  * conclusions are never emitted, and the raw historical input (if any) is kept
@@ -602,7 +608,12 @@ const MIME_TYPES = {
 /**
  * Send JSON response with ETag negotiation (304), Gzip/Deflate compression, and CORS headers
  */
-function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
+/**
+ * Serialize once into a reusable entry: body bytes + strong ETag, with the
+ * compressed variants filled in lazily by sendJsonResponse. Used for cached
+ * responses so repeated requests skip stringify / MD5 / gzip.
+ */
+function prepareJsonEntry(payload) {
   // Per-call derived ages on SOURCE-HEALTH objects (recognized by their own
   // policy/lastSuccessAt keys) are recomputed from lastSuccessAt/dataAsOf on
   // every request; keeping them off the wire lets byte-identical responses
@@ -618,9 +629,19 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
         return value;
       });
   const bodyBuffer = Buffer.from(jsonStr, 'utf8');
+  return {
+    __jsonEntry: true,
+    bodyBuffer,
+    // Compute strong MD5 ETag
+    etag: `"${crypto.createHash('md5').update(bodyBuffer).digest('hex')}"`,
+    gzip: null,
+    deflate: null
+  };
+}
 
-  // Compute strong MD5 ETag
-  const etag = `"${crypto.createHash('md5').update(bodyBuffer).digest('hex')}"`;
+function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
+  const entry = payload && payload.__jsonEntry ? payload : prepareJsonEntry(payload);
+  const { bodyBuffer, etag } = entry;
 
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
@@ -644,7 +665,7 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
   const acceptEncoding = (req && req.headers ? req.headers['accept-encoding'] : '') || '';
   if (acceptEncoding.includes('gzip')) {
     try {
-      const gzipped = zlib.gzipSync(bodyBuffer);
+      const gzipped = entry.gzip || (entry.gzip = zlib.gzipSync(bodyBuffer));
       headers['Content-Encoding'] = 'gzip';
       headers['Content-Length'] = gzipped.length;
       res.writeHead(statusCode, headers);
@@ -655,7 +676,7 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
     }
   } else if (acceptEncoding.includes('deflate')) {
     try {
-      const deflated = zlib.deflateSync(bodyBuffer);
+      const deflated = entry.deflate || (entry.deflate = zlib.deflateSync(bodyBuffer));
       headers['Content-Encoding'] = 'deflate';
       headers['Content-Length'] = deflated.length;
       res.writeHead(statusCode, headers);
@@ -722,6 +743,28 @@ async function handleApiRequest(req, res, parsedUrl) {
       }
       const allowed = key => analysisHealth[key].analysisAllowed;
 
+      // 拉取 Deribit 全链快照 (option_marks 自带 30s 缓存)，既用于提取各到期日 Black-76 远期价 F（喂给大宗 Greeks），又用于做市商敞口引擎
+      let marksSnapshot = null;
+      let marksErr = null;
+      try {
+        marksSnapshot = await getOptionMarks('BTC');
+      } catch (err) {
+        marksErr = err;
+      }
+
+      const cacheKey = `${thresholdParam}|${timeRangeParam}`;
+      const cacheSig = [
+        data.lastSyncCheckTime, data.dataVersion, data.lastSuccessAt,
+        marksSnapshot ? marksSnapshot.timestamp : 'no-marks',
+        new Date().toISOString().slice(0, 10),
+        Object.entries(analysisHealth).map(([k, h]) => `${k}:${h.state}:${h.analysisAllowed ? 1 : 0}`).join(',')
+      ].join('|');
+      const hit = marketDataCache.get(cacheKey);
+      if (hit && hit.sig === cacheSig && Date.now() - hit.at < MARKET_DATA_CACHE_MS) {
+        sendJsonResponse(req, res, 200, hit.entry);
+        return;
+      }
+
       // Filter trades from persistent 60-day store based on user-selected window
       const activeTrades = filterTradesByWindow(data.blockTrades, timeRangeParam);
 
@@ -756,14 +799,6 @@ async function handleApiRequest(req, res, parsedUrl) {
         })
         : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
 
-      // 拉取 Deribit 全链快照，既用于提取各到期日 Black-76 远期价 F（喂给大宗 Greeks），又用于做市商敞口引擎
-      let marksSnapshot = null;
-      let marksErr = null;
-      try {
-        marksSnapshot = await getOptionMarks('BTC');
-      } catch (err) {
-        marksErr = err;
-      }
       const forwardsByExpiry = buildForwardsMap(data.atmData, marksSnapshot);
       const liveSmile = smileAnalysis && smileAnalysis.status !== 'data_unavailable' && smileAnalysis.status !== 'insufficient_data' ? smileAnalysis : null;
       const liveSkew = skewAnalysis && skewAnalysis.status !== 'data_unavailable' && skewAnalysis.status !== 'insufficient_data' ? skewAnalysis : null;
@@ -845,7 +880,10 @@ async function handleApiRequest(req, res, parsedUrl) {
         volSurfaceHistory.recordSnapshot({ atm: atmAnalysis, smile: smileAnalysis, skew: skewAnalysis, spot: spotPrice });
       }
 
-      const termPremium = data.termPremium || null;
+      // The daily history (`series`, ~650KB) is served by /api/term-premium;
+      // market-data carries only the current snapshot to stay light.
+      const { series: _tpSeries, ...termPremiumCurrent } = data.termPremium || {};
+      const termPremium = data.termPremium ? { ...termPremiumCurrent, seriesOmitted: true } : null;
       const termPremiumOut = !termPremium
         ? null
         : (analysisHealth.termPremium.analysisAllowed
@@ -855,8 +893,8 @@ async function handleApiRequest(req, res, parsedUrl) {
             summaryText: DATA_UNAVAILABLE_TEXT,
             dataHealth: analysisHealth.termPremium,
             historicalOnly: true,
-            // Historical series stays browsable; current conclusions are withheld.
-            series: termPremium.series ?? null,
+            // Historical series stays browsable via /api/term-premium; current conclusions are withheld.
+            seriesOmitted: true,
             metadata: termPremium.metadata ?? null
           });
 
@@ -893,7 +931,10 @@ async function handleApiRequest(req, res, parsedUrl) {
         termPremium: termPremiumOut
       };
 
-      sendJsonResponse(req, res, 200, payload);
+      const entry = prepareJsonEntry(payload);
+      marketDataCache.set(cacheKey, { sig: cacheSig, at: Date.now(), entry });
+      if (marketDataCache.size > 24) marketDataCache.delete(marketDataCache.keys().next().value);
+      sendJsonResponse(req, res, 200, entry);
     } catch (err) {
       console.error('[API Error] market-data:', err);
       sendJsonResponse(req, res, 500, { code: -1, error: err.message });

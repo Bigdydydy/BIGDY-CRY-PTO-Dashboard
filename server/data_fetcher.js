@@ -507,6 +507,11 @@ function providerAsOf(candidateTs, receiptMs) {
   return { dataAsOf: new Date(ms).toISOString(), asOfKind: 'source', issues: [] };
 }
 
+// DVOL 统计是 2 年日线 + 120 天永续小时线 + 30 小时 DVOL，日内变化很慢：
+// 成功后 10 分钟内的刷新轮次直接沿用 (策略窗口 30 分钟预警，不受影响)。
+const DVOL_REFRESH_MS = 10 * 60 * 1000;
+let lastDvolSuccessMs = 0;
+
 async function doRefreshAllMarketData(currency) {
   const checkTime = new Date().toISOString();
   const attemptMs = Date.now();
@@ -523,6 +528,7 @@ async function doRefreshAllMarketData(currency) {
   for (const id of ['basis_live', 'basis_history', ...MARKET_SOURCE_IDS]) {
     prevReceipt[id] = getSourceHealth(id, attemptMs).lastSuccessAt || null;
   }
+  const dvolReused = !!dataCache.dvolStats && attemptMs - lastDvolSuccessMs < DVOL_REFRESH_MS;
   const [
     blockTradesRes,
     atmDataRes,
@@ -539,7 +545,9 @@ async function doRefreshAllMarketData(currency) {
     callSrc('greeks_iv_history', () => fetchGreeksDataLab('iv_history', { currency, gap: '1d' })),
     callSrc('greeks_skew', () => fetchGreeksDataLab('skew_chart', { currency, gap: '1d' })),
     callSrc('greeks_smile', () => fetchGreeksDataLab('iv_skew_month', { currency })),
-    callSrc('deribit_dvol', () => fetchDvolHistoricalStats(currency)),
+    dvolReused
+      ? Promise.resolve(dataCache.dvolStats)
+      : callSrc('deribit_dvol', () => fetchDvolHistoricalStats(currency)),
     // gold is leaf-instrumented: it records its own attempt/success/failure,
     // so no central attempt is recorded here.
     getGoldCorrelationData()
@@ -656,7 +664,9 @@ async function doRefreshAllMarketData(currency) {
   } else failSrc('greeks_smile', ivSkewMonthRes.reason);
 
   // --- deribit_dvol: latest chrono point; null payload is a failure.
-  if (dvolStatsRes.status === 'fulfilled') {
+  if (dvolReused) {
+    // reused within DVOL_REFRESH_MS: no new receipt, no new failure
+  } else if (dvolStatsRes.status === 'fulfilled') {
     const bad = validateDvolStats(dvolStatsRes.value);
     if (bad) failSrc('deribit_dvol', new Error(`dvol payload 校验失败: ${bad}`));
     else {
@@ -670,6 +680,7 @@ async function doRefreshAllMarketData(currency) {
       else {
         okSrc('deribit_dvol', asOf, 'deribit/volatility_index');
         dataCache.dvolStats = dvolStatsRes.value;
+        lastDvolSuccessMs = attemptMs;
       }
     }
   } else failSrc('deribit_dvol', dvolStatsRes.reason);
@@ -754,7 +765,9 @@ async function doRefreshAllMarketData(currency) {
     const h = getSourceHealth(id);
     return !!(h.lastSuccessAt && h.lastSuccessAt !== prevReceipt[id]);
   };
-  const liveRoundOk = [...MARKET_SOURCE_IDS, 'basis_live'].every(roundFreshOk);
+  // A DVOL round reused inside DVOL_REFRESH_MS is not a failure: its own
+  // health window still governs usability via healthNow below.
+  const liveRoundOk = [...MARKET_SOURCE_IDS.filter(id => !(dvolReused && id === 'deribit_dvol')), 'basis_live'].every(roundFreshOk);
   if (liveRoundOk && healthNow.analysisAllowed) dataCache.lastSuccessAt = completionIso;
 
   // Truthful summary: failure/degradation first, never "all verified" on failure.
@@ -810,5 +823,6 @@ module.exports = {
   recentChange,
   getCachedData,
   fetchBlockTrades,
-  MARKET_SOURCE_IDS
+  MARKET_SOURCE_IDS,
+  _internal: { expireDvolReuse: () => { lastDvolSuccessMs = 0; } }
 };

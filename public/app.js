@@ -676,11 +676,18 @@ function renderAll() {
   render25DeltaSkew(currentMarketData.delta25Skew);
   renderDealerExposure(currentMarketData.dealerExposure);
   renderBlockTrades(currentMarketData.blockTrades);
-  if (currentMarketData.termPremium) {
+  if (currentMarketData.termPremium && !currentMarketData.termPremium.seriesOmitted) {
     const shouldForce = !termPremiumChartInstance || !!(currentMarketData.syncStatus && currentMarketData.syncStatus.hasAnyUpdate);
     renderTermPremium(currentMarketData.termPremium, shouldForce);
   } else {
-    loadTermPremiumData();
+    // market-data 不再携带 ~650KB 的基差日线；完整数据走 /api/term-premium，
+    // 只在首次、模块可见时每分钟、否则每 10 分钟拉一次
+    const age = Date.now() - lastTermPremiumLoadAt;
+    const visible = currentActiveView === 'view-term-premium' || currentActiveView === 'view-all';
+    if (!termPremiumChartInstance || age > (visible ? 60000 : 600000)) {
+      lastTermPremiumLoadAt = Date.now();
+      loadTermPremiumData();
+    }
   }
 
   if (currentMarketData.goldCorrelation) {
@@ -2919,9 +2926,16 @@ btnTabSingles.addEventListener('click', () => {
   contentIcebergs.classList.add('hidden');
 });
 
-// Auto-refresh every 30 seconds while the page is visible; catch up as soon as it is shown again.
+// Auto-refresh while the page is visible: every 30 s on views that render market-data,
+// every 2 min elsewhere (header price / sync status only); catch up as soon as it is shown again.
+const MARKET_DATA_VIEWS = ['view-options', 'view-block-trades', 'view-term-premium', 'view-all'];
+let lastMarketDataPollAt = Date.now();
 setInterval(() => {
-  if (!document.hidden) loadMarketData(false);
+  if (document.hidden) return;
+  const interval = MARKET_DATA_VIEWS.includes(currentActiveView) ? 30000 : 120000;
+  if (Date.now() - lastMarketDataPollAt < interval - 1000) return;
+  lastMarketDataPollAt = Date.now();
+  loadMarketData(false);
 }, 30000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadMarketData(false);
@@ -4428,8 +4442,10 @@ const elTpInsightsList = document.getElementById('tp-insights-list');
 const elTpEcharts = document.getElementById('term-premium-echarts');
 const tpTimeframeSelector = document.getElementById('tp-timeframe-selector');
 
+let lastTermPremiumLoadAt = 0;
+
 /**
- * Fallback independent fetcher for Term Premium
+ * Independent fetcher for Term Premium (market-data omits the daily history)
  */
 async function loadTermPremiumData() {
   try {

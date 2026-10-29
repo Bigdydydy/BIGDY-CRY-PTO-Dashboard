@@ -56,10 +56,11 @@ const KEY_FOR = [
  * `shared` is read live at call time so tests can flip routes mid-scenario.
  */
 function loadFetcher(shared = {}) {
-  const s = Object.assign({ routes: goodRoutes(), goldMode: 'fresh', tpMode: 'live', calls: 0 }, shared);
+  const s = Object.assign({ routes: goodRoutes(), goldMode: 'fresh', tpMode: 'live', calls: 0, dvolCalls: 0 }, shared);
   stubModule('http_client.js', {
     fetchWithTimeout: async (url) => {
       s.calls++;
+      if (url.includes('get_volatility_index_data')) s.dvolCalls++;
       const hit = KEY_FOR.find(([frag]) => url.includes(frag));
       if (!hit) throw new Error(`unexpected url: ${url}`);
       const v = s.routes[hit[1]];
@@ -219,6 +220,7 @@ test('good then bad refresh: cache kept byte-identical, clocks never promoted', 
   shared.routes = Object.fromEntries(Object.keys(goodRoutes()).map(k => [k, 'fail']));
   shared.goldMode = 'fail';
   shared.tpMode = 'fail';
+  df._internal.expireDvolReuse(); // DVOL is reused for 10 min; force a real round
   const r2 = await df.refreshAllMarketData('BTC');
   assert.equal(r2.hasAnyUpdate, false);
   const c2 = df.getCachedData();
@@ -238,6 +240,18 @@ test('good then bad refresh: cache kept byte-identical, clocks never promoted', 
   }
   assert.deepEqual(r2.dataHealth.blockedSources, []);
   assert.ok(r2.dataHealth.sources.basis_history.usable, 'disk archive stays usable within its window');
+});
+
+test('DVOL stats are reused inside the 10-minute window: no refetch, no failure, batch success still advances', async () => {
+  const { df, shared } = loadFetcher();
+  await df.refreshAllMarketData('BTC');
+  const callsAfterFirst = shared.dvolCalls;
+  const r2 = await df.refreshAllMarketData('BTC');
+  assert.ok(!r2.dataHealth.failedSources.includes('deribit_dvol'));
+  assert.equal(r2.dataHealth.sources.deribit_dvol.state, 'OK');
+  assert.ok(callsAfterFirst > 0, 'first round fetched DVOL');
+  assert.equal(shared.dvolCalls, callsAfterFirst, 'no DVOL refetch inside the window');
+  assert.ok(df.getCachedData().lastSuccessAt, 'batch success time is set');
 });
 
 test('recovery: source returns to OK and error cleared after a failed round', async () => {
