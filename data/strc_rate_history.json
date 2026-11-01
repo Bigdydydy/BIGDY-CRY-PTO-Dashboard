@@ -159,6 +159,16 @@
       "inferred": false,
       "conditional": false,
       "observedAt": "2026-10-21T05:49:10.056Z"
+    },
+    "2026-11": {
+      "ratePct": 12,
+      "effectiveFrom": "2026-11-01",
+      "source": "sec_8k",
+      "documentUrl": "https://www.sec.gov/Archives/edgar/data/1050446/000119312526423400/mstr-20261015.htm",
+      "accession": "0001193125-26-423400",
+      "inferred": false,
+      "conditional": true,
+      "observedAt": "2026-11-01T06:28:39.080Z"
     }
   }
 }
