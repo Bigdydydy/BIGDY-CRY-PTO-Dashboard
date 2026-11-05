@@ -79,13 +79,34 @@ describe('liquidity history recorder', () => {
 });
 
 describe('liquidity history indicators', () => {
-  test('resilience score is 100bps depth over 24h volume x100', () => {
+  test('resilience score is 100bps depth over 7-day mean 24h volume x100', () => {
     const view = h.buildHistoryView(series(2, () => ({ d100: 74, vol24: 1000 })), { now: T0 + 2 * HOUR });
     assert.strictEqual(view.series[0].score, 7.4);
     assert.strictEqual(view.indicators.resilience.ma7, 7.4);
     assert.strictEqual(view.thresholds, null);
     assert.strictEqual(view.indicators.resilience.zone, null);
     assert.strictEqual(view.indicators.withdrawal.code, 'INSUFFICIENT');
+  });
+
+  test('a weekly volume cycle does not move the score, only the raw one', () => {
+    const weekly = [130, 300, 420, 450, 580, 530, 350]; // Sun..Sat
+    const hours = 28 * 24;
+    const samples = series(hours, i => ({ vol24: weekly[new Date(T0 + i * HOUR).getUTCDay()] }));
+    const rows = h.buildHistoryView(samples, { now: T0 + hours * HOUR }).series.filter(r => r.ts >= T0 + 7 * DAY);
+    const spread = f => Math.max(...rows.map(f)) / Math.min(...rows.map(f));
+    assert.ok(spread(r => r.scoreRaw) > 4);
+    assert.ok(spread(r => r.score) < 1.01);
+    assert.ok(spread(r => r.scoreMa7) < 1.01);
+  });
+
+  test('7D score is mean depth over mean volume, so one thin Sunday cannot dominate it', () => {
+    const hours = 7 * 24;
+    // 周日成交额 100，其余 6 天 800：比值的均值会被周日拉高，均值的比值不会
+    const samples = series(hours, i => ({ d100: 40, vol24: i < 24 ? 100 : 800 }));
+    const r = h.buildHistoryView(samples, { now: T0 + hours * HOUR }).indicators.resilience;
+    assert.strictEqual(r.volMa7, 700);
+    assert.strictEqual(r.ma7, 5.71);
+    assert.strictEqual(r.rawMa7, 10);
   });
 
   test('parallel collapse of all three tiers is classified as wholesale withdrawal', () => {
@@ -122,21 +143,31 @@ describe('liquidity history indicators', () => {
     assert.strictEqual(ind.resilience.inflated, true);
   });
 
-  test('thresholds come only from Coinbase daily score quartiles', () => {
+  test('thresholds are quartiles of the 7D score over days with a complete window', () => {
     // 第 d 天的评分 = (50 + (d % 10) * 5) / 1000 * 100
     const build = days => series(days * 24, i => ({ d100: 50 + (Math.floor(i / 24) % 10) * 5 }));
 
-    assert.strictEqual(h.buildHistoryView(build(6), { now: T0 + 6 * DAY }).thresholds, null);
+    // 窗口第 7 天才填满，前 6 天不计入
+    assert.strictEqual(h.buildHistoryView(build(12), { now: T0 + 12 * DAY }).thresholds, null);
 
-    const early = h.buildHistoryView(build(8), { now: T0 + 8 * DAY }).thresholds;
-    assert.strictEqual(early.days, 8);
+    const early = h.buildHistoryView(build(13), { now: T0 + 13 * DAY }).thresholds;
+    assert.strictEqual(early.days, 7);
     assert.strictEqual(early.provisional, true);
 
-    const full = h.buildHistoryView(build(31), { now: T0 + 31 * DAY });
+    const full = h.buildHistoryView(build(36), { now: T0 + 36 * DAY });
     assert.strictEqual(full.thresholds.provisional, false);
     assert.ok(full.thresholds.high > full.thresholds.low);
     assert.ok(full.thresholds.low >= 5 && full.thresholds.high <= 9.5);
     assert.ok(full.indicators.resilience.zone);
+  });
+
+  test('zone is withheld when an outage leaves the 7-day window short of a full week', () => {
+    const days = 40;
+    const samples = series(days * 24, i => ({ d100: 50 + (Math.floor(i / 24) % 10) * 5 }))
+      .filter(s => s.ts < T0 + (days - 3) * DAY || s.ts >= T0 + (days - 1) * DAY);
+    const view = h.buildHistoryView(samples, { now: T0 + days * DAY });
+    assert.ok(view.thresholds);
+    assert.strictEqual(view.indicators.resilience.zone, null);
   });
 
   test('range trims chart series but moving averages use full history', () => {

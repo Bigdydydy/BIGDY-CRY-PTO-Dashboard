@@ -7200,8 +7200,11 @@ const elCbHistoryEcharts = document.getElementById('cb-history-echarts');
 const elCbHistoryKpis = document.getElementById('cb-history-kpis');
 const elCbHistoryNotice = document.getElementById('cb-history-notice');
 
-const CB_TIER_COLORS = { d10: '#f59e0b', d50: '#38bdf8', d100: '#a855f7' };
-const CB_SCORE_COLOR = '#14b8a6';
+// 经 dataviz 校验器逐模式取色；天蓝/紫的色盲分离处于 6–8 区间，靠线尾直接标注兜底
+const cbTierColors = isLight => (isLight
+  ? { d10: '#b45309', d50: '#0284c7', d100: '#9333ea' }
+  : { d10: '#d97706', d50: '#0c98da', d100: '#a855f7' });
+const cbScoreColor = isLight => (isLight ? '#0f766e' : '#14b8a6');
 
 async function fetchCbLiquidityHistory(force = false) {
   if (!force && rawCbHistory && Date.now() - cbHistoryLastFetch < CB_HISTORY_REFRESH_MS) return;
@@ -7248,17 +7251,17 @@ function renderCbHistory(data) {
       elCbHistoryNotice.textContent = '档案刚开始记录，第一个小时样本写入后这里会出现曲线。';
     } else if (!th) {
       elCbHistoryNotice.hidden = false;
-      elCbHistoryNotice.textContent = `已累积 ${cov.samples} 个小时样本${days >= 1 ? `（约 ${days} 天）` : ''}。韧性阈值、7 日基线、峰值回撤与止损预警需满 7 天 Coinbase 数据后生效。`;
+      elCbHistoryNotice.textContent = `已累积 ${cov.samples} 个小时样本${days >= 1 ? `（约 ${days} 天）` : ''}。7 日基线、峰值回撤与止损预警需满 7 天生效；韧性阈值只统计 7 日窗口完整的日子，需约 14 天。`;
     } else if (th.provisional) {
       elCbHistoryNotice.hidden = false;
-      elCbHistoryNotice.textContent = `韧性阈值由 ${th.days} 个有效日的 Coinbase 数据算出，满 30 天前为暂定值，会随样本增加而移动。`;
+      elCbHistoryNotice.textContent = `韧性阈值由 ${th.days} 个有效日算出，满 30 个有效日前为暂定值，会随样本增加而移动。`;
     } else {
       elCbHistoryNotice.hidden = true;
     }
   }
 
   if (elCbHistoryKpis) {
-    elCbHistoryKpis.innerHTML = ind ? buildCbHistoryKpis(ind, data.thresholds) : '';
+    elCbHistoryKpis.innerHTML = ind ? buildCbHistoryKpis(ind, data.thresholds, cbTierColors(getChartThemeColors().isLight)) : '';
   }
 
   renderCbHistoryChart(data);
@@ -7276,46 +7279,72 @@ function renderCbHistory(data) {
   }
 }
 
-function buildCbHistoryKpis(ind, th) {
+/** 当前评分在枯竭 / 常态 / 充裕三段上的位置 */
+function buildCbZoneGauge(value, th) {
+  if (!th || !Number.isFinite(value)) return '';
+  const lo = Math.min(value, th.low);
+  const hi = Math.max(value, th.high);
+  const pad = (hi - lo) * 0.2;
+  const at = v => (((v - (lo - pad)) / (hi - lo + 2 * pad)) * 100).toFixed(1);
+  return `
+    <div class="cb-gauge" role="img" aria-label="当前 ${value.toFixed(2)}，枯竭线 ${th.low}，充裕线 ${th.high}">
+      <span class="cb-gauge-low" style="width:${at(th.low)}%"></span>
+      <span class="cb-gauge-high" style="left:${at(th.high)}%"></span>
+      <i style="left:${at(value)}%"></i>
+    </div>
+    <div class="cb-gauge-scale">
+      <span style="left:${at(th.low)}%">枯竭 ${th.low}</span>
+      <span style="left:${at(th.high)}%">充裕 ${th.high}</span>
+    </div>`;
+}
+
+function buildCbHistoryKpis(ind, th, tierColors) {
   const r = ind.resilience || {};
   const zone = r.zone || {};
   const w = ind.withdrawal || {};
   const vs = ind.vsBaseline7d || {};
   const slip = ind.slippage10m || {};
   const peak = ind.peak;
+  const d100Ma7 = ind.depthMa7?.d100;
   const thText = th
-    ? `阈值 ${th.high} / ${th.low}（Coinbase ${th.days} 日四分位${th.provisional ? ' · 暂定' : ''}）`
-    : '阈值累积中（需 7 天）';
+    ? `${th.days} 日四分位${th.provisional ? ' · 暂定' : ''}`
+    : '阈值累积中（约需 14 天）';
 
-  const tile = (label, value, sub, color) => `
-    <div class="cb-hk">
+  const tile = (label, value, sub, color, extra = '') => `
+    <div class="cb-hk${extra ? ' cb-hk-hero' : ''}">
       <span class="cb-hk-lbl">${label}</span>
       <span class="cb-hk-val" style="color:${color || 'var(--text-primary)'}">${value}</span>
+      ${extra}
       <span class="cb-hk-sub">${sub}</span>
     </div>`;
 
+  const tierRow = (key, label, chg) => `
+    <span class="cb-hk-tier"><i style="background:${tierColors[key]}"></i>${label}<b>${fmtSignedPct(chg)}</b></span>`;
+
+  const scoreValue = Number.isFinite(r.ma7) ? r.ma7.toFixed(2) : '--';
   const tiles = [
     tile('韧性评分 · 7D',
-      Number.isFinite(r.ma7) ? r.ma7.toFixed(2) : '--',
-      zone.label ? `${escapeHtml(zone.label)} · ${thText}` : thText,
-      cbSeverityColor(zone.severity)),
+      zone.label ? `${scoreValue}<em class="cb-hk-pill">${escapeHtml(zone.label)}</em>` : scoreValue,
+      `7 日均深度 ${Number.isFinite(d100Ma7) ? `$${d100Ma7.toFixed(1)}M` : '--'} ÷ 7 日均成交额 ${Number.isFinite(r.volMa7) ? `$${Math.round(r.volMa7)}M` : '--'} · ${thText}`,
+      cbSeverityColor(zone.severity),
+      buildCbZoneGauge(r.ma7, th) || '<div class="cb-gauge-empty"></div>'),
     tile('阶梯形态 · 对比 7 日基线',
       escapeHtml(w.label || '--'),
-      `10 / 50 / 100 bps：${fmtSignedPct(vs.d10)} / ${fmtSignedPct(vs.d50)} / ${fmtSignedPct(vs.d100)}`,
+      tierRow('d10', '10 bps', vs.d10) + tierRow('d50', '50 bps', vs.d50) + tierRow('d100', '100 bps', vs.d100),
       cbSeverityColor(w.severity)),
     tile('10 bps 深度',
       Number.isFinite(ind.depthNow?.d10) ? `$${ind.depthNow.d10.toFixed(2)}M` : '--',
-      `48h ${fmtSignedPct(ind.change48h)}${peak ? ` · 较 ${peak.date.slice(5)} 峰值 $${peak.d10}M ${fmtSignedPct(peak.drawdownPct)}` : ''}`,
+      `48h ${fmtSignedPct(ind.change48h)}${peak ? `<br>较 ${peak.date.slice(5)} 峰值 $${peak.d10.toFixed(2)}M ${fmtSignedPct(peak.drawdownPct)}` : ''}`,
       Number.isFinite(ind.change48h) && ind.change48h <= -30 ? '#f43f5e' : null),
     tile('$10M 市价卖出滑点',
       Number.isFinite(slip.nowBps) ? `${slip.nowBps.toFixed(1)} bps` : '--',
-      Number.isFinite(slip.excessPct) ? `较 30 日中位 ${slip.median30dBps} bps ${fmtSignedPct(slip.excessPct)}` : '30 日中位数累积中',
+      Number.isFinite(slip.excessPct) ? `30 日中位 ${slip.median30dBps} bps<br>当前 ${fmtSignedPct(slip.excessPct)}` : '30 日中位数累积中',
       Number.isFinite(slip.excessPct) && slip.excessPct >= 20 ? '#f59e0b' : null)
   ];
 
   const flags = [];
   if (r.inflated) {
-    flags.push(`评分虚高：7 日内评分 ${fmtSignedPct(r.chg7dPct)}，但 100 bps 深度 ${fmtSignedPct(r.depthChg7dPct)}——是成交缩量抬高了评分，不是深度修复。`);
+    flags.push(`评分虚高：7 日内评分 ${fmtSignedPct(r.chg7dPct)}，但 100 bps 深度 ${fmtSignedPct(r.depthChg7dPct)}——是 7 日均成交额萎缩抬高了评分，不是深度修复。`);
   }
   if (ind.stopLoss?.caution) {
     flags.push(`止损失灵预警：10 bps 深度处于历史第 ${ind.stopLoss.d10Pctl}% 分位，成交额处于第 ${ind.stopLoss.volPctl}% 分位。市价止损易劣后成交，宜用期权做确定性保护。`);
@@ -7436,22 +7465,24 @@ function buildCbSessionCompare(series) {
     score: cbMedian(rows.map(r => r.score))
   });
   const st = { us: stat(groups.us), off: stat(groups.off), closed: stat(groups.closed) };
-  const money = v => (Number.isFinite(v) ? `$${v.toFixed(2)}M` : '--');
+  const money = v => `$${v.toFixed(2)}M`;
   // higherIsBetter=false for slippage: a larger value is worse liquidity
-  const diff = (v, base, higherIsBetter = true) => (Number.isFinite(v) && Number.isFinite(base) && base > 0
-    ? ` <span style="color:${(v >= base) === higherIsBetter ? '#10b981' : '#f43f5e'};">${fmtSignedPct((v / base - 1) * 100)}</span>` : '');
-  const col = (key, title, sub) => {
-    const s = st[key];
-    const base = key === 'us' ? null : st.us;
-    return `<div class="cb-sess-col cb-sess-${key}">
-      <div class="cb-sess-title">${title}<span>${sub} · ${s.n} 小时</span></div>
-      <div class="cb-sess-row"><span>10 bps</span><b>${money(s.d10)}${base ? diff(s.d10, base.d10) : ''}</b></div>
-      <div class="cb-sess-row"><span>50 bps</span><b>${money(s.d50)}${base ? diff(s.d50, base.d50) : ''}</b></div>
-      <div class="cb-sess-row"><span>100 bps</span><b>${money(s.d100)}${base ? diff(s.d100, base.d100) : ''}</b></div>
-      <div class="cb-sess-row"><span>$10M 卖出滑点</span><b>${Number.isFinite(s.s10) ? `${s.s10.toFixed(1)} bps` : '--'}${base ? diff(s.s10, base.s10, false) : ''}</b></div>
-      <div class="cb-sess-row"><span>韧性评分${key === 'closed' ? '*' : ''}</span><b>${Number.isFinite(s.score) ? s.score.toFixed(2) : '--'}</b></div>
-    </div>`;
-  };
+  const diff = (v, base, higherIsBetter) => (Number.isFinite(v) && Number.isFinite(base) && base > 0
+    ? `<span class="cb-sess-delta" style="color:${(v >= base) === higherIsBetter ? '#10b981' : '#f43f5e'};">${fmtSignedPct((v / base - 1) * 100)}</span>` : '');
+  const metrics = [
+    ['10 bps 深度', 'd10', money, true],
+    ['50 bps 深度', 'd50', money, true],
+    ['100 bps 深度', 'd100', money, true],
+    ['$10M 卖出滑点', 's10', v => `${v.toFixed(1)} bps`, false],
+    ['韧性评分（小时）', 'score', v => v.toFixed(2), true]
+  ];
+  const rows = metrics.map(([label, key, fmt, better]) => `<tr>
+      <th scope="row">${label}</th>
+      ${['us', 'off', 'closed'].map(c => {
+        const v = st[c][key];
+        return `<td class="cb-sess-${c}">${Number.isFinite(v) ? fmt(v) : '--'}${c === 'us' ? '' : diff(v, st.us[key], better)}</td>`;
+      }).join('')}
+    </tr>`).join('');
   // 当前所处的夏/冬令时，以及换算成 UTC+8 的开收盘时刻
   const now = Date.now();
   const nowP = nyParts(now);
@@ -7460,15 +7491,15 @@ function buildCbSessionCompare(series) {
   const dstNow = nyOffsetMinutes(now) === -240;
   const switches = sessions.filter((s, i) => i > 0 && s.dst !== sessions[i - 1].dst);
   const switchNote = switches.length
-    ? ` · 区间内含夏/冬令时切换（${switches.map(s => `${s.date} 起${s.dst ? '夏令时' : '冬令时'}`).join('，')}），高亮按每日实际时刻绘制`
+    ? ` · 区间内 ${switches.map(s => `${s.date} 起${s.dst ? '夏令时' : '冬令时'}`).join('，')}，高亮按每日实际时刻绘制`
     : '';
-  return `<div class="cb-sess-head">美股常规交易时段（NYSE 09:30–16:00 纽约时间）当前为<b>${dstNow ? '夏令时' : '冬令时'}</b>，对应 UTC+8 <b>${fmtUtc8Hm(todayOpen)}–${fmtUtc8Hm(todayClose)}</b>（次日）${switchNote}。各列为中位数，非美股列的百分比为相对美股时段的差异。</div>
-    <div class="cb-sess-grid">
-      ${col('us', '美股交易时段', '图中浅色背景')}
-      ${col('off', '工作日盘外', '亚洲 / 欧洲时段')}
-      ${col('closed', '周末与休市', '美股不开盘')}
-    </div>
-    <div class="cb-sess-note">* 韧性评分 = 100 bps 深度 ÷ 24h 成交额，周末成交额低会把评分抬高，跨时段比较请以深度和滑点为准。</div>`;
+  const colHead = (key, title, sub) => `<th scope="col" class="cb-sess-${key}">${title}<span>${sub} · ${st[key].n} 小时</span></th>`;
+  return `<div class="cb-sess-head"><b>分时段对比</b><span>美股当前${dstNow ? '夏令时' : '冬令时'}，常规时段对应 UTC+8 ${fmtUtc8Hm(todayOpen)}–${fmtUtc8Hm(todayClose)}（次日）${switchNote}</span></div>
+    <div class="cb-sess-wrap"><table class="cb-sess-table">
+      <thead><tr><th scope="col">中位数</th>${colHead('us', '美股交易时段', '图中浅色背景')}${colHead('off', '工作日盘外', '亚 / 欧时段')}${colHead('closed', '周末与休市', '美股不开盘')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="cb-sess-note">百分比为相对美股时段的差异，绿色更好、红色更差。</div>`;
 }
 
 /**
@@ -7484,6 +7515,23 @@ function cbWithGaps(series, pick) {
   return out;
 }
 
+/** 尾随 24 小时均值 (按时间窗)，返回 ts → 均值 */
+function cbTrailing24h(series, field) {
+  const out = new Map();
+  let start = 0;
+  let sum = 0;
+  let cnt = 0;
+  for (const s of series) {
+    if (Number.isFinite(s[field])) { sum += s[field]; cnt++; }
+    while (series[start].ts <= s.ts - 86400000) {
+      if (Number.isFinite(series[start][field])) { sum -= series[start][field]; cnt--; }
+      start++;
+    }
+    out.set(s.ts, cnt > 0 ? sum / cnt : null);
+  }
+  return out;
+}
+
 function renderCbHistoryChart(data) {
   if (!elCbHistoryEcharts || !data) return;
   if (elCbHistoryEcharts.offsetWidth === 0) return; // 视图隐藏时跳过，切回时再画
@@ -7493,47 +7541,113 @@ function renderCbHistoryChart(data) {
   }
 
   const colors = getChartThemeColors();
+  const tierColors = cbTierColors(colors.isLight);
+  const scoreColor = cbScoreColor(colors.isLight);
   const series = data.series || [];
   const th = data.thresholds;
   const mono = { fontFamily: 'JetBrains Mono', fontSize: 10 };
-  const gridTop = elCbHistoryEcharts.offsetWidth < 560 ? 54 : 30; // 窄屏图例换两行
+  const narrow = elCbHistoryEcharts.offsetWidth < 560;
 
-  // 美股常规交易时段背景 (两个面板各一份，图例里可整体开关)
+  // 三个面板共用时间轴：评分 / 深度 / 价格各用自己的纵轴，不在同一面板叠双轴
+  const left = narrow ? 44 : 56;
+  const right = narrow ? 50 : 96;
+  const legendH = narrow ? 44 : 26;
+  const titleH = 18;
+  const gap = 6;
+  const footH = 52; // 时间轴标签 + 缩放条
+  const plotH = elCbHistoryEcharts.offsetHeight - legendH - footH - 3 * titleH - 2 * gap;
+  const heights = [plotH * 0.3, plotH * 0.5, plotH * 0.2];
+  const tops = [
+    legendH + titleH,
+    legendH + 2 * titleH + gap + heights[0],
+    legendH + 3 * titleH + 2 * gap + heights[0] + heights[1]
+  ];
+  const panelTitle = (i, text) => ({
+    text, left, top: tops[i] - titleH + 1,
+    textStyle: { color: colors.tickColor, fontSize: 11, fontWeight: 500 }
+  });
+
+  // 美股常规交易时段背景 (只画在深度面板：它只影响深度，不影响 7D 评分)
   const usSessions = series.length ? usSessionsBetween(series[0].ts, series[series.length - 1].ts + 3600000) : [];
-  const sessionShade = gridIdx => ({
+  const sessionShade = {
     name: '美股交易时段',
     type: 'line',
-    xAxisIndex: gridIdx,
-    yAxisIndex: gridIdx === 0 ? 0 : 2,
+    xAxisIndex: 1,
+    yAxisIndex: 1,
     data: [],
     silent: true,
     itemStyle: { color: 'rgba(56, 189, 248, 0.5)' },
     markArea: {
       silent: true,
-      itemStyle: { color: colors.isLight ? 'rgba(56, 189, 248, 0.10)' : 'rgba(56, 189, 248, 0.08)' },
+      itemStyle: { color: colors.isLight ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.09)' },
       data: usSessions.map(s => [{ xAxis: s.open }, { xAxis: s.close }])
     }
-  });
+  };
 
-  const line = (name, field, color, width = 1.6) => ({
-    name,
-    type: 'line',
-    xAxisIndex: 0,
-    yAxisIndex: 0,
-    showSymbol: series.length < 3,
-    symbolSize: 5,
-    connectNulls: false,
-    data: cbWithGaps(series, s => s[field]),
-    lineStyle: { width, color },
-    itemStyle: { color }
-  });
+  // 每档两条同名线：淡的小时值 + 实的 24h 均值，图例一起开关
+  const fmtDepth = v => `$${v.toFixed(v < 10 ? 1 : 0)}M`;
+  const tierLines = (name, field, width = 2) => {
+    const color = tierColors[field];
+    const ma24 = cbTrailing24h(series, field);
+    return [
+      {
+        name, type: 'line', xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, silent: true,
+        data: cbWithGaps(series, s => s[field]),
+        lineStyle: { width: 1, color, opacity: 0.22 },
+        itemStyle: { color }
+      },
+      {
+        name, type: 'line', xAxisIndex: 1, yAxisIndex: 1,
+        showSymbol: series.length < 3, symbolSize: 5,
+        data: cbWithGaps(series, s => ma24.get(s.ts)),
+        lineStyle: { width, color },
+        itemStyle: { color },
+        labelLayout: { moveOverlap: 'shiftY' },
+        endLabel: {
+          show: true,
+          color: colors.tickColor,
+          ...mono,
+          formatter: p => (Number.isFinite(p.value[1]) ? (narrow ? fmtDepth(p.value[1]) : `${name} ${fmtDepth(p.value[1])}`) : '')
+        }
+      }
+    ];
+  };
+
+  // 窗口未覆盖完整一周的小时不画：缺了周末的分母不可比
+  const scoreOf = s => (s.scoreFullWeek ? s.scoreMa7 : null);
+  const rawOf = s => (s.scoreFullWeek ? s.scoreRawMa7 : null);
+  // 纵轴跟随可见曲线并始终露出两条阈值；色带上下界故意取大，由坐标系裁到面板边缘
+  const scoreAxisMin = ({ min }) => Math.max(0, Math.floor(Math.min(min, th ? th.low : min) - 0.5));
+  const scoreAxisMax = ({ max }) => Math.ceil(Math.max(max, th ? th.high : max) + 0.5);
+  const zoneBand = (from, to, color, label, position) => [
+    {
+      yAxis: from,
+      itemStyle: { color },
+      label: { show: true, position, color: colors.tickColor, fontSize: 10, formatter: label }
+    },
+    { yAxis: to }
+  ];
+
+  const spanDays = series.length ? (series[series.length - 1].ts - series[0].ts) / 86400000 : 0;
+  const sameRange = cbHistoryZoomRange === cbHistoryRange;
+  const legendSelected = {
+    '原口径 7D': false,
+    '美股交易时段': spanDays <= 45, // 更长的区间里日内色带只剩一片梳齿
+    ...(sameRange ? cbHistoryChartInstance.getOption()?.legend?.[0]?.selected : null)
+  };
 
   const option = {
     backgroundColor: 'transparent',
     animation: false,
+    title: [
+      panelTitle(0, '韧性评分 · 7 日均深度 ÷ 7 日均成交额'),
+      panelTitle(1, narrow ? '三档双边深度 · 对数轴' : '三档双边深度 · 对数轴（实线 24h 均值，淡线小时值）'),
+      panelTitle(2, 'BTC 中间价')
+    ],
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross', label: { backgroundColor: colors.axisPointerBg } },
+      confine: true,
+      axisPointer: { type: 'cross', label: { backgroundColor: colors.axisPointerBg, precision: 2 } },
       backgroundColor: colors.tooltipBg,
       borderColor: colors.tooltipBorder,
       textStyle: { color: colors.tooltipText, fontFamily: 'JetBrains Mono', fontSize: 11 },
@@ -7543,18 +7657,21 @@ function renderCbHistoryChart(data) {
         const row = series.find(s => s.ts === ts);
         if (!row) return '';
         const t = new Date(ts).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        const rowHtml = (label, val, color) =>
-          `<div style="display:flex;justify-content:space-between;gap:18px;"><span style="color:${color};">${label}</span><span style="font-weight:600;">${val}</span></div>`;
+        const rowHtml = (label, val, swatch) =>
+          `<div style="display:flex;justify-content:space-between;gap:18px;"><span>${swatch ? `<i style="display:inline-block;width:8px;height:2px;margin-right:5px;vertical-align:middle;background:${swatch};"></i>` : ''}${label}</span><span style="font-weight:600;">${val}</span></div>`;
+        const fmtTip = v => (Number.isFinite(v) ? `$${v.toFixed(2)}M` : '--');
         const sess = cbSessionOf(ts, usSessions);
         const sessColor = sess.code === 'us' ? '#38bdf8' : colors.tickColor;
         return `<div style="font-weight:700;margin-bottom:4px;color:${colors.tooltipTitle};">${t} (UTC+8) · ${row.n} 次快照</div>` +
           `<div style="margin-bottom:4px;color:${sessColor};">${sess.label}${sess.session ? ` · ${fmtUtc8Hm(sess.session.open)}–${fmtUtc8Hm(sess.session.close)}` : ''}</div>` +
-          rowHtml('10 bps', `$${row.d10}M（时内低点 $${row.d10min}M）`, CB_TIER_COLORS.d10) +
-          rowHtml('50 bps', `$${row.d50}M`, CB_TIER_COLORS.d50) +
-          rowHtml('100 bps', `$${row.d100}M`, CB_TIER_COLORS.d100) +
-          rowHtml('金字塔 100/10', row.d10 ? `${(row.d100 / row.d10).toFixed(2)}x` : '--', colors.tooltipText) +
-          rowHtml('韧性评分 / 7D', `${row.score ?? '--'} / ${row.scoreMa7 ?? '--'}`, CB_SCORE_COLOR) +
-          rowHtml('中间价', `$${Math.round(row.mid).toLocaleString()}`, colors.tickColor);
+          rowHtml('韧性评分 7D / 小时', `${row.scoreMa7 ?? '--'} / ${row.score ?? '--'}`, scoreColor) +
+          rowHtml('原口径 7D / 小时', `${row.scoreRawMa7 ?? '--'} / ${row.scoreRaw ?? '--'}`, colors.tickColor) +
+          rowHtml('10 bps', `${fmtTip(row.d10)}（时内低点 ${fmtTip(row.d10min)}）`, tierColors.d10) +
+          rowHtml('50 bps', fmtTip(row.d50), tierColors.d50) +
+          rowHtml('100 bps', fmtTip(row.d100), tierColors.d100) +
+          rowHtml('金字塔 100/10', row.d10 ? `${(row.d100 / row.d10).toFixed(2)}x` : '--') +
+          rowHtml('成交额 24h / 7 日均', `$${row.vol24 != null ? Math.round(row.vol24) : '--'}M / $${row.volMa7 != null ? Math.round(row.volMa7) : '--'}M`) +
+          rowHtml('中间价', `$${Math.round(row.mid).toLocaleString()}`);
       }
     },
     legend: {
@@ -7562,75 +7679,83 @@ function renderCbHistoryChart(data) {
       left: 0,
       itemWidth: 14,
       itemHeight: 2,
-      textStyle: { color: colors.tickColor, fontSize: 10 },
-      data: ['10 bps', '50 bps', '100 bps', 'BTC 中间价', '韧性评分 7D', '韧性评分 (小时)', '美股交易时段']
+      textStyle: { color: colors.tickColor, fontSize: 11 },
+      inactiveColor: colors.isLight ? '#c4c4bd' : '#52525b', // 默认 #ccc 在夜间比启用项还亮
+      selected: legendSelected,
+      data: ['韧性评分 7D', '原口径 7D', '10 bps', '50 bps', '100 bps', '美股交易时段']
     },
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
-    grid: [
-      { left: 56, right: 56, top: gridTop, height: '50%' },
-      { left: 56, right: 56, top: '70%', bottom: 48 }
-    ],
-    xAxis: [0, 1].map(i => ({
+    grid: heights.map((height, i) => ({ left, right, top: tops[i], height })),
+    xAxis: [0, 1, 2].map(i => ({
       type: 'time',
       gridIndex: i,
       axisLine: { lineStyle: { color: colors.axisLine } },
       axisTick: { show: false },
-      axisLabel: { show: i === 1, color: colors.tickColor, hideOverlap: true, ...mono },
+      axisLabel: { show: i === 2, color: colors.tickColor, hideOverlap: true, ...mono },
       splitLine: { show: false }
     })),
     yAxis: [
       {
-        gridIndex: 0, type: 'value',
+        gridIndex: 0, type: 'value', min: scoreAxisMin, max: scoreAxisMax, splitNumber: 3,
+        axisLabel: { color: colors.tickColor, showMinLabel: false, showMaxLabel: false, ...mono },
+        splitLine: { lineStyle: { color: colors.gridLine } }
+      },
+      {
+        gridIndex: 1, type: 'log', logBase: 2,
         axisLabel: { color: colors.tickColor, ...mono, formatter: v => `$${v}M` },
         splitLine: { lineStyle: { color: colors.gridLine } }
       },
       {
-        gridIndex: 0, type: 'value', scale: true, position: 'right',
+        gridIndex: 2, type: 'value', scale: true, splitNumber: 2,
         axisLabel: { color: colors.tickColor, ...mono, formatter: v => `${Math.round(v / 1000)}k` },
-        splitLine: { show: false }
-      },
-      {
-        gridIndex: 1, type: 'value', scale: true,
-        axisLabel: { color: colors.tickColor, ...mono },
         splitLine: { lineStyle: { color: colors.gridLine } }
       }
     ],
     // A new range is a new fetch, so the window only carries over hourly refreshes of the same range
-    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win: cbHistoryZoomRange === cbHistoryRange ? keptZoomWindow(cbHistoryChartInstance) : null })],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1, 2], win: sameRange ? keptZoomWindow(cbHistoryChartInstance) : null })],
     series: [
-      sessionShade(0),
-      sessionShade(1),
-      line('10 bps', 'd10', CB_TIER_COLORS.d10, 2),
-      line('50 bps', 'd50', CB_TIER_COLORS.d50),
-      line('100 bps', 'd100', CB_TIER_COLORS.d100),
       {
-        name: 'BTC 中间价', type: 'line', xAxisIndex: 0, yAxisIndex: 1,
-        showSymbol: series.length < 3, symbolSize: 4,
-        data: cbWithGaps(series, s => s.mid),
-        lineStyle: { width: 1, type: 'dashed', color: colors.tickColor, opacity: 0.55 },
+        name: '原口径 7D', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false,
+        data: cbWithGaps(series, rawOf),
+        lineStyle: { width: 1.5, color: colors.tickColor, opacity: 0.8 },
         itemStyle: { color: colors.tickColor }
       },
       {
-        name: '韧性评分 (小时)', type: 'line', xAxisIndex: 1, yAxisIndex: 2, showSymbol: false,
-        data: cbWithGaps(series, s => s.score),
-        lineStyle: { width: 1, color: CB_SCORE_COLOR, opacity: 0.3 },
-        itemStyle: { color: CB_SCORE_COLOR }
-      },
-      {
-        name: '韧性评分 7D', type: 'line', xAxisIndex: 1, yAxisIndex: 2,
+        name: '韧性评分 7D', type: 'line', xAxisIndex: 0, yAxisIndex: 0,
         showSymbol: series.length < 3, symbolSize: 5,
-        data: cbWithGaps(series, s => s.scoreMa7),
-        lineStyle: { width: 2, color: CB_SCORE_COLOR },
-        itemStyle: { color: CB_SCORE_COLOR },
-        markLine: th ? {
+        data: cbWithGaps(series, scoreOf),
+        lineStyle: { width: 2, color: scoreColor },
+        itemStyle: { color: scoreColor },
+        endLabel: {
+          show: true,
+          color: colors.tickColor,
+          ...mono,
+          formatter: p => (Number.isFinite(p.value[1]) ? p.value[1].toFixed(2) : '')
+        },
+        markArea: th ? {
           silent: true,
-          symbol: 'none',
-          label: { color: colors.tickColor, fontSize: 9, formatter: p => p.name },
           data: [
-            { name: `充裕 ${th.high}`, yAxis: th.high, lineStyle: { color: '#10b981', type: 'dotted', width: 1 } },
-            { name: `枯竭 ${th.low}`, yAxis: th.low, lineStyle: { color: '#f43f5e', type: 'dotted', width: 1 } }
+            zoneBand(th.high, 1000, colors.isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.10)', `充裕 > ${th.high}`, 'insideTopLeft'),
+            zoneBand(0, th.low, colors.isLight ? 'rgba(244, 63, 94, 0.12)' : 'rgba(244, 63, 94, 0.10)', `枯竭 < ${th.low}`, 'insideBottomLeft')
           ]
         } : undefined
+      },
+      sessionShade,
+      ...tierLines('10 bps', 'd10', 2.2),
+      ...tierLines('50 bps', 'd50'),
+      ...tierLines('100 bps', 'd100'),
+      {
+        name: 'BTC 中间价', type: 'line', xAxisIndex: 2, yAxisIndex: 2,
+        showSymbol: series.length < 3, symbolSize: 4,
+        data: cbWithGaps(series, s => s.mid),
+        lineStyle: { width: 1.5, color: colors.tickColor },
+        itemStyle: { color: colors.tickColor },
+        endLabel: {
+          show: true,
+          color: colors.tickColor,
+          ...mono,
+          formatter: p => (Number.isFinite(p.value[1]) ? `$${(p.value[1] / 1000).toFixed(1)}k` : '')
+        }
       }
     ]
   };
@@ -7651,7 +7776,9 @@ function initCbHistoryEvents() {
     });
   }
   window.addEventListener('resize', () => {
-    if (cbHistoryChartInstance) cbHistoryChartInstance.resize();
+    if (!cbHistoryChartInstance) return;
+    cbHistoryChartInstance.resize();
+    renderCbHistoryChart(rawCbHistory); // 面板高度按像素算，跟随容器重排
   });
 }
 

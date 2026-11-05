@@ -21,7 +21,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20261020_1">
+  <link rel="stylesheet" href="/style.css?v=20261105_1">
   <link rel="stylesheet" href="/atelier.css?v=20261020_1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg" crossorigin="anonymous">
@@ -2737,10 +2737,11 @@
           <div class="cb-history-notice" id="cb-history-notice" hidden></div>
           <div class="cb-history-kpis" id="cb-history-kpis"></div>
           <div id="cb-history-echarts" class="cb-history-chart"></div>
-          <div class="cb-history-foot">
-            逐小时记录 Coinbase L2 双边深度（桶内多次快照取均值）。韧性评分 = 100 bps 深度 ÷ 24h 现货成交额 × 100，取 7 日滚动均值；
-            充裕 / 枯竭阈值为 Coinbase 自身近一年日均评分的 75% / 25% 分位，不引用其他交易所数据。
-          </div>
+          <ul class="cb-history-foot">
+            <li><b>韧性评分</b> = 7 日均 100 bps 深度 ÷ 7 日均 24h 现货成交额 × 100。分母取满 168 小时，正好抵消一个完整的周内周期，周末缩量不再抬高评分；图例「原口径 7D」保留用当时 24h 成交额计算的旧值以供对照。</li>
+            <li><b>阈值</b>：Coinbase 自身近一年每日 7D 评分的 75% / 25% 分位，只统计 7 日窗口已覆盖完整一周的日子，不引用其他交易所数据。</li>
+            <li><b>深度</b>：逐小时记录 Coinbase L2 双边深度（桶内多次快照取均值）。纵轴为对数刻度，同样的距离代表同样的百分比，三档等比例坍塌会表现为平行下移。</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -3494,7 +3495,7 @@
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
   <!-- mcclellan_structure 必须先于 app.js：Module 1-B 结构宽度面板由 app.js 调用其 window 全局 -->
   <script src="/mcclellan_structure.js"></script>
-  <script src="/app.js?v=20261021_1"></script>
+  <script src="/app.js?v=20261105_1"></script>
   <!-- Strategy 官方披露账本面板：独立加载，不影响既有渲染管线 -->
   <script src="/mstr_disclosures_ui.js?v=20261021_1" defer></script>
 </body>

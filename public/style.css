@@ -4244,141 +4244,267 @@ body {
 }
 
 .cb-sess-head {
-  font-size: 0.72rem;
-  line-height: 1.55;
-  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
   margin-bottom: 8px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .cb-sess-head b {
-  color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-size: 0.82rem;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
-.cb-sess-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.cb-sess-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+.cb-sess-wrap {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xs);
-  padding: 10px 12px;
+  overflow: hidden;
 }
 
-.cb-sess-us {
-  border-color: rgba(56, 189, 248, 0.45);
-  background: rgba(56, 189, 248, 0.06);
+.cb-sess-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
 }
 
-.cb-sess-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 2px;
+.cb-sess-table th,
+.cb-sess-table td {
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.cb-sess-title span {
-  font-size: 0.64rem;
+.cb-sess-table tbody tr:last-child th,
+.cb-sess-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cb-sess-table th:first-child {
+  text-align: left;
   font-weight: 500;
-  color: var(--text-muted);
-  white-space: nowrap;
+  color: var(--text-secondary);
 }
 
-.cb-sess-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.cb-sess-row b {
-  font-family: var(--font-mono);
+.cb-sess-table thead th {
   font-weight: 600;
   color: var(--text-primary);
+  vertical-align: bottom;
+}
+
+.cb-sess-table thead th span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.cb-sess-table td {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
   white-space: nowrap;
+}
+
+.cb-sess-table .cb-sess-us {
+  background: rgba(56, 189, 248, 0.07);
+}
+
+.cb-sess-delta {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
 }
 
 .cb-sess-note {
   margin-top: 6px;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
-}
-
-@media (max-width: 720px) {
-  .cb-sess-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .cb-hk-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .cb-hk {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   min-width: 0;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xs);
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .cb-hk-lbl {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.cb-hk-val {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.cb-hk-hero .cb-hk-val {
+  font-size: 1.75rem;
+}
+
+.cb-hk-pill {
+  font-family: var(--font-sans, inherit);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 600;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.cb-hk-sub {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.cb-hk-tier {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cb-hk-tier i {
+  flex: none;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.cb-hk-tier b {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* 评分在枯竭 / 常态 / 充裕三段上的位置 */
+.cb-gauge {
+  position: relative;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: var(--border-default);
+}
+
+.cb-gauge span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.cb-gauge-low {
+  left: 0;
+  background: #f43f5e;
+  border-radius: 3px 0 0 3px;
+}
+
+.cb-gauge-high {
+  right: 0;
+  background: #10b981;
+  border-radius: 0 3px 3px 0;
+}
+
+.cb-gauge i {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 14px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+.cb-gauge-scale {
+  position: relative;
+  height: 16px;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--text-muted);
 }
 
-.cb-hk-val {
-  font-family: var(--font-mono);
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.cb-hk-sub {
-  font-size: 0.68rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
+.cb-gauge-scale span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .cb-hk-flags {
   margin: 10px 0 0;
-  padding-left: 18px;
-  font-size: 0.74rem;
-  color: #f59e0b;
+  padding: 8px 12px 8px 28px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
   line-height: 1.6;
+  border-left: 2px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
 }
 
 .cb-history-chart {
   width: 100%;
-  height: 380px;
+  height: 580px;
 }
 
 .cb-history-foot {
-  font-size: 0.66rem;
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.74rem;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.65;
+}
+
+.cb-history-foot b {
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 1024px) {
   .cb-hk-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .cb-sess-table th,
+  .cb-sess-table td {
+    padding: 7px 8px;
+  }
+  .cb-sess-table thead th span {
+    display: none;
+  }
+  .cb-sess-table td {
+    white-space: normal;
+  }
+  .cb-sess-delta {
+    display: block;
+    margin-left: 0;
   }
 }
 
@@ -4389,11 +4515,17 @@ body {
   .cb-hk {
     padding: 8px 10px;
   }
+  .cb-hk-hero {
+    grid-column: 1 / -1;
+  }
   .cb-hk-val {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
+  }
+  .cb-hk-hero .cb-hk-val {
+    font-size: 1.5rem;
   }
   .cb-history-chart {
-    height: 340px;
+    height: 520px;
   }
 }
 

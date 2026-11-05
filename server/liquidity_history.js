@@ -9,12 +9,17 @@
  *
  * 指标口径参照 Amberdata《凭空蒸发的流动性》：
  *  - 10 / 50 / 100 bps 双边深度 (USD)，7 天滚动均值；
- *  - 流动性韧性评分 = 100bps 深度 / 24h 现货成交额 × 100 (7D MA)；
+ *  - 流动性韧性评分 = 7 日均 100bps 深度 / 7 日均 24h 现货成交额 × 100；
+ *    小时值 = 当前 100bps 深度 / 7 日均 24h 成交额 × 100。研报用当时的 24h 成交额做分母，
+ *    但 Coinbase 周日成交额只有周四的 1/3，深度却几乎不变 (周内差异 3.4 倍 vs 1.07 倍)，
+ *    周末评分因此虚高；168 小时均值恰好覆盖一个完整周期，周内季节性被整段抵消，
+ *    不需要估计任何季节因子。原口径另存为 scoreRaw / scoreRawMa7 供对照；
  *  - 全阶梯撤单 vs 近端撤单：三档深度相对 7 日基线是否等比例坍塌；
  *  - 深度较峰值回撤、48h 深度变化、评分虚高 (分母缩量) 与止损失灵预警。
- * 韧性阈值完全由 Coinbase 自身数据决定：近 365 天日均评分的 75% / 25% 分位
+ * 韧性阈值完全由 Coinbase 自身数据决定：近 365 天每日 7D 评分的 75% / 25% 分位
  * (对应研报"前 25% / 后 25%"的分档方式，但不使用其多交易所合计的绝对数值)。
- * 满 7 个有效日开始给出阈值，满 30 天前标记为暂定。
+ * 阈值与被比较的量必须同口径：只统计 7 日窗口已覆盖完整一周的日子，
+ * 因此约需 14 天 (6.5 天填满窗口 + 7 个有效日) 才给出阈值，满 30 个有效日前标记为暂定。
  */
 
 const fs = require('fs');
@@ -31,7 +36,9 @@ const COMMITTED_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity_hi
 const LOCAL_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity_history.local.json');
 
 const PYRAMID_BASELINE = 3.1;
-const THRESHOLD_MIN_DAYS = 7;       // 有效日 (≥12 个小时样本) 少于此数不给阈值
+const SCORE_WINDOW_MS = 7 * DAY_MS;
+const SCORE_MIN_WINDOW_HOURS = 156; // 7 日窗口内样本少于此数 (6.5 天) 时未覆盖完整一周，周内效应抵消不掉
+const THRESHOLD_MIN_DAYS = 7;       // 有效日 (≥12 个小时样本且窗口完整) 少于此数不给阈值
 const THRESHOLD_STABLE_DAYS = 30;   // 少于此数标记为暂定
 const THRESHOLD_LOOKBACK_DAYS = 365;
 
@@ -174,10 +181,15 @@ function writeHistoryFile(file, samples) {
 // 派生指标
 // ---------------------------------------------------------------------------
 
-function scoreOf(s) {
-  return Number.isFinite(s.d100) && Number.isFinite(s.vol24) && s.vol24 > 0
-    ? (s.d100 / s.vol24) * 100
+function depthToVolume(depth, volume) {
+  return Number.isFinite(depth) && Number.isFinite(volume) && volume > 0
+    ? (depth / volume) * 100
     : null;
+}
+
+/** 原口径 (当时的 24h 成交额做分母)，受周内成交额季节性影响，仅作对照 */
+function rawScoreOf(s) {
+  return depthToVolume(s.d100, s.vol24);
 }
 
 function mean(arr) {
@@ -210,10 +222,11 @@ function percentRank(arr, val) {
 }
 
 /**
- * 按时间窗 (非样本数) 的尾随均值，缺口小时不会被错误地压缩进窗口
+ * 按时间窗 (非样本数) 的尾随均值与有效样本数，缺口小时不会被错误地压缩进窗口
  */
-function trailingMean(samples, field, windowMs) {
-  const out = new Array(samples.length).fill(null);
+function trailingWindow(samples, field, windowMs) {
+  const means = new Array(samples.length).fill(null);
+  const counts = new Array(samples.length).fill(0);
   let start = 0;
   let sum = 0;
   let cnt = 0;
@@ -225,9 +238,14 @@ function trailingMean(samples, field, windowMs) {
       if (Number.isFinite(old)) { sum -= old; cnt--; }
       start++;
     }
-    out[i] = cnt > 0 ? sum / cnt : null;
+    means[i] = cnt > 0 ? sum / cnt : null;
+    counts[i] = cnt;
   }
-  return out;
+  return { means, counts };
+}
+
+function trailingMean(samples, field, windowMs) {
+  return trailingWindow(samples, field, windowMs).means;
 }
 
 function windowValues(samples, field, fromTs, toTs) {
@@ -236,7 +254,8 @@ function windowValues(samples, field, fromTs, toTs) {
     .map(s => (typeof field === 'function' ? field(s) : s[field]));
 }
 
-function dailyAggregate(samples) {
+/** scoreOf(sample) 给出该小时计入日均的评分，默认原口径 */
+function dailyAggregate(samples, scoreOf = rawScoreOf) {
   const byDay = new Map();
   for (const s of samples) {
     const day = new Date(s.ts).toISOString().slice(0, 10);
@@ -281,7 +300,7 @@ function zoneOf(score, thresholds) {
 }
 
 /**
- * Coinbase 自身韧性阈值：近一年有效日的日均评分四分位
+ * Coinbase 自身韧性阈值：近一年有效日的 7D 评分日均值四分位
  */
 function computeThresholds(daily, lastTs) {
   const from = lastTs - THRESHOLD_LOOKBACK_DAYS * DAY_MS;
@@ -323,11 +342,17 @@ function buildHistoryView(samples, opts = {}) {
     return { coverage, series: [], daily: [], indicators: null, thresholds: null };
   }
 
-  const scoreMa7 = trailingMean(all, scoreOf, 7 * DAY_MS);
-  const d10Ma7 = trailingMean(all, 'd10', 7 * DAY_MS);
-  const d100Ma7 = trailingMean(all, 'd100', 7 * DAY_MS);
+  const volWindow = trailingWindow(all, 'vol24', SCORE_WINDOW_MS);
+  const volMa7 = volWindow.means;
+  const d10Ma7 = trailingMean(all, 'd10', SCORE_WINDOW_MS);
+  const d100Ma7 = trailingMean(all, 'd100', SCORE_WINDOW_MS);
+  const scoreMa7 = all.map((_, i) => depthToVolume(d100Ma7[i], volMa7[i]));
+  const scoreHourly = all.map((s, i) => depthToVolume(s.d100, volMa7[i]));
+  const scoreRawMa7 = trailingMean(all, rawScoreOf, SCORE_WINDOW_MS);
+  const fullWeek = volWindow.counts.map(c => c >= SCORE_MIN_WINDOW_HOURS);
 
-  const daily = dailyAggregate(all);
+  const scoreByTs = new Map(all.map((s, i) => [s.ts, fullWeek[i] ? scoreMa7[i] : null]));
+  const daily = dailyAggregate(all, s => scoreByTs.get(s.ts));
 
   const thresholds = computeThresholds(daily, all[all.length - 1].ts);
 
@@ -388,9 +413,11 @@ function buildHistoryView(samples, opts = {}) {
     change48h: pct(now3, past48),
     peak: peak ? { date: peak.date, d10: peak.d10, drawdownPct: pct(d10Ma7[lastIdx], peak.d10) } : null,
     resilience: {
-      score: round(scoreOf(last), 2),
+      score: round(scoreHourly[lastIdx], 2),
       ma7: round(scoreNow, 2),
-      zone: zoneOf(scoreNow, thresholds),
+      zone: fullWeek[lastIdx] ? zoneOf(scoreNow, thresholds) : null,
+      volMa7: round(volMa7[lastIdx], 1),
+      rawMa7: round(scoreRawMa7[lastIdx], 2),
       chg7dPct: scoreChg7d,
       depthChg7dPct: depthChg7d,
       inflated: inflatedScore
@@ -416,8 +443,13 @@ function buildHistoryView(samples, opts = {}) {
       d50: s.d50,
       d100: s.d100,
       d10min: s.d10min,
-      score: round(scoreOf(s), 2),
+      score: round(scoreHourly[i], 2),
       scoreMa7: round(scoreMa7[i], 2),
+      scoreFullWeek: fullWeek[i],
+      scoreRaw: round(rawScoreOf(s), 2),
+      scoreRawMa7: round(scoreRawMa7[i], 2),
+      vol24: s.vol24,
+      volMa7: round(volMa7[i], 1),
       s10: s.s10,
       n: s.n
     });
@@ -546,5 +578,5 @@ module.exports = {
   classifyWithdrawal,
   recordLiveSnapshot,
   getMergedHistory,
-  _internal: { trailingMean, dailyAggregate, computeThresholds, scoreOf, quantile, percentRank }
+  _internal: { trailingMean, dailyAggregate, computeThresholds, rawScoreOf, quantile, percentRank }
 };
