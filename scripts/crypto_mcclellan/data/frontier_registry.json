@@ -52,7 +52,7 @@
   "address": "0x0e4f6209ed984b21edea43ace6e09559ed051d48",
   "chain": "bsc",
   "first_qualified": "2026-10-29",
-  "last_qualified": "2026-10-31",
+  "last_qualified": "2026-11-06",
   "symbol": "ON"
  },
  "bsc:0x0e63b9c287e32a05e6b9ab8ee8df88a2760225a9": {
@@ -73,7 +73,7 @@
   "address": "0x10d4183389e99233db3cc981c43443ebd28ebd5e",
   "chain": "bsc",
   "first_qualified": "2026-10-10",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "DGAI"
  },
  "bsc:0x14f6a94909c407854390aa2d2462a3095d317777": {
@@ -150,7 +150,7 @@
   "address": "0x2c3a8ee94ddd97244a93bc48298f97d2c412f7db",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "AKE"
  },
  "bsc:0x3783dcefe8811c1293cc0c71cb57109845490e06": {
@@ -171,7 +171,7 @@
   "address": "0x3b4de3c7855c03bb9f50ea252cd2c9fa1125ab07",
   "chain": "bsc",
   "first_qualified": "2026-10-29",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "IDOL"
  },
  "bsc:0x3d4f0513e8a29669b960f9dbca61861548a9a760": {
@@ -185,7 +185,7 @@
   "address": "0x3e5d4f8aee0d9b3082d5f6da5d6e225d17ba9ea0",
   "chain": "bsc",
   "first_qualified": "2026-10-08",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "UAI"
  },
  "bsc:0x444045b0ee1ee319a660a5e3d604ca0ffa35acaa": {
@@ -220,7 +220,7 @@
   "address": "0x4b3d30992f003c8167699735f5ab2831b2a087d3",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-04",
+  "last_qualified": "2026-11-06",
   "symbol": "COLLECT"
  },
  "bsc:0x4c067de26475e1cefee8b8d1f6e2266b33a2372e": {
@@ -290,7 +290,7 @@
   "address": "0x5d3a12c42e5372b2cc3264ab3cdcf660a1555238",
   "chain": "bsc",
   "first_qualified": "2026-10-18",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "ARIA"
  },
  "bsc:0x5dbde81fce337ff4bcaaee4ca3466c00aecae274": {
@@ -363,13 +363,6 @@
   "last_qualified": "2026-10-10",
   "symbol": "GBT"
  },
- "bsc:0x6b8e8546aa5bc6ae3869d256245f1fa9aa1a7777": {
-  "address": "0x6b8e8546aa5bc6ae3869d256245f1fa9aa1a7777",
-  "chain": "bsc",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "ANIMA"
- },
  "bsc:0x6d6521283cd3fd0188fe0408e700a5790a0f6c61": {
   "address": "0x6d6521283cd3fd0188fe0408e700a5790a0f6c61",
   "chain": "bsc",
@@ -430,7 +423,7 @@
   "address": "0x7ec43cf65f1663f820427c62a5780b8f2e25593a",
   "chain": "bsc",
   "first_qualified": "2026-10-09",
-  "last_qualified": "2026-11-02",
+  "last_qualified": "2026-11-06",
   "symbol": "LAB"
  },
  "bsc:0x7fd1fc83e4f72c9a58141948eed6dae30d227777": {
@@ -479,7 +472,7 @@
   "address": "0x8c907e0a72c3d55627e853f4ec6a96b0c8771145",
   "chain": "bsc",
   "first_qualified": "2026-10-23",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "ZIG"
  },
  "bsc:0x8d86caaed915c39209628fe13d31d1b466ec7777": {
@@ -558,13 +551,6 @@
   "first_qualified": "2026-10-06",
   "last_qualified": "2026-11-05",
   "symbol": "CAP"
- },
- "bsc:0x9ab2fe9188054153b4316c0f6c41e75755fc7777": {
-  "address": "0x9ab2fe9188054153b4316c0f6c41e75755fc7777",
-  "chain": "bsc",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "BI"
  },
  "bsc:0x9d8e6053abc326bdcd0ea6da441dbdd771727777": {
   "address": "0x9d8e6053abc326bdcd0ea6da441dbdd771727777",
@@ -675,7 +661,7 @@
   "address": "0xc07e1300dc138601fa6b0b59f8d0fa477e690589",
   "chain": "bsc",
   "first_qualified": "2026-10-08",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "Q"
  },
  "bsc:0xc35ef0564751a27b468f791113c686c8eebaa9ca": {
@@ -684,13 +670,6 @@
   "first_qualified": "2026-10-07",
   "last_qualified": "2026-10-07",
   "symbol": "79AU"
- },
- "bsc:0xc5c14ee7eaf167aca9201fd9433b9f8e66057777": {
-  "address": "0xc5c14ee7eaf167aca9201fd9433b9f8e66057777",
-  "chain": "bsc",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "币安公主"
  },
  "bsc:0xc5db0af8d5b7de624d48bfe25f4cf139f7497777": {
   "address": "0xc5db0af8d5b7de624d48bfe25f4cf139f7497777",
@@ -745,7 +724,7 @@
   "address": "0xcae117ca6bc8a341d2e7207f30e180f0e5618b9d",
   "chain": "bsc",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "ARK"
  },
  "bsc:0xcafdbce93477261db8250e42bdae6e66733f9e20": {
@@ -783,12 +762,26 @@
   "last_qualified": "2026-10-22",
   "symbol": "AXIS"
  },
+ "bsc:0xd5df4d260d7a0145f655bcbf3b398076f21016c7": {
+  "address": "0xd5df4d260d7a0145f655bcbf3b398076f21016c7",
+  "chain": "bsc",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "AOP"
+ },
  "bsc:0xd5f6ef5deabe61e6d5cdb49bfb6f156f2c1ca715": {
   "address": "0xd5f6ef5deabe61e6d5cdb49bfb6f156f2c1ca715",
   "chain": "bsc",
   "first_qualified": "2026-10-12",
   "last_qualified": "2026-10-15",
   "symbol": "ARX"
+ },
+ "bsc:0xd686a88a5c102bbcebd0d747734a809ea3207777": {
+  "address": "0xd686a88a5c102bbcebd0d747734a809ea3207777",
+  "chain": "bsc",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "CORLA"
  },
  "bsc:0xd955c9ba56fb1ab30e34766e252a97ccce3d31a6": {
   "address": "0xd955c9ba56fb1ab30e34766e252a97ccce3d31a6",
@@ -829,7 +822,7 @@
   "address": "0xea37a8de1de2d9d10772eeb569e28bfa5cb17707",
   "chain": "bsc",
   "first_qualified": "2026-10-09",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "JCT"
  },
  "bsc:0xeccbb861c0dda7efd964010085488b69317e4444": {
@@ -899,7 +892,7 @@
   "address": "0x000050e18ffa3f8f7ad170eb9cef160eb3ed1111",
   "chain": "robinhood",
   "first_qualified": "2026-10-10",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "TORCH"
  },
  "robinhood:0x000de658153f47f23e92973c8eb1e89762703676": {
@@ -927,7 +920,7 @@
   "address": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "CASHCAT"
  },
  "robinhood:0x05aaca11a0fba2a35dddf1e33f77c3667ddfb7ed": {
@@ -941,7 +934,7 @@
   "address": "0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "MOW"
  },
  "robinhood:0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b": {
@@ -964,6 +957,13 @@
   "first_qualified": "2026-10-07",
   "last_qualified": "2026-11-01",
   "symbol": "CHOP"
+ },
+ "robinhood:0x11188aa11daab927b3c1e7318ee9e57b35c1d5e8": {
+  "address": "0x11188aa11daab927b3c1e7318ee9e57b35c1d5e8",
+  "chain": "robinhood",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "ANTHROPIC"
  },
  "robinhood:0x127cdc74e44e3c60422b7e792ebe480c0f873ed5": {
   "address": "0x127cdc74e44e3c60422b7e792ebe480c0f873ed5",
@@ -997,7 +997,7 @@
   "address": "0x18e674231a58c239dc7daedcffe15ec3a24cff5c",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "HOOKR"
  },
  "robinhood:0x1940c4ff2c3dc4bec71405f5947a5d7622a3cf5b": {
@@ -1067,15 +1067,8 @@
   "address": "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-04",
+  "last_qualified": "2026-11-06",
   "symbol": "AI"
- },
- "robinhood:0x2fbd2ce682731f3ef65b7a1770421beabb4fc281": {
-  "address": "0x2fbd2ce682731f3ef65b7a1770421beabb4fc281",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "RVW"
  },
  "robinhood:0x309eebf2b90d1db1c41e34cd01e2aa0b5e5d4b49": {
   "address": "0x309eebf2b90d1db1c41e34cd01e2aa0b5e5d4b49",
@@ -1116,7 +1109,7 @@
   "address": "0x39dbed3a2bd333467115de45665cc57f813c4571",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "PONS"
  },
  "robinhood:0x3ba500f1ababbcf0f0247d06d1c56fd7e6c4c09d": {
@@ -1130,7 +1123,7 @@
   "address": "0x42afa2124ca5a2b83898e46b2da9a190995b1e18",
   "chain": "robinhood",
   "first_qualified": "2026-10-16",
-  "last_qualified": "2026-10-29",
+  "last_qualified": "2026-11-06",
   "symbol": "SCHIFFY"
  },
  "robinhood:0x43fc3c8440d85d7df99ecfbc6a267de8327f923b": {
@@ -1144,7 +1137,7 @@
   "address": "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",
   "chain": "robinhood",
   "first_qualified": "2026-10-14",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "SPCX"
  },
  "robinhood:0x4ca5fefd12f67d007da9e7aa58c995fad46f89d2": {
@@ -1165,7 +1158,7 @@
   "address": "0x4db7374e966097be94c6680d49156d580f097bbf",
   "chain": "robinhood",
   "first_qualified": "2026-10-16",
-  "last_qualified": "2026-10-30",
+  "last_qualified": "2026-11-06",
   "symbol": "TIBBIR"
  },
  "robinhood:0x51250b135174ca09450ec01c4aff73cf69dbb590": {
@@ -1223,13 +1216,6 @@
   "first_qualified": "2026-10-08",
   "last_qualified": "2026-10-17",
   "symbol": "ASTRO"
- },
- "robinhood:0x5c58f630161c33609dfd719bb390d3886ad99402": {
-  "address": "0x5c58f630161c33609dfd719bb390d3886ad99402",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "SHAIRUN"
  },
  "robinhood:0x5ccc18e4a12934c3b23e561efcd82e8cafaceb07": {
   "address": "0x5ccc18e4a12934c3b23e561efcd82e8cafaceb07",
@@ -1361,7 +1347,7 @@
   "address": "0x72be1277e198d0c476869253cb4e62807e14533c",
   "chain": "robinhood",
   "first_qualified": "2026-10-18",
-  "last_qualified": "2026-10-20",
+  "last_qualified": "2026-11-06",
   "symbol": "RAETO"
  },
  "robinhood:0x72d5bf142874d24d1565f8633621307fd2871111": {
@@ -1389,7 +1375,7 @@
   "address": "0x75d874378ae31b33ab9e7a40b4dca96134221111",
   "chain": "robinhood",
   "first_qualified": "2026-11-01",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "LOBIN"
  },
  "robinhood:0x7889958369724271fd06de3bd72698b5bbf9f78b": {
@@ -1426,6 +1412,13 @@
   "first_qualified": "2026-10-08",
   "last_qualified": "2026-10-10",
   "symbol": "SWARM"
+ },
+ "robinhood:0x801d37bcc89055e61fb97603a3be91a84a37d0fb": {
+  "address": "0x801d37bcc89055e61fb97603a3be91a84a37d0fb",
+  "chain": "robinhood",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "PONS"
  },
  "robinhood:0x806ba27b5e1c4c2e989a3757a8def9fe1145ed10": {
   "address": "0x806ba27b5e1c4c2e989a3757a8def9fe1145ed10",
@@ -1539,13 +1532,6 @@
   "last_qualified": "2026-11-03",
   "symbol": "PONS"
  },
- "robinhood:0x8e41fd25e85e624560fa50ff9f117a02cd30b8b3": {
-  "address": "0x8e41fd25e85e624560fa50ff9f117a02cd30b8b3",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-06",
-  "symbol": "SIF"
- },
  "robinhood:0x90a36713577d661e8f3ae0085dfed7f4460a2e71": {
   "address": "0x90a36713577d661e8f3ae0085dfed7f4460a2e71",
   "chain": "robinhood",
@@ -1585,7 +1571,7 @@
   "address": "0x94641b97010608c3827fb058074889f19868ff33",
   "chain": "robinhood",
   "first_qualified": "2026-10-12",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "VRAX"
  },
  "robinhood:0x94fc9ed527fc12d3c25229c44922e210f7e9fef0": {
@@ -1606,7 +1592,7 @@
   "address": "0x98096d17e191b3da1d5f99a6d7b3584351b11e18",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-30",
+  "last_qualified": "2026-11-06",
   "symbol": "BONER"
  },
  "robinhood:0x983a61426ea7f2485dcb0217e501aa9a2d149632": {
@@ -1784,18 +1770,11 @@
   "last_qualified": "2026-10-12",
   "symbol": "HYDX"
  },
- "robinhood:0xab093def657f15df31b33922a95e047add645b29": {
-  "address": "0xab093def657f15df31b33922a95e047add645b29",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-04",
-  "last_qualified": "2026-10-06",
-  "symbol": "SHROOM"
- },
  "robinhood:0xacc8de336f5d2366fa7334383d8fab73499f582a": {
   "address": "0xacc8de336f5d2366fa7334383d8fab73499f582a",
   "chain": "robinhood",
   "first_qualified": "2026-10-31",
-  "last_qualified": "2026-11-02",
+  "last_qualified": "2026-11-06",
   "symbol": "FOREVER"
  },
  "robinhood:0xb0007d59fe4050a1636c2fa19038973d16481337": {
@@ -1811,13 +1790,6 @@
   "first_qualified": "2026-10-24",
   "last_qualified": "2026-10-24",
   "symbol": "CREORA"
- },
- "robinhood:0xb18a4bcf9018bedb1fcb90ed80f87087151c09f4": {
-  "address": "0xb18a4bcf9018bedb1fcb90ed80f87087151c09f4",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "CLAUS"
  },
  "robinhood:0xb1da35ddb716a2f66c612d15e6d3ce5b90afb447": {
   "address": "0xb1da35ddb716a2f66c612d15e6d3ce5b90afb447",
@@ -1977,7 +1949,7 @@
   "address": "0xc9675fe679c7d4e1b94416f66d61c96127eb964a",
   "chain": "robinhood",
   "first_qualified": "2026-10-11",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "GIGATENEV"
  },
  "robinhood:0xca9c78dd337a67f6e0077f65f5e9218719d30edf": {
@@ -2028,6 +2000,13 @@
   "first_qualified": "2026-10-29",
   "last_qualified": "2026-10-30",
   "symbol": "PIZZA"
+ },
+ "robinhood:0xd167df6670106e9292177144beb70d9a376b6010": {
+  "address": "0xd167df6670106e9292177144beb70d9a376b6010",
+  "chain": "robinhood",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "HPHONE"
  },
  "robinhood:0xd421141b9d6afa274572a747e9a3fdd24ba8c400": {
   "address": "0xd421141b9d6afa274572a747e9a3fdd24ba8c400",
@@ -2250,7 +2229,7 @@
   "address": "0xedbf91223639800bcd5756815caf908df3b890be",
   "chain": "robinhood",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "PRIORS"
  },
  "robinhood:0xeff3a5fa1bf824c70bb269db81711160cb7b6b39": {
@@ -2266,13 +2245,6 @@
   "first_qualified": "2026-10-17",
   "last_qualified": "2026-10-17",
   "symbol": "TSI"
- },
- "robinhood:0xf1d958a5edd31308f02edd46cd9b6cc5e48fe8a4": {
-  "address": "0xf1d958a5edd31308f02edd46cd9b6cc5e48fe8a4",
-  "chain": "robinhood",
-  "first_qualified": "2026-10-05",
-  "last_qualified": "2026-10-06",
-  "symbol": "PONS"
  },
  "robinhood:0xf289e29aac29f039cc51041763c477c7f5a2b504": {
   "address": "0xf289e29aac29f039cc51041763c477c7f5a2b504",
@@ -2420,13 +2392,6 @@
   "first_qualified": "2026-10-25",
   "last_qualified": "2026-10-25",
   "symbol": "SO"
- },
- "solana:2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv": {
-  "address": "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv",
-  "chain": "solana",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "PENGU"
  },
  "solana:33jENUQnjoitkMFpvNJcSHyLAHFWJuHwT6E3E8CNpump": {
   "address": "33jENUQnjoitkMFpvNJcSHyLAHFWJuHwT6E3E8CNpump",
@@ -2593,7 +2558,7 @@
   "address": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
   "chain": "solana",
   "first_qualified": "2026-10-04",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "STONK"
  },
  "solana:6Mix12LiHrQFojaQEnfPUC65Qkwd6X4Y5Qg93oFbordr": {
@@ -2628,7 +2593,7 @@
   "address": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
   "chain": "solana",
   "first_qualified": "2026-10-16",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "TRUMP"
  },
  "solana:71Umq9mdXD81Do21xQro5JboWCaqmpb8nkx8JLdkuc3T": {
@@ -2698,7 +2663,7 @@
   "address": "7ymF66Z6VhgNiwadtVhjTtT6U7iQRpSxeiRrhfufhigh",
   "chain": "solana",
   "first_qualified": "2026-11-05",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "HIGH"
  },
  "solana:85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ": {
@@ -2728,6 +2693,13 @@
   "first_qualified": "2026-10-09",
   "last_qualified": "2026-10-12",
   "symbol": "QI"
+ },
+ "solana:8UQdy5sHMVWUWSHeA5B3ZuuAVNumjSLPXdf19MXcpump": {
+  "address": "8UQdy5sHMVWUWSHeA5B3ZuuAVNumjSLPXdf19MXcpump",
+  "chain": "solana",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "COGE"
  },
  "solana:8hnMfF4XL717GVwzDmvqjJvULozKW6w7BhHFABjvHje4": {
   "address": "8hnMfF4XL717GVwzDmvqjJvULozKW6w7BhHFABjvHje4",
@@ -2859,7 +2831,7 @@
   "address": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
   "chain": "solana",
   "first_qualified": "2026-10-27",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "ZEC"
  },
  "solana:AGNddB3rjPHELTdAyiCouqhZiGXfWda4CJbAvQGihERf": {
@@ -3013,7 +2985,7 @@
   "address": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
   "chain": "solana",
   "first_qualified": "2026-10-06",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "CARDS"
  },
  "solana:CFrEEKrVtJ8xkpBTuA6n6x3C4cJiheRSU1Zu2wXwoaLd": {
@@ -3051,13 +3023,6 @@
   "last_qualified": "2026-10-22",
   "symbol": "MASTERCARD"
  },
- "solana:CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU": {
-  "address": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
-  "chain": "solana",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "E/ACC"
- },
  "solana:Cbkg5w7V7W2J2sUmecnyN825CbvwvXwasfhduVtNpump": {
   "address": "Cbkg5w7V7W2J2sUmecnyN825CbvwvXwasfhduVtNpump",
   "chain": "solana",
@@ -3071,13 +3036,6 @@
   "first_qualified": "2026-10-16",
   "last_qualified": "2026-10-17",
   "symbol": "RSGP"
- },
- "solana:CscZaq5twomhUkvCY8Jdd1tge32L4Yj9FbkFFEZQpump": {
-  "address": "CscZaq5twomhUkvCY8Jdd1tge32L4Yj9FbkFFEZQpump",
-  "chain": "solana",
-  "first_qualified": "2026-10-06",
-  "last_qualified": "2026-10-06",
-  "symbol": "PLAGUE"
  },
  "solana:CuKMu1kgAiFU5oHRWXRv9pWHApr5QKsaoodb1WDuRP5v": {
   "address": "CuKMu1kgAiFU5oHRWXRv9pWHApr5QKsaoodb1WDuRP5v",
@@ -3461,8 +3419,15 @@
   "address": "HsprHxBRgiVaQdRf3TnKNuZZtaX9JUSPgMFdAkk6pump",
   "chain": "solana",
   "first_qualified": "2026-11-02",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "GATO"
+ },
+ "solana:HxceordYrtSS9pEtE3TSifpgWH5AB4XRfCy2LpKHCmM": {
+  "address": "HxceordYrtSS9pEtE3TSifpgWH5AB4XRfCy2LpKHCmM",
+  "chain": "solana",
+  "first_qualified": "2026-11-06",
+  "last_qualified": "2026-11-06",
+  "symbol": "XTEN"
  },
  "solana:Hyn3TNGqTyz936vJDHAEgRP9krcVKSahFtXXE6Jv4vKu": {
   "address": "Hyn3TNGqTyz936vJDHAEgRP9krcVKSahFtXXE6Jv4vKu",
@@ -3552,7 +3517,7 @@
   "address": "npz2FhoufQ7pKqhGpaipYWacrAkidyW2yDpVWSvpump",
   "chain": "solana",
   "first_qualified": "2026-11-01",
-  "last_qualified": "2026-11-01",
+  "last_qualified": "2026-11-06",
   "symbol": "DESSA"
  },
  "solana:nxPqZ4F7ux8Vph5NFu25rEP6Kx9Gr1U6Fmj36Rjpump": {
@@ -3573,7 +3538,7 @@
   "address": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
   "chain": "solana",
   "first_qualified": "2026-10-05",
-  "last_qualified": "2026-11-05",
+  "last_qualified": "2026-11-06",
   "symbol": "PUMP"
  }
 }
