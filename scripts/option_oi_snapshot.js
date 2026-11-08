@@ -11,7 +11,7 @@
  *
  * --skip-if-done：当前 OI 日 (UTC 08:00 起算) 已有快照时跳过采样 (仍会补算精确窗口成交量)，
  * 这样工作流一天排多个时段时只有第一次成功的运行会采样，后面的运行负责补齐。
- * --backfill N：本次最多补算 N 个窗口 (默认 10；0 关闭)。
+ * --backfill N：本次最多补算 N 个窗口 (默认 40，足以一次补齐 45 天保留期；0 关闭)。
  *
  * 用法: node scripts/option_oi_snapshot.js [--skip-if-done] [--backfill 10] [--file path]
  */
@@ -42,7 +42,7 @@ async function main() {
   }
 
   // 精确窗口成交量补算失败不影响当天采样的提交 (下次运行再补)
-  const maxWindows = Number(argValue('--backfill') ?? 10);
+  const maxWindows = Number(argValue('--backfill') ?? 40);
   if (maxWindows > 0) {
     try {
       const r = await oi.backfillWindowVolumes(snapshots, {
