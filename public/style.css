@@ -7485,3 +7485,188 @@ body {
 #mstr-disclosure-summary div { margin: 4px 0; font-size: 12px; opacity: 0.9; }
 #mstr-disclosure-filings { margin-top: 8px; font-size: 12px; }
 #mstr-disclosure-filings ul { margin: 6px 0; padding-left: 18px; }
+
+/* ==========================================================================
+   Module 4 大宗卡片配色：一种颜色只表达一个维度
+   方向 绿/红 · 波动率 紫(买)/蓝(卖) · 0DTE 橙 · 聪明钱 金 · 规则与 OI 矛盾 品红
+   开平仓不占色相：实底 = OI 确证 / 细框 = OI 倾向 / 虚框 = 规则推断
+   ========================================================================== */
+:root,
+[data-theme="dark"] {
+  --sig-bull: var(--color-pos);
+  --sig-bear: var(--color-neg);
+  --sig-volbuy: #a78bfa;
+  --sig-volbuy-bg: rgba(167, 139, 250, 0.14);
+  --sig-volbuy-border: rgba(167, 139, 250, 0.38);
+  --sig-volsell: #60a5fa;
+  --sig-volsell-bg: rgba(96, 165, 250, 0.14);
+  --sig-volsell-border: rgba(96, 165, 250, 0.38);
+  --sig-conflict: #e879f9;
+  --sig-conflict-bg: rgba(232, 121, 249, 0.14);
+  --sig-conflict-border: rgba(232, 121, 249, 0.45);
+  --sig-gold: #fbbf24;
+  --sig-gold-bg: rgba(251, 191, 36, 0.13);
+  --sig-gold-border: rgba(251, 191, 36, 0.45);
+  --sig-0dte: #fb923c;
+  --sig-0dte-bg: rgba(249, 115, 22, 0.14);
+  --sig-0dte-border: rgba(249, 115, 22, 0.4);
+  --sig-neutral: rgba(148, 163, 184, 0.45);
+}
+
+[data-theme="light"] {
+  --sig-volbuy: #7c3aed;
+  --sig-volbuy-bg: rgba(124, 58, 237, 0.09);
+  --sig-volbuy-border: rgba(124, 58, 237, 0.3);
+  --sig-volsell: #2563eb;
+  --sig-volsell-bg: rgba(37, 99, 235, 0.09);
+  --sig-volsell-border: rgba(37, 99, 235, 0.3);
+  --sig-conflict: #c026d3;
+  --sig-conflict-bg: rgba(192, 38, 211, 0.09);
+  --sig-conflict-border: rgba(192, 38, 211, 0.35);
+  --sig-gold: #a16207;
+  --sig-gold-bg: rgba(202, 138, 4, 0.12);
+  --sig-gold-border: rgba(202, 138, 4, 0.4);
+  --sig-0dte: #c2410c;
+  --sig-0dte-bg: rgba(234, 88, 12, 0.09);
+  --sig-0dte-border: rgba(234, 88, 12, 0.32);
+  --sig-neutral: rgba(100, 116, 139, 0.4);
+}
+
+/* 波动率意图：此前服务端输出了这两个类却没有样式，卡片上是无色的 */
+.badge-vol-buy {
+  background: var(--sig-volbuy-bg);
+  color: var(--sig-volbuy);
+  border-color: var(--sig-volbuy-border);
+}
+.badge-vol-sell {
+  background: var(--sig-volsell-bg);
+  color: var(--sig-volsell);
+  border-color: var(--sig-volsell-border);
+}
+/* 蝶式 / 鹰式等区间结构既非方向也非纯波动率：中性描边，把紫色让给买波动 */
+.badge-strategy-butterfly {
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-default) !important;
+}
+
+.dir-volbuy {
+  background: var(--sig-volbuy-bg);
+  color: var(--sig-volbuy);
+  border: 1px solid var(--sig-volbuy-border);
+}
+.dir-volsell {
+  background: var(--sig-volsell-bg);
+  color: var(--sig-volsell);
+  border: 1px solid var(--sig-volsell-border);
+}
+
+/* 开平仓：只用明度与描边表达可信度 */
+.lc-chip { white-space: nowrap; }
+.lc-confirmed {
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border: 1px solid var(--border-hover);
+  font-weight: 600;
+}
+.lc-leaning {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.lc-rule {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-default);
+}
+.lc-none {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-subtle);
+}
+
+.badge-conflict {
+  background: var(--sig-conflict-bg);
+  color: var(--sig-conflict);
+  border: 1px solid var(--sig-conflict-border);
+  font-weight: 600;
+}
+.badge-smart {
+  background: var(--sig-gold-bg);
+  color: var(--sig-gold);
+  border: 1px solid var(--sig-gold-border);
+  font-weight: 600;
+}
+
+/* 0DTE 统一为橙色一族，强度区分风险 */
+.badge-0dte-danger {
+  background: var(--sig-0dte) !important;
+  color: #fff !important;
+  border: 1px solid var(--sig-0dte) !important;
+}
+.badge-0dte-lotto,
+.badge-0dte-momentum {
+  background: var(--sig-0dte-bg) !important;
+  color: var(--sig-0dte) !important;
+  border: 1px solid var(--sig-0dte-border) !important;
+  font-weight: 600;
+}
+.badge-0dte-scraping,
+.badge-0dte-generic {
+  background: transparent !important;
+  color: var(--sig-0dte) !important;
+  border: 1px solid var(--sig-0dte-border) !important;
+}
+
+/* 背景信息 (时段 / 微笑) 降为一行灰字 */
+.card-meta-line {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+td .card-meta-line { justify-content: flex-start; }
+.card-meta-sep { opacity: 0.6; }
+
+/* 卡片左侧主信号色条：矛盾 > 方向 / 波动率；OI 确证实线，其余虚线 */
+.cluster-card.sig-bull, .whale-mobile-card.sig-bull { --sig: var(--sig-bull); }
+.cluster-card.sig-bear, .whale-mobile-card.sig-bear { --sig: var(--sig-bear); }
+.cluster-card.sig-volbuy, .whale-mobile-card.sig-volbuy { --sig: var(--sig-volbuy); }
+.cluster-card.sig-volsell, .whale-mobile-card.sig-volsell { --sig: var(--sig-volsell); }
+.cluster-card.sig-conflict, .whale-mobile-card.sig-conflict { --sig: var(--sig-conflict); }
+.cluster-card.sig-neutral, .whale-mobile-card.sig-neutral { --sig: var(--sig-neutral); }
+.cluster-card[class*="sig-"],
+.whale-mobile-card[class*="sig-"] {
+  border-left: 4px solid var(--sig);
+}
+.cluster-card.sig-dashed,
+.whale-mobile-card.sig-dashed {
+  border-left-style: dashed;
+}
+.cluster-card.sig-conflict {
+  background: linear-gradient(90deg, var(--sig-conflict-bg), transparent 40%), var(--bg-surface-elevated);
+}
+
+tr.sig-bull { --sig: var(--sig-bull); }
+tr.sig-bear { --sig: var(--sig-bear); }
+tr.sig-volbuy { --sig: var(--sig-volbuy); }
+tr.sig-volsell { --sig: var(--sig-volsell); }
+tr.sig-conflict { --sig: var(--sig-conflict); }
+tr.sig-neutral { --sig: var(--sig-neutral); }
+tr[class*="sig-"] > td:first-child {
+  border-left: 3px solid var(--sig);
+}
+tr.sig-dashed > td:first-child {
+  border-left-style: dashed;
+}
+
+.oi-legs-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+.oi-legs-list .mono { font-family: var(--font-mono); }

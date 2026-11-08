@@ -44,7 +44,7 @@ function buildServer(t, calls, { flowPayload } = {}) {
     [srv('etf_linkage_engine.js')]: { getEtfLinkageData: async () => ({}) },
     [srv('basis_fetcher.js')]: { getHistoricalBasisData: async () => ({}) },
     [srv('option_marks.js')]: { getOptionMarks: async () => ({}), pickInstruments: (s, i) => s, fetchBookSummaryRows: async () => [] },
-    [srv('option_oi_history.js')]: { getMergedHistory: async () => [], maybeRecordLiveSnapshot() {}, dayKey: () => '', profileFromItems: () => ({}) },
+    [srv('option_oi_history.js')]: { getMergedHistory: async () => [], maybeRecordLiveSnapshot() {}, withProvisionalSnapshot: s => s, dayKey: () => '', profileFromItems: () => ({}) },
     [srv('block_insight.js')]: { getServerInsight: async () => ({}) },
     [srv('vol_surface_history.js')]: { getHistory: () => [], recordSnapshot: () => { calls.recordSnapshot++; } },
     [srv('wave_engine.js')]: { analyzeWaves: () => ({}), evaluateUserCount: () => ({}), evaluateUserSketch: () => ({}), USER_TOOLS: [] },

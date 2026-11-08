@@ -18,7 +18,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       # 取 main 最新提交，确保同一天前一次运行的提交可见
       - name: Checkout

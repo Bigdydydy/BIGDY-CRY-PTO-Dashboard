@@ -1405,24 +1405,74 @@ function setTextIfPresent(id, text) {
 }
 
 /**
- * OI-verified opening / closing tag (estimated from Deribit daily open interest change vs 24h volume).
- * The rule-based actionTag next to it stays as the trade-feature inference.
+ * Module 4 卡片配色：一种颜色只表达一个维度。
+ *  方向 (Delta) 绿 / 红 · 波动率 (Vega) 紫 = 买波 / 蓝 = 卖波 · 0DTE 橙 · 聪明钱 金 · 规则与 OI 矛盾 品红；
+ *  开平仓不用色相，用符号 (＋ − ⟳ ⇄ ±) + 填充表示可信度：实底 = OI 确证，细框 = OI 倾向，虚框 = 规则推断。
+ *  卡片左侧色条 = 主信号 (矛盾优先，其次方向 / 波动率)，OI 确证为实线、否则虚线。
  */
-function oiBadgeHtml(p) {
-  if (!p) return '';
-  const howTitle = '按该合约当日 Deribit 未平仓量 (OI) 变化与 24h 成交量估算：开仓占比 = (成交量 + OI 变化) / (2 × 成交量)';
-  if (p.status === 'pending') {
-    return '<span class="intent-badge-pill badge-neutral" title="成交在最新一次 Deribit OI 快照之后，次日 08:15 UTC 快照后判定">⏳ OI 待确认</span>';
+const SIGNAL_OF_INTENT = {
+  'badge-bull': 'bull',
+  'badge-bear': 'bear',
+  'badge-vol-buy': 'volbuy',
+  'badge-vol-sell': 'volsell'
+};
+const LIFECYCLE_TIER = { 'oi-confirmed': 'lc-confirmed', 'oi-leaning': 'lc-leaning', 'oi-weak': 'lc-rule', rule: 'lc-rule', none: 'lc-none' };
+
+function cardSignalClass(item) {
+  const lc = item.lifecycle;
+  const sig = lc?.conflict ? 'conflict' : (SIGNAL_OF_INTENT[item.intentBadgeClass] || 'neutral');
+  return `sig-${sig} ${lc?.basis === 'oi-confirmed' ? 'sig-solid' : 'sig-dashed'}`;
+}
+
+function lifecycleChipHtml(item) {
+  const lc = item.lifecycle;
+  if (!lc) {
+    // 旧版接口 (无 lifecycle 字段) 仍按规则标签显示
+    return item.actionTag ? `<span class="intent-badge-pill lc-chip lc-rule">${escapeHtml(item.actionTag)}</span>` : '';
   }
-  if (p.openShare == null) return '';
-  const pct = Math.round(p.openShare * 100);
-  const styles = {
-    opening: ['badge-bull', `OI 验证 · 开仓 ${pct}%`],
-    closing: ['badge-bear', `OI 验证 · 平仓 ${100 - pct}%`],
-    mixed: ['badge-neutral', `OI 验证 · 开平混合 (开仓 ${pct}%)`]
-  };
-  const st = styles[p.status];
-  return st ? `<span class="intent-badge-pill ${st[0]}" title="${howTitle}">${st[1]}</span>` : '';
+  let html = `<span class="intent-badge-pill lc-chip ${LIFECYCLE_TIER[lc.basis] || 'lc-none'}" title="${escapeHtml(lc.title || '')}">${escapeHtml(lc.label)}</span>`;
+  if (lc.conflict && lc.conflictText) {
+    html += `<span class="intent-badge-pill badge-conflict" title="${escapeHtml(lc.title || '')}">${escapeHtml(lc.conflictText)}</span>`;
+  }
+  return html;
+}
+
+function smartStarHtml(item) {
+  const sm = item.smart;
+  if (!sm || !sm.star) return '';
+  const rate = sm.hitRate != null ? `${Math.round(sm.hitRate * 100)}%` : '--';
+  const basis = sm.basis === 'final' ? '交割结果' : '7 日盯市';
+  return `<span class="intent-badge-pill badge-smart" title="4B 聪明钱：「${escapeHtml(sm.label)}」家族按${basis}的历史胜率 ${rate}（${Number(sm.samples) || 0} 个样本），且本单经 OI 确证为新开仓">★ 聪明钱 · ${escapeHtml(sm.label)} ${rate}</span>`;
+}
+
+function zeroDteChipHtml(item, withTag = true) {
+  if (!item.is0DTE) return '';
+  return `<span class="intent-badge-pill ${escapeHtml(item.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE${withTag && item.timingTag ? ` ${escapeHtml(item.timingTag)}` : ''}</span>`;
+}
+
+/** 时段、微笑这类背景信息降级为一行灰色小字，不再占用彩色标签 */
+const META_EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2B55}]️?\s*/gu;
+
+function cardMetaHtml(item) {
+  // 灰字行去掉 emoji：⭐ 之类会和金色 ★ 聪明钱标记混淆
+  const plain = t => String(t || '').replace(META_EMOJI_RE, '').trim();
+  const parts = [];
+  if (item.sessionProfile?.tag) parts.push(`<span title="${escapeHtml(item.sessionProfile.desc || '')}">${escapeHtml(plain(item.sessionProfile.tag))}</span>`);
+  const smile = item.smileAlphaRating?.rating || (typeof item.smileAlphaRating === 'string' ? item.smileAlphaRating : '');
+  if (smile) parts.push(`<span title="${escapeHtml(item.smileAlphaRating?.comment || '')}">${escapeHtml(plain(smile))}</span>`);
+  return parts.length ? `<div class="card-meta-line">${parts.join('<span class="card-meta-sep">·</span>')}</div>` : '';
+}
+
+/** 多腿结构的逐腿 OI 判读 (详情抽屉) */
+function oiLegsHtml(p) {
+  if (!p || !Array.isArray(p.legs) || p.legs.length < 2) return '';
+  const pct = v => `${Math.round(v * 100)}%`;
+  const word = { opening: '开仓', closing: '平仓', mixed: '换手 / 相抵' };
+  const rows = p.legs.map(l => {
+    const range = l.openLo != null ? `区间 ${pct(l.openLo)}–${pct(l.openHi)}，本单占 ${pct(l.dominance)}` : '仅点估计';
+    return `<li><span class="mono">${escapeHtml(l.instrument)}</span>：${word[l.status] || escapeHtml(l.status)}（当日开仓占比 ${pct(l.openShare)}，${range}）${l.confidence === 'confirmed' ? ' ✓' : ''}</li>`;
+  }).join('');
+  return `<ul class="oi-legs-list">${rows}</ul>`;
 }
 
 /**
@@ -1452,12 +1502,18 @@ function renderIcebergsList(clusters) {
   let clusterHtml = '';
   pageClusters.forEach((c, idx) => {
     const globalIdx = startIdx + idx;
-    const isBuy = c.direction === 'buy';
-    const dirClass = isBuy ? 'dir-buy' : 'dir-sell';
-    const dirText = c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单');
+    // 方向徽章与意图分类同一口径：意图判为买 / 卖波动的 (如宽跨式) 不再因残余 Delta 显示成多头 / 空头
+    const intentSig = SIGNAL_OF_INTENT[c.intentBadgeClass];
+    const isVolAxis = intentSig === 'volbuy' || intentSig === 'volsell' || (!intentSig && c.primaryAxis === 'vega');
+    const isBuy = intentSig === 'volbuy' || intentSig === 'bull' ? true
+      : (intentSig === 'volsell' || intentSig === 'bear' ? false : c.direction === 'buy');
+    const dirClass = isVolAxis ? (isBuy ? 'dir-volbuy' : 'dir-volsell') : (isBuy ? 'dir-buy' : 'dir-sell');
+    const dirText = isVolAxis
+      ? (isBuy ? 'LONG VOL 买波动拆单' : 'SHORT VOL 卖波动拆单')
+      : (c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单'));
 
     clusterHtml += `
-      <div class="cluster-card" onclick="openIcebergDetail(${Number(globalIdx)})">
+      <div class="cluster-card ${cardSignalClass(c)}" onclick="openIcebergDetail(${Number(globalIdx)})">
         <div class="cluster-info">
           <span class="cluster-dir-badge ${dirClass}">${dirText}</span>
           <div>
@@ -1468,14 +1524,13 @@ function renderIcebergsList(clusters) {
         <div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
-              ${c.actionTag ? `<span class="intent-badge-pill ${escapeHtml(c.actionBadgeClass || 'badge-neutral')}">${escapeHtml(c.actionTag)}</span>` : ''}
-              ${oiBadgeHtml(c.oiProfile)}
-              ${c.sessionProfile?.tag ? `<span class="intent-badge-pill ${escapeHtml(c.sessionProfile.badgeClass || 'badge-neutral')}" title="${escapeHtml(c.sessionProfile.desc || '')}">${escapeHtml(c.sessionProfile.tag)}</span>` : ''}
-              ${c.smileAlphaRating ? `<span class="intent-badge-pill badge-neutral" title="${escapeHtml(c.smileAlphaRating.comment || '')}">${escapeHtml(c.smileAlphaRating.rating || c.smileAlphaRating)}</span>` : ''}
-              ${c.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(c.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE: ${escapeHtml(c.timingTag)}</span>` : ''}
+              ${smartStarHtml(c)}
               <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
+              ${lifecycleChipHtml(c)}
+              ${zeroDteChipHtml(c)}
             </div>
-            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:#a1a1aa;text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
+            ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:var(--text-muted);text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
+            ${cardMetaHtml(c)}
           </div>
         </div>
         <div class="cluster-stats">
@@ -1543,19 +1598,18 @@ function renderWhaleSinglesList(blocks) {
   pageBlocks.forEach((b, idx) => {
     const globalIdx = startIdx + idx;
     tableHtml += `
-      <tr onclick="openWhaleDetail(${Number(globalIdx)})">
+      <tr class="${cardSignalClass(b)}" onclick="openWhaleDetail(${Number(globalIdx)})">
         <td>${escapeHtml(b.dateTimeUTC8 || b.dateTime || formatUTC8(b.timestamp))}</td>
         <td><span class="text-accent">${escapeHtml(b.blockId)}</span></td>
         <td>
           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
-            ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
-            ${oiBadgeHtml(b.oiProfile)}
-            ${b.sessionProfile?.tag ? `<span class="intent-badge-pill ${escapeHtml(b.sessionProfile.badgeClass || 'badge-neutral')}" title="${escapeHtml(b.sessionProfile.desc || '')}">${escapeHtml(b.sessionProfile.tag)}</span>` : ''}
-            ${b.smileAlphaRating ? `<span class="intent-badge-pill badge-neutral" title="${escapeHtml(b.smileAlphaRating.comment || '')}">${escapeHtml(b.smileAlphaRating.rating || b.smileAlphaRating)}</span>` : ''}
-            ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE ${escapeHtml(b.timingTag)}</span>` : ''}
+            ${smartStarHtml(b)}
+            <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+            ${lifecycleChipHtml(b)}
+            ${zeroDteChipHtml(b)}
           </div>
-          <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
-          ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:#a1a1aa;margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
+          ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
+          ${cardMetaHtml(b)}
         </td>
         <td><strong>$${(Number(b.notionalUSDM) || 0).toFixed(2)}M</strong></td>
         <td>${(Number(b.netDeltaBTC) || 0) >= 0 ? '+' : ''}${(Number(b.netDeltaBTC) || 0).toFixed(1)} BTC</td>
@@ -1570,17 +1624,17 @@ function renderWhaleSinglesList(blocks) {
     `;
 
     cardsHtml += `
-      <div class="whale-mobile-card" onclick="openWhaleDetail(${Number(globalIdx)})">
+      <div class="whale-mobile-card ${cardSignalClass(b)}" onclick="openWhaleDetail(${Number(globalIdx)})">
         <div class="wmc-header">
           <div class="wmc-id-group">
             <span class="wmc-id">${escapeHtml(b.blockId)}</span>
             <span class="wmc-time">${escapeHtml((b.dateTimeUTC8 || b.dateTime || '').slice(5, 16))}</span>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;">
-            ${b.actionTag ? `<span class="intent-badge-pill ${escapeHtml(b.actionBadgeClass || 'badge-neutral')}">${escapeHtml(b.actionTag)}</span>` : ''}
-            ${oiBadgeHtml(b.oiProfile)}
-            ${b.is0DTE ? `<span class="intent-badge-pill ${escapeHtml(b.timingBadgeClass || 'badge-0dte-generic')}">⚡ 0DTE</span>` : ''}
+            ${smartStarHtml(b)}
             <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
+            ${lifecycleChipHtml(b)}
+            ${zeroDteChipHtml(b, false)}
           </div>
         </div>
         <div class="wmc-strategy">${escapeHtml(b.strategyNameZh || '机构定制结构')}</div>
@@ -1659,9 +1713,15 @@ function populateActionTimingDrawer(item) {
     }
   }
 
+  const lc = item.lifecycle;
   if (elActionBadge) {
-    elActionBadge.textContent = action.tag || item.actionTag || '常规撮合';
-    elActionBadge.className = `intent-badge-pill ${action.badgeClass || item.actionBadgeClass || 'badge-neutral'}`;
+    if (lc) {
+      elActionBadge.textContent = lc.label;
+      elActionBadge.className = `intent-badge-pill lc-chip ${LIFECYCLE_TIER[lc.basis] || 'lc-none'}`;
+    } else {
+      elActionBadge.textContent = action.tag || item.actionTag || '常规撮合';
+      elActionBadge.className = `intent-badge-pill ${action.badgeClass || item.actionBadgeClass || 'badge-neutral'}`;
+    }
   }
   if (elTimingBadge) {
     const is0D = timing.is0DTE ?? item.is0DTE;
@@ -1669,10 +1729,15 @@ function populateActionTimingDrawer(item) {
     elTimingBadge.className = `intent-badge-pill ${timing.badgeClass || item.timingBadgeClass || 'badge-timing-normal'}`;
   }
   if (elActionName) {
-    elActionName.textContent = action.tag ? `${action.tag} [置信度: ${action.confidence || 'MEDIUM'}]` : (item.actionTag || '常规撮合 (需OI确认)');
+    elActionName.textContent = lc
+      ? `${lc.label}${lc.conflict ? `　${lc.conflictText}` : ''}`
+      : (action.tag ? `${action.tag} [置信度: ${action.confidence || 'MEDIUM'}]` : (item.actionTag || '常规撮合 (需OI确认)'));
   }
   if (elActionRationale) {
-    elActionRationale.textContent = action.rationale || '成交价贴近理论公允价值，无极端微观定价偏离。';
+    const ruleText = `规则推断：${action.tag || item.actionTag || '常规撮合'} [置信度 ${action.confidence || 'MEDIUM'}] —— ${action.rationale || '成交价贴近理论公允价值，无极端微观定价偏离。'}`;
+    elActionRationale.innerHTML = lc
+      ? `${escapeHtml(lc.oiText || '')}<br>${escapeHtml(ruleText)}${oiLegsHtml(item.oiProfile)}`
+      : escapeHtml(ruleText);
   }
   if (elTimingName) {
     const is0D = timing.is0DTE ?? item.is0DTE;

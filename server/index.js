@@ -811,7 +811,9 @@ async function handleApiRequest(req, res, parsedUrl) {
 
       let blockAnalysis;
       if (allowed('blockTrades') && spotPrice !== null) {
-        blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiSnapshots, {
+        // 最近一次快照之后的成交：用实时 book summary 做盘中初判 (距快照 ≤ 24h 时 24h 成交量是窗口上界，区间仍成立)
+        const oiForBlocks = optionOiHistory.withProvisionalSnapshot(oiSnapshots, marksSnapshot);
+        blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiForBlocks, {
           smileContext,
           forwardsByExpiry
         });
@@ -819,6 +821,14 @@ async function handleApiRequest(req, res, parsedUrl) {
         blockAnalysis = unavailableAnalysis(analysisHealth.blockTrades, activeTrades);
         if (spotPrice === null && analysisHealth.blockTrades.analysisAllowed) {
           blockAnalysis.summaryText = '无可用实时现货价，暂停当前研判';
+        }
+      }
+      if (Array.isArray(blockAnalysis.whaleBlocks)) {
+        try {
+          const registry = await blockInsight.getMergedRegistry();
+          blockInsight.annotateSmartFamilies(blockAnalysis, blockInsight.summarizeSmartMoney(registry).families);
+        } catch (err) {
+          console.warn('[API] smart-money families unavailable:', err.message);
         }
       }
       blockAnalysis.oiHistory = {

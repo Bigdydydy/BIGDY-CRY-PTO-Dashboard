@@ -67,7 +67,7 @@ function validateMarkSnapshot(snapshot, nowMs) {
 /**
  * Reduce Deribit `get_book_summary_by_currency?kind=option` rows to what the PV engine needs.
  * @param {Array} rows
- * @returns {{indexPrice: number|null, marks: Object<string, {markIv: number, markPrice: number, underlyingPrice: number, openInterest: number}>}}
+ * @returns {{indexPrice: number|null, marks: Object<string, {markIv: number, markPrice: number, underlyingPrice: number, openInterest: number, volume24h: number}>}}
  */
 function compactBookSummary(rows) {
   const marks = {};
@@ -81,7 +81,9 @@ function compactBookSummary(rows) {
       markPrice: Number(r.mark_price),
       underlyingPrice: Number(r.underlying_price ?? r.estimated_delivery_price),
       // 做市商敞口引擎用的全链 OI (BTC)；缺失时记 0，不参与敞口聚合
-      openInterest: Number(r.open_interest) || 0
+      openInterest: Number(r.open_interest) || 0,
+      // 24h 成交量 (BTC)：大宗开平仓的盘中初判用它作窗口成交量的上界 (option_oi_history.withProvisionalSnapshot)
+      volume24h: Number(r.volume) || 0
     };
     if (indexPrice === null && Number(r.estimated_delivery_price) > 0) {
       indexPrice = Number(r.estimated_delivery_price);

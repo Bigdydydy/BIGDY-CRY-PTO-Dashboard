@@ -996,6 +996,39 @@ function buildBlockInsight({ daily, registry, oiSnapshots = [], nowMs = Date.now
   };
 }
 
+const SMART_STAR_MIN_WEIGHT = 0.6;
+
+/**
+ * Module 4 卡片的聪明钱标注：按 4B 的结构家族 (方向看多 / 看空 / 买波 / 卖波) 挂上该家族的历史胜率。
+ * 只有历史胜率高的家族 (weight ≥ 0.6，按交割结果或 7 日盯市，至少 5 个样本) 新开仓、且开仓经 OI 区间确证时才标 ★，
+ * 避免同一家族的每张卡都亮星。
+ * @param {Object} analysis - analyzeBlockTrades 的结果 (原地补充 smart 字段)
+ * @param {Array} families - summarizeSmartMoney(registry).families
+ */
+function annotateSmartFamilies(analysis, families) {
+  if (!analysis || !Array.isArray(families) || !families.length) return analysis;
+  const byKey = Object.fromEntries(families.map(f => [f.key, f]));
+  const tag = (x, notionalUSD) => {
+    const key = familyOf({ netDeltaUSD: x.netDeltaUSD, netVegaUSD: x.netVegaUSD, notionalUSD, legs: x.legs });
+    const f = byKey[key];
+    if (!f) return;
+    const hitRate = f.weightBasis === 'final' ? f.hitRate : (f.weightBasis === '7d' ? f.hitRate7d : null);
+    const oiBacked = Boolean(x.lifecycle && x.lifecycle.kind === 'open' && x.lifecycle.basis === 'oi-confirmed');
+    x.smart = {
+      family: key,
+      label: f.label,
+      weight: f.weight,
+      basis: f.weightBasis,
+      samples: f.weightBasis === 'final' ? f.finals : (f.weightBasis === '7d' ? f.n7 : 0),
+      hitRate,
+      star: Boolean(f.weightBasis && f.weight >= SMART_STAR_MIN_WEIGHT && oiBacked)
+    };
+  };
+  for (const b of analysis.whaleBlocks || []) tag(b, b.notionalUSD);
+  for (const c of analysis.icebergClusters || []) tag(c, c.clusterNotionalUSD);
+  return analysis;
+}
+
 module.exports = {
   DAILY_FILE,
   SMART_FILE,
@@ -1013,6 +1046,7 @@ module.exports = {
   markStructures,
   mergeRegistries,
   summarizeSmartMoney,
+  annotateSmartFamilies,
   profitZone,
   strikeMap,
   liveExpiries,

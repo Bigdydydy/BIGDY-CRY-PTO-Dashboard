@@ -1749,6 +1749,76 @@ function oiProfileOf(oiSnapshots, legs) {
   })));
 }
 
+const LIFECYCLE_ICON = { open: '＋', close: '−', roll: '⟳', mixed: '⇄', split: '±', unknown: '·' };
+const LIFECYCLE_TEXT = { open: '开仓', close: '平仓', roll: '展期', mixed: '换手 / 开平相抵', split: '腿间分化', unknown: '开平未明' };
+const OI_KIND = { opening: 'open', closing: 'close', mixed: 'mixed', roll: 'roll', split: 'split' };
+const RULE_KIND = { OPENING: 'open', CLOSING: 'close', ROLLOVER: 'roll' };
+const LIFECYCLE_STRONG_DOMINANCE = 0.4; // OI 只是「倾向」时，本单至少占窗口成交 40% 才压过规则推断
+
+/**
+ * 开平仓的统一判读：成交特征规则 (actionProfile) 与 OI 区间验证 (oiProfile) 合成一个结论。
+ *  - OI 确证，或 OI 倾向且本单占窗口成交足够大 → 以 OI 为准；规则给出相反的开/平结论时标记矛盾
+ *  - OI 只是弱倾向 / 待确认 / 无数据 → 沿用规则推断 (虚线样式)，OI 信息放进说明
+ * @returns {{kind: string, basis: 'oi-confirmed'|'oi-leaning'|'oi-weak'|'rule'|'none', pending: boolean,
+ *   provisional: boolean, conflict: boolean, label: string, title: string, conflictText?: string}}
+ */
+function reconcileLifecycle(actionProfile, oiProfile) {
+  const ruleKind = RULE_KIND[actionProfile?.action] || null;
+  const oiKind = oiProfile ? OI_KIND[oiProfile.status] || null : null;
+  const pct = v => `${Math.round(v * 100)}%`;
+  const oiStrong = Boolean(oiKind && (oiProfile.confidence === 'confirmed' || (oiProfile.dominance ?? 0) >= LIFECYCLE_STRONG_DOMINANCE));
+
+  let kind = 'unknown';
+  let basis = 'none';
+  if (oiStrong) {
+    kind = oiKind;
+    basis = oiProfile.confidence === 'confirmed' ? 'oi-confirmed' : 'oi-leaning';
+  } else if (ruleKind) {
+    kind = ruleKind;
+    basis = 'rule';
+  } else if (oiKind) {
+    kind = oiKind;
+    basis = 'oi-weak';
+  }
+  const conflict = Boolean(oiStrong && ruleKind && ((ruleKind === 'open' && oiKind === 'close') || (ruleKind === 'close' && oiKind === 'open')));
+
+  const oiDesc = (() => {
+    if (!oiProfile) return '无 OI 快照';
+    if (oiProfile.status === 'pending') return 'OI 待下一次快照确认';
+    if (!oiKind) return 'OI 无法判定 (合约已交割或快照缺失)';
+    const range = oiProfile.openLo != null
+      ? `，本单开仓占比区间 ${pct(oiProfile.openLo)}–${pct(oiProfile.openHi)}；本单占窗口成交 ${pct(oiProfile.dominance ?? 0)}`
+      : '；该窗口还没有逐笔汇总的精确成交量，只有点估计';
+    const struct = oiProfile.structure ? `；结构：${oiProfile.structure.text}` : '';
+    return `OI ${oiProfile.confidence === 'confirmed' ? '确证' : '倾向'}：合约当日开仓占比 ${pct(oiProfile.openShare)}${range}${struct}${oiProfile.provisional ? '（实时初判，下次快照后定稿）' : ''}`;
+  })();
+
+  let suffix = '';
+  if (basis === 'oi-confirmed') suffix = oiProfile.provisional ? ' ✓ 实时初判' : ' ✓ OI 确证';
+  else if (basis === 'oi-leaning') suffix = ` · OI 倾向 (本单占 ${pct(oiProfile.dominance)})`;
+  else if (basis === 'rule') suffix = ' · 规则推断';
+  else if (basis === 'oi-weak') suffix = ' · OI 弱倾向';
+  const pending = oiProfile?.status === 'pending';
+  if (pending) suffix += ' ⏳';
+  const structText = (kind === 'roll' || kind === 'split') && oiProfile?.structure && basis.startsWith('oi') ? ` ${oiProfile.structure.text}` : '';
+
+  const out = {
+    kind,
+    basis,
+    pending,
+    provisional: Boolean(oiProfile?.provisional),
+    conflict,
+    oiText: oiDesc,
+    // 规则只能看到「跨到期、方向相反」，分不清展期和日历价差新开仓；OI 能分开时才叫展期
+    label: `${LIFECYCLE_ICON[kind]} ${kind === 'roll' && basis === 'rule' ? '跨期 (展期或日历价差)' : LIFECYCLE_TEXT[kind]}${structText}${suffix}`,
+    title: `规则推断：${actionProfile?.tag || '无'}。${oiDesc}。`
+  };
+  if (conflict) {
+    out.conflictText = `⚠ 与 OI 矛盾：规则判${LIFECYCLE_TEXT[ruleKind]}，OI 显示${LIFECYCLE_TEXT[oiKind]} ${pct(oiKind === 'open' ? oiProfile.openShare : 1 - oiProfile.openShare)}`;
+  }
+  return out;
+}
+
 /**
  * 从 atmData 或 Deribit option_marks 构建到期日远期价格映射 { '30OCT26': 80200, ... }，
  * 供大宗交易与 4B 按 Black-76 远期价 F 计算远月 Greeks，消除用现货代替远期造成的 Delta 失真。
@@ -1824,7 +1894,7 @@ function classifyMarketSession(timestampMs) {
     return {
       key: 'us_etf_hours',
       tag: '🏛️ 美股ETF同频',
-      badgeClass: 'badge-bull',
+      badgeClass: 'badge-neutral',
       isUsHours: true,
       desc: '处于美东 09:30–16:00 交易窗口，与受监管 ETF 期权市场同步定价'
     };
@@ -2014,6 +2084,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         hoursToExpiry: timingProfile.hoursToExpiry,
         is0DTE: timingProfile.is0DTE,
         oiProfile,
+        lifecycle: reconcileLifecycle(actionProfile, oiProfile),
         ...intent
       });
     }
@@ -2141,7 +2212,10 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       }
 
       let primaryDirection = 'buy';
+      // 卡片主轴：方向性 (Delta) 还是波动率 (Vega)；单腿与 Delta 显著的组合按方向，其余按波动率
+      let primaryAxis = 'delta';
       if (isMultiLeg) {
+        if (Math.abs(clusterDeltaUSD) <= 500000) primaryAxis = 'vega';
         if (Math.abs(clusterDeltaUSD) > 500000) {
           primaryDirection = clusterDeltaUSD >= 0 ? 'buy' : 'sell';
         } else {
@@ -2171,6 +2245,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         instrument: displayInstrument,
         instrumentRaw: base.structureSignature,
         direction: primaryDirection,
+        primaryAxis,
         isMultiLeg,
         totalContracts,
         clusterNotionalUSD: clusterNotional,
@@ -2203,6 +2278,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         hoursToExpiry: timingProfile.hoursToExpiry,
         is0DTE: timingProfile.is0DTE,
         oiProfile,
+        lifecycle: reconcileLifecycle(actionProfile, oiProfile),
         ...intent
       });
     }
@@ -2347,13 +2423,16 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   const overlapText = overlapUnits.length
     ? `，其中 ${overlapUnits.length} 笔（$${M(whaleInClusterUSD)}M）同属冰山组`
     : '';
-  const oiCounts = { opening: 0, closing: 0, mixed: 0, pending: 0 };
+  // OI 验证计数：status 为合约当日的点估计；confirmed 为本单区间可确证的子集；conflict 为规则与 OI 相反
+  const oiCounts = { opening: 0, closing: 0, mixed: 0, roll: 0, split: 0, pending: 0, confirmed: 0, conflict: 0 };
   for (const x of [...icebergClusters, ...whaleBlocks.filter(b => !clusteredIdSet.has(b.blockId))]) {
     if (x.oiProfile && oiCounts[x.oiProfile.status] !== undefined) oiCounts[x.oiProfile.status]++;
+    if (x.lifecycle?.basis === 'oi-confirmed') oiCounts.confirmed++;
+    if (x.lifecycle?.conflict) oiCounts.conflict++;
   }
-  const oiJudged = oiCounts.opening + oiCounts.closing + oiCounts.mixed;
+  const oiJudged = oiCounts.opening + oiCounts.closing + oiCounts.mixed + oiCounts.roll + oiCounts.split;
   const oiText = oiJudged
-    ? `按 Deribit 未平仓量变化验证（冰山组与独立大单）：开仓 ${oiCounts.opening} 组，平仓 ${oiCounts.closing} 组，开平混合 ${oiCounts.mixed} 组${oiCounts.pending ? `，另 ${oiCounts.pending} 组待次日快照确认` : ''}。`
+    ? `按 Deribit 未平仓量变化验证（冰山组与独立大单）：合约当日开仓倾向 ${oiCounts.opening} 组、平仓倾向 ${oiCounts.closing} 组、换手 / 开平相抵 ${oiCounts.mixed} 组${oiCounts.roll ? `、展期 ${oiCounts.roll} 组` : ''}${oiCounts.split ? `、腿间分化 ${oiCounts.split} 组` : ''}；其中本单足以确证开平方向的 ${oiCounts.confirmed} 组${oiCounts.conflict ? `，规则推断与 OI 相反 ${oiCounts.conflict} 组` : ''}${oiCounts.pending ? `，另 ${oiCounts.pending} 组待下一次快照确认` : ''}。`
     : '';
   const sessionText = dedupedTotal > 0
     ? `跨市场时段切分：美股 ETF 同频窗口（09:30–16:00 ET）占 ${sessionSplit.usHoursPct}%，亚欧非美时段占 ${sessionSplit.offHoursPct}%，周末独立定价占 ${sessionSplit.weekendPct}%。`
@@ -2873,6 +2952,7 @@ module.exports = {
   analyzeAtmIv,
   analyzeDynamicGex,
   analyzeBlockTrades,
+  reconcileLifecycle,
   analyzeIvSmile,
   analyze25DeltaSkew,
   interpolateTotalVariance,
