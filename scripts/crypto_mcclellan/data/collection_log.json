@@ -157,5 +157,10 @@
   "collected_at": "2026-11-07T06:35:47Z",
   "failed": [],
   "sampling_basis": "utc_snapshot"
+ },
+ "2026-11-08": {
+  "collected_at": "2026-11-08T06:41:54Z",
+  "failed": [],
+  "sampling_basis": "utc_snapshot"
  }
 }
