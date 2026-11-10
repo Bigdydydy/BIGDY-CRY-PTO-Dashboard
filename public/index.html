@@ -1818,7 +1818,7 @@
       <div class="card-body">
         <div class="rule-banner">
           <span>⚙️</span>
-          <span id="gex-rule-text">本卡展示各独立到期日的 Call Wall / Put Wall 钉盘阻力位（Greeks.live 参照口径）；全链 Black-76 精算 GEX、订单流符号校正与滑动翻转位请以 02B 做市商敞口引擎为准。</span>
+          <span id="gex-rule-text">本卡展示各独立到期日净 GEX 最大 / 最负的行权价（Greeks.live 参照口径）。正负号是惯例假设（做市商多 Call、空 Put），不是观测值：按该假设 Put Wall 处做市商为负 Gamma，对冲流放大波动，不构成支撑；惯例与成交台账的吻合度见 02B 的“持仓符号口径”表。方向与翻转位以 02B 为准。</span>
         </div>
 
         <div class="metrics-row" id="gex-summary-row">
@@ -1891,7 +1891,7 @@
             <span class="m-sub" id="dealer-realized-sub">--</span>
           </div>
           <div class="metric-pill-box">
-            <span class="m-label">下行情景卖出 / 盘口买盘</span>
+            <span class="m-label">下行情景对冲卖出 (现货 −3% · IV +5)</span>
             <span class="m-value" id="dealer-depth">--</span>
             <span class="m-sub" id="dealer-depth-sub">--</span>
           </div>
@@ -1950,7 +1950,7 @@
 
         <div class="metrics-row" style="margin-top: 6px;">
           <div class="metric-pill-box">
-            <span class="m-label" title="全链现价上方最大 Call OI 与下方最大 Put OI 行权价">全链 OI 阻力 / 支撑墙</span>
+            <span class="m-label" title="全链现价上方最大 Call OI 与下方最大 Put OI 行权价">全链最大 OI 行权价 (Call / Put)</span>
             <span class="m-value" id="dealer-walls">--</span>
             <span class="m-sub" id="dealer-walls-sub">--</span>
           </div>
