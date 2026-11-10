@@ -646,7 +646,10 @@ describe('Phase 2: Term Premium on Real Tenors & Carry Score', () => {
     assert.equal(m.etfCostAnnualized, 1.26);
     assert.equal(m.etfNetCarry, 0.74);
     assert.equal(m.etfArbitrageStatus, 'COVERED');
-    assert.equal(etfCarryMetrics({ apr90d: 5, tbill: 4 }).etfArbitrageStatus, 'UNWIND_RISK');
+    // net −0.26 sits inside the ±0.5pp venue band (Deribit basis standing in for CME): not signable
+    assert.equal(etfCarryMetrics({ apr90d: 5, tbill: 4 }).etfArbitrageStatus, 'MARGINAL');
+    assert.equal(etfCarryMetrics({ apr90d: 5.4, tbill: 4 }).etfArbitrageStatus, 'MARGINAL');
+    assert.equal(etfCarryMetrics({ apr90d: 4.5, tbill: 4 }).etfArbitrageStatus, 'UNWIND_RISK');
   });
 
   test('analyzeTermPremium (history only) returns real-tenor payload', async () => {

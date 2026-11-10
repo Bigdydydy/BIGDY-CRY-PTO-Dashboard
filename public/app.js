@@ -739,7 +739,7 @@ function renderAtmIv(data) {
 
   elIv1m.textContent = data.iv1m ? `${data.iv1m.toFixed(1)}%` : '--%';
   elIv1mSub.textContent = (typeof data.vrp30 === 'number' && typeof data.hv30 === 'number')
-    ? `HV30 ${data.hv30.toFixed(1)}% · VRP ${fmtSignedNum(data.vrp30)}`
+    ? `HV30 ${data.hv30.toFixed(1)}% · IV−HV ${fmtSignedNum(data.vrp30)} 点`
     : 'HV30 --';
 
   elIv3m.textContent = data.iv3m ? `${data.iv3m.toFixed(1)}%` : '--%';
@@ -3356,7 +3356,12 @@ function renderMacroSummary(summary) {
     const diff20d = summary.fedNetLiqChange20d;
     const isExp = diff20d !== null ? diff20d >= 0 : (summary.currentFedNetLiquidity >= (summary.currentFedNetLiqSma20 || summary.currentFedNetLiquidity));
     const diffB = diff20d !== null ? Math.round(Math.abs(diff20d) * 1000) : 0;
-    if (isExp) {
+    // 20 日变化不足存量的 0.5% 视为持平：周频数据的常规波动，不贴"扩张/紧缩"标签
+    const level = summary.currentFedNetLiquidity;
+    if (diff20d !== null && level > 0 && Math.abs(diff20d) / level < 0.005) {
+      elMacroNetliqChip.textContent = `20D 持平 ${diff20d >= 0 ? '+' : '-'}$${diffB}B`;
+      elMacroNetliqChip.className = 'mm-chip';
+    } else if (isExp) {
       elMacroNetliqChip.textContent = `20D 扩张 +$${diffB}B`;
       elMacroNetliqChip.className = 'mm-chip chip-positive';
     } else {
@@ -3366,9 +3371,47 @@ function renderMacroSummary(summary) {
   }
   if (elMacroNetliqSub && summary.currentFedWalcl !== null && summary.currentFedTga !== null && summary.currentFedRrp !== null) {
     const rrpStr = summary.currentFedRrp < 0.01 ? `$${(summary.currentFedRrp * 1000).toFixed(1)}B` : `$${summary.currentFedRrp.toFixed(2)}T`;
-    elMacroNetliqSub.textContent = `WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}`;
+    const rrpGone = summary.currentFedRrp < 0.01; // < $10B：RRP 项已不起作用
+    elMacroNetliqSub.textContent = `WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}${rrpGone ? ' · RRP 已近零，现实际为 WALCL − TGA' : ''}`;
+  }
+  lastMacroSummaryForMstr = summary;
+  applyOfficialMstr();
+}
+
+/**
+ * 官方披露可用时，成本与 mNAV 两张卡以官方口径为准 (账本就在本页下方，避免同页两个来源、两个数)。
+ * 披露不可用时保持宏观数据集的第三方汇总值与旧口径估算，标签如实说明。
+ */
+let lastMacroSummaryForMstr = null;
+function applyOfficialMstr() {
+  const off = window.__mstrOfficial;
+  const summary = lastMacroSummaryForMstr;
+  const mnavLabel = document.querySelector('#card-metric-mnav .mm-label');
+  if (!off || !summary) return;
+  if (Number.isFinite(off.averageCostUsd) && off.averageCostUsd > 0) {
+    if (elMacroMstrVal) elMacroMstrVal.textContent = `$${Math.round(off.averageCostUsd).toLocaleString()}`;
+    if (elMacroMstrSub) elMacroMstrSub.textContent = `官方披露（${off.viaSec ? 'SEC 8-K' : 'strategy.com'}）· 持仓截至 ${off.holdingsAsOf || off.reportedOn || '--'}`;
+    if (elMacroMstrMult && summary.currentBtc) {
+      const mult = summary.currentBtc / off.averageCostUsd;
+      elMacroMstrMult.textContent = `${mult.toFixed(2)}x (${mult >= 1 ? '+' : ''}${((mult - 1) * 100).toFixed(1)}%)`;
+      elMacroMstrMult.className = `mm-chip ${mult >= 1 ? 'chip-positive' : 'chip-negative'}`;
+    }
+  }
+  if (Number.isFinite(off.mnav) && off.mnav > 0 && elMacroMnavVal) {
+    if (mnavLabel) mnavLabel.textContent = `mNAV（官方口径${off.mnavMethod ? ' ' + off.mnavMethod : ''}）`;
+    elMacroMnavVal.textContent = `${off.mnav.toFixed(2)}× 估`;
+    if (elMacroMnavChip) {
+      const d = off.mnav - 1;
+      elMacroMnavChip.textContent = Math.abs(d) <= 0.005 ? '平价 1.00×' : `${d > 0 ? '溢价 +' : '折价 -'}${(Math.abs(d) * 100).toFixed(1)}%`;
+      elMacroMnavChip.className = `mm-chip ${d > 0.005 ? 'chip-positive' : (d < -0.005 ? 'chip-negative' : '')}`;
+    }
+    if (elMacroMnavSub) {
+      const old = summary.currentMnav != null ? `现值 ${summary.currentMnav.toFixed(2)}×` : '现值不可用';
+      elMacroMnavSub.textContent = `MSTR 价 ÷ Net BPS，按披露输入推算 · 图中曲线为旧 EV/BTC 口径（${old}），两口径不可比、不拼接`;
+    }
   }
 }
+window.addEventListener('mstr-official-updated', applyOfficialMstr);
 
 /**
  * Filter points by selected timeframe
@@ -4642,11 +4685,12 @@ function renderTermPremium(data, forceRedraw = false) {
       tpSetSigned(elTpEtfNet, c.etfNetCarry);
     }
     if (elTpEtfStatusBadge) {
-      const covered = c.etfArbitrageStatus === 'COVERED';
-      elTpEtfStatusBadge.textContent = covered ? '成本覆盖' : '成本未覆盖';
-      elTpEtfStatusBadge.className = `tp-ef-badge ${covered ? 'profitable' : 'unprofitable'}`;
+      const st = c.etfArbitrageStatus;
+      const band = c.etfVenueBand != null ? c.etfVenueBand : 0.5;
+      elTpEtfStatusBadge.textContent = st === 'COVERED' ? '成本覆盖' : (st === 'UNWIND_RISK' ? '成本未覆盖' : (st === 'MARGINAL' ? '临界 · 无法定号' : '--'));
+      elTpEtfStatusBadge.className = `tp-ef-badge ${st === 'COVERED' ? 'profitable' : (st === 'UNWIND_RISK' ? 'unprofitable' : '')}`;
       elTpEtfStatusBadge.title = c.etfCostAnnualized != null
-        ? `90D 基差 − 3M 美债 − 年化成本 ${c.etfCostAnnualized}%（管理费 0.25%/年 + 申赎与滑点 0.25% 按 90 天摊销）`
+        ? `90D 基差 − 3M 美债 − 年化成本 ${c.etfCostAnnualized}%（管理费 0.25%/年 + 申赎与滑点 0.25% 按 90 天摊销）。基差取自 Deribit，实际对冲在 CME，两地基差有差异：净值在 ±${band}pp 以内不判断正负。`
         : '';
     }
 

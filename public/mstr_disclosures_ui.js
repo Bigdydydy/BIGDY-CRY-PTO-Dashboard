@@ -399,10 +399,32 @@
     });
   }
 
+  /* Hand the issuer-reported cost and official-method mNAV to the macro KPI cards, so the
+   * page shows one cost and one mNAV. Nothing is published when a value is missing or the
+   * mNAV has no economic meaning (Net BPS <= 0). */
+  function publishOfficial(payload) {
+    var latest = payload.latest || null;
+    var wrap = payload.officialMnav || null;
+    var res = wrap && wrap.result;
+    var issues = (res && res.issues) || (wrap && wrap.issues) || [];
+    var mnavOk = res && typeof res.mnav === 'number' && isFinite(res.mnav)
+      && issues.indexOf('net_bps_nonpositive') < 0 && !(typeof res.netBpsUsd === 'number' && res.netBpsUsd <= 0);
+    window.__mstrOfficial = {
+      averageCostUsd: latest && typeof latest.averageCostUsd === 'number' ? latest.averageCostUsd : null,
+      holdingsAsOf: latest ? latest.holdingsAsOf || null : null,
+      reportedOn: latest ? latest.reportedOn || null : null,
+      viaSec: payload.holdingsSource === 'sec_8k',
+      mnav: mnavOk ? res.mnav : null,
+      mnavMethod: mnavOk ? res.methodologyVersion || null : null
+    };
+    try { window.dispatchEvent(new Event('mstr-official-updated')); } catch (e) { /* old engines */ }
+  }
+
   function applyPayload(payload) {
     if (payload && typeof payload === 'object') {
       lastPayload = payload;
       lastFetchError = null;
+      publishOfficial(payload);
     }
     renderSummary();
     renderEvents();
