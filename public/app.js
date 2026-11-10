@@ -836,11 +836,11 @@ function renderGex(data) {
             <span class="gex-d-val ${gexColor}">${signStr}$${Math.abs(Number(exp.totalGexM) || 0).toFixed(2)}M</span>
           </div>
           <div class="gex-detail-row">
-            <span class="gex-d-label">Call Wall (阻力位):</span>
+            <span class="gex-d-label" title="该到期日净 GEX 最大的行权价。仅在做市商确为正 Gamma 时才有钉盘/阻力含义">Call Wall (最大正 GEX):</span>
             <span class="gex-d-val text-pos">$${exp.callWall ? Number(exp.callWall).toLocaleString() : '--'}</span>
           </div>
           <div class="gex-detail-row">
-            <span class="gex-d-label">Put Wall (支撑位):</span>
+            <span class="gex-d-label" title="该到期日净 GEX 最负的行权价。按本卡惯例这里是做市商负 Gamma：现货接近时对冲流放大波动，不是支撑">Put Wall (最大负 GEX):</span>
             <span class="gex-d-val text-neg">$${exp.putWall ? Number(exp.putWall).toLocaleString() : '--'}</span>
           </div>
           <div class="gex-detail-row">
@@ -1047,8 +1047,9 @@ function renderDealerExposure(data) {
     setTextIfPresent('dealer-depth', '--');
     setTextIfPresent('dealer-depth-sub', `下行情景做市商为买方，不消耗 ${depth.venue} 买盘`);
   } else if (depth) {
-    setTextIfPresent('dealer-depth', `${depth.downsideRatioPct}%`);
-    setTextIfPresent('dealer-depth-sub', `卖出 ${usdM(-depth.downsideSellUsd)} / ${depth.venue} ${depth.band} 买盘 ${usdM(depth.bidUsd)} · 量级参考`);
+    // 主值给对冲卖出量本身；与盘口的比值分母是单一现货场所的瞬时挂单，波动大，只放副行作量级参考
+    setTextIfPresent('dealer-depth', usdM(-depth.downsideSellUsd));
+    setTextIfPresent('dealer-depth-sub', `${depth.venue} 现货 ${depth.band} 买盘 ${usdM(depth.bidUsd)}（约 ${Math.round(depth.downsideRatioPct / 100)}× · 单一场所瞬时挂单，做市商多在永续对冲，仅量级参考）`);
   } else {
     setTextIfPresent('dealer-depth', '--');
     setTextIfPresent('dealer-depth-sub', '盘口深度不可用');
@@ -1081,7 +1082,8 @@ function renderDealerExposure(data) {
     }
     let robustText;
     if (sens.robust) {
-      robustText = '✅ 各口径同号，Gamma 方向结论稳健。';
+      // 同号 ≠ 稳健：未覆盖的 OI 三个口径共用惯例符号；净值占比小时置信度低 (服务端 confidence)
+      robustText = `${sens.confidence?.key === 'fragile' ? '⚠️' : '✅'} ${sens.confidence?.label || '各口径同号，Gamma 方向一致'}。未被成交净额覆盖的 OI 三个口径共用惯例符号，同号不是独立证据。`;
     } else if (cov?.source === 'ledger' && sens.flowRobust) {
       const convGex = (sens.scenarios || []).find(s => s.key === 'convention')?.gexUsd;
       const flowGex = (sens.scenarios || []).find(s => s.key === 'flow_adjusted')?.gexUsd;
@@ -5044,7 +5046,7 @@ function renderEtfLinkage() {
   const lastWeek = d.weeks?.[d.weeks.length - 1];
   const fr = d.freshness || {};
   const short = s => (s ? s.slice(5) : '--');
-  setText('el-update-time', `ETF 日流量截至 ${short(fr.etfFlowLatest)} · CME 持仓截至 ${short(fr.cotLatest || lastWeek?.weekEnd)} · OI 截至 ${short(fr.oiLatest)} · 生成 ${formatUTC8(d.generatedAt, false)}`);
+  setText('el-update-time', `ETF 日流量截至 ${short(fr.etfFlowLatest)} · CME 持仓截至 ${short(fr.cotLatest || lastWeek?.weekEnd)} · OI 截至 ${short(fr.oiLatest)} · 生成 ${formatUTC8(d.generatedAt, false)}${d.mirroredFrom === 'upstream' ? ' · 经线上转发' : ''}`);
 
   // KPIs
   const full = d.hedgeRatio?.full || {};

@@ -59,11 +59,13 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     assert.equal(D.hedgingState(-10, 5, -5).key, 'mixed');
   });
 
-  test('偏度信号优先用相对历史，历史不足时用 30D RR 绝对值', () => {
+  test('偏度信号只认相对历史；历史不足时不判极端（不用绝对阈值）', () => {
     assert.deepEqual(D.skewSignal({ d30: -1, richness: { verdict: 'put_rich' } }).side, 'put');
     assert.equal(D.skewSignal({ d30: -1, richness: { verdict: 'put_rich' } }).extreme, true);
-    assert.equal(D.skewSignal({ d30: -3.5, richness: { verdict: 'insufficient_history' } }).basis, '绝对值');
-    assert.equal(D.skewSignal({ d30: -3.5, richness: { verdict: 'insufficient_history' } }).extreme, true);
+    assert.equal(D.skewSignal({ d30: -3.5, richness: { verdict: 'insufficient_history' } }).basis, '历史不足');
+    assert.equal(D.skewSignal({ d30: -3.5, richness: { verdict: 'insufficient_history' } }).extreme, false);
+    assert.equal(D.skewSignal({ d30: -12, richness: { verdict: 'insufficient_history' } }).extreme, false, '再大的绝对值也不能替代分布');
+    assert.equal(D.skewSignal({ d30: 4, richness: { verdict: 'insufficient_history' } }).side, 'call');
     assert.equal(D.skewSignal({ d30: -1.5, richness: { verdict: 'normal' } }).extreme, false);
     assert.equal(D.skewSignal(null).side, null);
   });
@@ -80,7 +82,7 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     const args = {
       state: D.hedgingState(-10, -30e6, -1),
       vexUsd: 5e6,
-      skew: { d30: -3.6, richness: { verdict: 'insufficient_history' } },
+      skew: { d30: -3.6, richness: { verdict: 'put_rich' } },
       robust: true,
       depth: D.depthComparison(-30e6, 0, { venue: 'Coinbase', band: '±2%', bidUsd: 60e6, askUsd: 40e6 }),
       crashFlowUsd: -30e6,
@@ -91,8 +93,12 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     assert.equal(high.length, 1);
     assert.equal(high[0].key, 'downside_cascade');
     assert.equal(high[0].level, 'high');
-    assert.ok(high[0].detail.includes('50%'));
+    assert.ok(!high[0].detail.includes('盘口') && !high[0].detail.includes('深度'), '单一现货场所的瞬时深度比不进入预警文本');
+    assert.ok(high[0].detail.includes('相对自身历史偏贵'));
     assert.equal(D.buildAlerts({ ...args, robust: false })[0].level, 'medium');
+    const noHist = D.buildAlerts({ ...args, skew: { d30: -3.6, richness: { verdict: 'insufficient_history' } } })[0];
+    assert.equal(noHist.level, 'medium', '偏度历史不足时不升为高优先级');
+    assert.ok(noHist.detail.includes('历史样本不足'));
     assert.equal(D.buildAlerts({ ...args, skew: { d30: -1 } })[0].level, 'medium');
     assert.deepEqual(D.buildAlerts({ ...args, state: D.hedgingState(10, 5, -5) }), []);
   });

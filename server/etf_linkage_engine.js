@@ -28,6 +28,7 @@ const { fetchWithTimeout } = require('./http_client');
 const { callCoinglassEndpoint } = require('./cdri_fetcher');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { fetchUpstreamJson } = require('./upstream_mirror');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'etf_linkage.json');
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -277,7 +278,7 @@ async function fetchCftcBitcoin() {
  * non-null finite >= 0 number. Rows before the window are never used, so their
  * gaps (CoinGlass has no CME coverage for 2020-02-28 ~ 2020-06-04) must not
  * reject the source. USD and BTC legs never substitute. */
-function validateOiPayload(payload, exchange, label) {
+function validateOiPayload(payload, exchange, label, { closedOnWeekends = false } = {}) {
   if (!payload || !Array.isArray(payload.dateList) || !payload.dateList.length) {
     throw new Error(`OI ${label}: dateList 缺失或为空`);
   }
@@ -289,6 +290,10 @@ function validateOiPayload(payload, exchange, label) {
     const ts = Number(payload.dateList[i]);
     if (!Number.isFinite(ts)) throw new Error(`OI ${label}: dateList 含非法时间戳`);
     if (isoDate(ts) < START_DATE) return;
+    // A venue that does not trade on weekends (CME) has no observation on Sat/Sun:
+    // a null there is "market closed", not a corrupt row. It is skipped (never
+    // back-filled); any non-null value is still validated, weekend or not.
+    if (closedOnWeekends && v === null && [0, 6].includes(new Date(ts).getUTCDay())) return;
     if (!isNonNegNum(v)) throw new Error(`OI ${label}: ${exchange} 在 ${isoDate(ts)} 含 null/非法值`);
   });
 }
@@ -308,8 +313,8 @@ async function fetchOiPanel() {
     // USD and BTC legs are validated independently — never interchangeable.
     validateOiPayload(futUsd, 'Binance', 'fut/USD');
     validateOiPayload(futBtc, 'Binance', 'fut/BTC');
-    validateOiPayload(futUsd, 'CME', 'fut/USD');
-    validateOiPayload(futBtc, 'CME', 'fut/BTC');
+    validateOiPayload(futUsd, 'CME', 'fut/USD', { closedOnWeekends: true });
+    validateOiPayload(futBtc, 'CME', 'fut/BTC', { closedOnWeekends: true });
     validateOiPayload(optUsd, 'Deribit', 'opt/USD');
     validateOiPayload(optBtc, 'Deribit', 'opt/BTC');
 
@@ -622,7 +627,22 @@ function analyzeLinkage(weeks, { etfFlows, oiPanel } = {}) {
   };
 }
 
+// Fisher z of a correlation; se = 1/sqrt(n − 3). Used so "pass" means statistically
+// distinguishable, not merely numerically larger.
+const fisherZ = r => 0.5 * Math.log((1 + r) / (1 - r));
+function corrZ(c) {
+  if (!c || c.corrFlow == null || !(c.n > 3) || Math.abs(c.corrFlow) >= 1) return null;
+  return fisherZ(c.corrFlow) * Math.sqrt(c.n - 3);
+}
+function corrDiffZ(a, b) {
+  if (!a || !b || a.corrFlow == null || b.corrFlow == null || !(a.n > 3) || !(b.n > 3)
+      || Math.abs(a.corrFlow) >= 1 || Math.abs(b.corrFlow) >= 1) return null;
+  return (fisherZ(a.corrFlow) - fisherZ(b.corrFlow)) / Math.sqrt(1 / (a.n - 3) + 1 / (b.n - 3));
+}
+
 function buildVerdict({ full, splitHigh, splitLow, interaction, lead1, lag1, unwindSync, arbShare12w, recent }) {
+  const leadZ = corrZ(lead1);
+  const leadVsLagZ = corrDiffZ(lead1, lag1);
   const checks = [
     {
       key: 'hedgeRatio',
@@ -633,17 +653,21 @@ function buildVerdict({ full, splitHigh, splitLow, interaction, lead1, lag1, unw
     {
       key: 'carryDependence',
       label: '随基差变化',
-      pass: (interaction && interaction.betaPerCarryPct > 0 && interaction.tInteraction > 2)
-        || (splitHigh.beta != null && splitLow.beta != null && splitHigh.beta - splitLow.beta > 0.1),
+      // The interaction term is the test. The high/low split is descriptive only: a gap
+      // between two β without a standard error is not evidence, so it is used solely
+      // when the sample is too short to fit the interaction at all.
+      pass: interaction
+        ? interaction.betaPerCarryPct > 0 && interaction.tInteraction > 2
+        : (splitHigh.beta != null && splitLow.beta != null && splitHigh.beta - splitLow.beta > 0.1),
       detail: `基差高于美债周 β = ${fmt(splitHigh.beta, 2)} vs 低于美债周 β = ${fmt(splitLow.beta, 2)}；交互项每 1% 超额基差 β 变化 ${fmt(interaction?.betaPerCarryPct, 3)} (t = ${fmt(interaction?.tInteraction, 1)})`
     },
     {
       key: 'leadLag',
       label: '基差领先资金',
-      // Forward correlation must be material and clearly stronger than the reverse direction
-      pass: lead1 && lead1.corrFlow != null && lead1.corrFlow > 0.15
-        && (lag1?.corrFlow == null || lead1.corrFlow - lag1.corrFlow > 0.05),
-      detail: `本周基差变化 → 下周 ETF 流入相关 ${fmt(lead1?.corrFlow, 2)}（反向：上周流入 → 本周基差变化 ${fmt(lag1?.corrFlow, 2)}）；→ 下周空头增量相关 ${fmt(lead1?.corrShort, 2)}`
+      // "Leads" needs two things: the forward correlation differs from zero (two-sided 5%),
+      // and it is larger than the reverse direction by more than sampling noise (one-sided 5%).
+      pass: leadZ != null && leadZ > 1.96 && leadVsLagZ != null && leadVsLagZ > 1.645,
+      detail: `本周基差变化 → 下周 ETF 流入相关 ${fmt(lead1?.corrFlow, 2)}（z = ${fmt(leadZ, 1)}）；反向（上周流入 → 本周基差变化）${fmt(lag1?.corrFlow, 2)}，两者之差 z = ${fmt(leadVsLagZ, 1)}（需 > 1.6 才算领先）；→ 下周空头增量相关 ${fmt(lead1?.corrShort, 2)}`
     },
     {
       key: 'unwindSync',
@@ -656,13 +680,17 @@ function buildVerdict({ full, splitHigh, splitLow, interaction, lead1, lag1, unw
   const passed = checks.filter(c => c.pass).length;
   const level = passed === checks.length ? 'STRONG' : passed >= 2 ? 'MODERATE' : 'WEAK';
   const levelLabel = { STRONG: '强联动', MODERATE: '中等联动', WEAK: '弱联动' }[level];
+  // Name what held and what did not: a bare "3/4" hides which hypothesis lacks evidence.
+  const held = checks.filter(c => c.pass).map(c => c.label);
+  const notHeld = checks.filter(c => !c.pass).map(c => c.label);
+  const split = `${held.length ? `成立：${held.join('、')}` : '无一项成立'}${notHeld.length ? `；无证据：${notHeld.join('、')}` : ''}`;
   return {
     level,
     levelLabel,
     passed,
     total: checks.length,
     checks,
-    summary: `${passed}/${checks.length} 项检验通过（${levelLabel}）。近 ${ROLLING_WEEKS} 周对冲比例 β = ${fmt(recent.beta, 2)}，ETF 毛流量中被 CME 新增空头匹配的比例约 ${pct(arbShare12w)}。`
+    summary: `${passed}/${checks.length} 项检验通过（${split}）。近 ${ROLLING_WEEKS} 周对冲比例 β = ${fmt(recent.beta, 2)}，ETF 毛流量中被 CME 新增空头匹配的比例约 ${pct(arbShare12w)}。`
   };
 }
 
@@ -743,6 +771,38 @@ function seedDiskOnce(disk) {
   seedCachedHealth(disk, 'etf_oi', { dataAsOf: disk.freshness?.oiLatest || null, lastSuccessAt: receipt });
 }
 
+/**
+ * 线上兜底：本机构建失败时 (典型情况是本机网络出口被 publicreporting.cftc.gov 拦截)，
+ * 读取已部署线上实例的同一份结果。只在线上那份自身可用于研判、且 COT 比本机缓存新时采用；
+ * 线上自己也在用过期缓存时返回 null，由调用方退回本机旧缓存。未配置线上网址时静默不生效。
+ * 采用后各源的数据日期取线上那份的 dataAsOf，来源标为 upstream-mirror；不写入本机磁盘缓存。
+ */
+async function fetchMirroredLinkage(localCache) {
+  let data;
+  try {
+    data = await fetchUpstreamJson('/api/etf-linkage');
+  } catch (e) {
+    return null;
+  }
+  const { code, dataHealth, ...payload } = data || {};
+  if (!Array.isArray(payload.weeks) || !payload.weeks.length || !Number.isFinite(payload.generatedAt)
+      || !payload.verdict || !payload.freshness || !DATE_RE.test(String(payload.freshness.cotLatest || ''))) return null;
+  if (payload.stale || payload.historicalOnly || !dataHealth || dataHealth.analysisAllowed === false) return null;
+  const sources = dataHealth.sources || {};
+  if (!REQUIRED_IDS.every(id => sources[id] && sources[id].dataAsOf)) return null;
+  const localCot = localCache?.freshness?.cotLatest || '';
+  if (localCot && payload.freshness.cotLatest <= localCot) return null;
+  try {
+    for (const id of REQUIRED_IDS) {
+      recordSuccess(id, { dataAsOf: sources[id].dataAsOf, asOfKind: sources[id].asOfKind || 'source', source: 'upstream-mirror' });
+    }
+  } catch (e) {
+    return null; // e.g. an upstream dataAsOf in the future: never accepted
+  }
+  console.log(`[EtfLinkage] 使用线上转发的联动结果 (COT 截至 ${payload.freshness.cotLatest})`);
+  return { ...payload, mirroredFrom: 'upstream', mirroredAt: new Date().toISOString() };
+}
+
 /** Single-flight: concurrent callers share one in-flight build. */
 function getEtfLinkageData(basisSeries, force = false) {
   if (inflight) return inflight;
@@ -789,6 +849,13 @@ async function doGetEtfLinkageData(basisSeries, force = false) {
     lastFailureAt = now;
     console.error('[EtfLinkage] Build failed, using stale cache (retry after cooldown):', err.message);
     const disk = memoryCache || readDiskCache();
+    const mirrored = await fetchMirroredLinkage(disk);
+    if (mirrored) {
+      const bound = withDataHealth(mirrored, REQUIRED_IDS, ANCILLARY_IDS);
+      memoryCache = bound;
+      memoryCacheTime = now;
+      return bound;
+    }
     if (disk) {
       seedDiskOnce(disk);
       return withDataHealth({ ...disk, stale: true }, REQUIRED_IDS, ANCILLARY_IDS);

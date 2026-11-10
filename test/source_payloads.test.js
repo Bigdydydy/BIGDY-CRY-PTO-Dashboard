@@ -473,6 +473,107 @@ test('H/ETF linkage: OI gaps before the analysis window never reject the source'
   assert.equal(r.dataHealth.state, 'OK');
 });
 
+test('H/ETF linkage: a CME null on a weekend is "market closed", on a weekday it is a source failure', async (t) => {
+  resetHealth();
+  const withRow = (vals, day, nullFor) => {
+    const p = oiPayload(vals);
+    return { ...p, dateList: [Date.parse(day), ...p.dateList],
+      dataMap: Object.fromEntries(Object.entries(p.dataMap).map(([k, v]) => [k, [k === nullFor ? null : v[0], ...v]])),
+      priceList: [60000, ...p.priceList] };
+  };
+  const holder = { state: {} };
+  const http = etfHttp(holder);
+  const scenario = { day: '2024-01-07', nullFor: 'CME' }; // Sunday
+  installModuleMocks(t, { [HTTP]: { fetchWithTimeout: async (url, opts) => {
+    if (url.includes('/api/openInterest/v3/chart')) {
+      const coin = url.includes('currency=COIN');
+      const data = withRow(coin
+        ? { Binance: [10, 11, 12, 13], CME: [20, 21, 22, 23] }
+        : { Binance: [1e6, 1.1e6, 1.2e6, 1.3e6], CME: [2e6, 2.1e6, 2.2e6, 2.3e6] }, scenario.day, scenario.nullFor);
+      return fakeResp({ code: 0, data });
+    }
+    return http(url, opts);
+  } } });
+  delete require.cache[srv('cdri_fetcher.js')];
+  const mod = freshRequire('etf_linkage_engine.js');
+
+  await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(getSourceHealth('etf_oi').state, 'OK', 'Sunday CME null is skipped');
+
+  scenario.day = '2024-01-08'; // Monday: CME trades, a null is a real gap
+  await mod.getEtfLinkageData(basisSeries, true);
+  assert.notEqual(getSourceHealth('etf_oi').state, 'OK', 'weekday CME null still rejects');
+  assert.match(String(getSourceHealth('etf_oi').lastError?.message || getSourceHealth('etf_oi').lastError), /CME/);
+
+  scenario.day = '2024-01-07';
+  scenario.nullFor = 'Binance'; // 24/7 venue: a weekend null is never legal
+  resetHealth();
+  await mod.getEtfLinkageData(basisSeries, true);
+  assert.notEqual(getSourceHealth('etf_oi').state, 'OK', 'Binance weekend null still rejects');
+});
+
+test('H/ETF linkage: local build fails → fresher usable upstream copy is served; stale upstream copy is refused', async (t) => {
+  resetHealth();
+  const holder = { state: {} };
+  const local = etfHttp(holder);
+  const up = { payload: null, calls: 0 };
+  const prevOrigin = process.env.UPSTREAM_ORIGIN;
+  process.env.UPSTREAM_ORIGIN = 'https://mirror.example.test';
+  t.after(() => { if (prevOrigin === undefined) delete process.env.UPSTREAM_ORIGIN; else process.env.UPSTREAM_ORIGIN = prevOrigin; });
+  installModuleMocks(t, { [HTTP]: { fetchWithTimeout: async (url, opts) => {
+    if (url.startsWith('https://mirror.example.test')) {
+      up.calls++;
+      if (!up.payload) return fakeResp({}, { ok: false, status: 503 });
+      return fakeResp(up.payload);
+    }
+    return local(url, opts);
+  } } });
+  delete require.cache[srv('cdri_fetcher.js')];
+  delete require.cache[srv('upstream_mirror.js')];
+  const mod = freshRequire('etf_linkage_engine.js');
+  const mirror = require(srv('upstream_mirror.js'));
+
+  const good = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(good.dataHealth.state, 'OK');
+  assert.equal(up.calls, 0, 'a successful local build never touches the mirror');
+
+  const nextTue = new Date(Date.parse(good.freshness.cotLatest) + 7 * 86400000).toISOString().slice(0, 10);
+  const upstreamCopy = (over = {}) => {
+    const { dataHealth, ...rest } = JSON.parse(JSON.stringify(good));
+    const sources = Object.fromEntries(['etf', 'cot', 'etf_oi'].map(id => [id, { dataAsOf: dataHealth.sources[id].dataAsOf, asOfKind: 'source' }]));
+    sources.cot.dataAsOf = nextTue + 'T00:00:00.000Z';
+    return { code: 0, ...rest, freshness: { ...rest.freshness, cotLatest: nextTue },
+      dataHealth: { analysisAllowed: true, sources }, ...over };
+  };
+
+  // Local CFTC blocked, upstream holds a newer usable copy → served, marked as mirrored
+  holder.state = { cot: 'not-an-array' };
+  up.payload = upstreamCopy();
+  const viaMirror = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(viaMirror.mirroredFrom, 'upstream');
+  assert.equal(viaMirror.freshness.cotLatest, nextTue);
+  assert.equal(getSourceHealth('cot').source, 'upstream-mirror');
+  assert.notEqual(viaMirror.stale, true);
+
+  // Upstream itself is on a stale cache → refused, local last-good is served as stale
+  mirror.resetUpstreamMirror();
+  up.payload = upstreamCopy({ stale: true });
+  const refusedStale = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(refusedStale.stale, true);
+
+  // Upstream not newer than what we already hold → refused
+  mirror.resetUpstreamMirror();
+  up.payload = { ...upstreamCopy(), freshness: { ...good.freshness } };
+  const refusedOld = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(refusedOld.stale, true);
+
+  // Upstream unreachable → same honest stale fallback
+  mirror.resetUpstreamMirror();
+  up.payload = null;
+  const down = await mod.getEtfLinkageData(basisSeries, true);
+  assert.equal(down.stale, true);
+});
+
 // ===========================================================================
 // J · McClellan — artifact validation, warmup, pipeline failure keeps data
 // ===========================================================================

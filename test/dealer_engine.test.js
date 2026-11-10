@@ -197,7 +197,7 @@ describe('dealer_engine · analyzeDealerExposure 输出', () => {
 });
 
 describe('dealer_engine · 持仓符号敏感性', () => {
-  const { applyBlockFlow, flipThreshold, signSensitivity } = require('../server/dealer_engine');
+  const { applyBlockFlow, flipThreshold, signSensitivity, signConfidence } = require('../server/dealer_engine');
   const SPOT = 80000;
 
   test('翻号阈值：把阈值比例的 Call Gamma 改划为客户买入后净 GEX 归零', () => {
@@ -234,6 +234,11 @@ describe('dealer_engine · 持仓符号敏感性', () => {
     assert.deepEqual(sens.scenarios.map(s => s.key), ['convention', 'otm_call_bought']);
     assert.ok(sens.scenarios.every(s => s.gexUsd < 0));
     assert.equal(sens.robust, true);
+    assert.equal(sens.confidence.key, 'consistent');
+    // 同号但净值占比小 → fragile；不同号 → unstable
+    assert.equal(signConfidence(true, { netShareOfGrossPct: 9.9 }).key, 'fragile');
+    assert.equal(signConfidence(true, { netShareOfGrossPct: 40 }).key, 'consistent');
+    assert.equal(signConfidence(false, { netShareOfGrossPct: 40 }).key, 'unstable');
     assert.equal(sens.coverage, null);
     assert.equal(sens.threshold.side, 'put');
     assert.equal(sens.threshold.sharePct, 50, '只有 Put 时，一半 Put Gamma 改划为做市商多头即归零');

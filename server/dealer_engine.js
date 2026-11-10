@@ -537,6 +537,24 @@ function flipThreshold(contracts, spot) {
   };
 }
 
+/**
+ * 方向结论的置信度。各口径同号不等于稳健：三个口径在未被成交净额覆盖的 OI 上共用同一个惯例符号，
+ * 并非独立证据；净值相对总 Gamma 很小时，少量持仓改划就会翻号。
+ *   unstable   各口径不同号
+ *   fragile    同号，但净 GEX 占 Call/Put 总 Gamma 不足 FRAGILE_NET_SHARE_PCT
+ *   consistent 同号且净值占比不低
+ * 阈值是判断性参数 (无历史校准)，只用于措辞与预警降级。
+ */
+const FRAGILE_NET_SHARE_PCT = 15;
+function signConfidence(robust, threshold) {
+  if (!robust) return { key: 'unstable', label: '各口径不同号，Gamma 方向结论不稳健' };
+  const net = threshold ? threshold.netShareOfGrossPct : null;
+  if (net !== null && net < FRAGILE_NET_SHARE_PCT) {
+    return { key: 'fragile', label: `各口径同号，但净值只占总 Gamma 的 ${net}%，方向一致、置信度低` };
+  }
+  return { key: 'consistent', label: '各口径同号，Gamma 方向一致' };
+}
+
 const SCREEN_WEIGHTS = [0, 0.25, 0.5, 0.75, 1];
 const LEDGER_STALE_MS = 3 * DAY_MS;
 
@@ -676,13 +694,16 @@ function signSensitivity(contracts, spot, { ledger = null, blockTrades = null, n
     coverage = { source: 'block_trades', ...adj.coverage };
     scenarios.push(scenarioOf('block_adjusted', '60 天大宗校正（台账不可用）', adj.contracts, spot));
   }
+  const robust = sameSign([...scenarios, ...screenWeights]);
+  const threshold = flipThreshold(contracts, spot);
   const result = {
     scenarios,
     screenWeights,
-    robust: sameSign([...scenarios, ...screenWeights]),
+    robust,
     flowRobust: screenWeights.length ? sameSign(screenWeights) : null,
-    threshold: flipThreshold(contracts, spot),
-    coverage
+    threshold,
+    coverage,
+    confidence: signConfidence(robust, threshold)
   };
   // 全成交校正后的合约账本，供主口径的情景与状态判定使用；不可枚举，不进入 API 输出
   Object.defineProperty(result, 'flowBook', { value: flowBook, enumerable: false });
@@ -740,16 +761,18 @@ function hedgingState(gexUsd, crashFlowUsd, squeezeFlowUsd) {
   return { key: 'mixed', label: '负 Gamma · 情景对冲逆向', desc: '净 Gamma 为负，但两个压力情景下 Vanna/Charm 抵消了 Gamma 的助涨助跌。' };
 }
 
-/** 25Δ 偏度信号：优先用偏度相对自身历史的贵贱，历史不足时用 30D RR 绝对值 (≤ −3 / ≥ +2 个波动率点) */
+/**
+ * 25Δ 偏度信号：只有偏度相对自身历史偏贵时才算"极端"。
+ * 历史样本不足时不给极端判定——固定绝对阈值 (曾用 30D RR ≤ −3 / ≥ +2) 没有分布依据，
+ * BTC 的 Put 偏斜长期处在该水平附近，会让预警常态化触发。
+ */
 function skewSignal(skew) {
   const verdict = skew?.richness?.verdict;
   if (verdict === 'put_rich') return { side: 'put', extreme: true, basis: '相对历史', d30: skew.d30 };
   if (verdict === 'call_rich') return { side: 'call', extreme: true, basis: '相对历史', d30: skew.d30 };
   const d30 = Number(skew?.d30);
   if (!Number.isFinite(d30)) return { side: null, extreme: false, basis: null, d30: null };
-  if (d30 <= -3) return { side: 'put', extreme: true, basis: '绝对值', d30 };
-  if (d30 >= 2) return { side: 'call', extreme: true, basis: '绝对值', d30 };
-  return { side: d30 < 0 ? 'put' : 'call', extreme: false, basis: verdict === 'normal' ? '相对历史' : '绝对值', d30 };
+  return { side: d30 < 0 ? 'put' : 'call', extreme: false, basis: verdict === 'normal' ? '相对历史' : '历史不足', d30 };
 }
 
 /**
@@ -800,31 +823,38 @@ function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeeze
       detail: `${basisLabel}：${cm.expiry}（${cm.kind}，剩 ${cm.dte} 天）占全链 Gamma 绝对量 ${cm.removedGexSharePct}%，交割脱落${cm.regimeFlips ? `后残余 GEX 变号为 ${fmtUsdM(cm.residualGexUsd)}/1%（体制翻转）` : `后残余 GEX 缩水 ${cm.bufferDropPct}% 至 ${fmtUsdM(cm.residualGexUsd)}/1%`}`
     });
   }
+  // 盘口深度不进入预警文本：分母是单一现货场所的瞬时挂单，几分钟内可变动数十个百分点，
+  // 而做市商在永续/期货上对冲；比值只在独立磁贴中作量级参考。depth 参数保留以兼容调用方。
+  void depth;
   const downgrade = level => (robust ? level : (level === 'high' ? 'medium' : 'low'));
   const sk = skewSignal(skew);
-  const robustNote = robust ? '' : '（持仓符号结论不稳健，已降一级）';
+  const robustNote = robust ? '' : '（持仓符号结论置信度不足，已降一级）';
+  const skewNote = (s, side) => {
+    const name = side === 'put' ? 'Put' : 'Call';
+    if (s.side === side && s.extreme) return `（${name} 侧相对自身历史偏贵）`;
+    if (s.basis === '历史不足') return '（偏度历史样本不足，无法判断是否极端）';
+    return `（${name} 侧未到极端）`;
+  };
   if (state.key === 'downside_accel' || state.key === 'two_way_accel') {
     const vannaSells = vexUsd > 0; // IV 上升时做市商需卖出
     const level = sk.side === 'put' && sk.extreme && vannaSells ? 'high' : 'medium';
-    const depthText = depth ? `，约为 ${depth.venue} ${depth.band} 买盘深度的 ${depth.downsideRatioPct}%` : '';
     out.push({
       key: 'downside_cascade',
       level: downgrade(level),
       title: '下行踩踏加速器',
-      detail: `${basisLabel}：做市商负 Gamma，现货 −3% 且 IV +5 点时需卖出 ${fmtAbsUsdM(crashFlowUsd)}${depthText}；`
+      detail: `${basisLabel}：做市商负 Gamma，现货 −3% 且 IV +5 点时需卖出 ${fmtAbsUsdM(crashFlowUsd)}；`
         + `IV 每升 1 点需${vannaSells ? '卖出' : '买入'} ${fmtAbsUsdM(vexUsd)}；`
-        + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${sk.side === 'put' && sk.extreme ? `（Put 侧极端，${sk.basis}）` : '（Put 侧未到极端）'}${robustNote}`
+        + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${skewNote(sk, 'put')}${robustNote}`
     });
   }
   if (state.key === 'upside_squeeze' || state.key === 'two_way_accel') {
     const level = sk.side === 'call' && sk.extreme ? 'high' : 'medium';
-    const depthText = depth ? `，约为 ${depth.venue} ${depth.band} 卖盘深度的 ${depth.upsideRatioPct}%` : '';
     out.push({
       key: 'upside_squeeze',
       level: downgrade(level),
       title: '上行 Gamma 逼空',
-      detail: `${basisLabel}：做市商负 Gamma，现货 +3% 且 IV +2 点时需买入 ${fmtAbsUsdM(squeezeFlowUsd)}${depthText}；`
-        + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${sk.side === 'call' && sk.extreme ? `（Call 侧极端，${sk.basis}）` : ''}${robustNote}`
+      detail: `${basisLabel}：做市商负 Gamma，现货 +3% 且 IV +2 点时需买入 ${fmtAbsUsdM(squeezeFlowUsd)}；`
+        + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${skewNote(sk, 'call')}${robustNote}`
     });
   }
   return out;
@@ -924,7 +954,8 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     state,
     vexUsd: primaryExposures.vexUsd,
     skew: opts.skew,
-    robust: Boolean(primaryRobust),
+    // 同号但净值占比很小 (fragile) 时同样降一级：方向一致不等于有把握
+    robust: Boolean(primaryRobust) && sensitivity.confidence.key === 'consistent',
     depth,
     crashFlowUsd: pCrash.flowUsd,
     squeezeFlowUsd: pSqueeze.flowUsd,
@@ -1006,7 +1037,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
   } else {
     coverageText = '缺少成交台账与大宗成交数据，未做订单流校正。';
   }
-  const sensitivityText = `【符号敏感性】${scenarioText}，${sensitivity.robust ? '各口径同号，Gamma 方向结论稳健' : '各口径不同号，Gamma 方向结论不稳健'}。${thresholdText}${coverageText}`;
+  const sensitivityText = `【符号敏感性】${scenarioText}，${sensitivity.confidence.label}。${sensitivity.robust ? '注意三个口径在未被成交净额覆盖的 OI 上共用同一个惯例符号，同号不是三份独立证据。' : ''}${thresholdText}${coverageText}`;
 
   const alertText = alerts.length
     ? alerts.map(a => `【${a.level === 'high' ? '高优先级预警' : (a.level === 'medium' ? '预警' : '提示')}·${a.title}】${a.detail}。`).join('')
@@ -1079,6 +1110,7 @@ module.exports = {
   realizedFlow,
   hedgingState,
   skewSignal,
+  signConfidence,
   depthComparison,
   buildAlerts,
   SCREEN_WEIGHTS,
