@@ -29,6 +29,10 @@ const {
 const ETF_MGMT_FEE_ANNUAL = 0.25;
 const ETF_ROUND_TRIP_COST = 0.25;
 const ETF_HOLD_DAYS = 90;
+// The ETF leg is hedged on CME, but the basis here is Deribit's. The two venues' bases differ
+// by a varying amount, so a net carry inside ±ETF_VENUE_BAND cannot be signed with confidence.
+// Judgement parameter (no calibration): the status is three-way, not a flip at exactly zero.
+const ETF_VENUE_BAND = 0.5;
 
 let liveFeedError = null;
 
@@ -41,7 +45,8 @@ function etfCarryMetrics(row) {
   return {
     etfNetCarry: Number(net.toFixed(2)),
     etfCostAnnualized: Number(costAnnualized.toFixed(2)),
-    etfArbitrageStatus: net >= 0 ? 'COVERED' : 'UNWIND_RISK'
+    etfVenueBand: ETF_VENUE_BAND,
+    etfArbitrageStatus: net >= ETF_VENUE_BAND ? 'COVERED' : (net <= -ETF_VENUE_BAND ? 'UNWIND_RISK' : 'MARGINAL')
   };
 }
 
@@ -203,7 +208,7 @@ async function analyzeTermPremium(futuresList, spotPrice, options = {}) {
         acc[k] = (acc[k] || 0) + 1;
         return acc;
       }, {}),
-      scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量',
+      scoreMethod: '套利评分 0-100 = 60% 套利夏普 ((90D−美债)/基差盯市年化波动) + 25% 期限结构 (90D−资金费率) + 15% 30 日基差动量；权重与机构门槛 (+3.5%) 为判断性设定，未经回测校准',
       isRealHistorical: true,
       // Daily-history and live-curve health, so a stalled exchange feed is visible in the UI
       feed: {
@@ -231,5 +236,6 @@ module.exports = {
   calculateCarryScore,
   etfCarryMetrics,
   ETF_MGMT_FEE_ANNUAL,
-  ETF_ROUND_TRIP_COST
+  ETF_ROUND_TRIP_COST,
+  ETF_VENUE_BAND
 };

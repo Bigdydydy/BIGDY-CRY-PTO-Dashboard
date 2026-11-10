@@ -387,7 +387,7 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
 
   const vrpText = vrp30 === null
     ? '已实现波动率缺失，无法判断隐含相对已实现的贵贱'
-    : `1M ATM ${iv1m.toFixed(1)}% 对 HV30 ${hv30.toFixed(1)}%，方差风险溢价 VRP ${vrp30 >= 0 ? '+' : ''}${vrp30.toFixed(1)} 点`;
+    : `1M ATM ${iv1m.toFixed(1)}% 对 HV30 ${hv30.toFixed(1)}%，隐含−已实现价差 ${vrp30 >= 0 ? '+' : ''}${vrp30.toFixed(1)} 点（回看 HV30，非严格意义的方差风险溢价）`;
 
   if (percentileRaw !== null) {
     const pct = percentileRaw;
@@ -428,7 +428,7 @@ function analyzeAtmIv(ivHistory, dvolStats, atmData = null) {
   const dvolText = dvolLatest !== null
     ? `DVOL ${dvolLatest.toFixed(1)} 处于近 2 年 ${percentileText} 分位（${regimeTag}）。`
     : '';
-  const paragraph = `当下 Bitcoin ATM 隐含波动率呈现【${curveDesc}】期限结构（1M: ${iv1m?.toFixed(1)}%, 3M: ${iv3m?.toFixed(1)}%, 6M: ${iv6m?.toFixed(1)}%），按 365 日历日的时间平方根法则对应【日均预期振幅 ±${dailyExpectedMovePct}%】（周 ±${weeklyExpectedMovePct}%，1M 跨式约 ${atmStraddleEstPct}%）。${eventText}${extremeAlert ? '【极值预警】' : ''}${dvolText}${recommendation}`;
+  const paragraph = `当下 Bitcoin ATM 隐含波动率呈现【${curveDesc}】期限结构（1M: ${iv1m?.toFixed(1)}%, 3M: ${iv3m?.toFixed(1)}%, 6M: ${iv6m?.toFixed(1)}%），按 365 日历日的时间平方根法则对应【1σ 日波动 ±${dailyExpectedMovePct}%】（周 ±${weeklyExpectedMovePct}%，为一倍标准差而非期望涨跌幅，期望绝对涨跌幅约为其 0.8 倍；1M 跨式约 ${atmStraddleEstPct}%）。${eventText}${extremeAlert ? '【极值预警】' : ''}${dvolText}${recommendation}`;
 
   return {
     iv1m,
