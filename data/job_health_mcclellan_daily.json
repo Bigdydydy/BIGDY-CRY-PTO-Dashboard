@@ -1,14 +1,14 @@
 {
   "id": "mcclellan_daily",
   "status": "ok",
-  "lastAttemptAt": "2026-11-13T11:27:16.911Z",
-  "lastSuccessAt": "2026-11-13T11:27:16.920Z",
+  "lastAttemptAt": "2026-11-13T14:51:58.659Z",
+  "lastSuccessAt": "2026-11-13T14:51:58.666Z",
   "lastError": null,
   "steps": {
     "pipeline": {
       "status": "ok",
-      "lastAttemptAt": "2026-11-13T11:27:16.919Z",
-      "lastSuccessAt": "2026-11-13T11:27:16.919Z",
+      "lastAttemptAt": "2026-11-13T14:51:58.665Z",
+      "lastSuccessAt": "2026-11-13T14:51:58.665Z",
       "lastError": null,
       "dataAsOf": "2026-11-13T00:00:00.000Z",
       "verifiedSkip": false
