@@ -1,16 +1,16 @@
 {
   "id": "liquidity_hourly",
   "status": "ok",
-  "lastAttemptAt": "2026-11-13T20:00:51.318Z",
-  "lastSuccessAt": "2026-11-13T20:01:21.707Z",
+  "lastAttemptAt": "2026-11-13T21:00:44.938Z",
+  "lastSuccessAt": "2026-11-13T21:01:15.383Z",
   "lastError": null,
   "steps": {
     "samples": {
       "status": "ok",
-      "lastAttemptAt": "2026-11-13T20:01:21.703Z",
-      "lastSuccessAt": "2026-11-13T20:01:21.703Z",
+      "lastAttemptAt": "2026-11-13T21:01:15.378Z",
+      "lastSuccessAt": "2026-11-13T21:01:15.378Z",
       "lastError": null,
-      "dataAsOf": "2026-11-13T20:00:00.000Z",
+      "dataAsOf": "2026-11-13T21:00:00.000Z",
       "verifiedSkip": false
     }
   }
