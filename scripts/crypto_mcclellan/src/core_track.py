@@ -18,6 +18,7 @@ import math
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 import config
 from src.http_client import get_json
@@ -126,9 +127,36 @@ def fetch_candidates(n: int = config.CORE_CANDIDATE_N):
     return coins[:n]
 
 
-def fetch_live_snapshot(trade_date: str):
+def required_constituents(rows, trade_date: str):
+    """Freeze the basket before sampling; a new ranking cannot hide missing members."""
+    from src import breadth
+    prior = [r for r in rows if r["date"] < trade_date]
+    by_date, meta = index_store(prior)
+    if not by_date:
+        return []
+    last = by_date[max(by_date)]
+    excluded = breadth.core_exclusions(by_date, meta)
+    return sorted((cid for cid, (_p, cap) in last.items()
+                   if cap > 0 and cid not in excluded),
+                  key=lambda cid: last[cid][1], reverse=True)[:config.CORE_TOP_N]
+
+
+def fetch_live_snapshot(trade_date: str, required_ids=()):
     """Live quote snapshot for the Top-300 candidates, dated to its own UTC day."""
     coins = fetch_candidates()
+    def usable(c):
+        p = c.get("current_price")
+        return isinstance(p, (int, float)) and math.isfinite(p) and p > 0
+
+    # A previous member may drop out of today's Top 300 or have a missing
+    # price in that response. Request it by ID; never substitute another coin.
+    missing = sorted(set(required_ids) - {c["id"] for c in coins if usable(c)})
+    supplemental = []
+    for start in range(0, len(missing), 100):
+        query = urlencode({"vs_currency": "usd", "ids": ",".join(missing[start:start + 100]),
+                           "per_page": 100, "page": 1, "sparkline": "false"})
+        supplemental.extend(get_json(f"{config.COINGECKO_BASE}/coins/markets?{query}"))
+    coins = list({c["id"]: c for c in coins + supplemental if usable(c)}.values())
     retrieved = _utcnow()
     observed_at = retrieved.strftime("%Y-%m-%dT%H:%M:%SZ")
     if retrieved.strftime("%Y-%m-%d") != trade_date:
@@ -138,7 +166,7 @@ def fetch_live_snapshot(trade_date: str):
     rows = []
     for c in coins:
         price, mcap = c.get("current_price"), c.get("market_cap")
-        if not price or not mcap:
+        if not price or (not mcap and c["id"] not in required_ids):
             continue
         rows.append(make_row(trade_date, c["id"], c.get("symbol"), c.get("name"),
                              price, mcap, c.get("total_volume"),

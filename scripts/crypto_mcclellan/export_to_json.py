@@ -84,10 +84,20 @@ def collect(trade_date: str):
     print(f"[Collect] trade date {trade_date}")
     failed = []
 
-    snapshot = _with_retry("Core", lambda: core_track.fetch_live_snapshot(trade_date))
-    if snapshot:
+    required = core_track.required_constituents(core_track.load_store(), trade_date)
+
+    def collect_core():
+        snapshot = core_track.fetch_live_snapshot(trade_date, required)
+        if not snapshot:
+            raise ValueError("empty Core snapshot")
         core_track.save_store(core_track.replace_snapshot(core_track.load_store(), snapshot))
-    else:
+        by_date, _meta = core_track.index_store(snapshot)
+        missing = sorted(set(required) - set(by_date.get(trade_date, {})))
+        if missing or len(required) not in (0, config.CORE_TOP_N) or len(snapshot) < config.CORE_TOP_N:
+            raise ValueError(f"incomplete Core snapshot; missing prior members: {missing}")
+        return snapshot
+
+    if not _with_retry("Core", collect_core):
         failed.append("core")
 
     frontier_rows = frontier_track.load_store()
@@ -115,10 +125,12 @@ def track_summary(rows, warmup: int):
     fast = slow = None
     running, streak, previous_date = 0.0, 0, None
     bands, percentile, ramo = None, None, None
+    last_valid, last_reset = None, None
     for original in rows:
         b = dict(original)
         ramo = b.get("ramo", breadth.ratio_adjusted(b["adv"], b["dec"]))
         if previous_date and breadth.day_gap(previous_date, b["date"]) != 1:
+            last_reset = {"date": b["date"], "reason": "calendar_gap"}
             fast = slow = None
             running, streak = 0.0, 0
         valid = b.get("complete", True) and b["n"] > 0 and math.isfinite(ramo)
@@ -127,6 +139,10 @@ def track_summary(rows, warmup: int):
             slow = ramo if slow is None else alpha_slow * ramo + (1 - alpha_slow) * slow
             streak += 1
         else:
+            measured = {cid for cid, _ret in b.get("members", [])}
+            last_reset = {"date": b["date"], "reason": "incomplete_quotes",
+                          "constituents": b["n"], "expected_constituents": b.get("expected_n", b["n"]),
+                          "missing_members": [cid for cid in b.get("universe", []) if cid not in measured]}
             fast = slow = None
             running, streak = 0.0, 0
         o = fast - slow if valid and streak >= warmup else None
@@ -140,6 +156,8 @@ def track_summary(rows, warmup: int):
             running += o
             published.append(o)
         s = running if o is not None else None
+        if o is not None:
+            last_valid = {"date": b["date"], "oscillator": _r(o), "summation": _r(s, 1)}
         b.update({"band_low": bands["low"] if bands else None,
                   "band_high": bands["high"] if bands else None,
                   "percentile": _r(percentile, 0), "valid_streak_days": streak})
@@ -149,7 +167,8 @@ def track_summary(rows, warmup: int):
         previous_date = b["date"]
 
     current = {"ready": bool(osc and osc[-1] is not None), "breadth_days": len(rows),
-               "warmup_days": warmup, "valid_streak_days": streak}
+               "warmup_days": warmup, "valid_streak_days": streak,
+               "last_valid": last_valid, "last_reset": last_reset}
     if by_date:
         last = next(reversed(by_date.values()))[0]
         current.update({

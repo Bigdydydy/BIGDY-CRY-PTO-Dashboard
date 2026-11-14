@@ -227,6 +227,20 @@ class TestCausalExclusions(unittest.TestCase):
 
 
 class TestTrackSummaryBands(unittest.TestCase):
+    def test_missing_quote_preserves_dated_history_but_restarts_warmup(self):
+        from export_to_json import track_summary
+        rows = [{"date": f"2026-01-{i:02d}", "adv": 1, "dec": 1, "unch": 0,
+                 "n": 2, "expected_n": 2, "complete": True} for i in range(1, 7)]
+        rows[4].update(n=1, complete=False, universe=["a", "b"], members=[("a", .1)])
+        by_date, cur, _bands = track_summary(rows, warmup=3)
+        self.assertFalse(cur["ready"])
+        self.assertIsNone(cur["oscillator"])
+        self.assertEqual(cur["valid_streak_days"], 1)
+        self.assertEqual(cur["last_valid"], {"date": "2026-01-04", "oscillator": 0.0, "summation": 0.0})
+        self.assertEqual(cur["last_reset"]["missing_members"], ["b"])
+        self.assertEqual(cur["last_reset"]["date"], "2026-01-05")
+        self.assertIsNone(by_date["2026-01-05"][2])
+
     def test_future_append_preserves_past_band_fields(self):
         """Each date's P10/P90 band uses only PRIOR published oscillators."""
         from export_to_json import track_summary
@@ -248,6 +262,42 @@ class TestTrackSummaryBands(unittest.TestCase):
             self.assertEqual(b_new["band_high"], b_old["band_high"], f"band_high moved at {d}")
             seen_band = seen_band or b_old["band_low"] is not None
         self.assertTrue(seen_band, "test produced no populated bands to compare")
+
+
+class TestCoreCollectionCoverage(unittest.TestCase):
+    def test_quote_missing_from_ranking_is_fetched_by_id(self):
+        fixed = datetime(2026, 10, 6, 12, tzinfo=timezone.utc)
+        quote = {"id": "old-member", "current_price": 8, "market_cap": 0,
+                 "symbol": "OLD", "name": "Old member", "total_volume": 100}
+        with mock.patch.object(core_track, "fetch_candidates", return_value=[]), \
+                mock.patch.object(core_track, "get_json", return_value=[quote]) as fetch, \
+                mock.patch.object(core_track, "_utcnow", return_value=fixed):
+            rows = core_track.fetch_live_snapshot("2026-10-06", ["old-member"])
+        self.assertIn("ids=old-member", fetch.call_args.args[0])
+        self.assertEqual(rows[0]["coin_id"], "old-member")
+        self.assertEqual(rows[0]["price_basis"], "snapshot")
+
+    def test_required_basket_ignores_same_day_ranking(self):
+        rows = [core_track.make_row("2026-01-01", "a", "AAA", "Alpha", 10, 100, 1),
+                core_track.make_row("2026-01-02", "b", "BBB", "Beta", 20, 1000, 1)]
+        self.assertEqual(core_track.required_constituents(rows, "2026-01-02"), ["a"])
+
+    def test_partial_snapshot_saved_but_not_marked_successful(self):
+        import export_to_json as export
+        snapshot = [core_track.make_row("2026-01-02", "a", "AAA", "Alpha", 10, 100, 1)]
+        with mock.patch.object(core_track, "required_constituents", return_value=["a", "b"]), \
+                mock.patch.object(core_track, "load_store", return_value=[]), \
+                mock.patch.object(core_track, "save_store") as save, \
+                mock.patch.object(core_track, "fetch_live_snapshot", return_value=snapshot), \
+                mock.patch.object(frontier_track, "load_store", return_value=[]), \
+                mock.patch.object(frontier_track, "update", return_value=None), \
+                mock.patch.object(export.anchor, "fetch_volumes", return_value=None), \
+                mock.patch.object(export.time, "sleep"):
+            failed = export.collect("2026-01-02")
+        self.assertIn("core", failed)
+        self.assertEqual(save.call_count, 2)  # retries retain the partial observations
+        self.assertFalse(export.is_final({"collected_at": "2026-01-02T12:00:00Z",
+                                         "sampling_basis": "utc_snapshot", "failed": failed}, "2026-01-02"))
 
 
 class TestSamplingProvenance(unittest.TestCase):

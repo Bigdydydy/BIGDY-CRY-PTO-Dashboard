@@ -1185,9 +1185,15 @@ describe('Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme
     assert.deepEqual(data.metadata.frontier.chains, ['solana', 'bsc', 'robinhood']);
 
     const { core, frontier } = data.current;
-    assert.ok(core.ready, 'Core track must be published');
-    assert.ok(typeof core.oscillator === 'number');
-    assert.ok(typeof core.summation === 'number');
+    assert.equal(typeof core.ready, 'boolean');
+    if (core.ready) {
+      assert.ok(Number.isFinite(core.oscillator));
+      assert.ok(Number.isFinite(core.summation));
+    } else {
+      assert.equal(core.oscillator, null);
+      assert.equal(core.summation, null);
+      assert.ok(core.valid_streak_days < core.warmup_days);
+    }
     assert.ok(core.constituents >= 80 && core.constituents <= 100, `Core constituents ${core.constituents}`);
     assert.ok(typeof frontier.ready === 'boolean');
     assert.ok(typeof frontier.breadth_days === 'number');
@@ -1197,8 +1203,9 @@ describe('Module 1-B: Crypto McClellan Oscillator (Core Top 100 vs On-chain Meme
     const last = data.series[data.series.length - 1];
     assert.ok(last.date);
     assert.ok(typeof last.btc_close === 'number');
-    assert.ok(typeof last.core_oscillator === 'number');
-    assert.ok(typeof last.core_summation === 'number');
+    assert.equal(last.core_oscillator, core.oscillator);
+    assert.equal(last.core_summation, core.summation);
+    assert.ok(data.series.some(r => Number.isFinite(r.core_oscillator)), 'Core history includes published readings');
     assert.ok(last.core_adv + last.core_dec <= last.core_n);
     // Frontier readings stay null until the EMA warm-up completes
     if (!frontier.ready) assert.equal(last.frontier_oscillator, null);

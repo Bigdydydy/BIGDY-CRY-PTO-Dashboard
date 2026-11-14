@@ -8823,6 +8823,17 @@ function mcChangeChip(v) {
   return [`10日 ${mcFmtSigned(v, 0)}`, `mm-chip ${v > 0 ? 'text-pos' : (v < 0 ? 'text-neg' : '')}`];
 }
 
+// Historical values remain explicitly dated; they never replace today's null.
+function mcRecoveryText(cur, warmup) {
+  const reset = cur.last_reset;
+  const cause = reset ? (reset.reason === 'calendar_gap'
+    ? `${reset.date} 日历缺口`
+    : `${reset.date} 报价不完整（${reset.constituents}/${reset.expected_constituents}${reset.missing_members?.length ? `，缺 ${reset.missing_members.join('、')}` : ''}）`) : '';
+  const last = cur.last_valid;
+  return `${cause ? `${cause}，已重置；` : ''}连续有效观测 ${cur.valid_streak_days ?? cur.breadth_days ?? 0}/${warmup} 天。`
+    + (last ? `最后有效 ${last.date}：振荡器 ${mcFmtSigned(last.oscillator)}，累加 ${mcFmtSigned(last.summation)}（历史值）。` : '');
+}
+
 /**
  * Render KPI cards for Crypto McClellan
  */
@@ -8869,16 +8880,20 @@ function renderMcClellanDashboard(data) {
       `mm-val ${core.oscillator >= 0 ? 'text-cyan' : 'text-neg'}`);
     mcOscillatorChip(document.getElementById('kpi-mc-core-osc-chip'), core, bands.core);
   } else {
-    setText('kpi-mc-core-osc', '预热中', 'mm-val text-cyan');
+    setText('kpi-mc-core-osc', core.last_valid ? '重新预热' : '预热中', 'mm-val text-cyan');
     setText('kpi-mc-core-osc-chip', `${streakOf(core)}/${warmupDays} 天`, 'mm-chip');
   }
-  setText('kpi-mc-core-osc-sub', mcAdvDecText(core) || 'EMA19 − EMA39 of RAMO');
+  setText('kpi-mc-core-osc-sub', !core.ready && core.last_valid
+    ? `最后有效 ${core.last_valid.date}：${mcFmtSigned(core.last_valid.oscillator)}（历史值）`
+    : mcAdvDecText(core) || 'EMA19 − EMA39 of RAMO');
 
   // Summation baseline is arbitrary: no automatic bullish colour when > 0.
   setText('kpi-mc-core-sum', core.ready ? mcFmtSigned(core.summation, 0) : '--', 'mm-val');
   setText('kpi-mc-core-sum-chip', ...(core.ready ? mcChangeChip(core.summation_change_10d) : ['预热', 'mm-chip']));
   setText('kpi-mc-core-sum-sub',
-    `${core.constituents ?? '--'} 个成分 · 任意基线非资金流 · 始于 ${metadata.core?.history_start || '--'}`);
+    !core.ready && core.last_valid
+      ? `最后有效 ${core.last_valid.date}：${mcFmtSigned(core.last_valid.summation, 0)}（历史值）`
+      : `${core.constituents ?? '--'} 个成分 · 任意基线非资金流 · 始于 ${metadata.core?.history_start || '--'}`);
 
   // Frontier: accumulated forward only, so it may still be warming up
   if (fr.ready) {
@@ -8967,18 +8982,11 @@ function renderMcClellanCharts() {
   const notice = document.getElementById('mcclellan-warmup-notice');
   if (notice) {
     const warmup = data.metadata?.parameters?.warmup_days || fr.warmup_days || core.warmup_days || 40;
-    const streakOf = cur => cur.valid_streak_days ?? cur.breadth_days ?? 0;
     const cold = tracks.filter(t => !(t === 'core' ? core : fr).ready);
     const showNotice = cold.length > 0;
     notice.classList.toggle('hidden', !showNotice);
     if (showNotice) {
-      if (cold.includes('frontier') && track !== 'core') {
-        notice.textContent = fr.started
-          ? `链上 Meme 轨从 ${fr.started} 开始逐日累积（链上热度无法回填历史），需 ${warmup} 个有效交易日预热后才发布振荡器，目前 ${streakOf(fr)}/${warmup}。`
-          : '链上 Meme 轨尚未开始采集。';
-      } else {
-        notice.textContent = `Core 轨预热中：连续有效观测 ${streakOf(core)}/${warmup} 天（报价不完整或日历缺口会重置 streak）。`;
-      }
+      notice.textContent = cold.map(t => `${MC_TRACKS[t].label}：${mcRecoveryText(t === 'core' ? core : fr, warmup)}`).join(' ');
     }
   }
 

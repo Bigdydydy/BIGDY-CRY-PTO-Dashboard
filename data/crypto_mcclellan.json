@@ -3,7 +3,7 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按前次采样市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "3.0.0",
-  "generated_at": "2026-11-14T07:01:13Z",
+  "generated_at": "2026-11-14T08:41:50Z",
   "benchmark_date": "2026-11-14",
   "total_days": 406,
   "sampling_basis": "daily_snapshots_not_fixed_utc_close",
@@ -87,6 +87,20 @@
    "breadth_days": 406,
    "warmup_days": 40,
    "valid_streak_days": 1,
+   "last_valid": {
+    "date": "2026-11-12",
+    "oscillator": -38.71,
+    "summation": -487.2
+   },
+   "last_reset": {
+    "date": "2026-11-13",
+    "reason": "incomplete_quotes",
+    "constituents": 99,
+    "expected_constituents": 100,
+    "missing_members": [
+     "quantixai"
+    ]
+   },
    "date": "2026-11-14",
    "advances": 13,
    "declines": 86,
@@ -107,6 +121,12 @@
    "breadth_days": 41,
    "warmup_days": 40,
    "valid_streak_days": 41,
+   "last_valid": {
+    "date": "2026-11-14",
+    "oscillator": -18.17,
+    "summation": -31.2
+   },
+   "last_reset": null,
    "date": "2026-11-14",
    "advances": 29,
    "declines": 66,
