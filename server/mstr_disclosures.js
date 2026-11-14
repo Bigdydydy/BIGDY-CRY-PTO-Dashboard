@@ -1,4 +1,5 @@
 'use strict';
+const { snapshotPath } = require('./snapshot_path');
 
 /**
  * MSTR official disclosure collector (Module 1 milestone 2).
@@ -288,7 +289,7 @@ function createDisclosureService({
   },
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 } = {}) {
-  const stateFile = path.join(dataDir, 'mstr_disclosures.json');
+  const stateFile = snapshotPath(path.join(dataDir, 'mstr_disclosures.json'));
   const evidenceDir = path.join(dataDir, 'mstr_disclosure_evidence');
 
   let loaded = false;

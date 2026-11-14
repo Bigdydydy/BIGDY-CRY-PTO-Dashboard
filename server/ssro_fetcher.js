@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
@@ -5,7 +6,7 @@ const { fetchSpotDailyCloses } = require('./spot_daily');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'ssro_chart.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'ssro_chart.json'));
 let inMemoryCache = null;
 let lastFetchTime = 0;
 let inflight = null;

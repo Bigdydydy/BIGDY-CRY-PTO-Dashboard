@@ -3,14 +3,16 @@
  * Reads, caches, and serves the pre-computed market breadth dataset for Module 1-B.
  */
 const fs = require('fs');
+const { snapshotPath } = require('./snapshot_path');
+const { fetchWithTimeout } = require('./http_client');
 const path = require('path');
 const crypto = require('crypto');
 const { isDeepStrictEqual } = require('util');
 const { exec, execSync } = require('child_process');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
-const { withDataHealth, seedCachedHealth } = require('./data_health_cache');
+const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'crypto_mcclellan.json');
+const DATA_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'crypto_mcclellan.json'));
 const PYTHON_PIPELINE_DIR = path.join(__dirname, '..', 'scripts', 'crypto_mcclellan');
 const REQUIRED_IDS = ['mcclellan_core', 'mcclellan_frontier'];
 const ANCILLARY_IDS = ['mcclellan_anchor'];
@@ -279,23 +281,24 @@ function fileDigest() {
 
 /** Success clocks are the PRODUCER's clock — metadata.generated_at — never
  * the reader's now. */
-function recordPipelineSuccess(parsed) {
+function recordPipelineSuccess(parsed, source = 'python-pipeline') {
   const genMs = Date.parse(parsed.metadata?.generated_at || '');
-  const clock = Number.isFinite(genMs) ? { now: genMs } : {};
+  if (!Number.isFinite(genMs) || genMs > Date.now() + 300000) throw new Error('Invalid producer generated_at');
+  const clock = { now: genMs };
   recordSuccess('mcclellan_core', {
-    dataAsOf: parsed.current?.core?.date || null, asOfKind: 'source', source: 'python-pipeline',
+    dataAsOf: parsed.current?.core?.date || null, asOfKind: 'source', source,
     issues: parsed.current?.core?.warmup ? ['core warmup'] : [],
     ...clock
   });
   recordSuccess('mcclellan_frontier', {
-    dataAsOf: parsed.current?.frontier?.date || null, asOfKind: 'source', source: 'python-pipeline',
+    dataAsOf: parsed.current?.frontier?.date || null, asOfKind: 'source', source,
     issues: parsed.current?.frontier?.warmup ? ['frontier warmup'] : [],
     ...clock
   });
   const anchor = latestNonNullDate(parsed.series, 'dex_volume');
   if (anchor) {
     recordSuccess('mcclellan_anchor', {
-      dataAsOf: anchor, asOfKind: 'source', source: 'python-pipeline', ...clock
+      dataAsOf: anchor, asOfKind: 'source', source, ...clock
     });
   }
 }
@@ -324,7 +327,7 @@ function runPythonPipeline() {
     // --skip-if-final: a manual refresh never overwrites a finalized post-close snapshot
     const cmd = `"${pythonBin}" "${exportScript}" --skip-if-final`;
     // Collection waits out CoinGecko / GeckoTerminal rate limits, so allow a few minutes
-    exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 240000 }, (error, stdout, stderr) => {
+    exec(cmd, { cwd: PYTHON_PIPELINE_DIR, timeout: 240000, env: { ...process.env, MCCLELLAN_OUTPUT_FILE: DATA_FILE } }, (error, stdout, stderr) => {
       if (error) {
         console.warn('[McClellanFetcher] Python pipeline execution error:', error.message);
         recordPipelineResult(false, error);
@@ -368,7 +371,36 @@ function runPythonPipeline() {
 /**
  * Gets McClellan data, respecting cache unless forceRefresh is true
  */
+let remoteInflight = null;
+let remoteAttemptAt = 0;
+async function refreshRemoteSnapshot() {
+  if (remoteInflight) return remoteInflight;
+  if (Date.now() - remoteAttemptAt < 30 * 60 * 1000) return;
+  remoteAttemptAt = Date.now();
+  remoteInflight = (async () => {
+    try {
+      const resp = await fetchWithTimeout('https://raw.githubusercontent.com/Bigdydydy/BIGDY-CRY-PTO-Dashboard/main/data/crypto_mcclellan.json', { timeout: 8000, retries: 0 });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const parsed = await resp.json();
+      validateMcClellanData(parsed);
+      recordPipelineSuccess(parsed, 'github-archive');
+      atomicWriteJson(DATA_FILE, parsed);
+      cachedData = parsed;
+      lastLoadedTime = Date.now();
+    } catch (err) {
+      recordPipelineResult(false, err);
+    }
+  })().finally(() => { remoteInflight = null; });
+  return remoteInflight;
+}
+
 async function getMcClellanData(forceRefresh = false) {
+  if (process.env.NODE_ENV === 'production') {
+    // Scheduled collectors own Python; production reads their published archive.
+    try { if (!cachedData) loadFromDisk(); } catch (err) { /* remote may recover */ }
+    await refreshRemoteSnapshot();
+    forceRefresh = false;
+  }
   const now = Date.now();
 
   if (forceRefresh) {

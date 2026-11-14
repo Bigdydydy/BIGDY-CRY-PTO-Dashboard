@@ -23,7 +23,7 @@ const { getMacroChartData } = require('./macro_fetcher');
 const { getPreferredsData } = require('./mstr_preferreds');
 const { fetchCdriData } = require('./cdri_fetcher');
 const { getSsroData } = require('./ssro_fetcher');
-const { getFlowForce } = require('./flow_force');
+const { getFlowForce, startFlowForceRefresh } = require('./flow_force');
 const { getCoinbaseLiquidityData } = require('./coinbase_fetcher');
 const liquidityHistory = require('./liquidity_history');
 const { getGoldCorrelationData } = require('./gold_fetcher');
@@ -70,16 +70,31 @@ const WAVE_ENGINE_FILE = path.join(__dirname, 'wave_engine.js');
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
+    let bytes = 0;
+    let tooLarge = false;
     req.on('data', chunk => {
-      body += chunk;
-      if (body.length > 1e6) {
-        req.destroy();
-        reject(new Error('Payload too large (limit 1MB)'));
+      if (tooLarge) return;
+      bytes += Buffer.byteLength(chunk);
+      if (bytes > 1e6) {
+        tooLarge = true;
+        body = '';
+        reject(Object.assign(new Error('Payload too large (limit 1MB)'), { statusCode: 413 }));
+        return;
       }
+      body += chunk;
     });
     req.on('end', () => {
+      if (tooLarge) return;
       try {
         const parsed = body ? JSON.parse(body) : {};
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          reject(new Error('JSON body must be an object'));
+          return;
+        }
+        if (parsed.symbol !== undefined && typeof parsed.symbol !== 'string') {
+          reject(new Error('symbol must be a string'));
+          return;
+        }
         resolve(parsed);
       } catch (e) {
         reject(new Error('Invalid JSON payload'));
@@ -91,6 +106,14 @@ function parseJsonBody(req) {
 
 // Rate limiting & Single-flight locks
 const refreshRateLimitMap = new Map();
+let lastPublicRefreshAt = 0;
+// Proxy headers are trusted only when the deployment explicitly configures hops.
+function clientAddress(req) {
+  const hops = Number(process.env.TRUST_PROXY_HOPS || 0);
+  const chain = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
+  return Number.isInteger(hops) && hops > 0 && chain.length >= hops
+    ? chain[chain.length - hops] : (req.socket?.remoteAddress || 'unknown');
+}
 let activeRefreshPromise = null;
 
 // ---------------------------------------------------------------------------
@@ -224,12 +247,13 @@ const WAVE_HTF_INTERVALS = {
 function checkWaveRateLimit(clientIp) {
   const now = Date.now();
   const windowMs = 60000;
-  if (waveRateLimitMap.size > 2000) {
+  if (waveRateLimitMap.size >= 2000) {
     for (const [ip, ts] of waveRateLimitMap) {
       if (!ts.length || now - ts[ts.length - 1] >= windowMs) waveRateLimitMap.delete(ip);
     }
   }
   const maxReq = 20; // Max 20 requests per minute per IP
+  if (!waveRateLimitMap.has(clientIp) && waveRateLimitMap.size >= 2000) return false;
   let timestamps = waveRateLimitMap.get(clientIp) || [];
   timestamps = timestamps.filter(t => now - t < windowMs);
   if (timestamps.length >= maxReq) {
@@ -697,6 +721,25 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
  */
 async function handleApiRequest(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
+  // Query/body types are untrusted; repeated query keys are arrays in url.parse.
+  if (Object.values(parsedUrl.query || {}).some(Array.isArray)) {
+    sendJsonResponse(req, res, 400, { code: 400, error: 'Repeated query parameters are not supported' });
+    return;
+  }
+  if (pathname === '/api/market-data' && !checkWaveRateLimit(`market:${clientAddress(req)}`)) {
+    sendJsonResponse(req, res, 429, { code: 429, error: 'Market request rate limit exceeded' });
+    return;
+  }
+  const wantsForce = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
+  if (wantsForce || pathname === '/api/refresh') {
+    const now = Date.now();
+    // Global cooldown also bounds upstream work behind reverse proxies.
+    if (now - lastPublicRefreshAt < 10000) {
+      sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后刷新 (Refresh cooldown)' }, { 'Retry-After': '10' });
+      return;
+    }
+    lastPublicRefreshAt = now;
+  }
 
   // Read-only self-checks and CORS preflights must not mark the instance
   // "active": a probe of the audit/health endpoints must never wake the idle
@@ -1124,7 +1167,7 @@ async function handleApiRequest(req, res, parsedUrl) {
       const realtimeSpot = cache.gex?.index_price || cache.termPremium?.spotPrice || null;
 
       let finalMacroData = macroData;
-      if (realtimeSpot && macroData && macroData.summary) {
+      if (Number.isFinite(realtimeSpot) && realtimeSpot > 0 && getSourceHealth('greeks_gex').usable && macroData?.points?.at(-1)?.date === new Date().toISOString().slice(0, 10) && macroData.summary) {
         const updatedSummary = { ...macroData.summary };
         updatedSummary.currentBtc = realtimeSpot;
         if (updatedSummary.currentMstrCost) {
@@ -1307,7 +1350,7 @@ async function handleApiRequest(req, res, parsedUrl) {
 
   // POST /api/refresh
   if (pathname === '/api/refresh' && req.method === 'POST') {
-    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    const clientIp = clientAddress(req);
     const now = Date.now();
     const lastRequest = refreshRateLimitMap.get(clientIp) || 0;
 
@@ -1321,6 +1364,13 @@ async function handleApiRequest(req, res, parsedUrl) {
       return;
     }
 
+    if (refreshRateLimitMap.size >= 1000) {
+      for (const [ip, time] of refreshRateLimitMap) if (now - time > 60000) refreshRateLimitMap.delete(ip);
+    }
+    if (!refreshRateLimitMap.has(clientIp) && refreshRateLimitMap.size >= 1000) {
+      sendJsonResponse(req, res, 429, { code: 429, error: 'Refresh capacity reached' });
+      return;
+    }
     refreshRateLimitMap.set(clientIp, now);
 
     // Clean up stale entries if map gets too large
@@ -1441,13 +1491,13 @@ async function handleApiRequest(req, res, parsedUrl) {
 
   // GET /api/wave/klines (Module 8: Wave Kline Feed Proxy & Cache with IP Rate Limit)
   if (pathname === '/api/wave/klines' && req.method === 'GET') {
-    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    const clientIp = clientAddress(req);
     if (!checkWaveRateLimit(clientIp)) {
       sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
       return;
     }
 
-    const rawSymbol = (parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    const rawSymbol = String(parsedUrl.query?.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
     if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
       sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
@@ -1499,7 +1549,7 @@ async function handleApiRequest(req, res, parsedUrl) {
 
   // GET / POST /api/wave/analysis (Module 8: Liu Yudong Elliott Wave Theory Analysis API)
   if (pathname === '/api/wave/analysis' && (req.method === 'GET' || req.method === 'POST')) {
-    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    const clientIp = clientAddress(req);
     if (!checkWaveRateLimit(clientIp)) {
       sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
       return;
@@ -1510,12 +1560,12 @@ async function handleApiRequest(req, res, parsedUrl) {
       try {
         payload = await parseJsonBody(req);
       } catch (e) {
-        sendJsonResponse(req, res, 400, { code: 400, error: 'Invalid JSON request payload' });
+        sendJsonResponse(req, res, e.statusCode || 400, { code: e.statusCode || 400, error: e.statusCode === 413 ? 'Payload too large' : 'Invalid JSON request payload' });
         return;
       }
     }
 
-    const rawSymbol = ((payload.symbol || parsedUrl.query?.symbol) || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    const rawSymbol = String((payload.symbol || parsedUrl.query?.symbol) || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
     if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
       sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
@@ -1609,7 +1659,7 @@ async function handleApiRequest(req, res, parsedUrl) {
 
   // POST /api/wave/evaluate (Module 8: 用户画浪评估 — 4H 画浪 + 15m 子浪证伪 + 柳氏监测点/目标)
   if (pathname === '/api/wave/evaluate' && req.method === 'POST') {
-    const clientIp = (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+    const clientIp = clientAddress(req);
     if (!checkWaveRateLimit(clientIp)) {
       sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后再试 (Rate limit: 20 req/min per IP)' });
       return;
@@ -1619,11 +1669,11 @@ async function handleApiRequest(req, res, parsedUrl) {
     try {
       payload = await parseJsonBody(req);
     } catch (e) {
-      sendJsonResponse(req, res, 400, { code: 400, error: 'Invalid JSON request payload' });
+      sendJsonResponse(req, res, e.statusCode || 400, { code: e.statusCode || 400, error: e.statusCode === 413 ? 'Payload too large' : 'Invalid JSON request payload' });
       return;
     }
 
-    const rawSymbol = (payload.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
+    const rawSymbol = String(payload.symbol || 'BTCUSDT').toUpperCase().replace(/[\/\-_]/g, '');
     if (rawSymbol !== 'BTCUSDT' && rawSymbol !== 'ETHUSDT') {
       sendJsonResponse(req, res, 400, { code: 400, error: '波浪理论研判目前仅限定 BTC/USDT 与 ETH/USDT 标的' });
       return;
@@ -1874,30 +1924,36 @@ function handleStaticRequest(req, res, parsedUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+  try {
+    const parsedUrl = url.parse(req.url, true);
+    const pathname = parsedUrl.pathname;
 
-  // Universal Health Check Endpoints for Render / Cloud deployments (instant 200 OK)
-  if (pathname === '/healthz' || pathname === '/health' || pathname === '/ping' || pathname === '/api/health') {
-    res.writeHead(200, {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache'
-    });
-    res.end('OK');
-    return;
-  }
+    // Universal Health Check Endpoints for Render / Cloud deployments (instant 200 OK)
+    if (pathname === '/healthz' || pathname === '/health' || pathname === '/ping' || pathname === '/api/health') {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache'
+      });
+      res.end('OK');
+      return;
+    }
 
-  // Handle HEAD requests for health checkers
-  if (req.method === 'HEAD') {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end();
-    return;
-  }
+    // Handle HEAD requests for health checkers
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end();
+      return;
+    }
 
-  if (pathname.startsWith('/api/')) {
-    await handleApiRequest(req, res, parsedUrl);
-  } else {
-    handleStaticRequest(req, res, parsedUrl);
+    if (pathname.startsWith('/api/')) {
+      await handleApiRequest(req, res, parsedUrl);
+    } else {
+      handleStaticRequest(req, res, parsedUrl);
+    }
+  } catch (err) {
+    console.error('[HTTP] request failed:', err);
+    if (!res.headersSent && !res.destroyed) sendJsonResponse(req, res, 500, { code: 500, error: 'Internal server error' });
+    else if (!res.destroyed) res.destroy();
   }
 });
 
@@ -1911,6 +1967,7 @@ function startServer() {
   });
 
   backgroundRefreshEnabled = true;
+  startFlowForceRefresh();
   console.log('[Server] Initializing market data cache...');
   refreshMarketInBackground()
     .then(() => console.log('[Server] Initial market data cache ready.'));
@@ -1973,7 +2030,7 @@ module.exports = {
   startServer,
   sendJsonResponse,
   _internal: {
-    fetchBinanceKlines, fetchKlinePages, fetchKlineTier,
+    clientAddress, fetchBinanceKlines, fetchKlinePages, fetchKlineTier,
     waveKlineSourceHealth, waveHealthSummary, waveSourceId, klineCacheEntry,
     KLINE_SOURCES, waveKlineCache, KLINE_TIERS, KLINE_SEC, noteApiActivity, isServerIdle,
     setBackgroundRefreshEnabled: v => { backgroundRefreshEnabled = !!v; },

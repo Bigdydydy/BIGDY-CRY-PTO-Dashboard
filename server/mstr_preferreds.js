@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
@@ -7,7 +8,7 @@ const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_he
 
 // MSTR 融资压力：STRC 平价锚定 + 优先股分层利差
 const CONFIG_FILE = path.join(__dirname, '..', 'data', 'mstr_preferreds.json');
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'mstr_preferreds_cache.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'mstr_preferreds_cache.json'));
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const PAR = 100;
 const BREAK_LEVEL = 99;
@@ -18,7 +19,7 @@ const isPosNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
   !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v)) && Number(v) > 0;
 
 // STRC 月度股息率历史：由官网 /debt 的 strc_metrics 自动按月记录 (Actions 快照会提交该文件，跨部署累积)
-const STRC_RATE_HISTORY_FILE = path.join(__dirname, '..', 'data', 'strc_rate_history.json');
+const STRC_RATE_HISTORY_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'strc_rate_history.json'));
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 let inMemoryCache = null;

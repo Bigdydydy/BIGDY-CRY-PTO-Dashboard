@@ -87,8 +87,8 @@ describe('option_flow_ledger · 分页同步', () => {
     const ledger = flow.emptyLedger();
     ledger.startTs = 0;
     // 每页 3 笔：第 1 页止于 20 毫秒的前两笔，第 2 页从 20 毫秒重取，去重后只记入新的第 3 笔
-    const r = await flow.syncLedger(ledger, { endTs: 50, fetchPage: makeFetcher(all, 3, calls), sleepMs: 0 });
-    assert.deepEqual(calls, [0, 20, 21]);
+    const r = await flow.syncLedger(ledger, { endTs: 50, fetchPage: makeFetcher(all, 4, calls), sleepMs: 0 });
+    assert.deepEqual(calls, [0, 20, 30]);
     assert.equal(r.complete, true);
     assert.equal(ledger.instruments[C][0], 3);   // 4 买 − 1 卖
     assert.equal(ledger.instruments[C][6], 5);
@@ -98,7 +98,7 @@ describe('option_flow_ledger · 分页同步', () => {
 
     // 增量：新成交到来后从游标继续，旧成交不重复
     all.push(trade(7, 40, P, 'sell', 1), trade(8, 60, C, 'buy', 1));
-    const r2 = await flow.syncLedger(ledger, { endTs: 70, fetchPage: makeFetcher(all, 2, []), sleepMs: 0 });
+    const r2 = await flow.syncLedger(ledger, { endTs: 70, fetchPage: makeFetcher(all, 3, []), sleepMs: 0 });
     assert.equal(r2.applied, 2);
     assert.equal(ledger.instruments[P][0], 1);
     assert.equal(ledger.instruments[C][0], 4);
@@ -116,14 +116,15 @@ describe('option_flow_ledger · 分页同步', () => {
     assert.equal(ledger.syncedThrough, 1000);
   });
 
-  // 已知局限：同一毫秒成交超过一页 (真实接口为 1000 笔) 时，该毫秒剩余成交会被跳过
-  test('整页落在同一毫秒时游标前移 1 毫秒，避免原地循环', async () => {
+  // 单毫秒超过一页时，API 时间戳游标无法证明完整性，必须拒绝完成
+  test('整页落在同一毫秒时拒绝宣称同步完整', async () => {
     const all = [trade(1, 10, C, 'buy', 1), trade(2, 10, C, 'buy', 1), trade(3, 10, C, 'buy', 1), trade(4, 20, C, 'buy', 1)];
     const calls = [];
     const ledger = flow.emptyLedger();
     ledger.startTs = 10;
-    await flow.syncLedger(ledger, { endTs: 30, fetchPage: makeFetcher(all, 2, calls), sleepMs: 0, maxPages: 5 });
-    assert.ok(calls.includes(11), `游标应前移到 11，实际请求起点 ${calls}`);
+    await assert.rejects(flow.syncLedger(ledger, { endTs: 30, fetchPage: makeFetcher(all, 2, calls), sleepMs: 0, maxPages: 5 }), /completeness/);
+    assert.equal(ledger.syncedThrough, null);
+    assert.equal(calls.includes(11), false);
   });
 
   test('缺少起点时报错', async () => {

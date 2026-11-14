@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 /**
  * Module 2-B: Spot ETF flows × basis-arbitrage capital linkage
  *
@@ -30,7 +31,7 @@ const { recordAttempt, recordSuccess, recordFailure } = require('./data_health')
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 const { fetchUpstreamJson } = require('./upstream_mirror');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'etf_linkage.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'etf_linkage.json'));
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const START_DATE = '2024-01-01';
 const ROLLING_WEEKS = 12;
@@ -40,7 +41,9 @@ const CFTC_CONTRACTS = { '133741': 5, '133742': 0.1 }; // BTC per contract
 // Carry/basis health is ancillary: it enriches the panel but never gates the
 // required ETF/COT/OI legs.
 const REQUIRED_IDS = ['etf', 'cot', 'etf_oi'];
-const ANCILLARY_IDS = ['basis_live', 'basis_history'];
+// The weekly panel consumes daily history, never the live curve. Its 6h cache
+// must not be downgraded by the unrelated live curve's 15-minute expiry.
+const ANCILLARY_IDS = ['basis_history'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const isFiniteNum = v => v !== null && v !== undefined && typeof v !== 'boolean' &&
   !(typeof v === 'string' && v.trim() === '') && Number.isFinite(Number(v));
@@ -425,6 +428,23 @@ function cotWeekEndOf(dateStr) {
   return isoDate(t + ((2 - dow + 7) % 7) * DAY_MS);
 }
 
+// Official 2026 holiday exceptions to the usual Friday release:
+// https://www.cftc.gov/MarketReports/CommitmentsofTraders/ReleaseSchedule/index.htm
+// Dates are US release dates; refresh this map when the next calendar is published.
+const COT_RELEASE_OVERRIDES = {
+  '2026-01-02': '2026-01-05',
+  '2026-06-19': '2026-06-22',
+  '2026-07-03': '2026-07-06',
+  '2026-11-13': '2026-11-16',
+  '2026-11-27': '2026-11-30',
+  '2026-12-25': '2026-12-28'
+};
+
+function cotExpectedRelease(weekEnd) {
+  const friday = isoDate(Date.parse(weekEnd) + 3 * DAY_MS);
+  return COT_RELEASE_OVERRIDES[friday] || friday;
+}
+
 /**
  * ETF flows printed after the latest CFTC report, grouped into the COT weeks they will belong to.
  * CME positioning for these weeks is not published yet (the Tuesday snapshot is released the
@@ -468,8 +488,7 @@ function buildPendingWeeks({ etfFlows, lastCotDate, oiPanel, basisSeries, now = 
       excessOverTBill: carry.length ? round(mean(carry)) : null,
       apr90d: apr.length ? round(mean(apr)) : null,
       btcPrice: price != null ? Math.round(price) : null,
-      // CFTC publishes the Tuesday snapshot on the following Friday
-      cotExpectedRelease: isoDate(Date.parse(weekEnd) + 3 * DAY_MS),
+      cotExpectedRelease: cotExpectedRelease(weekEnd),
       dLfNetShortBtc: null
     };
   });

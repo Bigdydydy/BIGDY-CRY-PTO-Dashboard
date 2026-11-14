@@ -380,7 +380,7 @@ function deriveSecCapital({ reference, docs, xbrl = {}, today }) {
       },
       issues
     };
-    if (capital.cashUsd === null) capital.cashUsd = 0;
+    // Missing USD balances remain unknown; official mNAV must reject them.
   }
 
   // Holdings timeline as ledger-compatible events (newest last).

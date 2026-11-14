@@ -18,9 +18,9 @@
  *   Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1，以及 永续基差。
  *
  * 历史不可变:
- *   - 已收盘K线按"先写入者为准"存档 (data/flow_force/<周期>.json)，之后不再被任何数据源覆盖。
- *   - 某根K线收盘且 6 个场所 + USDT/USD 全部到齐，这一行指标即"定死"，以后原样返回、不再重算。
- *   - 缺场所的行标记为暂定 (missing)，等数据补齐 (币安最迟次日官方档案) 后再定死。
+ *   - 官方已收盘K线按"先写入者为准"存档；TradingView/旧版来源不明的币安K线暂存，允许官方核验替换。
+ *   - 收盘且 6 个场所 + USDT/USD 到齐、整个基线窗口来源已核验，才定稿并原样返回。
+ *   - 缺场所不输出主导方向；备用数据及其50根基线待官方档案发布核验后再定死。
  *   - 进行中的K线按已过时间折算成交额，与已收盘K线可比，并标出缺失的场所。
  * 币安不直接依赖 REST (云主机共享出口常被 418 封禁)，见 binance_feed.js。
  */
@@ -45,7 +45,8 @@ const DAY_MS = 8.64e7;
 const MONDAY_OFFSET_MS = 4 * DAY_MS; // 1970-01-01 是周四，+4 天对齐到周一 (币安 / OKX 周线口径)
 const AUDIT_TTL_MS = 10 * 60e3;
 const DEPTH_BAND = 0.001;   // ±10bps
-const ALGO_VERSION = 2;     // 算法口径变化时 +1，旧的定死行作废重建 (原始K线存档保留)
+const ALGO_VERSION = 3;     // 缺数不出方向；旧币安存档需重新确认官方来源
+const STORE_SCHEMA = 2;
 const STORE_DIR = process.env.FLOW_FORCE_STORE_DIR || path.join(__dirname, '..', 'data', 'flow_force');
 
 // 同格权重定死 (2026-10-18 实测 ±10bps 深度: 币安永续 $42.6M / OKX 永续 $38.1M；币安现货 $13.6M / OKX 现货 $7.6M)
@@ -204,11 +205,12 @@ const DIRECT = {
  * 币安: 官方档案 (已收盘历史) → WebSocket 流 (当天收盘与进行中) → REST (带熔断) → TradingView。
  * 只为存档里缺的K线去找数据源，存档补齐后正常情况下不再访问 REST。
  */
-async function fetchBinanceVenue(key, tf, stored, now) {
+async function fetchBinanceVenue(key, tf, stored, now, historyFrom = Infinity) {
   const market = key === 'bnPerp' ? 'perp' : 'spot';
   const tfMs = TF_MS[tf];
   const current = alignT(now, tf);
-  const fromT = current - (FETCH_BARS - 1) * tfMs;
+  const fromT = Math.max(current - (KEEP_BARS - 1) * tfMs,
+    Math.min(current - (FETCH_BARS - 1) * tfMs, historyFrom, ...stored.keys()));
   const todayStart = Math.floor(now / DAY_MS) * DAY_MS;
   const got = new Map();
   const used = [];
@@ -219,7 +221,7 @@ async function fetchBinanceVenue(key, tf, stored, now) {
 
   // 1. 档案：今天之前、已收盘但存档里没有的K线。
   //    周线档案的月度文件并不完整 (有缺月)，改由日线档案合成周一对齐的周线，7 根齐全才算数
-  const oldGap = gridTimes.filter(t => t + tfMs <= todayStart && missing(t));
+  const oldGap = gridTimes.filter(t => t + tfMs <= todayStart && (missing(t) || stored.get(t)?.viaTv));
   if (oldGap.length) {
     try {
       const bars = tf === '1w'
@@ -245,15 +247,18 @@ async function fetchBinanceVenue(key, tf, stored, now) {
   } catch (e) {
     errors.push(`实时流: ${e.message}`);
   }
-  // 3/4. 仍缺的近期K线 (服务启动前的当天K线、断流期间、昨天的档案尚未发布) → REST → TradingView
-  const recentFrom = Math.min(todayStart, current) - tfMs;
-  const isUsable = t => !missing(t) && !(got.get(t) && got.get(t).need && got.get(t).n < got.get(t).need && t !== current);
-  const recentGap = () => gridTimes.filter(t => t >= recentFrom && !isUsable(t));
+  // 3/4. 档案未能补齐的保留范围缺口 → REST → TradingView
+  const isUsable = t => {
+    const b = got.get(t) || stored.get(t);
+    return !!b && !(b.need && b.n < b.need && t !== current);
+  };
+  // Scan the entire retained range, including old holes, not only yesterday/today.
+  const recentGap = () => gridTimes.filter(t => !isUsable(t));
   if (recentGap().length) {
     try {
-      const bars = await binance.fetchRestBars(market, tf, Math.min(1000, FETCH_BARS));
+      const bars = await binance.fetchRestBars(market, tf, KEEP_BARS);
       validateFlowBars(bars, 'REST');
-      for (const b of bars) if (!isUsable(b.t) || b.t === current) got.set(b.t, b);
+      for (const b of bars) if (!isUsable(b.t) || stored.get(b.t)?.viaTv || b.t === current) got.set(b.t, b);
       used.push('REST');
     } catch (e) {
       errors.push(`REST: ${e.message}`);
@@ -290,8 +295,8 @@ const MIRROR = {
   }
 };
 
-async function fetchVenue(key, tf, stored, now) {
-  if (key === 'bnPerp' || key === 'bnSpot') return fetchBinanceVenue(key, tf, stored, now);
+async function fetchVenue(key, tf, stored, now, historyFrom) {
+  if (key === 'bnPerp' || key === 'bnSpot') return fetchBinanceVenue(key, tf, stored, now, historyFrom);
   const errors = [];
   const direct = DIRECT[key];
   try {
@@ -389,7 +394,8 @@ function venuePressure(bars, n = LOOKBACK, opts = {}) {
       frac = Math.min(1, Math.max(0.1, (now - bars[i].t) / tfMs));
       v /= frac;
     }
-    out.set(bars[i].t, { p: v * (2 * normCdf(z) - 1) / baseV, base: baseV, c: bars[i].c, v: bars[i].v, frac });
+    const provisional = bars.slice(i - n - 1, i + 1).some(b => b.viaTv || b.closed === false && b.t + (tfMs || 0) <= now);
+    out.set(bars[i].t, { p: v * (2 * normCdf(z) - 1) / baseV, base: baseV, c: bars[i].c, v: bars[i].v, frac, provisional });
   }
   return out;
 }
@@ -415,10 +421,20 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
 
   const times = new Set();
   for (const m of Object.values(pressures)) for (const t of m.keys()) times.add(t);
+  if (tfMs && times.size) {
+    const last = Math.max(...times, now ? Math.floor((now - (opts.offsetMs || 0)) / tfMs) * tfMs + (opts.offsetMs || 0) : -Infinity);
+    const first = Math.max(Math.min(...times), last - (KEEP_ROWS - 1) * tfMs);
+    for (const t of times) if (t < first) times.delete(t);
+    for (let t = first; t <= last; t += tfMs) times.add(t);
+  }
   const sorted = [...times].sort((a, b) => a - b);
 
   const series = [];
   for (const t of sorted) {
+    const lacking = VENUE_KEYS.filter(k => !pressures[k]?.has(t));
+    const absent = lacking.filter(k => listedFrom[k] && tfMs && t < listedFrom[k] + (LOOKBACK + 1) * tfMs);
+    const missing = lacking.filter(k => !absent.includes(k));
+    const provisional = VENUE_KEYS.some(k => pressures[k]?.get(t)?.provisional);
     const cell = {};
     for (const [ck, members] of Object.entries(CELLS)) {
       let num = 0, den = 0;
@@ -430,13 +446,13 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
         num += w * pt.p;
         den += w;
       }
-      cell[ck] = den > 0 ? num / den : null;
+      cell[ck] = den > 0 && !members.some(k => missing.includes(k)) ? num / den : null;
     }
-    const F = mean([cell.futAsia, cell.futWest]);
-    const S = mean([cell.spotAsia, cell.spotWest]);
-    if (F === null || S === null) continue;
-    const A = mean([cell.futAsia, cell.spotAsia]);
-    const W = mean([cell.futWest, cell.spotWest]);
+    const fullMean = xs => xs.every(Number.isFinite) ? mean(xs) : null;
+    const F = fullMean([cell.futAsia, cell.futWest]);
+    const S = fullMean([cell.spotAsia, cell.spotWest]);
+    const A = fullMean([cell.futAsia, cell.spotAsia]);
+    const W = fullMean([cell.futWest, cell.spotWest]);
 
     // Absolute activity intensities for dominance comparisons (avoids cancellation of hedging/arbitrage flows)
     const absVal = x => (x !== null && !isNaN(x) ? Math.abs(x) : null);
@@ -446,14 +462,12 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
     const westStrength = mean([absVal(cell.futWest), absVal(cell.spotWest)]);
 
     const px = k => (pressures[k] && pressures[k].get(t) ? pressures[k].get(t).c : null);
-    const bnS = px('bnSpot') || px('okxSpot');
+    const bnS = px('bnSpot');
     const us = px('usSpot');
     const perp = mean([px('bnPerp'), px('okxPerp')]);
     const rate = usdtUsd.get(t); // 1 USDT = rate USD
     // 场所尚未上线 (含上线后 n+1 根预热期) 是结构性缺席，永远不会补齐，不算缺数据
-    const lacking = VENUE_KEYS.filter(k => !(pressures[k] && pressures[k].get(t)));
-    const absent = lacking.filter(k => listedFrom[k] && tfMs && t < listedFrom[k] + (LOOKBACK + 1) * tfMs);
-    const missing = lacking.filter(k => !absent.includes(k));
+    const signalReady = missing.length === 0 && Object.values(cell).every(Number.isFinite);
     const live = !!(tfMs && now && t + tfMs > now);
     const usPremiumBps = us && bnS && rate > 0 ? round((us / (bnS * rate) - 1) * 1e4, 2) : null;
 
@@ -462,8 +476,8 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
       futAsia: round(cell.futAsia), futWest: round(cell.futWest),
       spotAsia: round(cell.spotAsia), spotWest: round(cell.spotWest),
       fut: round(F), spot: round(S), asia: round(A), west: round(W),
-      hist: futStrength !== null && spotStrength !== null ? round(futStrength - spotStrength) : null,
-      region: asiaStrength !== null && westStrength !== null ? round(asiaStrength - westStrength) : null,
+      hist: signalReady ? round(futStrength - spotStrength) : null,
+      region: signalReady ? round(asiaStrength - westStrength) : null,
       // Coinbase 溢价 = Coinbase BTC-USD ÷ (币安 BTCUSDT × USDT/USD) − 1，两边都换成美元后再比
       usPremiumBps,
       // 未换汇的原始价差 = 真实溢价 + USDT 相对美元的折溢价
@@ -471,7 +485,9 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
       basisBps: perp && bnS ? round((perp / bnS - 1) * 1e4, 2) : null,
       price: round(us || bnS, 2),
       missing,
-      complete: missing.length === 0 && usPremiumBps !== null
+      signalReady,
+      provisional,
+      complete: missing.length === 0 && usPremiumBps !== null && !provisional
     };
     if (absent.length) row.absent = absent;
     if (live) {
@@ -488,26 +504,31 @@ function computeFlowForce(venueBars, weights = {}, usdtUsd = new Map(), opts = {
     const cur = series[i].usPremiumRawBps;
     series[i].usPremiumDevBps = cur !== null && base !== null ? round(cur - base, 2) : null;
   }
-  return series;
+  // Leading warm-up rows have no comparable matrix. Keep interior/trailing gaps
+  // explicitly, so neither charts nor summaries bridge a data outage.
+  const firstReady = series.findIndex(p => p.signalReady);
+  return firstReady > 0 ? series.slice(firstReady) : series;
 }
 
 /** 最近 k 根已收盘 (不含进行中) 的均值研判 */
 function summarize(series, k = 3) {
   const done = series.filter(p => !p.live).slice(-k);
   if (!done.length) return null;
-  const h = mean(done.map(p => p.hist));
-  const r = mean(done.map(p => p.region));
+  const ready = done.every(p => Number.isFinite(p.hist) && Number.isFinite(p.region));
+  const h = ready ? mean(done.map(p => p.hist)) : null;
+  const r = ready ? mean(done.map(p => p.region)) : null;
   const f = mean(done.map(p => p.fut));
   const s = mean(done.map(p => p.spot));
   const dir = v => (v === null ? '' : v > 0.05 ? '净买' : v < -0.05 ? '净卖' : '中性');
   return {
     bars: done.length,
+    provisional: done.some(p => p.provisional),
     complete: done.every(p => p.complete),
     hist: round(h), region: round(r),
     leader: h === null ? null : h > 0 ? 'futures' : 'spot',
-    leaderLabel: h === null ? '--' : h > 0 ? '期货主导' : '现货主导',
+    leaderLabel: h === null ? '数据不足' : h > 0 ? '期货主导' : '现货主导',
     regionLeader: r === null ? null : r > 0 ? 'asia' : 'west',
-    regionLabel: r === null ? '--' : r > 0 ? '亚太主导' : '欧美主导',
+    regionLabel: r === null ? '数据不足' : r > 0 ? '亚太主导' : '欧美主导',
     futDir: dir(f), spotDir: dir(s)
   };
 }
@@ -533,7 +554,12 @@ function loadStore(tf) {
   try {
     const raw = JSON.parse(fs.readFileSync(storeFile(tf), 'utf8'));
     for (const k of VENUE_KEYS) {
-      for (const r of (raw.bars && raw.bars[k]) || []) st.bars[k].set(r[0], { t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] });
+      for (const r of (raw.bars && raw.bars[k]) || []) st.bars[k].set(r[0], {
+        t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5],
+        // Legacy stores did not retain provenance. Reconcile Binance with
+        // official archives before treating these bars as verified again.
+        viaTv: !!r[6] || raw.schema !== STORE_SCHEMA && (k === 'bnPerp' || k === 'bnSpot')
+      });
     }
     for (const r of raw.usdt || []) st.usdt.set(r[0], r[1]);
     // 算法或权重变了，旧的定死行作废 (原始K线仍然有效，会按新口径重新定死)
@@ -547,23 +573,30 @@ function loadStore(tf) {
   return st;
 }
 
+const storeWrites = new Map();
 function saveStore(tf, st) {
   if (!st.dirty) return;
   st.dirty = false;
   const trimSorted = (entries, keep) => entries.sort((a, b) => a[0] - b[0]).slice(-keep);
   const bars = {};
   for (const k of VENUE_KEYS) {
-    bars[k] = trimSorted([...st.bars[k].values()].map(b => [b.t, b.o, b.h, b.l, b.c, round(b.v, 2)]), KEEP_BARS);
+    bars[k] = trimSorted([...st.bars[k].values()].map(b => [b.t, b.o, b.h, b.l, b.c, b.v, b.viaTv ? 1 : 0]), KEEP_BARS);
     // 内存里也同步裁剪，避免无限增长
     if (st.bars[k].size > KEEP_BARS) for (const [t] of [...st.bars[k].entries()].sort((a, b) => a[0] - b[0]).slice(0, st.bars[k].size - KEEP_BARS)) st.bars[k].delete(t);
   }
   const usdt = trimSorted([...st.usdt.entries()], KEEP_BARS);
   const rows = [...st.rows.values()].sort((a, b) => a.time - b.time).slice(-KEEP_ROWS);
-  const payload = JSON.stringify({ algo: ALGO_VERSION, weights: FIXED_WEIGHTS, tf, savedAt: new Date().toISOString(), bars, usdt, rows });
-  fs.promises.mkdir(STORE_DIR, { recursive: true })
+  st.usdt = new Map(usdt);
+  st.rows = new Map(rows.map(row => [row.time, row]));
+  const payload = JSON.stringify({ schema: STORE_SCHEMA, algo: ALGO_VERSION, weights: FIXED_WEIGHTS, tf, savedAt: new Date().toISOString(), bars, usdt, rows });
+  // Serialize writes per timeframe: the background worker and API may both
+  // save, and an older write must never win or consume a newer .tmp file.
+  const write = (storeWrites.get(tf) || Promise.resolve()).then(() => fs.promises.mkdir(STORE_DIR, { recursive: true }))
     .then(() => fs.promises.writeFile(`${storeFile(tf)}.tmp`, payload))
     .then(() => fs.promises.rename(`${storeFile(tf)}.tmp`, storeFile(tf)))
-    .catch(e => console.warn(`[FlowForce] 写入存档 ${tf} 失败: ${e.message}`));
+    .catch(e => { st.dirty = true; console.warn(`[FlowForce] 写入存档 ${tf} 失败: ${e.message}`); });
+  storeWrites.set(tf, write);
+  return write;
 }
 
 /**
@@ -578,19 +611,27 @@ function tvUnitsPlausible(bars, stored) {
   return ratio > 1 / 20 && ratio < 20;
 }
 
-/** 把新拿到的已收盘K线并入存档 (已存在的时间点不覆盖)；返回本次计算用的K线 (存档 + 未定的近期K线) */
+/** 并入收盘K线；官方可替换暂估来源，已核验数据不覆盖。返回存档与近期未收盘K线。 */
 function mergeVenue(st, key, bars, tf, now) {
   const stored = st.bars[key];
   const transient = new Map();
-  let usable = bars.filter(b => !(b.need && b.n < b.need && isFinal(b.t, tf, now)));
+  let usable = bars.filter(b => !(b.t + TF_MS[tf] <= now && (b.closed === false || b.need && b.n < b.need)));
   if (usable.some(b => b.viaTv) && !tvUnitsPlausible(usable.filter(b => b.viaTv), stored)) {
     usable = usable.filter(b => !b.viaTv);
   }
   for (const b of usable) {
     const final = isFinal(b.t, tf, now) && (!b.need || b.n >= b.need) && (b.closed !== false);
     if (final) {
-      if (!stored.has(b.t)) {
-        stored.set(b.t, { t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v });
+      const previous = stored.get(b.t);
+      if (!previous || previous.viaTv && !b.viaTv) {
+        stored.set(b.t, { t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v, viaTv: !!b.viaTv });
+        if (previous) {
+          // A corrected bar affects its own pressure and the following 51
+          // baseline/return windows. Recompute only those frozen rows.
+          for (const [time] of st.rows) {
+            if (time * 1000 >= b.t && time * 1000 <= b.t + (LOOKBACK + 1) * TF_MS[tf]) st.rows.delete(time);
+          }
+        }
         st.dirty = true;
       }
     } else if (!stored.has(b.t)) {
@@ -750,8 +791,9 @@ async function buildFlowForce(tf) {
   for (const k of VENUE_KEYS) recordAttempt(venueId(k), { now });
   recordAttempt(`flow:${tf}:fx`, { now });
   try {
+    const historyFrom = Math.min(...VENUE_KEYS.flatMap(k => [...st.bars[k].keys()]));
     const [fetched, audit, usdt] = await Promise.all([
-      Promise.all(VENUE_KEYS.map(k => fetchVenue(k, tf, st.bars[k], now))),
+      Promise.all(VENUE_KEYS.map(k => fetchVenue(k, tf, st.bars[k], now, historyFrom))),
       getVenueAudit().catch(() => null),
       fetchUsdtUsd(tf)
     ]);
@@ -809,19 +851,12 @@ async function buildFlowForce(tf) {
     for (const b of usdt.bars) if (!rates.has(b.t)) rates.set(b.t, b.c);
     if (usdt.errors.length) console.warn(`[FlowForce] ${tf} USDT/USD: ${usdt.errors.join(' | ')}`);
 
-    // 数据源正常应答、却给不满请求窗口的场所：首根有成交的K线即上线时间
-    // (Hyperliquid 会把上线前的日子补成成交量为 0 的占位K线，因此不能只看第一根)
-    const windowStart = alignT(now, tf) - (FETCH_BARS - 1) * TF_MS[tf];
-    const listedFrom = {};
-    VENUE_KEYS.forEach((k, i) => {
-      const first = venueBars[k].find(b => b.v > 0);
-      if (first && !fetched[i].errors.length && first.t > windowStart + 2 * TF_MS[tf]) listedFrom[k] = first.t;
-    });
-
-    const computed = computeFlowForce(venueBars, FIXED_WEIGHTS, rates, { tfMs: TF_MS[tf], now, listedFrom });
+    // A short API response is not proof of a listing date. Treat it as missing
+    // history rather than silently exempting that venue from completeness.
+    const computed = computeFlowForce(venueBars, FIXED_WEIGHTS, rates, { tfMs: TF_MS[tf], now, offsetMs: tfOffset(tf) });
     const { series, newlyFrozen } = applyFrozen(st, computed, tf, now);
     if (!series.length) throw new Error('各场所K线均不可用');
-    saveStore(tf, st);
+    await saveStore(tf, st);
 
     // 主图K线: Coinbase；欧美现货整体缺失时退到币安现货
     const candleKey = venueBars.usSpot.length ? 'usSpot' : 'bnSpot';
@@ -847,7 +882,9 @@ async function buildFlowForce(tf) {
       archive: {
         frozenRows: st.rows.size,
         newlyFrozen,
-        provisionalRows: series.filter(r => !r.frozen && !r.live).length
+        provisionalRows: series.filter(r => !r.frozen && !r.live).length,
+        missingRows: series.filter(r => r.missing.length).length,
+        pendingVerificationRows: series.filter(r => r.provisional).length
       },
       summary: summarize(series),
       latest: series[series.length - 1],
@@ -899,11 +936,8 @@ async function getFlowForce(tf = '1h', force = false) {
   if (inflight.has(tf)) return inflight.get(tf);
   const task = buildFlowForce(tf)
     .then(data => {
-      // A history-only build (a cell had no newly fetched bars) is real data
-      // but must never replace or rejuvenate the last good payload's clocks.
-      if (data.historicalOnly && hit) {
-        return withDataHealth({ ...hit.data, stale: true, historicalOnly: true }, [`flow:${tf}`], venueIdsFor(tf));
-      }
+      // Even a degraded run may have repaired older holes. Serve the repaired
+      // snapshot with its real health, never discard it for the previous cache.
       // Store the health-bound snapshot so a sibling timeframe's newer fetch
       // can never rejuvenate this payload's per-source clocks.
       const bound = withDataHealth(data, [`flow:${tf}`], venueIdsFor(tf));
@@ -922,8 +956,31 @@ async function getFlowForce(tf = '1h', force = false) {
   return task;
 }
 
+let refreshTimer = null;
+function startFlowForceRefresh({ refresh = getFlowForce, schedule = setInterval } = {}) {
+  if (refreshTimer) return refreshTimer;
+  let running = false;
+  const sweep = async () => {
+    if (running) return;
+    running = true;
+    try {
+      // Sequential, TTL-aware refreshes keep all periods warm without a burst
+      // of archive downloads or dependence on the browser's selected period.
+      for (const tf of Object.keys(TF_MS)) {
+        try { await refresh(tf); }
+        catch (e) { console.warn(`[FlowForce] 后台补数 ${tf}: ${e.message}`); }
+      }
+    } finally { running = false; }
+  };
+  refreshTimer = schedule(sweep, 60000);
+  refreshTimer.unref?.();
+  void sweep();
+  return refreshTimer;
+}
+
 module.exports = {
   getFlowForce,
+  startFlowForceRefresh,
   computeFlowForce,
   venuePressure,
   aggregateBars,

@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       # 只用 Node 内置模块，无需 npm install；台账不存在时自动全量回补
       - name: Sync option flow ledger

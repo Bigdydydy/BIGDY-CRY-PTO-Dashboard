@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const { formatUTC8 } = require('./analytics_engine');
@@ -16,7 +17,7 @@ const memoryCache = new Map();
  * Get storage file path for currency
  */
 function getStorageFilePath(currency = 'BTC') {
-  return path.join(DATA_DIR, `block_trades_${currency.toUpperCase()}.json`);
+  return snapshotPath(path.join(DATA_DIR, `block_trades_${currency.toUpperCase()}.json`));
 }
 
 /**
@@ -42,10 +43,11 @@ function loadPersistedTrades(currency = 'BTC') {
     if (Array.isArray(parsed)) {
       return parsed;
     }
-    return parsed.trades || [];
+    if (!parsed || !Array.isArray(parsed.trades)) throw new Error('Invalid trade archive schema');
+    return parsed.trades;
   } catch (err) {
     console.error(`[TradeStore] Error loading ${filePath}:`, err.message);
-    return [];
+    throw err;
   }
 }
 

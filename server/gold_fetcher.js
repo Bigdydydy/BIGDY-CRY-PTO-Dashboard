@@ -1,10 +1,11 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const { fetchSpotDailyCloses } = require('./spot_daily');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'gold_correlation.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'gold_correlation.json'));
 const HISTORY_DAYS = 1000;
 const DAY_MS = 86400000;
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);

@@ -81,13 +81,15 @@ function binanceStub(S) {
     ensureStreams() {},
     getStreamBars() {
       if (S.fail.has('stream')) throw new Error('stream broken');
-      return [];
+      return S.streamBars || [];
     },
-    fetchArchiveBars() {
+    fetchArchiveBars(market, tf, from) {
+      (S.archiveCalls ||= []).push({ market, tf, from });
       if (S.fail.has('archive')) throw new Error('archive n/a');
-      return [];
+      return S.archiveBars || [];
     },
-    fetchRestBars() {
+    fetchRestBars(market, tf, limit) {
+      S.restLimit = limit;
       if (S.fail.has('bn')) throw new Error('rest down');
       return S.bnBars;
     },
@@ -212,8 +214,11 @@ test('c · every fetch path fails after a success: last-good payload and clocks 
 
   assert.equal(r.historicalOnly, true);
   assert.equal(r.stale, true);
-  assert.equal(r.updatedAt, good.updatedAt, 'served payload is the last-good one');
-  assert.equal(r.series.length, good.series.length);
+  assert.ok(r.series.length > 0, 'disk-backed snapshot remains available');
+  for (const row of good.series.filter(p => p.frozen)) {
+    assert.deepEqual(r.series.find(p => p.time === row.time), row, 'verified history preserved');
+  }
+  assert.equal(r.latest.hist, null, 'failed current bar must not be carried forward');
   assert.equal(agg().lastSuccessAt, aggSuccessAt, 'aggregate clock not rejuvenated');
   assert.equal(leaf('okxPerp').lastSuccessAt, okxSuccessAt, 'leaf clock preserved');
   assert.ok(agg().lastError, 'aggregate failure recorded');
@@ -300,4 +305,74 @@ test('f · FX dataAsOf is the last actual FX bar; a stale FX is never renewed to
   assert.equal(fxH2.dataAsOf, iso(fxEnd), 'failed FX refresh keeps the old data clock');
   assert.equal(fxH2.lastSuccessAt, fxH.lastSuccessAt);
   assert.ok(fxH2.lastError);
+});
+
+test('g · old Binance holes beyond 300 bars are fetched from archives and REST covers 1000', async (t) => {
+  const { S, mod } = setup(t);
+  const all = bars(650, alignNow()), gap = all[100];
+  const stored = new Map(all.filter(b => b.t !== gap.t && b.t !== alignNow()).map(b => [b.t, b]));
+  S.archiveBars = [gap];
+  const r = await mod.fetchVenue('bnPerp', TF, stored, Date.now());
+  assert.ok(S.archiveCalls[0].from <= gap.t, 'archive scan extends to retained history');
+  assert.ok(r.bars.some(b => b.t === gap.t), 'old hole actually repaired');
+  assert.equal(S.restLimit, 1000);
+});
+
+test('h · archive down and current stream present: old holes still trigger REST/TV', async (t) => {
+  const { S, mod } = setup(t);
+  const all = bars(310, alignNow()), gap = all[70];
+  const stored = new Map(all.filter(b => b.t !== gap.t && b.t !== alignNow()).map(b => [b.t, b]));
+  S.fail.add('archive'); S.fail.add('bn');
+  S.streamBars = [{ ...all.at(-1), closed: false }];
+  const r = await mod.fetchVenue('bnSpot', TF, stored, Date.now());
+  assert.ok(r.bars.some(b => b.t === gap.t && b.viaTv), 'TV repairs yesterday-or-older hole even when live stream is healthy');
+});
+
+test('i · TV provenance survives restart; official bars replace it and permit finalization', async (t) => {
+  const { S, mod, tmp } = setup(t);
+  S.fail.add('bn');
+  S.tvRows = S.bnBars.map(b => ({ ...b, vol: 10 }));
+  const estimated = await mod.getFlowForce(TF, true);
+  assert.equal(estimated.latest.provisional, true);
+  assert.equal(estimated.archive.frozenRows, 0);
+  const disk = JSON.parse(fs.readFileSync(storeFile(tmp)));
+  assert.ok(disk.bars.bnPerp.every(b => b[6] === 1));
+  const cold = freshRequire('flow_force.js');
+  S.fail.delete('bn');
+  const confirmed = await cold.getFlowForce(TF, true);
+  assert.equal(confirmed.latest.provisional, false);
+  assert.ok(confirmed.archive.frozenRows > 0);
+  assert.ok(JSON.parse(fs.readFileSync(storeFile(tmp))).bars.bnPerp.every(b => b[6] === 0));
+});
+
+test('j · legacy Binance bars are reverified instead of inheriting false frozen status', async (t) => {
+  const { S, mod, tmp } = setup(t);
+  await mod.getFlowForce(TF, true);
+  const file = storeFile(tmp), old = JSON.parse(fs.readFileSync(file));
+  delete old.schema; old.algo = 2;
+  for (const k of ['bnPerp', 'bnSpot']) old.bars[k] = old.bars[k].map(b => b.slice(0, 6));
+  fs.writeFileSync(file, JSON.stringify(old));
+  for (const k of ['bn', 'archive', 'stream', 'tv']) S.fail.add(k);
+  const cold = freshRequire('flow_force.js');
+  const r = await cold.getFlowForce(TF, true);
+  assert.equal(r.archive.frozenRows, 0);
+  assert.ok(r.series.some(p => p.provisional), 'legacy unknown provenance stays provisional');
+});
+
+test('k · background worker sweeps all periods, prevents overlap and survives one failing period', async (t) => {
+  const { mod } = setup(t);
+  let tick, release;
+  const calls = [];
+  const gate = new Promise(resolve => { release = resolve; });
+  mod.startFlowForceRefresh({
+    schedule(fn, ms) { tick = fn; assert.equal(ms, 60000); return { unref() {} }; },
+    async refresh(tf) { calls.push(tf); if (calls.length === 1) await gate; if (tf === '4h') throw new Error('offline'); }
+  });
+  await tick();
+  assert.deepEqual(calls, ['15m'], 'a slow initial sweep cannot overlap');
+  release();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, ['15m', '1h', '4h', '1d', '1w']);
+  await tick();
+  assert.equal(calls.length, 10, 'subsequent sweeps continue after failures');
 });

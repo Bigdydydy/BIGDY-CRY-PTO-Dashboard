@@ -575,11 +575,15 @@ async function doRefreshAllMarketData(currency) {
       failSrc('greeks_trades', new Error(`block_trade payload 校验失败: ${bad}`));
       if (!accumulatedTrades.length) accumulatedTrades = getCachedTrades(currency);
     } else {
-      okSrc('greeks_trades', { dataAsOf: receiptIso, asOfKind: 'received' }, 'greeks.live/block_trade');
-      const mergeResult = recordAndMergeTrades(currency, blockTradesRes.value);
-      accumulatedTrades = mergeResult.trades;
-      tradeStats = mergeResult.stats;
-      newAddedTrades = tradeStats.newAddedCount;
+      try {
+        const mergeResult = recordAndMergeTrades(currency, blockTradesRes.value);
+        accumulatedTrades = mergeResult.trades;
+        tradeStats = mergeResult.stats;
+        newAddedTrades = tradeStats.newAddedCount;
+        okSrc('greeks_trades', { dataAsOf: receiptIso, asOfKind: 'received' }, 'greeks.live/block_trade');
+      } catch (err) {
+        failSrc('greeks_trades', err);
+      }
     }
   } else {
     failSrc('greeks_trades', blockTradesRes.reason);

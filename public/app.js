@@ -2802,7 +2802,7 @@ function renderInsightSmart() {
   if (!sm) return;
   const pct = v => (v == null ? '--' : `${Math.round(v * 100)}%`);
   const bias = (v, pos, neg) => {
-    if (v == null) return { text: '--', cls: '', sub: '暂无未结算结构' };
+    if (v == null) return { text: '--', cls: '', sub: '胜率不能代表预期收益，暂不加权' };
     const cls = v > 0.05 ? 'text-pos' : (v < -0.05 ? 'text-neg' : '');
     const word = v > 0.05 ? pos : (v < -0.05 ? neg : '中性');
     return { text: `${v > 0 ? '+' : ''}${v.toFixed(2)}`, cls, sub: word };
@@ -2821,7 +2821,7 @@ function renderInsightSmart() {
   const elFam = document.getElementById('insight-family-body');
   if (elFam) {
     elFam.innerHTML = sm.families.map(f => {
-      const basis = f.weightBasis === 'final' ? '按到期结果' : (f.weightBasis === '7d' ? '按 7 天结果' : '样本不足');
+      const basis = f.weightBasis === 'final' ? '按到期结果' : (f.weightBasis === '7d' ? '按 7 天结果' : '暂不加权');
       const avg = f.avgPnlBtc == null ? '--' : `<span class="${f.avgPnlBtc >= 0 ? 'text-pos' : 'text-neg'}">${f.avgPnlBtc >= 0 ? '+' : ''}${f.avgPnlBtc.toFixed(2)} ₿</span>`;
       return `
         <tr>
@@ -2831,7 +2831,7 @@ function renderInsightSmart() {
           <td>${avg}</td>
           <td>${pct(f.hitRate7d)}<span class="horizon-range">n=${f.n7}</span></td>
           <td>${f.open}</td>
-          <td><strong>${Math.round(f.weight * 100)}%</strong><span class="horizon-range">${basis}</span></td>
+          <td><strong>${f.weight == null ? '--' : Math.round(f.weight * 100) + '%'}</strong><span class="horizon-range">${basis}</span></td>
         </tr>
       `;
     }).join('');
@@ -3013,7 +3013,15 @@ document.addEventListener('visibilitychange', () => {
 // ============================================================================
 
 let rawMacroData = null;
-let macroChartInstance = null;
+let macroChartInstance = null; // 利率图实例，保留给既有的"是否已渲染"判断
+// 宏观数据集拆成三张图，每张只回答一个问题、最多两根常显纵轴。
+// series 是 renderMacroChart 里 datasets 数组的下标；axes 第一项在左，其余在右。
+const macroCharts = {};
+const MACRO_CHART_DEFS = [
+  { key: 'rates', canvas: 'macro-chart-canvas', series: [2, 3, 4], axes: ['yYield', 'ySpread'], hidden: [], autoAxes: [] },
+  { key: 'liq', canvas: 'macro-liq-canvas', series: [0, 7, 8], axes: ['yUSD', 'yLiquidity'], hidden: [], autoAxes: [] },
+  { key: 'mstr', canvas: 'mstr-chart-canvas', series: [0, 1, 6, 5], axes: ['yUSD', 'yMNAV', 'yVelocity'], hidden: [5], autoAxes: ['yVelocity'] }
+];
 let currentMacroTimeframe = '1y';
 
 // DOM Elements
@@ -3039,8 +3047,6 @@ const elMacroMnavSub = document.getElementById('macro-mnav-sub');
 const elMacroNetliqVal = document.getElementById('macro-netliq-val');
 const elMacroNetliqChip = document.getElementById('macro-netliq-chip');
 const elMacroNetliqSub = document.getElementById('macro-netliq-sub');
-const macroTimeframeSwitch = document.getElementById('macro-timeframe-switch');
-const macroLegendGroup = document.getElementById('macro-legend-group');
 
 /**
  * Load Macro Chart Data from API
@@ -3374,8 +3380,44 @@ function renderMacroSummary(summary) {
     const rrpGone = summary.currentFedRrp < 0.01; // < $10B：RRP 项已不起作用
     elMacroNetliqSub.textContent = `WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}${rrpGone ? ' · RRP 已近零，现实际为 WALCL − TGA' : ''}`;
   }
+  renderMacroClaims(summary);
   lastMacroSummaryForMstr = summary;
   applyOfficialMstr();
+}
+
+/** 每张图上方的一句结论：只陈述读数与方向，不给操作建议。 */
+function renderMacroClaims(summary) {
+  const set = (id, text) => { const n = document.getElementById(id); if (n) n.textContent = text; };
+  const bp = v => `${v >= 0 ? '+' : ''}${Math.round(v)}bp`;
+  const r20 = summary.curveRegime20d || (summary.curveRegimes && summary.curveRegimes['20d']) || null;
+  if (summary.currentSpread != null) {
+    const level = `10Y − 1Y 利差 ${summary.currentSpread >= 0 ? '+' : ''}${summary.currentSpread.toFixed(2)}%（${summary.currentSpread < 0 ? '倒挂' : '正利差'}）`;
+    set('macro-rates-claim', r20
+      ? `${level}；近 20 天${r20.label}，利差 ${bp(r20.chgSpreadBp)}（1Y ${bp(r20.chg1yBp)} / 10Y ${bp(r20.chg10yBp)}）。`
+      : `${level}。`);
+  }
+  if (summary.currentFedNetLiquidity != null) {
+    const d = summary.fedNetLiqChange20d;
+    let move = '';
+    if (d != null) {
+      const flat = Math.abs(d) / summary.currentFedNetLiquidity < 0.005;
+      move = `，近 20 天${flat ? '基本持平' : (d >= 0 ? '扩张' : '收缩')}（${d >= 0 ? '+' : '-'}$${Math.round(Math.abs(d) * 1000)}B）`;
+    }
+    set('macro-liq-claim', `净流动性 $${summary.currentFedNetLiquidity.toFixed(2)}T${move}。两条线同图只为对照走势，不代表因果。`);
+  }
+}
+
+/** MSTR 页的结论句：BTC 相对持仓均价的位置 + mNAV + 净增持速度。 */
+function renderMstrClaim(cost, costSource, mnavText) {
+  const summary = lastMacroSummaryForMstr;
+  if (!summary || !summary.currentBtc || !cost) return;
+  const gap = (summary.currentBtc / cost - 1) * 100;
+  const vel = summary.currentMstrVelocity30d;
+  const velText = vel == null ? '' : `；近 30 天日均${vel >= 0 ? '净增持' : '净减持'} ${Math.abs(vel).toLocaleString()} BTC`;
+  const head = `BTC $${Math.round(summary.currentBtc).toLocaleString()} ${gap >= 0 ? '高于' : '低于'} Strategy 持仓均价 $${Math.round(cost).toLocaleString()}（${gap >= 0 ? '+' : ''}${gap.toFixed(1)}%，${costSource}）`;
+  const set = (id, text) => { const n = document.getElementById(id); if (n) n.textContent = text; };
+  set('mstr-page-claim', `${head}${mnavText ? '；' + mnavText : ''}${velText}。持仓均价是成本参照，不是强平线。`);
+  set('mstr-chart-claim', `${gap >= 0 ? 'BTC 在持仓均价之上' : 'BTC 已跌到持仓均价之下'}（${gap >= 0 ? '+' : ''}${gap.toFixed(1)}%）。图中倍数线为旧 EV/BTC 口径，仅看历史走势。`);
 }
 
 /**
@@ -3387,7 +3429,15 @@ function applyOfficialMstr() {
   const off = window.__mstrOfficial;
   const summary = lastMacroSummaryForMstr;
   const mnavLabel = document.querySelector('#card-metric-mnav .mm-label');
-  if (!off || !summary) return;
+  if (!summary) return;
+  const officialCost = off && Number.isFinite(off.averageCostUsd) && off.averageCostUsd > 0 ? off.averageCostUsd : null;
+  const officialMnav = off && Number.isFinite(off.mnav) && off.mnav > 0 ? off.mnav : null;
+  renderMstrClaim(
+    officialCost || summary.currentMstrCost,
+    officialCost ? '官方披露' : '第三方汇总',
+    officialMnav ? `官方口径 mNAV ${officialMnav.toFixed(2)}×` : (summary.currentMnav != null ? `EV/BTC 旧口径 ${summary.currentMnav.toFixed(2)}×（估算）` : '')
+  );
+  if (!off) return;
   if (Number.isFinite(off.averageCostUsd) && off.averageCostUsd > 0) {
     if (elMacroMstrVal) elMacroMstrVal.textContent = `$${Math.round(off.averageCostUsd).toLocaleString()}`;
     if (elMacroMstrSub) elMacroMstrSub.textContent = `官方披露（${off.viaSec ? 'SEC 8-K' : 'strategy.com'}）· 持仓截至 ${off.holdingsAsOf || off.reportedOn || '--'}`;
@@ -3442,23 +3492,38 @@ function getFilteredMacroPoints() {
 const MACRO_COMPACT_QUERY = window.matchMedia('(max-width: 768px)');
 
 function applyMacroChartCompactLayout() {
-  if (!macroChartInstance) return;
   const compact = MACRO_COMPACT_QUERY.matches;
-  const scales = macroChartInstance.options.scales;
-  ['yUSD', 'yYield', 'yVelocity', 'yMNAV', 'yLiquidity'].forEach(id => {
-    if (!scales[id]) return;
-    scales[id].title.display = !compact;
-    if (id !== 'yUSD' && id !== 'yYield') scales[id].display = !compact;
+  MACRO_CHART_DEFS.forEach(def => {
+    const chart = macroCharts[def.key];
+    if (!chart) return;
+    const scales = chart.options.scales;
+    def.axes.forEach((id, k) => {
+      if (!scales[id]) return;
+      scales[id].title.display = !compact;
+      // 手机窄屏只留前两根轴；第三根 (MSTR 净增持) 仍参与缩放，数值看点按提示
+      if (k >= 2) scales[id].display = compact ? false : (def.autoAxes.includes(id) ? 'auto' : true);
+    });
+    scales.x.ticks.maxTicksLimit = compact ? 4 : 10;
+    chart.update('none');
   });
-  scales.x.ticks.maxTicksLimit = compact ? 4 : 10;
-  macroChartInstance.update('none');
+}
+
+function syncMacroLegends() {
+  document.querySelectorAll('.macro-legend[data-chart]').forEach(group => {
+    const chart = macroCharts[group.dataset.chart];
+    if (!chart) return;
+    group.querySelectorAll('.legend-pill').forEach(btn => {
+      const visible = chart.isDatasetVisible(parseInt(btn.dataset.dataset, 10));
+      btn.classList.toggle('active', visible);
+      btn.classList.toggle('inactive', !visible);
+    });
+  });
 }
 
 MACRO_COMPACT_QUERY.addEventListener('change', applyMacroChartCompactLayout);
 
 function renderMacroChart() {
-  const canvas = document.getElementById('macro-chart-canvas');
-  if (!canvas || typeof Chart === 'undefined') return;
+  if (typeof Chart === 'undefined') return;
 
   const points = getFilteredMacroPoints();
   if (points.length === 0) return;
@@ -3474,37 +3539,12 @@ function renderMacroChart() {
   const netLiqs = points.map(p => (p.fedNetLiquidity !== null && p.fedNetLiquidity !== undefined) ? p.fedNetLiquidity : null);
   const netLiqSmas = points.map(p => (p.fedNetLiqSma20 !== null && p.fedNetLiqSma20 !== undefined) ? p.fedNetLiqSma20 : null);
 
-  // Preserve visibility state across re-renders for all 9 datasets
-  let visibilityStates = [true, true, true, true, true, true, true, true, true];
-  if (macroChartInstance) {
-    for (let i = 0; i < 9; i++) {
-      visibilityStates[i] = macroChartInstance.isDatasetVisible(i);
-    }
-    macroChartInstance.destroy();
-  }
-
-  const ctx = canvas.getContext('2d');
   const colors = getChartThemeColors();
-
-  // Gradient for BTC Price line
-  const btcGradient = ctx.createLinearGradient(0, 0, 0, 350);
-  btcGradient.addColorStop(0, 'rgba(245, 158, 11, 0.14)');
-  btcGradient.addColorStop(1, 'rgba(245, 158, 11, 0.00)');
-
-  // Gradient for Spread
-  const spreadGradient = ctx.createLinearGradient(0, 0, 0, 350);
-  spreadGradient.addColorStop(0, 'rgba(244, 63, 94, 0.08)');
-  spreadGradient.addColorStop(1, 'rgba(244, 63, 94, 0.00)');
-
-  // Gradient for MSTR Velocity
-  const velGradient = ctx.createLinearGradient(0, 0, 0, 350);
-  velGradient.addColorStop(0, 'rgba(236, 72, 153, 0.12)');
-  velGradient.addColorStop(1, 'rgba(236, 72, 153, 0.00)');
-
-  // Gradient for Net Liquidity
-  const netLiqGradient = ctx.createLinearGradient(0, 0, 0, 350);
-  netLiqGradient.addColorStop(0, 'rgba(59, 130, 246, 0.14)');
-  netLiqGradient.addColorStop(1, 'rgba(59, 130, 246, 0.00)');
+  // 面积填充用纯色：渐变对象绑定在单个 canvas 的绘图上下文上，三张图不能共用
+  const btcGradient = 'rgba(245, 158, 11, 0.07)';
+  const spreadGradient = 'rgba(244, 63, 94, 0.05)';
+  const velGradient = 'rgba(236, 72, 153, 0.06)';
+  const netLiqGradient = 'rgba(59, 130, 246, 0.08)';
 
   const datasets = [
     {
@@ -3520,8 +3560,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yUSD',
-      tension: 0.12,
-      hidden: !visibilityStates[0]
+      tension: 0.12
     },
     {
       label: 'MSTR Average Cost (USD)',
@@ -3535,8 +3574,7 @@ function renderMacroChart() {
       pointHoverBackgroundColor: '#8b5cf6',
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
-      yAxisID: 'yUSD',
-      hidden: !visibilityStates[1]
+      yAxisID: 'yUSD'
     },
     {
       label: 'US 1Y T-Bill (%)',
@@ -3551,8 +3589,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yYield',
-      tension: 0.1,
-      hidden: !visibilityStates[2]
+      tension: 0.1
     },
     {
       label: 'US 10Y T-Note (%)',
@@ -3566,8 +3603,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yYield',
-      tension: 0.1,
-      hidden: !visibilityStates[3]
+      tension: 0.1
     },
     {
       label: '(US 10Y - US 1Y) 利差 (%)',
@@ -3581,9 +3617,8 @@ function renderMacroChart() {
       pointHoverBackgroundColor: '#f43f5e',
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
-      yAxisID: 'yYield',
-      tension: 0.12,
-      hidden: !visibilityStates[4]
+      yAxisID: 'ySpread', // 利差量级 (±1%) 远小于收益率 (4–5%)，同轴会把两者都压扁
+      tension: 0.12
     },
     {
       label: 'MSTR 30D 平均净增持 (BTC/天)',
@@ -3598,8 +3633,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yVelocity',
-      tension: 0.15,
-      hidden: !visibilityStates[5]
+      tension: 0.15
     },
     {
       label: 'EV / BTC 市值（旧口径参考）',
@@ -3613,8 +3647,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yMNAV',
-      tension: 0.12,
-      hidden: !visibilityStates[6]
+      tension: 0.12
     },
     {
       label: 'FED 净流动性 ($T)',
@@ -3629,8 +3662,7 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yLiquidity',
-      tension: 0.15,
-      hidden: !visibilityStates[7]
+      tension: 0.15
     },
     {
       label: '净流动性 20D SMA ($T)',
@@ -3645,17 +3677,15 @@ function renderMacroChart() {
       pointHoverBorderColor: '#ffffff',
       pointHoverBorderWidth: 2,
       yAxisID: 'yLiquidity',
-      tension: 0.15,
-      hidden: !visibilityStates[8]
+      tension: 0.15
     }
   ];
 
-  try {
-    macroChartInstance = new Chart(ctx, {
+  const makeConfig = (dsList) => ({
       type: 'line',
       data: {
         labels: labels,
-        datasets: datasets
+        datasets: dsList
       },
       options: {
         responsive: true,
@@ -3763,8 +3793,24 @@ function renderMacroChart() {
             },
             title: {
               display: true,
-              text: '美债利率与利差 (%)',
+              text: '美债收益率 (%)',
               color: colors.isLight ? '#0284c7' : '#38bdf8',
+              font: { family: 'Inter', size: 10, weight: '500' }
+            }
+          },
+          ySpread: {
+            type: 'linear',
+            position: 'right',
+            grid: { drawOnChartArea: false, borderColor: colors.axisLine },
+            ticks: {
+              color: colors.isLight ? '#e11d48' : '#fb7185',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: function(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+            },
+            title: {
+              display: true,
+              text: '10Y − 1Y 利差 (%)',
+              color: colors.isLight ? '#e11d48' : '#fb7185',
               font: { family: 'Inter', size: 10, weight: '500' }
             }
           },
@@ -3839,27 +3885,36 @@ function renderMacroChart() {
         }
       }
     });
-    applyMacroChartCompactLayout();
-    window.macroChartInstance = macroChartInstance;
-  } catch (err) {
-    console.error('[MacroChart] Chart creation error:', err);
-  }
 
-  // Sync custom legend button active/inactive states
-  if (macroLegendGroup) {
-    const buttons = macroLegendGroup.querySelectorAll('.legend-pill');
-    buttons.forEach(btn => {
-      const idx = parseInt(btn.dataset.dataset, 10);
-      const isVisible = macroChartInstance.isDatasetVisible(idx);
-      if (isVisible) {
-        btn.classList.add('active');
-        btn.classList.remove('inactive');
-      } else {
-        btn.classList.remove('active');
-        btn.classList.add('inactive');
-      }
-    });
-  }
+  MACRO_CHART_DEFS.forEach(def => {
+    const canvas = document.getElementById(def.canvas);
+    if (!canvas) return;
+    const prev = macroCharts[def.key];
+    // 重绘时保留读者在图例上的开关；首次渲染按 def.hidden
+    const dsList = def.series.map((si, k) => ({
+      ...datasets[si],
+      hidden: prev ? !prev.isDatasetVisible(k) : def.hidden.includes(si)
+    }));
+    if (prev) prev.destroy();
+    try {
+      const cfg = makeConfig(dsList);
+      const scales = cfg.options.scales;
+      Object.keys(scales).forEach(id => { if (id !== 'x' && !def.axes.includes(id)) delete scales[id]; });
+      def.axes.forEach((id, k) => {
+        scales[id].position = k === 0 ? 'left' : 'right';
+        scales[id].grid.drawOnChartArea = k === 0;
+        if (def.autoAxes.includes(id)) scales[id].display = 'auto';
+      });
+      macroCharts[def.key] = new Chart(canvas.getContext('2d'), cfg);
+    } catch (err) {
+      delete macroCharts[def.key];
+      console.error(`[MacroChart] ${def.key} chart creation error:`, err);
+    }
+  });
+  macroChartInstance = macroCharts.rates || null;
+  window.macroChartInstance = macroChartInstance;
+  applyMacroChartCompactLayout();
+  syncMacroLegends();
 }
 
 // ============================================================================
@@ -4039,46 +4094,39 @@ function disposePreferredsCharts() {
  * Initialize Event Listeners for Macro Chart (Interactive Legend & Timeframe Switcher)
  */
 function initMacroChartEvents() {
-  // Custom Interactive Legend Pills Click
-  if (macroLegendGroup) {
-    macroLegendGroup.addEventListener('click', (e) => {
+  // 图例开关：每组图例通过 data-chart 指向自己的图
+  document.querySelectorAll('.macro-legend[data-chart]').forEach(group => {
+    group.addEventListener('click', (e) => {
       const btn = e.target.closest('.legend-pill');
-      if (!btn || !macroChartInstance) return;
-
-      const datasetIndex = parseInt(btn.dataset.dataset, 10);
-      const isVisible = macroChartInstance.isDatasetVisible(datasetIndex);
-      macroChartInstance.setDatasetVisibility(datasetIndex, !isVisible);
-      macroChartInstance.update();
-
-      if (isVisible) {
-        btn.classList.remove('active');
-        btn.classList.add('inactive');
-      } else {
-        btn.classList.remove('inactive');
-        btn.classList.add('active');
-      }
+      const chart = macroCharts[group.dataset.chart];
+      if (!btn || !chart) return;
+      const idx = parseInt(btn.dataset.dataset, 10);
+      chart.setDatasetVisibility(idx, !chart.isDatasetVisible(idx));
+      chart.update();
+      syncMacroLegends();
     });
-  }
+  });
 
-  // Timeframe Switch Buttons (3M, 6M, 1Y, 3Y, ALL)
-  if (macroTimeframeSwitch) {
-    macroTimeframeSwitch.addEventListener('click', (e) => {
+  // 时间窗切换 (3M, 6M, 1Y, 3Y, ALL)：宏观页与 MSTR 页各有一组按钮，共用同一个时间窗
+  const tfSwitches = document.querySelectorAll('.macro-tf-switch');
+  tfSwitches.forEach(sw => {
+    sw.addEventListener('click', (e) => {
       const btn = e.target.closest('.switch-btn');
       if (!btn) return;
-
       const range = btn.dataset.range;
       if (!range || range === currentMacroTimeframe) return;
 
       currentMacroTimeframe = range;
-      macroTimeframeSwitch.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      tfSwitches.forEach(other => other.querySelectorAll('.switch-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.range === range);
+      }));
 
       if (rawMacroData && rawMacroData.summary) {
         renderMacroSummary(rawMacroData.summary);
       }
       renderMacroChart();
     });
-  }
+  });
 }
 
 // ============================================================================
@@ -5218,7 +5266,7 @@ function renderElWeeklyChart() {
       <div>ETF 累计净流入: <b>${elFmtBtc(w.etfFlowBtc)}</b> (${elFmtUsd(w.etfFlowUsd)})</div>
       ${daily}
       <div>90D 超额美债（期内均值）: ${tpPct(w.excessOverTBill)} · BTC $${w.btcPrice ? w.btcPrice.toLocaleString('en-US') : '--'}</div>
-      <div style="margin-top:4px;color:#f59e0b;">CME 杠杆基金持仓：待 CFTC 于 ${w.cotExpectedRelease}（周五）发布</div>
+      <div style="margin-top:4px;color:#f59e0b;">CME 杠杆基金持仓：预计 CFTC 于 ${w.cotExpectedRelease}（美国日期，节假日顺延）发布</div>
       <div style="color:${colors.textSecondary};">本周暂不计入 β、R² 与各项检验</div>`;
   };
 
@@ -6127,7 +6175,7 @@ function initTermCurveEvents() {
   });
   // Refresh while Module 2 is on screen (the server caches the live curve for 60 s)
   setInterval(() => {
-    if (currentActiveView === 'view-term-premium' || currentActiveView === 'view-all') loadTermCurve(false);
+    if (!document.hidden && (currentActiveView === 'view-term-premium' || currentActiveView === 'view-all')) loadTermCurve(false);
   }, TERM_CURVE_REFRESH_MS);
 }
 
@@ -6482,7 +6530,7 @@ function activateFlowModule() {
       fetchFlowForce(false);
       if (!flowPollTimer) {
         flowPollTimer = setInterval(() => {
-          if (isFlowViewVisible()) fetchFlowForce(false);
+          if (!document.hidden && isFlowViewVisible()) fetchFlowForce(false);
         }, 60000);
       }
     })
@@ -6520,7 +6568,7 @@ function flowEma(values, len) {
   const k = 2 / (len + 1);
   let prev = null;
   return values.map(v => {
-    if (v === null || !Number.isFinite(v)) return prev === null ? null : prev;
+    if (v === null || !Number.isFinite(v)) { prev = null; return null; }
     prev = prev === null ? v : prev + k * (v - prev);
     return prev;
   });
@@ -6551,23 +6599,23 @@ function setFlowChip(el, text, tone) {
 }
 
 function updateFlowKpis(data) {
-  const s = data.summary;
+  const s = data.summary || {};
   const last = data.latest || {};
   const leaderVal = document.getElementById('flow-leader-val');
   const regionVal = document.getElementById('flow-region-val');
   if (s && leaderVal) {
-    leaderVal.textContent = s.leaderLabel;
-    leaderVal.style.color = s.leader === 'futures' ? FLOW_RED : FLOW_GREEN;
+    leaderVal.textContent = s.leaderLabel || '数据不足';
+    leaderVal.style.color = !s.leader ? '' : s.leader === 'futures' ? FLOW_RED : FLOW_GREEN;
     // 与图上方向一致: 正 = 现货 (绿柱向上)，负 = 期货 (红柱向下)
-    setFlowChip(document.getElementById('flow-leader-chip'), fmtFlowSigned(s.hist === null ? null : -s.hist), s.leader === 'futures' ? 'red' : 'green');
+    setFlowChip(document.getElementById('flow-leader-chip'), fmtFlowSigned(s.hist === null ? null : -s.hist), !s.leader ? '' : s.leader === 'futures' ? 'red' : 'green');
     const sub = document.getElementById('flow-leader-sub');
-    if (sub) sub.textContent = `期货${s.futDir} · 现货${s.spotDir}`;
+    if (sub) sub.textContent = s.leader ? `期货${s.futDir} · 现货${s.spotDir}` : '场所数据缺失，等待补齐';
   }
   if (s && regionVal) {
-    regionVal.textContent = s.regionLabel;
-    regionVal.style.color = s.regionLeader === 'asia' ? FLOW_RED : FLOW_GREEN;
+    regionVal.textContent = s.regionLabel || '数据不足';
+    regionVal.style.color = !s.regionLeader ? '' : s.regionLeader === 'asia' ? FLOW_RED : FLOW_GREEN;
     // 正 = 欧美 (绿点上沿)，负 = 亚太 (红点下沿)
-    setFlowChip(document.getElementById('flow-region-chip'), fmtFlowSigned(s.region === null ? null : -s.region), s.regionLeader === 'asia' ? 'red' : 'green');
+    setFlowChip(document.getElementById('flow-region-chip'), fmtFlowSigned(s.region === null ? null : -s.region), !s.regionLeader ? '' : s.regionLeader === 'asia' ? 'red' : 'green');
   }
   ['futAsia', 'futWest', 'spotAsia', 'spotWest'].forEach(k => {
     const el = document.getElementById(`fq-${k}`);
@@ -6596,19 +6644,20 @@ function updateFlowKpis(data) {
   if (st && data.sources) {
     // ✕ 只表示"当前这根拿不到实时数据"；已收盘的历史来自存档 / 官方档案，不受影响
     const parts = Object.values(data.sources).map(v => {
-      const tip = [`来源: ${v.source || '无'}`, `存档 ${v.stored ?? 0} 根`].concat(v.errors || []).join(' | ').replace(/"/g, '&quot;');
+      const tip = [`来源: ${v.source || '无'}`, `存档 ${v.stored ?? 0} 根`].concat(v.errors || []).join(' | ');
       const viaTv = v.source && /TradingView/.test(v.source);
       // 线上转发 = 线上部署直连该交易所的同一份数据，本机只是拿不到，不算降级
       const viaUp = v.source && /线上转发/.test(v.source);
       const via = viaUp ? ' · 经线上' : viaTv ? ' · 经 TV' : '';
-      return `<span class="${v.ok ? (viaTv ? 'flow-src-warn' : '') : 'flow-src-bad'}" title="${tip}">${v.name}${v.ok ? via : ' ✕实时'}</span>`;
+      return `<span class="${v.ok ? (viaTv ? 'flow-src-warn' : '') : 'flow-src-bad'}" title="${escapeHtml(tip)}">${escapeHtml(v.name)}${v.ok ? via : ' ✕实时'}</span>`;
     });
     const a = data.archive || {};
     const t = new Date(data.updatedAt);
     st.innerHTML = `${parts.join(' · ')} · 定死 ${a.frozenRows ?? 0} 根${a.provisionalRows ? ` · <span class="flow-src-warn">暂定 ${a.provisionalRows} 根</span>` : ''} · ${t.toLocaleTimeString('zh-CN', { hour12: false })}${data.stale ? ' · 缓存' : ''}`;
   }
   const leaderSub = document.getElementById('flow-leader-sub');
-  if (s && leaderSub && s.complete === false) leaderSub.textContent += ' · 含暂定K线';
+  if (s && leaderSub && s.provisional) leaderSub.textContent += ' · 备用数据暂估，待官方核验';
+  else if (s && leaderSub && s.complete === false) leaderSub.textContent += ' · 含暂定K线';
 }
 
 function renderFlowAudit(data) {
@@ -6623,10 +6672,10 @@ function renderFlowAudit(data) {
       const pct = v => (v !== undefined && v !== null ? `${(v * 100).toFixed(0)}%` : '--');
       const weightTd = `<td>${pct(r.fixedWeight)}${r.liveDepthShare !== undefined ? ` <span class="flow-audit-live">实时 ${pct(r.liveDepthShare)}</span>` : ''}</td>`;
       if (r.error) {
-        rows.push(`<tr>${cellTd}<td>${r.name || k}</td><td colspan="3" class="flow-src-bad">盘口不可用: ${r.error}</td>${weightTd}</tr>`);
+        rows.push(`<tr>${cellTd}<td>${escapeHtml(r.name || k)}</td><td colspan="3" class="flow-src-bad">盘口不可用: ${escapeHtml(r.error)}</td>${weightTd}</tr>`);
         return;
       }
-      rows.push(`<tr>${cellTd}<td>${r.name}${r.via ? ` <span class="flow-audit-live">(${r.via})</span>` : ''}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td>${weightTd}</tr>`);
+      rows.push(`<tr>${cellTd}<td>${escapeHtml(r.name)}${r.via ? ` <span class="flow-audit-live">(${escapeHtml(r.via)})</span>` : ''}</td><td>${fmtFlowUsd(r.vol24hUsd)}</td><td>${fmtFlowUsd(r.depthUsd)}</td><td>${r.turnoverToDepth ?? '--'}×</td>${weightTd}</tr>`);
     });
   }
   body.innerHTML = rows.join('');
@@ -6782,13 +6831,13 @@ function updateFlowCrosshair(time) {
   const state = row.frozen
     ? '<span class="fc-state fc-frozen">已定死</span>'
     : row.live
-      ? `<span class="fc-state fc-live">进行中 ${Math.round((row.liveFrac || 0) * 100)}%·成交额已折算${missing ? ` · 缺 ${missing}` : ''}</span>`
-      : `<span class="fc-state fc-prov">暂定${missing ? ` · 缺 ${missing}` : ''}</span>`;
+      ? `<span class="fc-state fc-live">进行中 ${Math.round((row.liveFrac || 0) * 100)}%·成交额已折算${missing ? ` · 缺 ${missing}` : row.provisional ? ' · 备用数据待核验' : ''}</span>`
+      : `<span class="fc-state fc-prov">暂定${missing ? ` · 缺 ${missing}` : row.provisional ? ' · 备用数据待核验' : ''}</span>`;
   box.innerHTML = `
     <span class="fc-time">主导力量 ${flowSmooth > 1 ? `EMA${flowSmooth}` : '原始'}</span>
     ${state}
-    <span style="color:${h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h === null ? null : -h)} ${h > 0 ? '期货主导 ↓' : '现货主导 ↑'}</span>
-    <span style="color:${r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${r > 0 ? '亚太主导 (下沿)' : '欧美主导 (上沿)'}</span>
+    <span style="color:${h === null ? 'inherit' : h > 0 ? FLOW_RED : FLOW_GREEN}">柱 ${fmtFlowSigned(h === null ? null : -h)} ${h === null ? '数据不足' : h > 0 ? '期货主导 ↓' : '现货主导 ↑'}</span>
+    <span style="color:${r === null ? 'inherit' : r > 0 ? FLOW_RED : FLOW_GREEN}">点 ${r === null ? '数据不足' : r > 0 ? '亚太主导 (下沿)' : '欧美主导 (上沿)'}</span>
     <span>期·亚 <b class="${tone(row.futAsia)}">${fmtFlowSigned(row.futAsia)}</b></span>
     <span>期·欧美 <b class="${tone(row.futWest)}">${fmtFlowSigned(row.futWest)}</b></span>
     <span>现·亚 <b class="${tone(row.spotAsia)}">${fmtFlowSigned(row.spotAsia)}</b></span>
@@ -6801,8 +6850,9 @@ function renderFlowChart(resetRange = false) {
   if (!rawFlowData || !Array.isArray(rawFlowData.series) || !rawFlowData.series.length) return;
   if (!flowChart && !buildFlowChart()) return;
   const series = rawFlowData.series;
-  const hs = flowEma(series.map(p => p.hist), flowSmooth);
-  const rs = flowEma(series.map(p => p.region), flowSmooth);
+  const valid = p => p.signalReady !== false && !(p.missing || []).length;
+  const hs = flowEma(series.map(p => valid(p) ? p.hist : null), flowSmooth);
+  const rs = flowEma(series.map(p => valid(p) ? p.region : null), flowSmooth);
   flowRowsByTime = new Map();
   const histData = [], dotData = [], premData = [];
   // 已定死 / 完整的K线实色；进行中半透明；缺场所的暂定K线更淡
@@ -6813,9 +6863,12 @@ function renderFlowChart(resetRange = false) {
     // 显示方向: 绿柱 (现货主导) 向上、红柱 (期货主导) 向下；绿点 (欧美主导) 贴窗格上沿、红点 (亚太主导) 贴下沿。
     // 服务端 hist / region 仍是 |期货|−|现货|、|亚太|−|欧美| (>0 = 期货 / 亚太)，这里只翻转显示
     if (hs[i] !== null) histData.push({ time: p.time, value: -hs[i], color: shade(hs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
+    else histData.push({ time: p.time });
     if (rs[i] !== null) dotData.push({ time: p.time, value: rs[i] > 0 ? -1 : 1, color: shade(rs[i] > 0 ? FLOW_RED : FLOW_GREEN, p) });
+    else dotData.push({ time: p.time });
     const pv = flowPremium(p);
     if (pv !== null && pv !== undefined) premData.push({ time: p.time, value: pv });
+    else premData.push({ time: p.time });
   });
   const candles = Array.isArray(rawFlowData.candles) ? rawFlowData.candles : [];
   flowCandlesByTime = new Map(candles.map(k => [k.time, k]));
@@ -7905,7 +7958,7 @@ function initCoinbaseLiquidityEvents() {
   // Auto-refresh Coinbase order book liquidity every 15 seconds when viewing
   // (the history archive throttles itself to once per 5 minutes)
   setInterval(() => {
-    if (currentActiveView === 'view-coinbase-liquidity' || currentActiveView === 'view-all') {
+    if (!document.hidden && (currentActiveView === 'view-coinbase-liquidity' || currentActiveView === 'view-all')) {
       fetchCoinbaseLiquidityData(false);
       fetchCbLiquidityHistory(false);
     }
@@ -7937,7 +7990,8 @@ let currentFocusModule = null;
 // 侧栏二级目录：每个 module 下的单独指标（顺序即侧栏顺序）
 const NAV_TREE = {
   'view-overview': [
-    { id: 'module-macro-chart', label: '美债曲线 × MSTR 成本' },
+    { id: 'module-mstr-financing', label: 'MSTR 融资压力与披露' },
+    { id: 'module-macro-chart', label: '美债曲线 × Fed 净流动性' },
     { id: 'module-crypto-mcclellan', label: '加密麦克莱伦宽度' },
     { id: 'module-cdri', label: '衍生品风险指数 CDRI' }
   ],
@@ -8060,7 +8114,7 @@ function switchView(viewId, updateHash = true, moduleId = null) {
   // 8. Trigger chart resizes for freshly displayed views
   setTimeout(() => {
     if (macroChartInstance) {
-      macroChartInstance.resize();
+      Object.values(macroCharts).forEach(c => c.resize());
     } else if (rawMacroData && (viewId === 'view-overview' || viewId === 'view-all')) {
       renderMacroChart();
     }

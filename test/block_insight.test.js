@@ -136,7 +136,7 @@ test('markStructures marks once per OI day, settles at delivery and compresses m
   assert.equal(BI.markStructures(live.registry, { deliveryByDate: {}, nowMs: Date.UTC(2026, 8, 26, 9) }).settled, 0);
 });
 
-test('summarizeSmartMoney: Laplace-smoothed weights, final outcomes first, weighted directional bias', () => {
+test('summarizeSmartMoney: descriptive outcomes retained; unvalidated win-rate weighting disabled', () => {
   const mk = (i, family, pnl, extra = {}) => ({ id: `S${i}`, ts: now - 40 * D, family, notionalUSD: 50e6, legs: [], marks: [], final: pnl === null ? null : { pnlBtc: pnl, ts: now }, ...extra });
   const registry = [
     ...[1, 2, 3, 4, 5, 6].map(i => mk(i, 'bull', i <= 5 ? 1 : -1)),        // 5/6 wins
@@ -147,13 +147,13 @@ test('summarizeSmartMoney: Laplace-smoothed weights, final outcomes first, weigh
   const sm = BI.summarizeSmartMoney(registry, now);
   const bull = sm.families.find(f => f.key === 'bull');
   const bear = sm.families.find(f => f.key === 'bear');
-  assert.equal(bull.weightBasis, 'final');
-  assert.ok(Math.abs(bull.weight - 6 / 8) < 1e-12);
+  assert.equal(bull.weightBasis, null);
+  assert.equal(bull.weight, null);
   assert.ok(Math.abs(bull.hitRate - 5 / 6) < 1e-12);
   assert.equal(bear.weightBasis, null);
-  assert.equal(bear.weight, 0.5);
+  assert.equal(bear.weight, null);
   // Open bull (edge 0.5) and open bear (edge 0): bias = (50e6 × 0.5) / 100e6
-  assert.ok(Math.abs(sm.directionalBias - 0.25) < 1e-12);
+  assert.equal(sm.directionalBias, null);
   assert.equal(sm.settled, 8);
   assert.ok(Math.abs(sm.overallHitRate - 5 / 8) < 1e-12);
   assert.equal(sm.recent[0].id, 'S20');

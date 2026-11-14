@@ -102,7 +102,7 @@
     if (!r || !r.resolved) return null;
     const factor = Math.max(0.6, Math.min(1.5, (r.hits + TRACK_SHRINK_K) / (r.expected + TRACK_SHRINK_K)));
     return {
-      key: trackKeyOf(c), resolved: r.resolved, hits: r.hits, expected: +r.expected.toFixed(1), expired: r.expired,
+      generatedAt: TRACK_RECORD.generatedAt, key: trackKeyOf(c), resolved: r.resolved, hits: r.hits, expected: +r.expected.toFixed(1), expired: r.expired,
       hitPct: Math.round(100 * r.hits / r.resolved), expectedPct: Math.round(100 * r.expected / r.resolved),
       factor: +factor.toFixed(3)
     };
@@ -4598,7 +4598,7 @@
     if (forecast) lines.push(`可检验的预测：${forecast.text}；随机游走下先到目标的概率约 ${forecast.randomWalkPct}%`);
     // 历史命中率与随机游走相差不到 TRACK_EDGE_PCT 个百分点时没有区分度，不写进评语
     if (trackRecord && Math.abs(trackRecord.hitPct - trackRecord.expectedPct) >= TRACK_EDGE_PCT) {
-      lines.push(`历史记录（${TRACK_RECORD.source || '回放'}）：同类计数先到目标 ${trackRecord.hitPct}%，随机游走期望 ${trackRecord.expectedPct}%（${trackRecord.resolved} 次）`);
+      lines.push(`历史记录（回放日期 ${TRACK_RECORD.generatedAt}；${TRACK_RECORD.source || '回放'}）：同类计数先到目标 ${trackRecord.hitPct}%，随机游走期望 ${trackRecord.expectedPct}%（${trackRecord.resolved} 次）`);
     }
     hypotheses.forEach(h => { if (h.isPrimary) { h.verdict = verdict; h.verdictLabel = VERDICTS[verdict]; } });
     lines.push('只讨论波浪，没有任何交易建议，不对任何交易行为负责。');

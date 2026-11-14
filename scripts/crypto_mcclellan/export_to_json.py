@@ -13,6 +13,8 @@ Run: python export_to_json.py            (collect + compute)
 import argparse
 import json
 import math
+import os
+import tempfile
 import sys
 import time
 from datetime import datetime, timezone
@@ -338,8 +340,18 @@ def main():
 
     payload = build_payload()
     config.OUTPUT_JSON_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(config.OUTPUT_JSON_FILE, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=1)
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=config.OUTPUT_JSON_FILE.parent,
+                                         prefix=".mcclellan-", suffix=".tmp", delete=False) as f:
+            tmp = f.name
+            json.dump(payload, f, ensure_ascii=False, indent=1, allow_nan=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, config.OUTPUT_JSON_FILE)
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.unlink(tmp)
 
     cur = payload["current"]
     print(f"[Export] {config.OUTPUT_JSON_FILE} | {payload['metadata']['total_days']} days | "

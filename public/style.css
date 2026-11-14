@@ -2316,6 +2316,26 @@ body {
   width: 100%;
 }
 
+/* Module 1 重排：每张图一个标题 + 一句结论 + 自己的图例 */
+.macro-chart-block { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+.macro-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px; }
+.macro-chart-title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.macro-chart-claim { margin: 0; font-size: 0.8rem; line-height: 1.55; color: var(--text-secondary, var(--text-muted)); }
+.macro-page-claim { font-size: 0.9rem; color: var(--text-primary); margin-bottom: 14px; }
+.macro-chart-block .legend-pills-group { margin-bottom: 8px; }
+.macro-chart-canvas-wrapper.macro-chart-split { height: 300px; }
+.macro-metrics-row.macro-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.macro-metrics-row.macro-row-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+#module-mstr-financing { margin-bottom: 24px; }
+#module-mstr-financing #mstr-pref-section { margin-top: 6px; padding-top: 0; border-top: 0; }
+@media (max-width: 1100px) {
+  .macro-metrics-row.macro-row-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .macro-metrics-row.macro-row-3, .macro-metrics-row.macro-row-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .macro-chart-canvas-wrapper.macro-chart-split { height: 250px; }
+}
+
 @media (max-width: 1600px) {
   .macro-metrics-row {
     grid-template-columns: repeat(4, 1fr);
@@ -7473,7 +7493,18 @@ body {
 }
 
 /* MSTR disclosures panel (Module 1) */
-.md-events-wrap { overflow-x: auto; margin-top: 8px; }
+/* Ledger: about five rows visible, the rest scrolls inside the box */
+.md-events-wrap { overflow: auto; margin-top: 8px; max-height: 178px; border: 1px solid rgba(127,127,127,0.18); border-radius: 8px; }
+.md-events-table thead th { position: sticky; top: 0; background: var(--bg-card, var(--bg-secondary, #111)); z-index: 1; }
+.md-row-noop td { opacity: 0.45; }
+/* Section header: title and button keep their width; status takes the middle and wraps */
+#mstr-disclosures .pref-section-head { align-items: flex-start; }
+#mstr-disclosures .pref-section-title, #mstr-disclosure-refresh { flex: 0 0 auto; white-space: nowrap; }
+#mstr-disclosure-status { flex: 1 1 auto; min-width: 0; }
+.md-status-detail { margin-top: 4px; color: var(--text-muted); }
+.md-status-detail summary, .md-summary-more summary { cursor: pointer; opacity: 0.8; }
+.md-status-detail div { margin: 3px 0; word-break: break-word; }
+.md-summary-more { font-size: 12px; margin-top: 4px; }
 .md-events-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .md-events-table th, .md-events-table td { padding: 6px 8px; text-align: right; white-space: nowrap; }
 .md-events-table th { font-weight: 600; opacity: 0.7; border-bottom: 1px solid rgba(127,127,127,0.3); }
@@ -7483,8 +7514,8 @@ body {
 .md-status-bad { color: #f59e0b; }
 .md-kind { display: inline-block; padding: 0 6px; margin-right: 4px; border: 1px solid rgba(127,127,127,0.4); border-radius: 8px; font-size: 10px; line-height: 1.6; opacity: 0.85; vertical-align: baseline; }
 #mstr-disclosure-summary div { margin: 4px 0; font-size: 12px; opacity: 0.9; }
-#mstr-disclosure-filings { margin-top: 8px; font-size: 12px; }
-#mstr-disclosure-filings ul { margin: 6px 0; padding-left: 18px; }
+#mstr-disclosure-filings, #mstr-disclosure-press { margin-top: 8px; font-size: 12px; }
+#mstr-disclosure-filings ul, #mstr-disclosure-press ul { margin: 6px 0; padding-left: 18px; }
 
 /* ==========================================================================
    Module 4 大宗卡片配色：一种颜色只表达一个维度

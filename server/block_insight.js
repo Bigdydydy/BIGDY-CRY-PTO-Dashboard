@@ -437,34 +437,19 @@ function summarizeSmartMoney(registry, nowMs = Date.now()) {
     }
   }
   const families = Object.values(fam).map(f => {
-    const basis = f.finals >= 5 ? 'final' : (f.n7 >= 5 ? '7d' : null);
-    const p = basis === 'final' ? (f.wins + 1) / (f.finals + 2) : (basis === '7d' ? (f.wins7 + 1) / (f.n7 + 2) : 0.5);
+    const basis = null; // Win rate alone is not an expected-return weight.
+
     return {
       ...f,
       hitRate: f.finals ? f.wins / f.finals : null,
       hitRate7d: f.n7 ? f.wins7 / f.n7 : null,
       avgPnlBtc: f.finals ? f.pnlBtc / f.finals : null,
-      weight: p,
+      weight: null,
       weightBasis: basis
     };
   });
   const weightOf = Object.fromEntries(families.map(f => [f.key, f.weight]));
 
-  let dirScore = 0;
-  let dirNotional = 0;
-  let volScore = 0;
-  let volNotional = 0;
-  for (const s of registry) {
-    if (s.final || nowMs - s.ts > 30 * DAY_MS) continue;
-    const edge = 2 * (weightOf[s.family] ?? 0.5) - 1;
-    if (s.family === 'bull' || s.family === 'bear') {
-      dirScore += (s.family === 'bull' ? 1 : -1) * s.notionalUSD * edge;
-      dirNotional += s.notionalUSD;
-    } else {
-      volScore += (s.family === 'long-vol' ? 1 : -1) * s.notionalUSD * edge;
-      volNotional += s.notionalUSD;
-    }
-  }
 
   const recent = registry.slice().sort((a, b) => b.ts - a.ts).slice(0, 30).map(s => {
     const last = s.marks[s.marks.length - 1] || null;
@@ -492,8 +477,9 @@ function summarizeSmartMoney(registry, nowMs = Date.now()) {
     open: registry.length - finals.length,
     overallHitRate: finals.length ? finals.filter(s => s.final.pnlBtc > 0).length / finals.length : null,
     families,
-    directionalBias: dirNotional ? dirScore / dirNotional : null,
-    volBias: volNotional ? volScore / volNotional : null,
+    directionalBias: null,
+    volBias: null,
+    weightingStatus: 'disabled_unvalidated_expected_returns',
     recent
   };
 }

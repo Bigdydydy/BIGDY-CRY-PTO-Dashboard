@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 /**
  * Real Historical Basis & Term Structure Fetcher (schema v5)
  * Source: Deribit BTC inverse futures + CoinGlass OI-weighted BTC funding + FRED DGS3MO
@@ -28,7 +29,7 @@ const { callCoinglassEndpoint } = require('./cdri_fetcher');
 const { recordAttempt, recordSuccess, recordFailure, getSourceHealth } = require('./data_health');
 const { seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'term_premium_history.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'term_premium_history.json'));
 // Sidecar receipt file: the bare-array artifact itself carries no health
 // record, so a verified build persists its producer receipt alongside and a
 // cold start can restore an honest clock ONLY when it matches the array tail.

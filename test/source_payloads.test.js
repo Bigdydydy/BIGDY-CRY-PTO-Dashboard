@@ -388,11 +388,24 @@ test('H/ETF linkage: good → malformed CFTC missing field/contract → all-fail
   const mod = freshRequire('etf_linkage_engine.js');
   const cacheFile = path.join(tmpDir, 'etf_linkage.json');
 
+  require('../server/data_health').recordSuccess('basis_history', {
+    dataAsOf: new Date().toISOString(), asOfKind: 'source'
+  });
   const r1 = await mod.getEtfLinkageData(basisSeries, true);
   assert.ok(r1.weeks.length >= 1);
   assert.equal(r1.dataHealth.state, 'OK');
   const goodBytes = diskBytes(cacheFile);
   assert.ok(goodBytes?.length > 0);
+
+  // A live curve is not an input to weekly linkage; its short TTL must not
+  // downgrade an otherwise current six-hour linkage snapshot.
+  const health = require('../server/data_health');
+  health.recordSuccess('basis_live', { now: Date.now() - 3600000,
+    dataAsOf: new Date(Date.now() - 3600000).toISOString(), asOfKind: 'source' });
+  assert.equal(getSourceHealth('basis_live').state, 'STALE');
+  const cached = await mod.getEtfLinkageData(basisSeries);
+  assert.equal(cached.dataHealth.state, 'OK');
+  assert.equal(cached.ancillarySources.basis_live, undefined);
 
   // CFTC row missing a required numeric field → build fails, last-good served
   holder.state = { cot: cftcPayload({ dropField: 'lev_money_positions_long' }) };
@@ -514,7 +527,9 @@ test('H/ETF linkage: a CME null on a weekend is "market closed", on a weekday it
 
 test('H/ETF linkage: local build fails → fresher usable upstream copy is served; stale upstream copy is refused', async (t) => {
   resetHealth();
-  const holder = { state: {} };
+  // Leave one known past week for the newer mirror. Adding seven days to
+  // the latest Tuesday can otherwise create a forbidden future timestamp.
+  const holder = { state: { cot: cftcPayload({ dates: TUESDAYS.slice(0, -1) }) } };
   const local = etfHttp(holder);
   const up = { payload: null, calls: 0 };
   const prevOrigin = process.env.UPSTREAM_ORIGIN;

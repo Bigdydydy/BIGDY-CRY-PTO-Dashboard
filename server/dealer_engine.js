@@ -414,7 +414,12 @@ function postExpiryCliff(primaryBook, spot, nowMs, rollOff, primaryExposures) {
       kind: nextMajor.kind,
       dte: nextMajor.dte,
       removedOiSharePct: nextMajor.oiShare,
-      removedGexSharePct: nextMajor.gexShare,
+      removedGexSharePct: (() => {
+        const gross = primaryBook.reduce((a, c) => a + Math.abs(unitGexUsd(c, spot) * c.oi), 0);
+        const removed = primaryBook.filter(c => c.expiry === nextMajor.expiry)
+          .reduce((a, c) => a + Math.abs(unitGexUsd(c, spot) * c.oi), 0);
+        return gross > 0 ? Number((100 * removed / gross).toFixed(1)) : null;
+      })(),
       residualGexUsd: resGex,
       residualDexUsd: exEval.delta * spot,
       residualRegime: resGex > 0 ? 'long_gamma' : 'short_gamma',
@@ -727,11 +732,16 @@ function realizedFlow(book, spot, recent) {
   const now = evaluateBook(book);
   const then = evaluateBook(book, { spotMult: spotThen / spotNow, volShift: -dvolChange / 100, dtDays: -hours / 24 });
   const spotPct = (spotNow / spotThen - 1) * 100;
+  const gammaUsd = -now.gamma1pct * spotPct * spot;
+  const vannaUsd = -now.vannaPt * dvolChange * spot;
+  const charmUsd = -now.charmDay * (hours / 24) * spot;
+  const flowUsd = -(now.delta - then.delta) * spot;
   return {
     hours,
+    residualUsd: flowUsd - gammaUsd - vannaUsd - charmUsd,
     spotPct: Number(spotPct.toFixed(2)),
     dvolChange: Number(dvolChange.toFixed(2)),
-    flowUsd: -(now.delta - then.delta) * spot,
+    flowUsd,
     approx: {
       gammaUsd: -now.gamma1pct * spotPct * spot,
       vannaUsd: -now.vannaPt * dvolChange * spot,
@@ -994,7 +1004,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     ? `，剔除该到期后主口径残余 GEX 为 ${fmtUsdM(cliff.afterNextMajor.residualGexUsd)}/1%${cliff.afterNextMajor.regimeFlips ? '（触发正负 Gamma 体制翻转）' : ''}`
     : '';
   const rollText = nextMajor
-    ? `${NEAR_TERM_DAYS} 天内到期的合约占全链 OI ${nearOiShare.toFixed(1)}%（惯例口径 GEX ${fmtUsdM(nearGexUsd)}）；下一个大交割 ${nextMajor.expiry}（${nextMajor.kind}，剩 ${nextMajor.dte} 天）占 OI ${nextMajor.oiShare}%、占全链 Gamma 绝对量 ${nextMajor.gexShare}%，交割后这部分 Gamma 消失${cliffNote}。`
+    ? `${NEAR_TERM_DAYS} 天内到期的合约占全链 OI ${nearOiShare.toFixed(1)}%（惯例口径 GEX ${fmtUsdM(nearGexUsd)}）；下一个大交割 ${nextMajor.expiry}（${nextMajor.kind}，剩 ${nextMajor.dte} 天）占 OI ${nextMajor.oiShare}%、占惯例口径各到期净 GEX 绝对值之和 ${nextMajor.gexShare}%，交割后这部分 Gamma 消失${cliffNote}。`
     : '';
   const maturityText = `【期限与行权价结构】全链 Call:Put 持仓比 ${maturity.chainCallPutRatio ?? '--'}:1，>16周长端 OI 占 ${maturity.longDatedOiSharePct}%、<2周短端占 ${maturity.shortDatedOiSharePct}%（${maturity.maturityRegime.label}）；深度虚值 Put（≤0.75F）占 Put OI ${maturity.tailWings.deepPutSharePct}%，深虚值 Call（≥1.50F）占 Call OI ${maturity.tailWings.deepCallSharePct}%。`;
 
@@ -1045,7 +1055,7 @@ function analyzeDealerExposure(snapshot, opts = {}) {
   const stateText = `【对冲状态·${primaryLabel}】${state.label}：${state.desc}${primaryRobust ? '' : '（持仓符号结论不稳健）'}`;
   const rp = realized24h.primary || realized24h.convention;
   const realizedText = rp
-    ? `过去 ${rp.hours} 小时现货 ${rp.spotPct >= 0 ? '+' : ''}${rp.spotPct}%、DVOL ${rp.dvolChange >= 0 ? '+' : ''}${rp.dvolChange} 点，按${realized24h.primary ? primaryLabel : '惯例口径'}估计做市商已被动${flowWord(rp.flowUsd)} ${fmtAbsUsdM(rp.flowUsd)}（Gamma ${fmtUsdM(rp.approx.gammaUsd)}、Vanna ${fmtUsdM(rp.approx.vannaUsd)}、Charm ${fmtUsdM(rp.approx.charmUsd)}，OI 视为不变）。`
+    ? `过去 ${rp.hours} 小时现货 ${rp.spotPct >= 0 ? '+' : ''}${rp.spotPct}%、DVOL ${rp.dvolChange >= 0 ? '+' : ''}${rp.dvolChange} 点，按${realized24h.primary ? primaryLabel : '惯例口径'}估计做市商已被动${flowWord(rp.flowUsd)} ${fmtAbsUsdM(rp.flowUsd)}（Gamma ${fmtUsdM(rp.approx.gammaUsd)}、Vanna ${fmtUsdM(rp.approx.vannaUsd)}、Charm ${fmtUsdM(rp.approx.charmUsd)}、高阶/临期残差 ${fmtUsdM(rp.residualUsd)}，OI 视为不变）。`
     : '';
   const depthText = depth
     ? `对冲流与盘口深度：${primaryLabel}${depth.downsideSellUsd > 0 ? `下行情景需卖出 ${fmtAbsUsdM(depth.downsideSellUsd)}，为 ${depth.venue} ${depth.band} 买盘深度的 ${depth.downsideRatioPct}%` : '下行情景做市商为买方，不消耗买盘'}；${depth.upsideBuyUsd > 0 ? `上行情景需买入 ${fmtAbsUsdM(depth.upsideBuyUsd)}，为卖盘深度的 ${depth.upsideRatioPct}%` : '上行情景做市商为卖方，不消耗卖盘'}（单一现货场所，做市商多在永续/期货上分批对冲，比值只说明量级）。`

@@ -696,14 +696,14 @@ describe('Phase 2-C: Cross-sectional term structure curve', () => {
     const book = [
       { instrument_name: 'BTC-PERPETUAL', mark_price: 80000 },
       { instrument_name: 'BTC-23OCT26', mark_price: 80100 }, // weekly: excluded
-      { instrument_name: 'BTC-30OCT26', mark_price: 80300, open_interest: 150, volume_usd: 5000000 }, // monthly (13D), 150 BTC * $80,000 = $12,000,000
-      { instrument_name: 'BTC-25DEC26', mark_price: 81200, open_interest: 1125, volume_usd: 30000000 } // quarterly (69D), 1125 BTC * $80,000 = $90,000,000
+      { instrument_name: 'BTC-30OCT26', mark_price: 80300, open_interest: 12000000, volume_usd: 5000000 }, // inverse futures OI is already USD
+      { instrument_name: 'BTC-25DEC26', mark_price: 81200, open_interest: 90000000, volume_usd: 30000000 }
     ];
     const pts = extractLiveCurvePoints(book, now, 80000);
     assert.deepEqual(pts.map(p => p.name), ['BTC-30OCT26', 'BTC-25DEC26']);
     assert.equal(Math.round(pts[0].days), 13);
     assert.equal(Math.round(pts[1].days), 69);
-    assert.equal(pts[0].oiUsd, 12000000, 'open_interest in BTC must be multiplied by index price to get oiUsd');
+    assert.equal(pts[0].oiUsd, 12000000, 'inverse futures open_interest is USD and must not be multiplied by BTC price');
     assert.equal(pts[1].oiUsd, 90000000);
   });
 
@@ -814,6 +814,24 @@ describe('Phase 2-B: ETF × Carry Linkage Statistics', () => {
     assert.equal(w2.etfFlowBtc, 300);
     assert.equal(w2.excessOverTBill, 4);
     assert.deepEqual(buildPendingWeeks({ etfFlows, lastCotDate: '2026-10-14', oiPanel: [], basisSeries }), []);
+  });
+
+  test('pending COT weeks respect the official 2026 holiday release calendar', () => {
+    const { buildPendingWeeks } = require('../server/etf_linkage_engine');
+    for (const [weekEnd, release] of [
+      ['2025-12-30', '2026-01-05'], ['2026-06-16', '2026-06-22'],
+      ['2026-06-30', '2026-07-06'], ['2026-11-10', '2026-11-16'],
+      ['2026-11-24', '2026-11-30'], ['2026-12-22', '2026-12-28'],
+      ['2026-11-17', '2026-11-20']
+    ]) {
+      const [pending] = buildPendingWeeks({
+        lastCotDate: new Date(Date.parse(weekEnd) - 7 * 86400000).toISOString().slice(0, 10),
+        etfFlows: [{ date: weekEnd, flowBtc: 1, flowUsd: 100000 }],
+        oiPanel: [], basisSeries: [], now: Date.parse(weekEnd)
+      });
+      assert.equal(pending.cotExpectedRelease, release, weekEnd);
+      assert.equal(pending.dLfNetShortBtc, null);
+    }
   });
 
   test('buildWeeklyPanel aggregates (prev Tue, Tue] and matches arbitrage flow', () => {

@@ -157,10 +157,21 @@
     return { state: state, src: src, ageMs: age };
   }
 
+  // Folded blocks are rebuilt on every render; remember whether the reader had them open.
+  var statusDetailNode = null;
+  var summaryMoreNode = null;
+  function takeOpenState(n) {
+    var open = !!(n && n.open);
+    if (n && typeof n.remove === 'function') n.remove();
+    return open;
+  }
+
   function renderStatus() {
     var statusEl = el('mstr-disclosure-status');
     if (!statusEl) return;
     var now = Date.now();
+    var detailWasOpen = takeOpenState(statusDetailNode);
+    statusDetailNode = null;
     if (lastFetchError) {
       var bits = ['读取失败，保留上次披露；当前覆盖未核验'];
       if (lastPayload && lastPayload.lastCompletedAt) bits.push('上次完成回执 ' + fmtIso(lastPayload.lastCompletedAt));
@@ -218,15 +229,35 @@
     if (lastPayload.latest && lastPayload.latest.reportedOn) lines.push('最新披露日 ' + lastPayload.latest.reportedOn);
     if (conflicted.length) lines.push('历史成本对账差异 ' + conflicted.length + ' 条');
     if (issues.length) lines.push('账本/股数对账差异: ' + issues.join(', '));
-    statusEl.textContent = lines.join(' · ') + ' — ' + parts.join('；');
+    // Headline stays one line; per-source receipts and upstream error strings are diagnostics
+    // and sit behind a disclosure widget instead of filling the section header.
+    statusEl.textContent = lines.join(' · ');
     statusEl.className = 'pref-section-asof' + (allOk && !issues.length && !conflicted.length ? '' : ' md-status-bad');
+    if (parts.length) {
+      var det = node('details');
+      det.className = 'md-status-detail';
+      if (detailWasOpen) det.open = true;
+      det.appendChild(node('summary', '数据源明细（' + parts.length + '）'));
+      parts.forEach(function (p) { det.appendChild(node('div', p)); });
+      statusEl.appendChild(det);
+      statusDetailNode = det;
+    }
   }
 
   function renderSummary() {
     var box = el('mstr-disclosure-summary');
     if (!box) return;
+    var moreWasOpen = takeOpenState(summaryMoreNode);
+    summaryMoreNode = null;
     box.textContent = '';
     if (!lastPayload) return;
+    // Visible: latest reported holdings and the official-method mNAV. Everything else
+    // (share baseline, capital structure, provenance, preferred terms, parsing notes) is
+    // reference material and goes into `more`.
+    var more = node('details');
+    more.className = 'md-summary-more';
+    if (moreWasOpen) more.open = true;
+    more.appendChild(node('summary', '股数基线、资本结构、优先股条款与口径说明'));
     var latest = lastPayload.latest;
     var shares = lastPayload.shares;
     var viaSec = lastPayload.holdingsSource === 'sec_8k';
@@ -242,14 +273,14 @@
     }
     var capViaSec = lastPayload.capitalSource === 'sec';
     if (shares && capViaSec) {
-      box.appendChild(node('div',
+      more.appendChild(node('div',
         '股数基线 asOf ' + shares.asOf + ' · basic ' + fmtInt(shares.basicShares) +
         '（官网参考基线 + 其后 8-K 披露的增发/回购逐期累加）'));
     } else if (shares) {
-      box.appendChild(node('div',
+      more.appendChild(node('div',
         '股数基线 asOf ' + shares.asOf + ' · basic ' + fmtInt(shares.basicShares) +
         ' · ADSO ' + fmtInt(shares.assumedDilutedShares)));
-      box.appendChild(node('div', 'ADSO 不是 FDSO；不用于推算当前官方 mNAV。'));
+      more.appendChild(node('div', 'ADSO 不是 FDSO；不用于推算当前官方 mNAV。'));
     }
     var capital = lastPayload.capital;
     if (capital) {
@@ -259,15 +290,15 @@
       if (capital.annualDividendsUsd !== null && capital.annualDividendsUsd !== undefined) {
         capLine += ' · 年化优先股股息 $' + fmtInt(capital.annualDividendsUsd) + 'M';
       }
-      box.appendChild(node('div', capLine));
+      more.appendChild(node('div', capLine));
       var prov = lastPayload.sec && lastPayload.sec.provenance;
       if (capViaSec && prov) {
-        box.appendChild(node('div', '来源：持仓/美元资产 ' + prov.holdings +
+        more.appendChild(node('div', '来源：持仓/美元资产 ' + prov.holdings +
           '；可转债条款与优先股股数取自 ' + prov.termsReference +
           (prov.rolledForwardPeriods ? '，已累加其后 ' + prov.rolledForwardPeriods + ' 期增发/回购' : '')));
       }
       var capIssues = (lastPayload.sec && lastPayload.sec.capitalIssues) || [];
-      if (capViaSec && capIssues.length) box.appendChild(node('div', '推导注记：' + capIssues.join('；')));
+      if (capViaSec && capIssues.length) more.appendChild(node('div', '推导注记：' + capIssues.join('；')));
     }
     var prefs = lastPayload.preferreds || [];
     if (prefs.length) {
@@ -277,7 +308,7 @@
         if (typeof p.sharesOutstanding === 'number') seg += ' · ' + fmtInt(p.sharesOutstanding) + ' 股';
         return seg;
       });
-      box.appendChild(node('div', '优先股条款：' + prefParts.join('；')));
+      more.appendChild(node('div', '优先股条款：' + prefParts.join('；')));
     }
     // Milestone 3: official mNAV per the issuer's 2026-07-23 methodology.
     // Values are estimates derived from disclosed inputs — labelled as such —
@@ -307,7 +338,7 @@
       if (mnavIssueList.length) {
         box.appendChild(node('div', '官方 mNAV 注记: ' + describeMnavIssues(mnavIssueList)));
       }
-      box.appendChild(node('div',
+      more.appendChild(node('div',
         '新旧口径不可比：官方 mNAV 自 2026-07-23 改用 Net BPS/FDSO 方法，' +
         '与旧 EV 口径历史/估算序列不可直接拼接或比较。'));
     } else {
@@ -315,20 +346,22 @@
         '官方口径 mNAV：输入不足，未计算' + (mnavIssueList.length ? '（' + describeMnavIssues(mnavIssueList) + '）' : '')));
     }
     var rc = lastPayload.revisionCount || 0;
-    if (rc > 0) box.appendChild(node('div', '历史修订记录 ' + rc + ' 条（保留原始版本）'));
+    if (rc > 0) more.appendChild(node('div', '历史修订记录 ' + rc + ' 条（保留原始版本）'));
     var cov = lastPayload.coverage || {};
     if (cov.sec === '8k_parsed') {
       var docs = lastPayload.sec && lastPayload.sec.documentsParsed;
-      box.appendChild(node('div', 'SEC 8-K 正文已解析 ' + (docs || 0) + ' 份（持仓、美元资产、增发/回购、STRC 股息率）；' +
+      more.appendChild(node('div', 'SEC 8-K 正文已解析 ' + (docs || 0) + ' 份（持仓、美元资产、增发/回购、STRC 股息率）；' +
         (capViaSec ? '资本结构 由 8-K 与官网参考条款推导' : capital ? '资本结构 已接入官方快照' : '资本结构 不可用') +
         '；' + (cov.strc === 'sec_8k_rate_schedule'
           ? 'STRC 股息率按 8-K 公告逐期记录（' + (lastPayload.strcRateSchedule || []).length + ' 条）。'
           : 'STRC 仅公告发现（标题级，正文未核验）。')));
     } else {
-      box.appendChild(node('div', 'SEC 当前仅发现申报，正文待核验；' +
+      more.appendChild(node('div', 'SEC 当前仅发现申报，正文待核验；' +
         (capital ? '资本结构 已接入官方快照' : '资本结构 官方快照不可用') +
         '；STRC 仅公告发现（标题级，正文未核验）。'));
     }
+    box.appendChild(more);
+    summaryMoreNode = more;
   }
 
   function renderEvents() {
@@ -338,12 +371,14 @@
     var events = (lastPayload && lastPayload.events || []).slice(0, MAX_EVENTS);
     events.forEach(function (ev) {
       var tr = node('tr');
+      var delta = ev.deltaBtc;
       if ((ev.issues || []).length) {
         tr.className = 'md-row-flagged';
         tr.setAttribute('title', '对账差异: ' + ev.issues.join(', '));
+      } else if (!delta) {
+        tr.className = 'md-row-noop'; // weekly filing with no purchase or sale
       }
       tr.appendChild(node('td', ev.reportedOn));
-      var delta = ev.deltaBtc;
       var deltaText = (delta < 0 ? '卖出 ' : delta > 0 ? '买入 +' : '更新 ') + fmtInt(delta);
       tr.appendChild(node('td', deltaText));
       tr.appendChild(node('td', fmtUsd(ev.transactionAverageUsd)));

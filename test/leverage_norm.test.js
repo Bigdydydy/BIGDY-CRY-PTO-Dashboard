@@ -128,7 +128,7 @@ test('ETF turnover: 20-session ratio over funds with known volume; missing core 
   const flows = lev.parseEtfFlows(dates.map(d => ({
     date: Date.parse(d),
     list: [
-      { ticker: 'IBIT', changeUsd: 1e8 }, { ticker: 'FBTC', changeUsd: null },
+      { ticker: 'IBIT', changeUsd: 1e8 }, { ticker: 'FBTC', changeUsd: 0 },
       { ticker: 'GBTC', changeUsd: -5e7 }, { ticker: 'ARKB', changeUsd: 1e7 }
     ]
   })));

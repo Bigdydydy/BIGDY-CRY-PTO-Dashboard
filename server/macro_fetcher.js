@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -7,7 +8,7 @@ const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'macro_chart.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'macro_chart.json'));
 
 // Required legs of the `macro` aggregate. mstr_cost / mstr_treasury are
 // ancillary — supplementary reference legs that never gate the aggregate.
@@ -736,21 +737,9 @@ async function fetchAndBuildMacroData() {
       const d = btDailyMap.get(date);
       curHoldings = d.holdings;
       curMnav = d.mnav;
-    } else if (mnavAnchor && date > mnavAnchor.date) {
-      // 快照之后：EV = (锚点股数 + 增发股数) × 股价 + 固定债权
-      const btcToday = btcMap.get(date);
-      if (lastMstrPx && curHoldings > 0 && btcToday > 0) {
-        const added = curHoldings - prevEstHoldings;
-        if (added > 0) dilutionShares += (added * btcToday) / lastMstrPx;
-        prevEstHoldings = curHoldings;
-        const evNow = (mnavAnchor.shares + dilutionShares) * lastMstrPx + mnavAnchor.fixedClaims;
-        curMnav = Number((evNow / (curHoldings * btcToday)).toFixed(3));
-        mnavEstimated = true;
-      }
-    } else if (!mnavAnchor && prevMnavByDate.get(date)?.mnavEstimated) {
-      // Yahoo 不可用导致无法建立锚点：沿用上一版数据集当天的估算
-      curMnav = prevMnavByDate.get(date).mnav;
-      mnavEstimated = true;
+    } else {
+      // Legacy EV-based observations stop at the last actual source date.
+      curMnav = null;
     }
 
     // 30 日平均净增持速率 (BTC/天)，保留符号：负值即净减持

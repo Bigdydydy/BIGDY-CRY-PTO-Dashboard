@@ -395,7 +395,8 @@ async function windowVolumesFromTape(fetchPage, { currency = 'BTC', fromTs, toTs
     }
     if (!hasMore || !trades || !trades.length) break;
     const lastTs = Number(trades[trades.length - 1].timestamp);
-    cursor = lastTs > cursor ? lastTs : cursor + 1;
+    if (!(lastTs > cursor)) throw new Error('Trade pagination stalled within one millisecond; completeness cannot be verified');
+    cursor = lastTs;
     if (sleepMs) await new Promise(r => setTimeout(r, sleepMs));
   }
   return { volumes, pages, trades: seen.size };

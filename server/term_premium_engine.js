@@ -109,6 +109,10 @@ function evaluateCarryRegime(latest) {
     fundingApr, cqApr, nqApr, apr90d, tbill, hurdle,
     spreadShort, spreadTerm, excessOverTBill, excessOverHurdle, carryScore
   } = latest;
+  if (!Number.isFinite(apr90d)) return {
+    regimeCode: 'INSUFFICIENT_DATA', regimeName: '数据不足', regimeBadgeClass: 'badge-warning',
+    statusSummary: '90D 基差不可用，暂不判定套利体制。', keyPointers: []
+  };
   const fmt = v => (v == null ? '--' : `${v >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`);
   const tb = tbill ?? 4.0;
   const hd = hurdle ?? tb + HURDLE_SPREAD;

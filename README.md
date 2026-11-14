@@ -108,7 +108,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 - 由 `.github/workflows/block_insight_daily.yml` 每日产出 `block_flow`/`smart_money` 归档。
 
 ### BTC 主导力量雷达与稳定币流动性 (Module 05/05B)
-- **Flow Force 主导力量指标**（`server/flow_force.js`）：2×2 场域矩阵——期货/现货 × 亚太/欧美（币安+OKX 亚太侧、Hyperliquid 欧美期货、Coinbase 欧美现货）；BVC 批量成交量分类（Easley-López de Prado-O'Hara 2012）估计主动买卖净额；已收盘 K 线"先写入者为准"定稿、不可篡改，缺场标记 missing 等待补齐；币安在云主机常被 418 拦截，经备用源链获取。
+- **Flow Force 主导力量指标**（`server/flow_force.js`）：2×2 场域矩阵——期货/现货 × 亚太/欧美（币安+OKX 亚太侧、Hyperliquid 欧美期货、Coinbase 欧美现货）；BVC 批量成交量分类（Easley-López de Prado-O'Hara 2012）估计主动买卖净额；官方已核验的收盘 K 线定稿；缺场所时暂停主导方向、EMA 在缺口处重置。TradingView 与旧版来源不明的币安历史暂存待核验，官方到达后替换并重算相关 51 根后续窗口。服务器启动后每分钟按各周期 TTL 后台检查全部周期，补齐最多 1000 根原始 K 线保留范围内的币安旧缺口（REST 最多 1000 根，TV 最近 300 根，其余依赖官方档案；档案发布时间不保证）。宿主休眠/离线时无法运行，重启后继续补数。
 - **SSRO 稳定币供应比率振荡器**：稳定币总市值对 BTC 市值的相对强弱与宏观流动性传导。
 
 ### Coinbase 订单簿微观流动性
@@ -195,7 +195,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 1. **零外部依赖**：生产环境仅 Node.js 原生模块（`http`、`fs`、`path`、`zlib`、`crypto`、`url`），无 npm 运行时包。
 2. **带宽优化与协商缓存**：MD5 Strong ETag + `304 Not Modified`；Gzip/Deflate 压缩（约 1.5MB 数据集压至 130KB 以下）。
 3. **并发防击穿**：Single-Flight 合并并发刷新；`/api/refresh` 单 IP 每 10 秒限 1 次。
-4. **端到端 XSS 防护**：全部动态插入点经 `escapeHtml` 转义。
+4. **端到端 XSS 防护**：动态错误文本与外部字符串在 HTML 插入前经 `escapeHtml` 转义。
 5. **离线降级诚实**：上游不可用时按源健康状态如实降级（FALLBACK/STALE/UNAVAILABLE），不用缓存伪装实时数据；Python 管线缺失时以 `pipelineUnavailable` 载入经核验的基准快照。
 
 ---
@@ -222,7 +222,7 @@ BIGDY Quantitative Dashboard 是一套面向专业对冲基金与量化做市商
 ├── scripts/                 # 定时任务入口与工具（macro_snapshot、option_flow_ledger…）
 │   ├── crypto_mcclellan/    #   McClellan Python 计量管线
 │   └── run_tests.js         #   测试运行器（沙箱副本，不写污染仓库）
-├── test/                    # 48 个测试文件 / 637 个用例（node:test，离线运行）
+├── test/                    # 50 个测试文件 / 679 个用例（node:test，离线运行）
 ├── .github/workflows/       # 6 条定时数据管线 + 健康巡检
 ├── docs/                    # data_resilience / mstr_disclosures / module8_wave_v3 / crypto_breadth
 ├── analyst_agent/           # 本地自用宏观评论 Agent（双视角方法论，不对外部署）
@@ -298,7 +298,7 @@ python scripts/crypto_mcclellan/export_to_json.py
 基于 Node.js 原生 `node:test` + `node:assert/strict`，无需 Jest/Mocha，完全离线运行。
 
 ```bash
-npm test    # 48 个测试文件 / 637 个用例（test/ 复制到沙箱执行，不写污染仓库）
+npm test    # 50 个测试文件 / 679 个用例（test/ 复制到沙箱执行，不写污染仓库）
 ```
 
 覆盖：Black-76 Greeks 与远期定价、Smile 两翼与 wingRegime 分类、期限矩阵与交割断崖、时段归类、冰山聚合、GEX/做市商敞口三口径敏感性、MSTR 披露账本（修订合并/证据哈希/SEC 回退/官方 mNAV）、比率调整 McClellan 与结构宽度、数据源健康状态机与时钟口径、ETag/Gzip 协商缓存、波浪规则引擎等。
@@ -314,3 +314,26 @@ npm test    # 48 个测试文件 / 637 个用例（test/ 复制到沙箱执行�
 ## 开源协议
 
 本项目采用 [MIT License](LICENSE) 授权开源。
+
+## 期权大宗研究（首期）
+
+- 报告：[`docs/reports/options-2026-10-28.md`](docs/reports/options-2026-10-28.md)，线上证据与研究文件哈希见同目录 evidence JSON。
+- 原始大宗腿沿用 JSON 原子文件库，滚动保留60天；30d筛选独立于完整库存。现有4B工作流同时提交原始流水。更改不会恢复已删除记录，也不代表已部署到线上。
+- 手工采集下一期证据（不会创建定时任务）：
+
+```powershell
+node scripts/options_research_snapshot.js --research-dir "C:\Users\HZX\Downloads\研究\金融" --out scratch/options-research-evidence.json
+```
+
+证据脚本只采集，不自动判定玩家身份。每期研究沿用首期的竞争假设、失效条件、PnL验证与产品验收框架。
+
+
+### 审计修复后的运行约定（2026-11-12）
+
+服务进程把可变快照写入 `data/*.local.json`，首次读取时从随仓库分发的快照复制。`scripts/` 下直接启动的采集脚本写正式归档；其它采集入口可显式设置 `SNAPSHOT_MODE=producer`。已有正式数据文件不会被迁移或删除。
+
+默认按 socket 地址限流；部署配置明确设置 `TRUST_PROXY_HOPS=1` 后，才使用反向代理追加的最后一跳地址。Render 配置使用此设置，多级代理需要按实际拓扑调整。公开强制刷新与手动刷新共享全实例 10 秒冷却；market-data 和波浪接口另有限流。
+
+成功的测试沙箱会自动清理；失败沙箱保留定位，也可设置 `KEEP_TEST_SANDBOX=1` 保留成功运行。生产环境 McClellan 从 GitHub 已发布归档读取，每 30 分钟检查，采集留给定时管线。
+
+聪明钱的胜率、平均盈亏仍是描述统计，暂停生成胜率加权倾向与星标。波浪历史命中率显示原始回放日期，尚未用当前引擎重跑校准。

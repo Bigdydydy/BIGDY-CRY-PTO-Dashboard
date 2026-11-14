@@ -4,8 +4,8 @@
  * Copies the repo code+data into a unique temp sandbox and runs `node --test`
  * there with test/helpers/offline_guard.cjs preloaded. Every `__dirname`-based
  * path inside tests resolves under the sandbox, so nothing the suite does can
- * write to (or read secrets from) the real worktree. The sandbox is kept for
- * review; its path is printed.
+ * write to (or read secrets from) the real worktree. Failed sandboxes are kept for
+ * review (KEEP_TEST_SANDBOX=1 also keeps successful runs); its path is printed.
  *
  * Usage:
  *   node scripts/run_tests.js                 → all test/*.test.js
@@ -119,4 +119,14 @@ const res = spawnSync(
   ['--test', ...passthrough, ...targets],
   { cwd: sandbox, env, stdio: 'inherit' }
 );
-process.exit(res.status === null ? 1 : res.status);
+const code = res.status === null ? 1 : res.status;
+if (code === 0 && process.env.KEEP_TEST_SANDBOX !== '1') {
+  const resolved = path.resolve(sandbox);
+  if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('be-test-sandbox-')) {
+    throw new Error('Refusing to remove an unexpected sandbox path');
+  }
+  fs.rmSync(resolved, { recursive: true, force: true });
+} else {
+  console.log(`[run_tests] retained sandbox: ${sandbox}`);
+}
+process.exit(code);

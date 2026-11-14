@@ -21,7 +21,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20261108_1">
+  <link rel="stylesheet" href="/style.css?v=20261111_2">
   <link rel="stylesheet" href="/atelier.css?v=20261020_1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preload" as="image" href="/art/friedrich-monk-by-the-sea-thumb.jpg" crossorigin="anonymous">
@@ -373,15 +373,14 @@
       <!-- View 1: 宏观与风控总览 (Module 1 上 + Module 2 下) -->
       <div class="view-panel active" id="view-overview">
 
-    <!-- Bento Row 0: Macro & On-Chain Cost Chart (Full Width) -->
-    <section class="bento-card" id="module-macro-chart">
+    <!-- Module 1-A: Strategy (MSTR) 融资压力 — 优先股锚定、成本与 mNAV、官方披露账本 -->
+    <section class="bento-card" id="module-mstr-financing">
       <div class="card-header">
         <div class="card-title-group">
-          <span class="card-module-tag">00 MACRO &amp; ON-CHAIN COST</span>
-          <h2>美债收益率曲线与 MicroStrategy 持仓成本与披露全景</h2>
-          <span class="data-freshness" id="macro-freshness">数据加载中</span>
+          <span class="card-module-tag">01-A MSTR FINANCING</span>
+          <h2>Strategy 融资压力：优先股锚定、持仓成本与官方披露</h2>
         </div>
-        <div class="view-switch timeframe-switch" id="macro-timeframe-switch">
+        <div class="view-switch timeframe-switch macro-tf-switch" id="mstr-timeframe-switch">
           <button class="switch-btn" data-range="3m">3M</button>
           <button class="switch-btn" data-range="6m">6M</button>
           <button class="switch-btn active" data-range="1y">1Y</button>
@@ -391,16 +390,8 @@
       </div>
 
       <div class="card-body">
-        <!-- Quick Stats Top Bar -->
-        <div class="macro-metrics-row">
-          <div class="macro-metric-card" id="card-metric-btc">
-            <span class="mm-label">BTC 现货指数</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val text-amber" id="macro-btc-val">$--,---</span>
-            </div>
-            <span class="mm-sub" id="macro-btc-sub">Binance / Deribit 实时收盘</span>
-          </div>
-
+        <p class="macro-chart-claim macro-page-claim" id="mstr-page-claim">--</p>
+        <div class="macro-metrics-row macro-row-3" id="mstr-kpi-row" data-live-analysis="macro">
           <div class="macro-metric-card" id="card-metric-mstr">
             <span class="mm-label">MSTR 平均持仓成本</span>
             <div class="mm-val-wrap">
@@ -408,42 +399,6 @@
               <span class="mm-chip" id="macro-mstr-mult">--x</span>
             </div>
             <span class="mm-sub" id="macro-mstr-sub">数据来源加载中</span>
-          </div>
-
-          <div class="macro-metric-card" id="card-metric-1y">
-            <span class="mm-label">US 1Y T-Bill (1年期)</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val text-cyan" id="macro-1y-val">--%</span>
-              <span class="mm-chip" id="macro-1y-chip">--</span>
-            </div>
-            <span class="mm-sub" id="macro-1y-sub">FRED 美联储常备到期收益率</span>
-          </div>
-
-          <div class="macro-metric-card" id="card-metric-10y">
-            <span class="mm-label">US 10Y T-Note (10年期)</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val text-green" id="macro-10y-val">--%</span>
-              <span class="mm-chip" id="macro-10y-chip">--</span>
-            </div>
-            <span class="mm-sub" id="macro-10y-sub">全球无风险基准利率</span>
-          </div>
-
-          <div class="macro-metric-card" id="card-metric-spread">
-            <span class="mm-label">(10Y - 1Y) 美债期限利差</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val" id="macro-spread-val">--%</span>
-              <span class="mm-chip" id="macro-spread-badge">--</span>
-            </div>
-            <span class="mm-sub" id="macro-spread-sub">衰退倒挂与陡峭化监视</span>
-          </div>
-
-          <div class="macro-metric-card" id="card-metric-velocity">
-            <span class="mm-label">MSTR 30D 平均净增持</span>
-            <div class="mm-val-wrap">
-              <span class="mm-val text-fuchsia" id="macro-velocity-val">-- BTC/d</span>
-              <span class="mm-chip" id="macro-velocity-chip">--× 日产量</span>
-            </div>
-            <span class="mm-sub" id="macro-velocity-sub">(持仓_t − 持仓_t−30) ÷ 30，负值为净减持</span>
           </div>
 
           <div class="macro-metric-card" id="card-metric-mnav">
@@ -455,110 +410,15 @@
             <span class="mm-sub" id="macro-mnav-sub">企业价值 / BTC NAV 溢折价</span>
           </div>
 
-          <div class="macro-metric-card" id="card-metric-netliq">
-            <span class="mm-label">FED 净流动性 (WALCL-TGA-RRP)</span>
+          <div class="macro-metric-card" id="card-metric-velocity">
+            <span class="mm-label">MSTR 30D 平均净增持</span>
             <div class="mm-val-wrap">
-              <span class="mm-val text-blue" id="macro-netliq-val">$--.-T</span>
-              <span class="mm-chip" id="macro-netliq-chip">--</span>
+              <span class="mm-val text-fuchsia" id="macro-velocity-val">-- BTC/d</span>
+              <span class="mm-chip" id="macro-velocity-chip">--× 日产量</span>
             </div>
-            <span class="mm-sub" id="macro-netliq-sub">美联储总资产 - 财政部TGA - 逆回购RRP</span>
+            <span class="mm-sub" id="macro-velocity-sub">(持仓_t − 持仓_t−30) ÷ 30，负值为净减持</span>
           </div>
         </div>
-
-        <!-- Custom Interactive Legend Bar with Click to Toggle Visibility -->
-        <div class="interactive-legend-container">
-          <div class="legend-header-note">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-            </svg>
-            <span>交互式图例（点击任意指标可切换单项/组合显示）：</span>
-          </div>
-          <div class="legend-pills-group" id="macro-legend-group">
-            <button class="legend-pill active" data-dataset="0" id="legend-btn-btc" title="点击隐藏/显示 BTC 价格">
-              <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
-              <span class="legend-name">BTC 价格</span>
-              <span class="legend-axis-tag tag-left">左轴 USD</span>
-            </button>
-            <button class="legend-pill active" data-dataset="1" id="legend-btn-mstr" title="点击隐藏/显示 MSTR 成本">
-              <span class="legend-color-dot" style="background-color: #8b5cf6;"></span>
-              <span class="legend-name">MSTR Average Cost</span>
-              <span class="legend-axis-tag tag-left">左轴 USD</span>
-            </button>
-            <button class="legend-pill active" data-dataset="2" id="legend-btn-1y" title="点击隐藏/显示 US 1Y T-Bill">
-              <span class="legend-color-dot" style="background-color: #06b6d4;"></span>
-              <span class="legend-name">US 1Y T-Bill</span>
-              <span class="legend-axis-tag tag-right">右轴 %</span>
-            </button>
-            <button class="legend-pill active" data-dataset="3" id="legend-btn-10y" title="点击隐藏/显示 US 10Y T-Note">
-              <span class="legend-color-dot" style="background-color: #10b981;"></span>
-              <span class="legend-name">US 10Y T-Note</span>
-              <span class="legend-axis-tag tag-right">右轴 %</span>
-            </button>
-            <button class="legend-pill active" data-dataset="4" id="legend-btn-spread" title="点击隐藏/显示 (10Y - 1Y) 利差">
-              <span class="legend-color-dot" style="background-color: #f43f5e;"></span>
-              <span class="legend-name">(US 10Y - US 1Y) 利差</span>
-              <span class="legend-axis-tag tag-right">右轴 %</span>
-            </button>
-            <button class="legend-pill active" data-dataset="5" id="legend-btn-velocity" title="点击隐藏/显示 MSTR 30D 平均净增持">
-              <span class="legend-color-dot" style="background-color: #ec4899;"></span>
-              <span class="legend-name">MSTR 30D 平均净增持</span>
-              <span class="legend-axis-tag tag-velocity">右轴2 BTC/d</span>
-            </button>
-            <button class="legend-pill active" data-dataset="6" id="legend-btn-mnav" title="点击隐藏/显示 EV / BTC 市值（旧口径参考）">
-              <span class="legend-color-dot" style="background-color: #6366f1;"></span>
-              <span class="legend-name">EV / BTC 市值（旧口径参考）</span>
-              <span class="legend-axis-tag tag-mnav">右轴3 倍数</span>
-            </button>
-            <button class="legend-pill active" data-dataset="7" id="legend-btn-netliq" title="点击隐藏/显示 FED 净流动性 (WALCL - TGA - RRP)">
-              <span class="legend-color-dot" style="background-color: #3b82f6;"></span>
-              <span class="legend-name">Fed 净流动性</span>
-              <span class="legend-axis-tag tag-liquidity">右轴4 $T</span>
-            </button>
-            <button class="legend-pill active" data-dataset="8" id="legend-btn-netliq-sma" title="点击隐藏/显示 Fed 净流动性 20D SMA">
-              <span class="legend-color-dot" style="background-color: #60a5fa; border: 1px dashed #ffffff;"></span>
-              <span class="legend-name">净流动性 20D SMA</span>
-              <span class="legend-axis-tag tag-liquidity">右轴4 $T</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Chart Canvas Container -->
-        <div class="macro-chart-canvas-wrapper">
-          <canvas id="macro-chart-canvas"></canvas>
-        </div>
-
-        <!-- Strategy 官方披露账本：issuer BTC 账本 + 股数表 + SEC 申报发现 -->
-        <section id="mstr-disclosures" class="pref-section" aria-labelledby="mstr-disclosures-title">
-          <div class="pref-section-head">
-            <span class="pref-section-title" id="mstr-disclosures-title">Strategy 官方披露账本</span>
-            <span class="pref-section-asof" id="mstr-disclosure-status" role="status" aria-live="polite">未加载</span>
-            <button type="button" id="mstr-disclosure-refresh" class="switch-btn">重新检查披露</button>
-          </div>
-          <div id="mstr-disclosure-summary"></div>
-          <div class="md-events-wrap">
-            <table class="md-events-table">
-              <thead>
-                <tr>
-                  <th>披露日期</th>
-                  <th>买入/卖出 BTC</th>
-                  <th>交易均价 $</th>
-                  <th>报告持仓 BTC</th>
-                  <th>报告持仓均价 $</th>
-                  <th>证据</th>
-                </tr>
-              </thead>
-              <tbody id="mstr-disclosure-events"></tbody>
-            </table>
-          </div>
-          <details id="mstr-disclosure-filings">
-            <summary>最近 SEC 申报发现（仅索引，正文未核验）</summary>
-            <ul id="mstr-disclosure-filings-list"></ul>
-          </details>
-          <details id="mstr-disclosure-press">
-            <summary>官方公告发现（标题级，正文未核验）</summary>
-            <ul id="mstr-disclosure-announcements"></ul>
-          </details>
-        </section>
 
         <!-- MSTR 融资压力：STRC 平价锚定 + 优先股分层利差 -->
         <div class="pref-section" id="mstr-pref-section">
@@ -620,6 +480,191 @@
           <div class="pref-charts">
             <div class="pref-chart-wrapper" id="pref-strc-echarts"></div>
             <div class="pref-chart-wrapper" id="pref-spread-echarts"></div>
+          </div>
+        </div>
+
+        <div class="macro-chart-block">
+          <div class="macro-chart-head">
+            <span class="macro-chart-title">BTC 价格 vs 持仓均价</span>
+            <p class="macro-chart-claim" id="mstr-chart-claim">--</p>
+          </div>
+          <div class="legend-pills-group macro-legend" data-chart="mstr">
+            <button class="legend-pill active" data-dataset="0" title="点击隐藏/显示 BTC 价格">
+              <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
+              <span class="legend-name">BTC 价格</span>
+              <span class="legend-axis-tag tag-left">左轴 USD</span>
+            </button>
+            <button class="legend-pill active" data-dataset="1" title="点击隐藏/显示 MSTR 持仓均价">
+              <span class="legend-color-dot" style="background-color: #8b5cf6;"></span>
+              <span class="legend-name">MSTR 持仓均价</span>
+              <span class="legend-axis-tag tag-left">左轴 USD</span>
+            </button>
+            <button class="legend-pill active" data-dataset="2" title="点击隐藏/显示 EV / BTC 市值（旧口径参考）">
+              <span class="legend-color-dot" style="background-color: #6366f1;"></span>
+              <span class="legend-name">EV / BTC 市值（旧口径参考）</span>
+              <span class="legend-axis-tag tag-mnav">右轴 倍数</span>
+            </button>
+            <button class="legend-pill inactive" data-dataset="3" title="点击隐藏/显示 30D 平均净增持">
+              <span class="legend-color-dot" style="background-color: #ec4899;"></span>
+              <span class="legend-name">30D 平均净增持</span>
+              <span class="legend-axis-tag tag-velocity">右轴2 BTC/d</span>
+            </button>
+          </div>
+          <div class="macro-chart-canvas-wrapper macro-chart-split">
+            <canvas id="mstr-chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Strategy 官方披露账本：issuer BTC 账本 + 股数表 + SEC 申报发现 -->
+        <section id="mstr-disclosures" class="pref-section" aria-labelledby="mstr-disclosures-title">
+          <div class="pref-section-head">
+            <span class="pref-section-title" id="mstr-disclosures-title">Strategy 官方披露账本</span>
+            <span class="pref-section-asof" id="mstr-disclosure-status" role="status" aria-live="polite">未加载</span>
+            <button type="button" id="mstr-disclosure-refresh" class="switch-btn">重新检查披露</button>
+          </div>
+          <div id="mstr-disclosure-summary"></div>
+          <div class="md-events-wrap">
+            <table class="md-events-table">
+              <thead>
+                <tr>
+                  <th>披露日期</th>
+                  <th>买入/卖出 BTC</th>
+                  <th>交易均价 $</th>
+                  <th>报告持仓 BTC</th>
+                  <th>报告持仓均价 $</th>
+                  <th>证据</th>
+                </tr>
+              </thead>
+              <tbody id="mstr-disclosure-events"></tbody>
+            </table>
+          </div>
+          <details id="mstr-disclosure-filings">
+            <summary>最近 SEC 申报发现（仅索引，正文未核验）</summary>
+            <ul id="mstr-disclosure-filings-list"></ul>
+          </details>
+          <details id="mstr-disclosure-press">
+            <summary>官方公告发现（标题级，正文未核验）</summary>
+            <ul id="mstr-disclosure-announcements"></ul>
+          </details>
+        </section>
+      </div>
+    </section>
+
+    <!-- Module 1-B: 美债曲线与 Fed 净流动性（一张图一个问题） -->
+    <section class="bento-card" id="module-macro-chart">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">00 MACRO RATES &amp; LIQUIDITY</span>
+          <h2>美债收益率曲线与 Fed 净流动性</h2>
+          <span class="data-freshness" id="macro-freshness">数据加载中</span>
+        </div>
+        <div class="view-switch timeframe-switch macro-tf-switch" id="macro-timeframe-switch">
+          <button class="switch-btn" data-range="3m">3M</button>
+          <button class="switch-btn" data-range="6m">6M</button>
+          <button class="switch-btn active" data-range="1y">1Y</button>
+          <button class="switch-btn" data-range="3y">3Y</button>
+          <button class="switch-btn" data-range="all">ALL (2020~)</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="macro-metrics-row macro-row-5">
+          <div class="macro-metric-card" id="card-metric-btc">
+            <span class="mm-label">BTC 现货指数</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-amber" id="macro-btc-val">$--,---</span>
+            </div>
+            <span class="mm-sub" id="macro-btc-sub">Binance / Deribit 实时收盘</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-1y">
+            <span class="mm-label">US 1Y T-Bill (1年期)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-cyan" id="macro-1y-val">--%</span>
+              <span class="mm-chip" id="macro-1y-chip">--</span>
+            </div>
+            <span class="mm-sub" id="macro-1y-sub">FRED 美联储常备到期收益率</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-10y">
+            <span class="mm-label">US 10Y T-Note (10年期)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-green" id="macro-10y-val">--%</span>
+              <span class="mm-chip" id="macro-10y-chip">--</span>
+            </div>
+            <span class="mm-sub" id="macro-10y-sub">全球无风险基准利率</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-spread">
+            <span class="mm-label">(10Y - 1Y) 美债期限利差</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val" id="macro-spread-val">--%</span>
+              <span class="mm-chip" id="macro-spread-badge">--</span>
+            </div>
+            <span class="mm-sub" id="macro-spread-sub">衰退倒挂与陡峭化监视</span>
+          </div>
+
+          <div class="macro-metric-card" id="card-metric-netliq">
+            <span class="mm-label">FED 净流动性 (WALCL-TGA-RRP)</span>
+            <div class="mm-val-wrap">
+              <span class="mm-val text-blue" id="macro-netliq-val">$--.-T</span>
+              <span class="mm-chip" id="macro-netliq-chip">--</span>
+            </div>
+            <span class="mm-sub" id="macro-netliq-sub">美联储总资产 - 财政部TGA - 逆回购RRP</span>
+          </div>
+        </div>
+
+        <div class="macro-chart-block">
+          <div class="macro-chart-head">
+            <span class="macro-chart-title">曲线在走陡还是走平</span>
+            <p class="macro-chart-claim" id="macro-rates-claim">--</p>
+          </div>
+          <div class="legend-pills-group macro-legend" data-chart="rates">
+            <button class="legend-pill active" data-dataset="0" title="点击隐藏/显示 US 1Y T-Bill">
+              <span class="legend-color-dot" style="background-color: #06b6d4;"></span>
+              <span class="legend-name">US 1Y T-Bill</span>
+              <span class="legend-axis-tag tag-left">左轴 %</span>
+            </button>
+            <button class="legend-pill active" data-dataset="1" title="点击隐藏/显示 US 10Y T-Note">
+              <span class="legend-color-dot" style="background-color: #10b981;"></span>
+              <span class="legend-name">US 10Y T-Note</span>
+              <span class="legend-axis-tag tag-left">左轴 %</span>
+            </button>
+            <button class="legend-pill active" data-dataset="2" title="点击隐藏/显示 (10Y − 1Y) 利差">
+              <span class="legend-color-dot" style="background-color: #f43f5e;"></span>
+              <span class="legend-name">(10Y − 1Y) 利差</span>
+              <span class="legend-axis-tag tag-right">右轴 %</span>
+            </button>
+          </div>
+          <div class="macro-chart-canvas-wrapper macro-chart-split">
+            <canvas id="macro-chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="macro-chart-block">
+          <div class="macro-chart-head">
+            <span class="macro-chart-title">净流动性与 BTC</span>
+            <p class="macro-chart-claim" id="macro-liq-claim">--</p>
+          </div>
+          <div class="legend-pills-group macro-legend" data-chart="liq">
+            <button class="legend-pill active" data-dataset="0" title="点击隐藏/显示 BTC 价格">
+              <span class="legend-color-dot" style="background-color: #f59e0b;"></span>
+              <span class="legend-name">BTC 价格</span>
+              <span class="legend-axis-tag tag-left">左轴 USD</span>
+            </button>
+            <button class="legend-pill active" data-dataset="1" title="点击隐藏/显示 Fed 净流动性">
+              <span class="legend-color-dot" style="background-color: #3b82f6;"></span>
+              <span class="legend-name">Fed 净流动性</span>
+              <span class="legend-axis-tag tag-liquidity">右轴 $T</span>
+            </button>
+            <button class="legend-pill active" data-dataset="2" title="点击隐藏/显示 净流动性 20D SMA">
+              <span class="legend-color-dot" style="background-color: #60a5fa; border: 1px dashed #ffffff;"></span>
+              <span class="legend-name">净流动性 20D SMA</span>
+              <span class="legend-axis-tag tag-liquidity">右轴 $T</span>
+            </button>
+          </div>
+          <div class="macro-chart-canvas-wrapper macro-chart-split">
+            <canvas id="macro-liq-canvas"></canvas>
           </div>
         </div>
       </div>
@@ -2465,7 +2510,7 @@
               <tbody id="flow-audit-body"></tbody>
             </table>
           </div>
-          <p class="flow-audit-note">同一象限内的权重按 2026-10-18 实测 ±10bps 盘口深度占比定死 (挂单要占用真实资金，比成交额难伪造)；实时深度只用于对照，不参与计算，否则每次刷新都会改写全部历史。换手/深度比明显高于同类场所时，多出来的成交更可能是高频对敲或刷量。每个场所的信号都先除以它自己的 50 根平均成交额，所以持续性刷量只会抬高基线，不会制造信号。已收盘且六个场所到齐的K线一经算出即定死，之后任何数据源断线都不会改变它；缺场所的K线显示为淡色“暂定”，等数据补齐 (币安最迟次日官方档案) 后再定死。</p>
+          <p class="flow-audit-note">同一象限内的权重按 2026-10-18 实测 ±10bps 盘口深度占比定死 (挂单要占用真实资金，比成交额难伪造)；实时深度只用于对照，不参与计算，否则每次刷新都会改写全部历史。换手/深度比明显高于同类场所时，多出来的成交更可能是高频对敲或刷量。每个场所的信号都先除以它自己的 50 根平均成交额，所以持续性刷量只会抬高基线，不会制造信号。已收盘、六个场所与汇率齐全且来源已核验的K线才定稿。缺场所时柱与区域点留空，摘要显示“数据不足”；备用数据以淡色暂估展示，待官方历史发布后核验并重算受影响的指标。后台自动检查所有周期及保留范围内的旧缺口；官方档案发布时间不固定，不能保证次日补齐。</p>
         </details>
       </div>
     </section>
@@ -3496,8 +3541,8 @@
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
   <!-- mcclellan_structure 必须先于 app.js：Module 1-B 结构宽度面板由 app.js 调用其 window 全局 -->
   <script src="/mcclellan_structure.js"></script>
-  <script src="/app.js?v=20261110_1"></script>
+  <script src="/app.js?v=20261111_3"></script>
   <!-- Strategy 官方披露账本面板：独立加载，不影响既有渲染管线 -->
-  <script src="/mstr_disclosures_ui.js?v=20261110_1" defer></script>
+  <script src="/mstr_disclosures_ui.js?v=20261111_1" defer></script>
 </body>
 </html>

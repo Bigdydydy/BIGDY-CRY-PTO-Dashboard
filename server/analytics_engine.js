@@ -75,7 +75,7 @@ function calcGreeks(S, K, T_years, iv_pct, isCall, r = 0, F = null) {
 
   // Dollar Greeks (Natenberg Ch 16 / Bossu Ch 1)
   const dollarDelta = delta * S;
-  const dollarGamma = 0.5 * S * S * gamma; // 1/2 * S^2 * gamma (daily gamma P&L unit for 1% move)
+  const dollarGamma = 0.5 * S * S * gamma; // 1/2 * S^2 * gamma; multiply by return squared for USD P&L
   const dollarVega = vega;
   const dollarTheta = theta;
 
@@ -522,8 +522,8 @@ function aggregateByStrike(gexData) {
 function wallsOf(rows) {
   let callWall = null;
   let putWall = null;
-  let maxPos = -Infinity;
-  let minNeg = Infinity;
+  let maxPos = 0;
+  let minNeg = 0;
   for (const r of rows || []) {
     if (r.number > maxPos) { maxPos = r.number; callWall = r.strike; }
     if (r.number < minNeg) { minNeg = r.number; putWall = r.strike; }

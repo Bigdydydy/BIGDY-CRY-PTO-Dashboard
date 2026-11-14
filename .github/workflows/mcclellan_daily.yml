@@ -39,12 +39,12 @@ jobs:
       - name: Setup Node for producer heartbeat
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       # Pipeline is stdlib-only: no dependency install step
       - name: Unit tests
         working-directory: scripts/crypto_mcclellan
-        run: python test_breadth.py
+        run: python -m unittest discover -p 'test_*.py'
 
       - name: Run breadth pipeline (collect + compute + export JSON)
         id: pipeline
@@ -69,7 +69,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No data changes; skipping commit."
           else
-            git commit -m "chore(mcclellan): daily breadth data update [skip ci]"
+            git commit -m "chore(mcclellan): daily breadth data update [skip ci] [skip render]"
             # main may have moved while the pipeline ran; rebase and retry
             pushed=0
             for i in 1 2 3; do

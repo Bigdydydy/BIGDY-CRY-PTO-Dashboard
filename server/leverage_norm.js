@@ -206,7 +206,9 @@ function parseFundingBars(bars, now = Date.now()) {
   const byTime = new Map();
   for (const b of bars) {
     const open = Number(b?.data?.[0]);
-    const close = Number(b?.data?.[4]);
+    const rawClose = b?.data?.[4];
+    if (rawClose == null || typeof rawClose === 'boolean' || String(rawClose).trim() === '') throw new Error('资金费率: 缺少已结算费率');
+    const close = Number(rawClose);
     if (!Number.isFinite(open) || open <= 0 || !Number.isFinite(close)) throw new Error('资金费率: bar 含非法值');
     const fundingTime = open * 1000 + 8 * HOUR_MS;
     if (fundingTime > now) continue;
@@ -328,8 +330,9 @@ function buildEtfTurnover(flows, volumes) {
         if (CORE_ETF_TICKERS.includes(t)) missingCore = true;
         continue;
       }
+      if (f.funds[t] == null) { missingCore = true; continue; }
       vol += v;
-      flow += f.funds[t] ?? 0;
+      flow += f.funds[t];
     }
     if (missingCore || !(vol > 0)) continue;
     rows.push({ date: f.date, flowUsd: flow, volumeUsd: vol });

@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -6,7 +7,7 @@ const { fetchWithTimeout } = require('./http_client');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'cdri_data.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'cdri_data.json'));
 let inMemoryCache = null;
 let lastFetchTime = 0;
 let inflight = null;

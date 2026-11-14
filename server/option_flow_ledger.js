@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchWithTimeout } = require('./http_client');
-const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
+const { recordAttempt, recordSuccess, recordFailure, seedSource } = require('./data_health');
 const { atomicWriteJson } = require('./data_health_cache');
 
 const HISTORY_BASE = 'https://history.deribit.com/api/v2/public';
@@ -179,7 +179,8 @@ async function syncLedger(ledger, {
     if (!hasMore || !trades.length) { complete = true; break; }
     const lastTs = Number(trades[trades.length - 1].timestamp);
     // 整页落在同一毫秒 (>1000 笔同毫秒成交) 时只能跳过该毫秒，否则会原地循环
-    cursor = lastTs > cursor ? lastTs : cursor + 1;
+    if (!(lastTs > cursor)) throw new Error('Trade pagination stalled within one millisecond; completeness cannot be verified');
+    cursor = lastTs;
     if (sleepMs) await new Promise(r => setTimeout(r, sleepMs));
   }
   if (complete) ledger.syncedThrough = endTs;
@@ -188,7 +189,7 @@ async function syncLedger(ledger, {
 
 function validLedger(json) {
   if (!json || typeof json !== 'object' || !json.instruments || typeof json.instruments !== 'object') return false;
-  if (json.syncedThrough !== null && !(Number.isFinite(json.syncedThrough) && json.syncedThrough > 0)) return false;
+  if (json.syncedThrough !== null && !(Number.isFinite(json.syncedThrough) && json.syncedThrough > 0 && json.syncedThrough <= Date.now() + 300000)) return false;
   return Object.entries(json.instruments).every(([name, row]) =>
     typeof name === 'string' && name && Array.isArray(row) && row.length === 7 && row.every(Number.isFinite)
   );
@@ -227,11 +228,12 @@ async function getLedger({ now = Date.now(), fetcher = fetchWithTimeout, file = 
   } catch (err) {
     ledger = readLedger(file);
     source = 'disk';
-    if (!ledger) recordFailure('option_flow_ledger', err);
+    if (ledger) seedSource('option_flow_ledger', { dataAsOf: ledger.syncedThrough, lastSuccessAt: null, source: 'disk' });
+    recordFailure('option_flow_ledger', err);
   }
-  if (ledger) {
+  if (ledger && source !== 'disk') {
     recordSuccess('option_flow_ledger', {
-      dataAsOf: ledger.syncedThrough ? new Date(Math.min(ledger.syncedThrough, Date.now())).toISOString() : null,
+      dataAsOf: ledger.syncedThrough ? new Date(ledger.syncedThrough).toISOString() : null,
       asOfKind: 'source',
       source
     });

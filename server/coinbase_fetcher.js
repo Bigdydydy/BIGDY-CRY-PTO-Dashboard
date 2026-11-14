@@ -1,3 +1,4 @@
+const { snapshotPath } = require('./snapshot_path');
 /**
  * Coinbase BTC Order Book Depth & Micro-Liquidity Fetcher & Quantitative Engine
  * Based on Amberdata Microstructure Research Framework:
@@ -18,7 +19,7 @@ const { recordAttempt, recordSuccess, recordFailure } = require('./data_health')
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 const { fetchUpstreamJson } = require('./upstream_mirror');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'coinbase_liquidity.json');
+const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'coinbase_liquidity.json'));
 const CACHE_TTL_MS = 15000; // 15 seconds memory cache
 const REQUIRED_IDS = ['coinbase', 'coinbase_candles'];
 const MAX_FUTURE_MS = 5 * 60 * 1000;

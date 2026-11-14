@@ -32,6 +32,7 @@ function validateBookSummaryRows(rows) {
     for (const k of ['estimated_delivery_price', 'underlying_price', 'index_price']) {
       if (r[k] !== undefined && r[k] !== null && !isPosNum(r[k])) return `${k} 非正值`;
     }
+    if (r.volume != null && !isNonNegNum(r.volume)) return 'volume <0 或非法';
     if (Number(r.mark_iv) > 0) {
       if (!isNonNegNum(r.mark_price)) return `${r.instrument_name}: mark_iv>0 但 mark_price 缺失/非法`;
       if (!isPosNum(r.underlying_price) && !isPosNum(r.estimated_delivery_price)) {
@@ -80,10 +81,10 @@ function compactBookSummary(rows) {
       markIv: Number(r.mark_iv),
       markPrice: Number(r.mark_price),
       underlyingPrice: Number(r.underlying_price ?? r.estimated_delivery_price),
-      // 做市商敞口引擎用的全链 OI (BTC)；缺失时记 0，不参与敞口聚合
-      openInterest: Number(r.open_interest) || 0,
+      // 做市商敞口引擎用的全链 OI (BTC)；缺失时保留 null，不参与敞口聚合
+      openInterest: r.open_interest == null ? null : Number(r.open_interest),
       // 24h 成交量 (BTC)：大宗开平仓的盘中初判用它作窗口成交量的上界 (option_oi_history.withProvisionalSnapshot)
-      volume24h: Number(r.volume) || 0
+      volume24h: r.volume == null ? null : Number(r.volume)
     };
     if (indexPrice === null && Number(r.estimated_delivery_price) > 0) {
       indexPrice = Number(r.estimated_delivery_price);

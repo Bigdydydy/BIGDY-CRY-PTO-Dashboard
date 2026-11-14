@@ -44,6 +44,7 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     close(r.flowUsd, -(now.delta - then.delta) * 80000, 1e-6);
     close(r.spotPct, (80000 / 81600 - 1) * 100, 0.01);
     assert.equal(r.dvolChange, 1);
+    close(r.flowUsd, r.approx.gammaUsd + r.approx.vannaUsd + r.approx.charmUsd + r.residualUsd, 1e-6);
     assert.equal(D.realizedFlow(book, 80000, null), null);
     assert.equal(D.realizedFlow(book, 80000, { ...recent, spotThen: NaN }), null);
   });

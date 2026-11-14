@@ -63,7 +63,8 @@ function extractLiveCurvePoints(book, now, index) {
       expiry: isoDate(exp),
       days,
       apr: (b.mark_price - index) / index * 365 / days * 100,
-      oiUsd: Math.round((Number(b.open_interest) || 0) * index),
+      // BTC inverse futures report open_interest in USD, unlike options (BTC).
+      oiUsd: Math.round(Number(b.open_interest) || 0),
       volumeUsd: Math.round(Number(b.volume_usd) || 0)
     });
   }

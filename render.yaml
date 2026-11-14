@@ -1,11 +1,13 @@
-﻿services:
+services:
   - type: web
     name: greeks-quant-dashboard
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install
+    buildCommand: npm install && npm test
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: TRUST_PROXY_HOPS
+        value: "1"

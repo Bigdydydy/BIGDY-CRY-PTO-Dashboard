@@ -1486,7 +1486,7 @@ self.onmessage = function (e) {
   }
 
   // 历史命中率比随机游走高 (低) 不到 5 个百分点时没有区分度，不显示
-  const trackTxt = tr => tr && Math.abs(tr.hitPct - tr.expectedPct) >= 5 ? `历史上同类计数先到目标 ${tr.hitPct}%（随机 ${tr.expectedPct}%）` : '';
+  const trackTxt = tr => tr && Math.abs(tr.hitPct - tr.expectedPct) >= 5 ? `历史回放 ${tr.generatedAt || '日期未知'}：同类计数先到目标 ${tr.hitPct}%（随机 ${tr.expectedPct}%）` : '';
 
   function userEvalHtml(r, nd) {
     const st = VERDICT_STYLE[nd.verdict] || VERDICT_STYLE.DOUBT;

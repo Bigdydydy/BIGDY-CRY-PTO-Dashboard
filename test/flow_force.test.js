@@ -65,7 +65,7 @@ test('computeFlowForce: 期货放量时柱为正 (期货主导)，现货放量�
   assert.ok(rowS.region < 0, 'Coinbase 现货放量 → 点 < 0 (欧美主导)');
 });
 
-test('computeFlowForce: 同格按深度加权，缺失场所不阻断计算', () => {
+test('computeFlowForce: 同格按深度加权，缺失场所暂停主导方向', () => {
   const rets = noise(120, 3);
   rets[110] = 0.01;
   const base = rets.map(() => 1e6);
@@ -79,7 +79,9 @@ test('computeFlowForce: 同格按深度加权，缺失场所不阻断计算', ()
   const highOkx = computeFlowForce(venues, { bnPerp: 1, okxPerp: 9 }).find(p => p.time === t);
   assert.ok(highOkx.futAsia > lowOkx.futAsia, 'OKX 深度占比越高，其放量对期货/亚太格的影响越大');
   assert.strictEqual(lowOkx.futWest, null, 'Hyperliquid 缺失时该格为 null');
-  assert.ok(Number.isFinite(lowOkx.hist), '其余格仍可合成柱值');
+  assert.strictEqual(lowOkx.hist, null, '缺场所不使用剩余场所推断主导方向');
+  assert.strictEqual(lowOkx.region, null);
+  assert.strictEqual(lowOkx.spotAsia, null, '缺 OKX 现货时不放大币安权重');
 });
 
 test('Coinbase 溢价按 USDT/USD 换汇：USDT 折价 13bps 时原始价差 −13bps 对应真实溢价 ≈0', () => {
@@ -203,7 +205,7 @@ test('定死: 已收盘且 6 场所齐全的行写死，之后场所缺失也不
   assert.strictEqual(second.newlyFrozen, 0, '缺场所的行不会被定死');
 });
 
-test('场所上线前 (含预热期) 算结构性缺席，不阻止定死', () => {
+test('预热边界不输出残缺矩阵，已知结构性缺席也不输出完整主导方向', () => {
   const rets = noise(160, 13);
   const vols = rets.map(() => 1e6);
   const start = Date.UTC(2026, 0, 5);
@@ -213,11 +215,10 @@ test('场所上线前 (含预热期) 算结构性缺席，不阻止定死', () =
   const opts = { tfMs: HOUR, now: start + 200 * HOUR };
   const early = venues.bnPerp[80].t / 1000;
   const noListing = computeFlowForce(venues, FIXED_WEIGHTS, rates, opts).find(r => r.time === early);
-  assert.deepStrictEqual(noListing.missing, ['hlPerp'], '不知道上线时间时算缺数据');
-  const listed = computeFlowForce(venues, FIXED_WEIGHTS, rates, { ...opts, listedFrom: { hlPerp: venues.hlPerp[0].t } }).find(r => r.time === early);
-  assert.deepStrictEqual(listed.missing, []);
-  assert.deepStrictEqual(listed.absent, ['hlPerp']);
-  assert.strictEqual(listed.complete, true);
+  assert.strictEqual(noListing, undefined, '预热边界残缺行被裁掉');
+  const listed = computeFlowForce(venues, FIXED_WEIGHTS, rates, { ...opts, listedFrom: { hlPerp: venues.hlPerp[0].t } });
+  assert.strictEqual(listed.find(r => r.time === early), undefined);
+  assert.ok(listed[0].signalReady);
 });
 
 test('币安档案: 解出单文件 zip，兼容现货微秒时间戳与合约表头', () => {
@@ -249,4 +250,57 @@ test('summarize 只看已收盘K线', () => {
   assert.strictEqual(s.leader, 'futures');
   assert.strictEqual(s.regionLeader, 'west');
   assert.strictEqual(s.futDir, '净买');
+});
+
+test('全场所同时缺一根时保留空白，基线恢复后才恢复方向', () => {
+  const rets = noise(180, 15), vols = rets.map(() => 1e6);
+  const venues = sixVenues(rets, vols);
+  const gapT = venues.bnPerp[90].t;
+  for (const k of ALL6) venues[k] = venues[k].filter(b => b.t !== gapT);
+  const series = computeFlowForce(venues, FIXED_WEIGHTS, new Map(), { tfMs: HOUR });
+  for (let i = 0; i <= 51; i++) {
+    const row = series.find(p => p.time === (gapT + i * HOUR) / 1000);
+    assert.ok(row, '时间轴不跨越缺口');
+    assert.strictEqual(row.hist, null);
+    assert.strictEqual(row.region, null);
+  }
+  assert.ok(Number.isFinite(series.find(p => p.time === (gapT + 52 * HOUR) / 1000).hist));
+});
+
+test('摘要任一近三根缺数时不跳过缺口给方向', () => {
+  const s = summarize([
+    { hist: 1, region: 1 }, { hist: null, region: null, complete: false }, { hist: 1, region: 1 }
+  ]);
+  assert.strictEqual(s.leader, null);
+  assert.strictEqual(s.regionLeader, null);
+  assert.strictEqual(s.leaderLabel, '数据不足');
+});
+
+test('TV来源覆盖整个BVC窗口：暂估不定稿，官方到达替换并重算', () => {
+  const rets = noise(140, 17), vols = rets.map(() => 1e6);
+  const venues = sixVenues(rets, vols), st = emptyStore();
+  const now = venues.bnPerp.at(-1).t + 2 * HOUR;
+  const correction = { ...venues.bnPerp[70], v: venues.bnPerp[70].v * 2 };
+  for (const k of ALL6) {
+    mergeVenue(st, k, venues[k].map((b, i) => k === 'bnPerp' && i === 70 ? { ...b, viaTv: true } : b), '1h', now);
+  }
+  const bars = () => Object.fromEntries(ALL6.map(k => [k, [...st.bars[k].values()]]));
+  const rates = new Map(venues.bnPerp.map(b => [b.t, 1]));
+  const opts = { tfMs: HOUR, now: venues.bnPerp.at(-1).t + HOUR / 2 };
+  const before = applyFrozen(st, computeFlowForce(bars(), FIXED_WEIGHTS, rates, opts), '1h', now);
+  const rowT = venues.bnPerp[80].t / 1000;
+  assert.strictEqual(before.series.find(p => p.time === rowT).provisional, true);
+  assert.strictEqual(st.rows.has(rowT), false, '前50根基线含TV也不能定稿');
+  const unaffected = st.rows.get(venues.bnPerp[130].t / 1000);
+  mergeVenue(st, 'bnPerp', [correction], '1h', now);
+  assert.strictEqual(st.bars.bnPerp.get(correction.t).v, correction.v);
+  const after = applyFrozen(st, computeFlowForce(bars(), FIXED_WEIGHTS, rates, opts), '1h', now);
+  assert.ok(after.series.find(p => p.time === rowT).frozen);
+  assert.notStrictEqual(after.series.find(p => p.time === rowT).futAsia, before.series.find(p => p.time === rowT).futAsia);
+  assert.deepStrictEqual(st.rows.get(venues.bnPerp[130].t / 1000), unaffected, '未受影响的官方历史不变');
+});
+
+test('已过收盘时间但没有闭合的流不进入计算或存档', () => {
+  const st = emptyStore(), b = makeBars(noise(1), [1e6])[0];
+  assert.deepStrictEqual(mergeVenue(st, 'bnPerp', [{ ...b, closed: false }], '1h', b.t + HOUR + 1), []);
 });

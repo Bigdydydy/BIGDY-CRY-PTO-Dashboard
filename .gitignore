@@ -45,3 +45,9 @@ data/mstr_disclosure_evidence/
 
 # Module 2-D 杠杆与资金归一化的运行期构建缓存 (服务器按需重建，1h TTL)
 data/leverage_norm.json
+
+# HTTP runtime snapshots; committed artifacts belong to collectors
+data/*.local.json
+
+# Windows `> nul` 重定向误生成的空文件
+nul

@@ -109,6 +109,13 @@ async function mapLimit(items, limit, fn) {
 }
 
 async function fetchArchiveBars(market, interval, fromMs) {
+  const errors = [];
+  // One damaged/unavailable file must not discard all other history. A failed
+  // monthly download falls back to daily files; missing days are retried later.
+  const fetchFile = async url => {
+    try { return await fetchArchiveFile(url); }
+    catch (e) { errors.push(e.message); return null; }
+  };
   const base = `${MARKETS[market].archive}`;
   const todayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS;
   const now = new Date(todayStart);
@@ -129,7 +136,7 @@ async function fetchArchiveBars(market, interval, fromMs) {
     return urls;
   };
   const monthly = await mapLimit(months, 6, m =>
-    fetchArchiveFile(`${base}/monthly/klines/BTCUSDT/${interval}/BTCUSDT-${interval}-${ym(m)}.zip`));
+    fetchFile(`${base}/monthly/klines/BTCUSDT/${interval}/BTCUSDT-${interval}-${ym(m)}.zip`));
   const daily = [];
   months.forEach((m, i) => {
     if (monthly[i]) return;
@@ -139,9 +146,11 @@ async function fetchArchiveBars(market, interval, fromMs) {
     daily.push(...dailyUrls(m.getTime(), next.getTime()));
   });
   daily.push(...dailyUrls(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1), todayStart));
-  const dailyBars = await mapLimit(daily, 6, fetchArchiveFile);
+  const dailyBars = await mapLimit(daily, 6, fetchFile);
   const out = [];
   for (const bars of monthly.concat(dailyBars)) if (bars) out.push(...bars);
+  if (!out.length && errors.length) throw new Error(errors.join(' | '));
+  if (errors.length) console.warn(`[BinanceFeed] 档案部分缺失，稍后重试: ${errors.join(' | ')}`);
   return out.filter(b => b.t >= fromMs).sort((a, b) => a.t - b.t);
 }
 
