@@ -3406,6 +3406,7 @@ function renderMacroClaims(summary) {
     set('macro-liq-claim', `净流动性 $${summary.currentFedNetLiquidity.toFixed(2)}T${move}。两条线同图只为对照走势，不代表因果。`);
   }
 }
+window.addEventListener('mstr-official-updated', applyOfficialMstr);
 
 /** MSTR 页的结论句：BTC 相对持仓均价的位置 + mNAV + 净增持速度。 */
 function renderMstrClaim(cost, costSource, mnavText) {
