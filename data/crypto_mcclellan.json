@@ -3,9 +3,9 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按前次采样市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "3.0.0",
-  "generated_at": "2026-11-14T08:41:50Z",
-  "benchmark_date": "2026-11-14",
-  "total_days": 406,
+  "generated_at": "2026-11-15T07:11:21Z",
+  "benchmark_date": "2026-11-15",
+  "total_days": 407,
   "sampling_basis": "daily_snapshots_not_fixed_utc_close",
   "quality": {
    "historical_candidate_survivorship_bias": true,
@@ -80,13 +80,13 @@
   "frontier": null
  },
  "current": {
-  "date": "2026-11-14",
-  "btc_close": 67349.0,
+  "date": "2026-11-15",
+  "btc_close": 64335.0,
   "core": {
    "ready": false,
-   "breadth_days": 406,
+   "breadth_days": 407,
    "warmup_days": 40,
-   "valid_streak_days": 1,
+   "valid_streak_days": 2,
    "last_valid": {
     "date": "2026-11-12",
     "oscillator": -38.71,
@@ -101,77 +101,77 @@
      "quantixai"
     ]
    },
-   "date": "2026-11-14",
-   "advances": 13,
-   "declines": 86,
-   "unchanged": 1,
+   "date": "2026-11-15",
+   "advances": 8,
+   "declines": 92,
+   "unchanged": 0,
    "constituents": 100,
-   "ramo": -737.4,
+   "ramo": -840.0,
    "oscillator": null,
    "summation": null,
    "summation_change_10d": null,
    "percentile": null,
    "expected_constituents": 100,
    "coverage_pct": 100.0,
-   "observed_at": "2026-11-14T06:59:29Z",
+   "observed_at": "2026-11-15T07:09:10Z",
    "sampling_time_verified": true
   },
   "frontier": {
    "ready": true,
-   "breadth_days": 41,
+   "breadth_days": 42,
    "warmup_days": 40,
-   "valid_streak_days": 41,
+   "valid_streak_days": 42,
    "last_valid": {
-    "date": "2026-11-14",
-    "oscillator": -18.17,
-    "summation": -31.2
+    "date": "2026-11-15",
+    "oscillator": -26.21,
+    "summation": -57.4
    },
    "last_reset": null,
-   "date": "2026-11-14",
-   "advances": 29,
-   "declines": 66,
-   "unchanged": 2,
-   "constituents": 97,
-   "ramo": -399.6,
-   "oscillator": -18.17,
-   "summation": -31.2,
+   "date": "2026-11-15",
+   "advances": 27,
+   "declines": 71,
+   "unchanged": 1,
+   "constituents": 99,
+   "ramo": -474.6,
+   "oscillator": -26.21,
+   "summation": -57.4,
    "summation_change_10d": null,
    "percentile": 0.0,
-   "expected_constituents": 97,
+   "expected_constituents": 99,
    "coverage_pct": 100.0,
-   "observed_at": "2026-11-14T07:00:42Z",
+   "observed_at": "2026-11-15T07:10:43Z",
    "sampling_time_verified": true,
    "started": "2026-10-04",
    "tracked_today": 99,
    "tracked_by_chain": {
     "solana": 27,
-    "bsc": 37,
-    "robinhood": 35
+    "bsc": 39,
+    "robinhood": 33
    },
    "chains": {
     "bsc": {
-     "adv": 14,
-     "dec": 22,
-     "n": 36
+     "adv": 11,
+     "dec": 25,
+     "n": 37
     },
     "robinhood": {
-     "adv": 8,
-     "dec": 25,
+     "adv": 13,
+     "dec": 22,
      "n": 35
     },
     "solana": {
-     "adv": 7,
-     "dec": 19,
-     "n": 26
+     "adv": 3,
+     "dec": 24,
+     "n": 27
     }
    },
-   "dead": 3,
+   "dead": 6,
    "entries": 10,
-   "exits": 8,
-   "age_median": 16,
+   "exits": 10,
+   "age_median": 17,
    "low_sample": false,
-   "ramo_pooled": -389.5,
-   "anchor_corr_days": 0,
+   "ramo_pooled": -449.0,
+   "anchor_corr_days": 1,
    "anchor_corr": null
   }
  },
@@ -1163,7 +1163,7 @@
   {
    "date": "2025-11-15",
    "btc_close": 95380.13,
-   "dex_volume": 6.368,
+   "dex_volume": 6.37,
    "dex_momentum": -5.1,
    "core_adv": 82,
    "core_dec": 17,
@@ -1187,7 +1187,7 @@
   {
    "date": "2025-11-16",
    "btc_close": 94188.28,
-   "dex_volume": 5.084,
+   "dex_volume": 5.085,
    "dex_momentum": -12.2,
    "core_adv": 9,
    "core_dec": 91,
@@ -1211,7 +1211,7 @@
   {
    "date": "2025-11-17",
    "btc_close": 92100.37,
-   "dex_volume": 5.581,
+   "dex_volume": 5.582,
    "dex_momentum": -18.4,
    "core_adv": 11,
    "core_dec": 89,
@@ -1235,7 +1235,7 @@
   {
    "date": "2025-11-18",
    "btc_close": 92903.18,
-   "dex_volume": 6.046,
+   "dex_volume": 6.05,
    "dex_momentum": -22.8,
    "core_adv": 88,
    "core_dec": 12,
@@ -1259,7 +1259,7 @@
   {
    "date": "2025-11-19",
    "btc_close": 91408.36,
-   "dex_volume": 5.308,
+   "dex_volume": 5.319,
    "dex_momentum": -26.8,
    "core_adv": 15,
    "core_dec": 85,
@@ -1283,8 +1283,8 @@
   {
    "date": "2025-11-20",
    "btc_close": 86618.47,
-   "dex_volume": 6.181,
-   "dex_momentum": -28.0,
+   "dex_volume": 6.19,
+   "dex_momentum": -27.9,
    "core_adv": 3,
    "core_dec": 97,
    "core_n": 100,
@@ -1307,7 +1307,7 @@
   {
    "date": "2025-11-21",
    "btc_close": 85087.95,
-   "dex_volume": 7.016,
+   "dex_volume": 7.02,
    "dex_momentum": -26.8,
    "core_adv": 12,
    "core_dec": 88,
@@ -1331,8 +1331,8 @@
   {
    "date": "2025-11-22",
    "btc_close": 84675.51,
-   "dex_volume": 4.468,
-   "dex_momentum": -30.4,
+   "dex_volume": 4.472,
+   "dex_momentum": -30.3,
    "core_adv": 33,
    "core_dec": 67,
    "core_n": 100,
@@ -1355,8 +1355,8 @@
   {
    "date": "2025-11-23",
    "btc_close": 86740.12,
-   "dex_volume": 4.787,
-   "dex_momentum": -31.1,
+   "dex_volume": 4.79,
+   "dex_momentum": -31.0,
    "core_adv": 69,
    "core_dec": 31,
    "core_n": 100,
@@ -1379,8 +1379,8 @@
   {
    "date": "2025-11-24",
    "btc_close": 88256.04,
-   "dex_volume": 4.595,
-   "dex_momentum": -31.8,
+   "dex_volume": 4.599,
+   "dex_momentum": -31.7,
    "core_adv": 89,
    "core_dec": 11,
    "core_n": 100,
@@ -1403,8 +1403,8 @@
   {
    "date": "2025-11-25",
    "btc_close": 87317.01,
-   "dex_volume": 4.63,
-   "dex_momentum": -34.0,
+   "dex_volume": 4.632,
+   "dex_momentum": -33.9,
    "core_adv": 57,
    "core_dec": 43,
    "core_n": 100,
@@ -1427,7 +1427,7 @@
   {
    "date": "2025-11-26",
    "btc_close": 90515.94,
-   "dex_volume": 5.342,
+   "dex_volume": 5.344,
    "dex_momentum": -32.5,
    "core_adv": 77,
    "core_dec": 23,
@@ -1451,8 +1451,8 @@
   {
    "date": "2025-11-27",
    "btc_close": 91323.63,
-   "dex_volume": 5.533,
-   "dex_momentum": -32.5,
+   "dex_volume": 5.534,
+   "dex_momentum": -32.4,
    "core_adv": 39,
    "core_dec": 61,
    "core_n": 100,
@@ -1475,8 +1475,8 @@
   {
    "date": "2025-11-28",
    "btc_close": 90904.87,
-   "dex_volume": 5.782,
-   "dex_momentum": -34.6,
+   "dex_volume": 5.786,
+   "dex_momentum": -34.5,
    "core_adv": 24,
    "core_dec": 76,
    "core_n": 100,
@@ -1499,8 +1499,8 @@
   {
    "date": "2025-11-29",
    "btc_close": 90832.19,
-   "dex_volume": 5.083,
-   "dex_momentum": -32.5,
+   "dex_volume": 5.09,
+   "dex_momentum": -32.4,
    "core_adv": 16,
    "core_dec": 84,
    "core_n": 100,
@@ -1523,7 +1523,7 @@
   {
    "date": "2025-11-30",
    "btc_close": 90359.87,
-   "dex_volume": 5.155,
+   "dex_volume": 5.161,
    "dex_momentum": -31.0,
    "core_adv": 22,
    "core_dec": 78,
@@ -1547,8 +1547,8 @@
   {
    "date": "2025-12-01",
    "btc_close": 86303.9,
-   "dex_volume": 6.323,
-   "dex_momentum": -25.2,
+   "dex_volume": 6.326,
+   "dex_momentum": -25.1,
    "core_adv": 5,
    "core_dec": 95,
    "core_n": 100,
@@ -1571,8 +1571,8 @@
   {
    "date": "2025-12-02",
    "btc_close": 91320.08,
-   "dex_volume": 5.929,
-   "dex_momentum": -18.8,
+   "dex_volume": 5.931,
+   "dex_momentum": -18.7,
    "core_adv": 90,
    "core_dec": 10,
    "core_n": 100,
@@ -1595,7 +1595,7 @@
   {
    "date": "2025-12-03",
    "btc_close": 93428.6,
-   "dex_volume": 6.021,
+   "dex_volume": 6.023,
    "dex_momentum": -15.5,
    "core_adv": 85,
    "core_dec": 15,
@@ -1619,7 +1619,7 @@
   {
    "date": "2025-12-04",
    "btc_close": 92119.19,
-   "dex_volume": 6.014,
+   "dex_volume": 6.018,
    "dex_momentum": -12.2,
    "core_adv": 11,
    "core_dec": 89,
@@ -1643,8 +1643,8 @@
   {
    "date": "2025-12-05",
    "btc_close": 89264.23,
-   "dex_volume": 5.474,
-   "dex_momentum": -10.3,
+   "dex_volume": 5.477,
+   "dex_momentum": -10.2,
    "core_adv": 4,
    "core_dec": 96,
    "core_n": 100,
@@ -1667,7 +1667,7 @@
   {
    "date": "2025-12-06",
    "btc_close": 89227.45,
-   "dex_volume": 4.789,
+   "dex_volume": 4.791,
    "dex_momentum": -9.2,
    "core_adv": 69,
    "core_dec": 31,
@@ -1691,7 +1691,7 @@
   {
    "date": "2025-12-07",
    "btc_close": 90398.45,
-   "dex_volume": 5.358,
+   "dex_volume": 5.36,
    "dex_momentum": -6.2,
    "core_adv": 27,
    "core_dec": 73,
@@ -1715,7 +1715,7 @@
   {
    "date": "2025-12-08",
    "btc_close": 90626.04,
-   "dex_volume": 5.631,
+   "dex_volume": 5.632,
    "dex_momentum": -5.8,
    "core_adv": 79,
    "core_dec": 21,
@@ -1739,7 +1739,7 @@
   {
    "date": "2025-12-09",
    "btc_close": 92686.1,
-   "dex_volume": 6.072,
+   "dex_volume": 6.075,
    "dex_momentum": -3.4,
    "core_adv": 87,
    "core_dec": 13,
@@ -1763,7 +1763,7 @@
   {
    "date": "2025-12-10",
    "btc_close": 91986.58,
-   "dex_volume": 5.575,
+   "dex_volume": 5.577,
    "dex_momentum": -3.4,
    "core_adv": 19,
    "core_dec": 81,
@@ -1787,7 +1787,7 @@
   {
    "date": "2025-12-11",
    "btc_close": 92525.87,
-   "dex_volume": 6.33,
+   "dex_volume": 6.331,
    "dex_momentum": -1.6,
    "core_adv": 29,
    "core_dec": 71,
@@ -1811,7 +1811,7 @@
   {
    "date": "2025-12-12",
    "btc_close": 90260.54,
-   "dex_volume": 5.938,
+   "dex_volume": 5.939,
    "dex_momentum": 0.1,
    "core_adv": 15,
    "core_dec": 85,
@@ -1835,7 +1835,7 @@
   {
    "date": "2025-12-13",
    "btc_close": 90253.12,
-   "dex_volume": 4.31,
+   "dex_volume": 4.311,
    "dex_momentum": 0.4,
    "core_adv": 73,
    "core_dec": 27,
@@ -1859,7 +1859,7 @@
   {
    "date": "2025-12-14",
    "btc_close": 88184.41,
-   "dex_volume": 4.204,
+   "dex_volume": 4.205,
    "dex_momentum": -1.1,
    "core_adv": 9,
    "core_dec": 91,
@@ -1883,7 +1883,7 @@
   {
    "date": "2025-12-15",
    "btc_close": 86413.22,
-   "dex_volume": 5.951,
+   "dex_volume": 5.952,
    "dex_momentum": 0.1,
    "core_adv": 13,
    "core_dec": 87,
@@ -1907,7 +1907,7 @@
   {
    "date": "2025-12-16",
    "btc_close": 87719.68,
-   "dex_volume": 5.988,
+   "dex_volume": 5.989,
    "dex_momentum": 0.5,
    "core_adv": 60,
    "core_dec": 40,
@@ -1931,8 +1931,8 @@
   {
    "date": "2025-12-17",
    "btc_close": 86196.82,
-   "dex_volume": 5.873,
-   "dex_momentum": 1.7,
+   "dex_volume": 5.875,
+   "dex_momentum": 1.6,
    "core_adv": 8,
    "core_dec": 92,
    "core_n": 100,
@@ -1955,7 +1955,7 @@
   {
    "date": "2025-12-18",
    "btc_close": 85450.18,
-   "dex_volume": 5.951,
+   "dex_volume": 5.953,
    "dex_momentum": 1.0,
    "core_adv": 8,
    "core_dec": 92,
@@ -1979,8 +1979,8 @@
   {
    "date": "2025-12-19",
    "btc_close": 88091.7,
-   "dex_volume": 5.622,
-   "dex_momentum": 1.4,
+   "dex_volume": 5.623,
+   "dex_momentum": 1.3,
    "core_adv": 95,
    "core_dec": 5,
    "core_n": 100,
@@ -2003,8 +2003,8 @@
   {
    "date": "2025-12-20",
    "btc_close": 88348.28,
-   "dex_volume": 4.881,
-   "dex_momentum": 2.6,
+   "dex_volume": 4.882,
+   "dex_momentum": 2.5,
    "core_adv": 57,
    "core_dec": 43,
    "core_n": 100,
@@ -2027,7 +2027,7 @@
   {
    "date": "2025-12-21",
    "btc_close": 88672.33,
-   "dex_volume": 4.819,
+   "dex_volume": 4.82,
    "dex_momentum": 3.9,
    "core_adv": 26,
    "core_dec": 74,
@@ -2051,7 +2051,7 @@
   {
    "date": "2025-12-22",
    "btc_close": 88489.72,
-   "dex_volume": 5.82,
+   "dex_volume": 5.825,
    "dex_momentum": 2.8,
    "core_adv": 50,
    "core_dec": 50,
@@ -2075,8 +2075,8 @@
   {
    "date": "2025-12-23",
    "btc_close": 87496.15,
-   "dex_volume": 5.735,
-   "dex_momentum": 1.1,
+   "dex_volume": 5.739,
+   "dex_momentum": 1.0,
    "core_adv": 17,
    "core_dec": 83,
    "core_n": 100,
@@ -2099,7 +2099,7 @@
   {
    "date": "2025-12-24",
    "btc_close": 87589.02,
-   "dex_volume": 4.833,
+   "dex_volume": 4.834,
    "dex_momentum": -1.8,
    "core_adv": 50,
    "core_dec": 50,
@@ -2123,7 +2123,7 @@
   {
    "date": "2025-12-25",
    "btc_close": 87192.24,
-   "dex_volume": 5.014,
+   "dex_volume": 5.017,
    "dex_momentum": -4.3,
    "core_adv": 18,
    "core_dec": 82,
@@ -2147,7 +2147,7 @@
   {
    "date": "2025-12-26",
    "btc_close": 87303.04,
-   "dex_volume": 5.427,
+   "dex_volume": 5.43,
    "dex_momentum": -5.2,
    "core_adv": 86,
    "core_dec": 14,
@@ -2171,7 +2171,7 @@
   {
    "date": "2025-12-27",
    "btc_close": 87852.99,
-   "dex_volume": 4.629,
+   "dex_volume": 4.63,
    "dex_momentum": -6.2,
    "core_adv": 92,
    "core_dec": 8,
@@ -2195,7 +2195,7 @@
   {
    "date": "2025-12-28",
    "btc_close": 87867.04,
-   "dex_volume": 4.317,
+   "dex_volume": 4.32,
    "dex_momentum": -7.8,
    "core_adv": 26,
    "core_dec": 74,
@@ -2219,7 +2219,7 @@
   {
    "date": "2025-12-29",
    "btc_close": 87154.68,
-   "dex_volume": 6.547,
+   "dex_volume": 6.549,
    "dex_momentum": -6.2,
    "core_adv": 13,
    "core_dec": 87,
@@ -2243,7 +2243,7 @@
   {
    "date": "2025-12-30",
    "btc_close": 88363.72,
-   "dex_volume": 6.465,
+   "dex_volume": 6.467,
    "dex_momentum": -4.4,
    "core_adv": 54,
    "core_dec": 46,
@@ -2267,7 +2267,7 @@
   {
    "date": "2025-12-31",
    "btc_close": 87575.05,
-   "dex_volume": 6.31,
+   "dex_volume": 6.311,
    "dex_momentum": -0.3,
    "core_adv": 19,
    "core_dec": 81,
@@ -2291,8 +2291,8 @@
   {
    "date": "2026-01-01",
    "btc_close": 88764.13,
-   "dex_volume": 4.175,
-   "dex_momentum": -1.2,
+   "dex_volume": 4.177,
+   "dex_momentum": -1.1,
    "core_adv": 89,
    "core_dec": 11,
    "core_n": 100,
@@ -2339,7 +2339,7 @@
   {
    "date": "2026-01-03",
    "btc_close": 90614.41,
-   "dex_volume": 5.295,
+   "dex_volume": 5.296,
    "dex_momentum": -1.5,
    "core_adv": 65,
    "core_dec": 35,
@@ -2363,7 +2363,7 @@
   {
    "date": "2026-01-04",
    "btc_close": 91879.58,
-   "dex_volume": 5.876,
+   "dex_volume": 5.878,
    "dex_momentum": -0.3,
    "core_adv": 82,
    "core_dec": 18,
@@ -2387,7 +2387,7 @@
   {
    "date": "2026-01-05",
    "btc_close": 93879.95,
-   "dex_volume": 7.101,
+   "dex_volume": 7.104,
    "dex_momentum": -2.7,
    "core_adv": 86,
    "core_dec": 14,
@@ -2411,7 +2411,7 @@
   {
    "date": "2026-01-06",
    "btc_close": 93649.63,
-   "dex_volume": 7.421,
+   "dex_volume": 7.422,
    "dex_momentum": -6.2,
    "core_adv": 56,
    "core_dec": 44,
@@ -2435,7 +2435,7 @@
   {
    "date": "2026-01-07",
    "btc_close": 91286.03,
-   "dex_volume": 6.364,
+   "dex_volume": 6.365,
    "dex_momentum": -10.3,
    "core_adv": 7,
    "core_dec": 93,
@@ -2459,7 +2459,7 @@
   {
    "date": "2026-01-08",
    "btc_close": 91027.67,
-   "dex_volume": 5.07,
+   "dex_volume": 5.071,
    "dex_momentum": -8.6,
    "core_adv": 19,
    "core_dec": 81,
@@ -2483,7 +2483,7 @@
   {
    "date": "2026-01-09",
    "btc_close": 90551.71,
-   "dex_volume": 4.753,
+   "dex_volume": 4.754,
    "dex_momentum": -8.4,
    "core_adv": 61,
    "core_dec": 39,
@@ -2507,7 +2507,7 @@
   {
    "date": "2026-01-10",
    "btc_close": 90420.3,
-   "dex_volume": 3.217,
+   "dex_volume": 3.218,
    "dex_momentum": -8.7,
    "core_adv": 54,
    "core_dec": 46,
@@ -2531,7 +2531,7 @@
   {
    "date": "2026-01-11",
    "btc_close": 90856.56,
-   "dex_volume": 4.689,
+   "dex_volume": 4.69,
    "dex_momentum": -9.1,
    "core_adv": 43,
    "core_dec": 57,
@@ -2555,7 +2555,7 @@
   {
    "date": "2026-01-12",
    "btc_close": 91200.63,
-   "dex_volume": 5.0,
+   "dex_volume": 5.001,
    "dex_momentum": -10.9,
    "core_adv": 20,
    "core_dec": 80,
@@ -2579,7 +2579,7 @@
   {
    "date": "2026-01-13",
    "btc_close": 95429.16,
-   "dex_volume": 5.455,
+   "dex_volume": 5.456,
    "dex_momentum": -12.3,
    "core_adv": 84,
    "core_dec": 16,
@@ -2603,8 +2603,8 @@
   {
    "date": "2026-01-14",
    "btc_close": 96898.76,
-   "dex_volume": 6.669,
-   "dex_momentum": -9.4,
+   "dex_volume": 6.67,
+   "dex_momentum": -9.5,
    "core_adv": 31,
    "core_dec": 69,
    "core_n": 100,
@@ -2627,7 +2627,7 @@
   {
    "date": "2026-01-15",
    "btc_close": 95593.31,
-   "dex_volume": 6.67,
+   "dex_volume": 6.671,
    "dex_momentum": -4.8,
    "core_adv": 21,
    "core_dec": 79,
@@ -2651,7 +2651,7 @@
   {
    "date": "2026-01-16",
    "btc_close": 95523.19,
-   "dex_volume": 6.576,
+   "dex_volume": 6.577,
    "dex_momentum": -0.1,
    "core_adv": 62,
    "core_dec": 38,
@@ -2675,7 +2675,7 @@
   {
    "date": "2026-01-17",
    "btc_close": 94802.88,
-   "dex_volume": 5.173,
+   "dex_volume": 5.174,
    "dex_momentum": 4.8,
    "core_adv": 25,
    "core_dec": 75,
@@ -2699,7 +2699,7 @@
   {
    "date": "2026-01-18",
    "btc_close": 93344.22,
-   "dex_volume": 5.21,
+   "dex_volume": 5.211,
    "dex_momentum": 6.3,
    "core_adv": 30,
    "core_dec": 70,
@@ -2723,7 +2723,7 @@
   {
    "date": "2026-01-19",
    "btc_close": 92566.01,
-   "dex_volume": 6.412,
+   "dex_volume": 6.415,
    "dex_momentum": 9.8,
    "core_adv": 36,
    "core_dec": 64,
@@ -2747,7 +2747,7 @@
   {
    "date": "2026-01-20",
    "btc_close": 88416.89,
-   "dex_volume": 8.502,
+   "dex_volume": 8.505,
    "dex_momentum": 15.9,
    "core_adv": 10,
    "core_dec": 90,
@@ -2771,7 +2771,7 @@
   {
    "date": "2026-01-21",
    "btc_close": 89453.9,
-   "dex_volume": 10.228,
+   "dex_volume": 10.231,
    "dex_momentum": 20.6,
    "core_adv": 86,
    "core_dec": 14,
@@ -2795,7 +2795,7 @@
   {
    "date": "2026-01-22",
    "btc_close": 89483.65,
-   "dex_volume": 7.901,
+   "dex_volume": 7.903,
    "dex_momentum": 21.5,
    "core_adv": 46,
    "core_dec": 54,
@@ -2819,7 +2819,7 @@
   {
    "date": "2026-01-23",
    "btc_close": 89524.85,
-   "dex_volume": 7.472,
+   "dex_volume": 7.48,
    "dex_momentum": 22.3,
    "core_adv": 45,
    "core_dec": 55,
@@ -2843,8 +2843,8 @@
   {
    "date": "2026-01-24",
    "btc_close": 89149.96,
-   "dex_volume": 5.206,
-   "dex_momentum": 21.6,
+   "dex_volume": 5.209,
+   "dex_momentum": 21.7,
    "core_adv": 59,
    "core_dec": 41,
    "core_n": 100,
@@ -2867,7 +2867,7 @@
   {
    "date": "2026-01-25",
    "btc_close": 86625.33,
-   "dex_volume": 5.816,
+   "dex_volume": 5.819,
    "dex_momentum": 22.3,
    "core_adv": 4,
    "core_dec": 96,
@@ -2891,7 +2891,7 @@
   {
    "date": "2026-01-26",
    "btc_close": 88249.9,
-   "dex_volume": 6.567,
+   "dex_volume": 6.57,
    "dex_momentum": 22.3,
    "core_adv": 88,
    "core_dec": 12,
@@ -2915,7 +2915,7 @@
   {
    "date": "2026-01-27",
    "btc_close": 89141.65,
-   "dex_volume": 7.087,
+   "dex_volume": 7.089,
    "dex_momentum": 17.9,
    "core_adv": 80,
    "core_dec": 20,
@@ -2939,7 +2939,7 @@
   {
    "date": "2026-01-28",
    "btc_close": 89212.21,
-   "dex_volume": 6.937,
+   "dex_volume": 6.939,
    "dex_momentum": 8.9,
    "core_adv": 39,
    "core_dec": 61,
@@ -2963,7 +2963,7 @@
   {
    "date": "2026-01-29",
    "btc_close": 84630.42,
-   "dex_volume": 6.075,
+   "dex_volume": 6.076,
    "dex_momentum": 3.4,
    "core_adv": 10,
    "core_dec": 90,
@@ -2987,7 +2987,7 @@
   {
    "date": "2026-01-30",
    "btc_close": 84091.63,
-   "dex_volume": 8.078,
+   "dex_volume": 8.081,
    "dex_momentum": 2.4,
    "core_adv": 15,
    "core_dec": 85,
@@ -3011,7 +3011,7 @@
   {
    "date": "2026-01-31",
    "btc_close": 78647.03,
-   "dex_volume": 7.392,
+   "dex_volume": 7.393,
    "dex_momentum": 4.2,
    "core_adv": 4,
    "core_dec": 96,
@@ -3035,7 +3035,7 @@
   {
    "date": "2026-02-01",
    "btc_close": 76895.59,
-   "dex_volume": 6.957,
+   "dex_volume": 6.958,
    "dex_momentum": 4.4,
    "core_adv": 39,
    "core_dec": 61,
@@ -3059,7 +3059,7 @@
   {
    "date": "2026-02-02",
    "btc_close": 78670.59,
-   "dex_volume": 7.8,
+   "dex_volume": 7.801,
    "dex_momentum": 5.6,
    "core_adv": 80,
    "core_dec": 20,
@@ -3108,7 +3108,7 @@
    "date": "2026-02-04",
    "btc_close": 73059.18,
    "dex_volume": 8.254,
-   "dex_momentum": 9.0,
+   "dex_momentum": 8.9,
    "core_adv": 33,
    "core_dec": 67,
    "core_n": 100,
@@ -3131,7 +3131,7 @@
   {
    "date": "2026-02-05",
    "btc_close": 62778.22,
-   "dex_volume": 10.064,
+   "dex_volume": 10.065,
    "dex_momentum": 14.4,
    "core_adv": 2,
    "core_dec": 98,
@@ -3155,7 +3155,7 @@
   {
    "date": "2026-02-06",
    "btc_close": 70272.52,
-   "dex_volume": 9.285,
+   "dex_volume": 9.286,
    "dex_momentum": 14.3,
    "core_adv": 93,
    "core_dec": 7,
@@ -3179,7 +3179,7 @@
   {
    "date": "2026-02-07",
    "btc_close": 69245.78,
-   "dex_volume": 6.486,
+   "dex_volume": 6.488,
    "dex_momentum": 11.8,
    "core_adv": 59,
    "core_dec": 41,
@@ -3203,7 +3203,7 @@
   {
    "date": "2026-02-08",
    "btc_close": 70398.09,
-   "dex_volume": 5.688,
+   "dex_volume": 5.689,
    "dex_momentum": 9.7,
    "core_adv": 51,
    "core_dec": 49,
@@ -3227,7 +3227,7 @@
   {
    "date": "2026-02-09",
    "btc_close": 70175.15,
-   "dex_volume": 5.977,
+   "dex_volume": 5.979,
    "dex_momentum": 6.6,
    "core_adv": 28,
    "core_dec": 72,
@@ -3251,7 +3251,7 @@
   {
    "date": "2026-02-10",
    "btc_close": 68841.87,
-   "dex_volume": 5.433,
+   "dex_volume": 5.434,
    "dex_momentum": 1.7,
    "core_adv": 9,
    "core_dec": 91,
@@ -3275,7 +3275,7 @@
   {
    "date": "2026-02-11",
    "btc_close": 67090.58,
-   "dex_volume": 5.672,
+   "dex_volume": 5.673,
    "dex_momentum": -3.4,
    "core_adv": 46,
    "core_dec": 54,
@@ -3419,8 +3419,8 @@
   {
    "date": "2026-02-17",
    "btc_close": 67559.3,
-   "dex_volume": 4.006,
-   "dex_momentum": -35.4,
+   "dex_volume": 4.007,
+   "dex_momentum": -35.5,
    "core_adv": 30,
    "core_dec": 70,
    "core_n": 100,
@@ -3468,7 +3468,7 @@
    "date": "2026-02-19",
    "btc_close": 66976.03,
    "dex_volume": 3.885,
-   "dex_momentum": -37.1,
+   "dex_momentum": -37.2,
    "core_adv": 36,
    "core_dec": 64,
    "core_n": 100,
@@ -3611,7 +3611,7 @@
   {
    "date": "2026-02-25",
    "btc_close": 67850.1,
-   "dex_volume": 3.919,
+   "dex_volume": 3.92,
    "dex_momentum": -38.5,
    "core_adv": 77,
    "core_dec": 23,
@@ -3635,7 +3635,7 @@
   {
    "date": "2026-02-26",
    "btc_close": 67496.84,
-   "dex_volume": 3.712,
+   "dex_volume": 3.713,
    "dex_momentum": -37.9,
    "core_adv": 37,
    "core_dec": 63,
@@ -3683,7 +3683,7 @@
   {
    "date": "2026-02-28",
    "btc_close": 67017.08,
-   "dex_volume": 4.804,
+   "dex_volume": 4.805,
    "dex_momentum": -27.9,
    "core_adv": 56,
    "core_dec": 44,
@@ -3707,7 +3707,7 @@
   {
    "date": "2026-03-01",
    "btc_close": 65824.42,
-   "dex_volume": 3.697,
+   "dex_volume": 3.698,
    "dex_momentum": -22.4,
    "core_adv": 28,
    "core_dec": 72,
@@ -3731,7 +3731,7 @@
   {
    "date": "2026-03-02",
    "btc_close": 68815.94,
-   "dex_volume": 4.274,
+   "dex_volume": 4.276,
    "dex_momentum": -21.6,
    "core_adv": 69,
    "core_dec": 31,
@@ -3755,7 +3755,7 @@
   {
    "date": "2026-03-03",
    "btc_close": 68287.46,
-   "dex_volume": 4.02,
+   "dex_volume": 4.023,
    "dex_momentum": -20.4,
    "core_adv": 41,
    "core_dec": 59,
@@ -3779,8 +3779,8 @@
   {
    "date": "2026-03-04",
    "btc_close": 72752.3,
-   "dex_volume": 4.513,
-   "dex_momentum": -15.5,
+   "dex_volume": 4.515,
+   "dex_momentum": -15.4,
    "core_adv": 71,
    "core_dec": 29,
    "core_n": 100,
@@ -3803,7 +3803,7 @@
   {
    "date": "2026-03-05",
    "btc_close": 70868.22,
-   "dex_volume": 4.053,
+   "dex_volume": 4.055,
    "dex_momentum": -9.7,
    "core_adv": 43,
    "core_dec": 57,
@@ -3827,7 +3827,7 @@
   {
    "date": "2026-03-06",
    "btc_close": 68142.88,
-   "dex_volume": 4.005,
+   "dex_volume": 4.006,
    "dex_momentum": -3.9,
    "core_adv": 22,
    "core_dec": 78,
@@ -3851,7 +3851,7 @@
   {
    "date": "2026-03-07",
    "btc_close": 67339.67,
-   "dex_volume": 2.475,
+   "dex_volume": 2.476,
    "dex_momentum": -8.9,
    "core_adv": 48,
    "core_dec": 52,
@@ -3875,7 +3875,7 @@
   {
    "date": "2026-03-08",
    "btc_close": 66042.75,
-   "dex_volume": 2.987,
+   "dex_volume": 2.988,
    "dex_momentum": -9.6,
    "core_adv": 19,
    "core_dec": 81,
@@ -3899,8 +3899,8 @@
   {
    "date": "2026-03-09",
    "btc_close": 68430.61,
-   "dex_volume": 4.008,
-   "dex_momentum": -9.3,
+   "dex_volume": 4.009,
+   "dex_momentum": -9.2,
    "core_adv": 70,
    "core_dec": 30,
    "core_n": 100,
@@ -3923,7 +3923,7 @@
   {
    "date": "2026-03-10",
    "btc_close": 69849.2,
-   "dex_volume": 4.183,
+   "dex_volume": 4.184,
    "dex_momentum": -7.6,
    "core_adv": 69,
    "core_dec": 31,
@@ -3971,7 +3971,7 @@
   {
    "date": "2026-03-12",
    "btc_close": 70417.19,
-   "dex_volume": 3.767,
+   "dex_volume": 3.768,
    "dex_momentum": -7.6,
    "core_adv": 74,
    "core_dec": 26,
@@ -4019,7 +4019,7 @@
   {
    "date": "2026-03-14",
    "btc_close": 71149.28,
-   "dex_volume": 2.881,
+   "dex_volume": 2.882,
    "dex_momentum": -3.5,
    "core_adv": 70,
    "core_dec": 30,
@@ -4067,8 +4067,8 @@
   {
    "date": "2026-03-16",
    "btc_close": 74679.37,
-   "dex_volume": 4.447,
-   "dex_momentum": -0.0,
+   "dex_volume": 4.448,
+   "dex_momentum": -0.1,
    "core_adv": 66,
    "core_dec": 34,
    "core_n": 100,
@@ -4091,7 +4091,7 @@
   {
    "date": "2026-03-17",
    "btc_close": 74004.69,
-   "dex_volume": 4.042,
+   "dex_volume": 4.043,
    "dex_momentum": -1.0,
    "core_adv": 38,
    "core_dec": 62,
@@ -4115,7 +4115,7 @@
   {
    "date": "2026-03-18",
    "btc_close": 71220.05,
-   "dex_volume": 5.35,
+   "dex_volume": 5.351,
    "dex_momentum": 0.6,
    "core_adv": 10,
    "core_dec": 90,
@@ -4139,7 +4139,7 @@
   {
    "date": "2026-03-19",
    "btc_close": 69936.2,
-   "dex_volume": 3.81,
+   "dex_volume": 3.811,
    "dex_momentum": 0.4,
    "core_adv": 30,
    "core_dec": 70,
@@ -4163,7 +4163,7 @@
   {
    "date": "2026-03-20",
    "btc_close": 70526.29,
-   "dex_volume": 3.624,
+   "dex_volume": 3.625,
    "dex_momentum": -2.1,
    "core_adv": 37,
    "core_dec": 63,
@@ -4188,7 +4188,7 @@
    "date": "2026-03-21",
    "btc_close": 68424.08,
    "dex_volume": 2.684,
-   "dex_momentum": -2.7,
+   "dex_momentum": -2.8,
    "core_adv": 43,
    "core_dec": 57,
    "core_n": 100,
@@ -4211,7 +4211,7 @@
   {
    "date": "2026-03-22",
    "btc_close": 67933.43,
-   "dex_volume": 3.631,
+   "dex_volume": 3.632,
    "dex_momentum": -2.8,
    "core_adv": 25,
    "core_dec": 75,
@@ -4235,7 +4235,7 @@
   {
    "date": "2026-03-23",
    "btc_close": 70987.25,
-   "dex_volume": 5.062,
+   "dex_volume": 5.063,
    "dex_momentum": -0.7,
    "core_adv": 71,
    "core_dec": 29,
@@ -4259,7 +4259,7 @@
   {
    "date": "2026-03-24",
    "btc_close": 70528.86,
-   "dex_volume": 3.689,
+   "dex_volume": 3.69,
    "dex_momentum": -1.3,
    "core_adv": 64,
    "core_dec": 36,
@@ -4308,7 +4308,7 @@
    "date": "2026-03-26",
    "btc_close": 68727.21,
    "dex_volume": 3.453,
-   "dex_momentum": -7.2,
+   "dex_momentum": -7.3,
    "core_adv": 12,
    "core_dec": 88,
    "core_n": 100,
@@ -4379,7 +4379,7 @@
   {
    "date": "2026-03-29",
    "btc_close": 65947.03,
-   "dex_volume": 2.515,
+   "dex_volume": 2.516,
    "dex_momentum": -9.2,
    "core_adv": 20,
    "core_dec": 80,
@@ -4403,7 +4403,7 @@
   {
    "date": "2026-03-30",
    "btc_close": 66691.27,
-   "dex_volume": 3.422,
+   "dex_volume": 3.424,
    "dex_momentum": -15.1,
    "core_adv": 68,
    "core_dec": 32,
@@ -4427,7 +4427,7 @@
   {
    "date": "2026-03-31",
    "btc_close": 68107.48,
-   "dex_volume": 3.556,
+   "dex_volume": 3.558,
    "dex_momentum": -14.7,
    "core_adv": 77,
    "core_dec": 23,
@@ -4451,7 +4451,7 @@
   {
    "date": "2026-04-01",
    "btc_close": 67959.88,
-   "dex_volume": 4.478,
+   "dex_volume": 4.479,
    "dex_momentum": -10.9,
    "core_adv": 60,
    "core_dec": 40,
@@ -4475,7 +4475,7 @@
   {
    "date": "2026-04-02",
    "btc_close": 66887.51,
-   "dex_volume": 3.066,
+   "dex_volume": 3.067,
    "dex_momentum": -10.8,
    "core_adv": 16,
    "core_dec": 84,
@@ -4499,7 +4499,7 @@
   {
    "date": "2026-04-03",
    "btc_close": 66822.55,
-   "dex_volume": 2.501,
+   "dex_volume": 2.502,
    "dex_momentum": -13.7,
    "core_adv": 61,
    "core_dec": 39,
@@ -4524,7 +4524,7 @@
    "date": "2026-04-04",
    "btc_close": 67077.15,
    "dex_volume": 2.085,
-   "dex_momentum": -15.2,
+   "dex_momentum": -15.1,
    "core_adv": 52,
    "core_dec": 48,
    "core_n": 100,
@@ -4547,7 +4547,7 @@
   {
    "date": "2026-04-05",
    "btc_close": 69002.04,
-   "dex_volume": 2.04,
+   "dex_volume": 2.041,
    "dex_momentum": -16.5,
    "core_adv": 70,
    "core_dec": 30,
@@ -4619,8 +4619,8 @@
   {
    "date": "2026-04-08",
    "btc_close": 70644.79,
-   "dex_volume": 3.267,
-   "dex_momentum": -25.3,
+   "dex_volume": 3.271,
+   "dex_momentum": -25.2,
    "core_adv": 16,
    "core_dec": 84,
    "core_n": 100,
@@ -4643,8 +4643,8 @@
   {
    "date": "2026-04-09",
    "btc_close": 71367.8,
-   "dex_volume": 2.632,
-   "dex_momentum": -26.8,
+   "dex_volume": 2.637,
+   "dex_momentum": -26.7,
    "core_adv": 69,
    "core_dec": 31,
    "core_n": 100,
@@ -4667,8 +4667,8 @@
   {
    "date": "2026-04-10",
    "btc_close": 72920.26,
-   "dex_volume": 2.691,
-   "dex_momentum": -23.6,
+   "dex_volume": 2.694,
+   "dex_momentum": -23.5,
    "core_adv": 77,
    "core_dec": 23,
    "core_n": 100,
@@ -4691,8 +4691,8 @@
   {
    "date": "2026-04-11",
    "btc_close": 73021.86,
-   "dex_volume": 2.022,
-   "dex_momentum": -22.4,
+   "dex_volume": 2.024,
+   "dex_momentum": -22.3,
    "core_adv": 45,
    "core_dec": 55,
    "core_n": 100,
@@ -4715,7 +4715,7 @@
   {
    "date": "2026-04-12",
    "btc_close": 70660.64,
-   "dex_volume": 2.176,
+   "dex_volume": 2.177,
    "dex_momentum": -19.4,
    "core_adv": 7,
    "core_dec": 93,
@@ -4739,8 +4739,8 @@
   {
    "date": "2026-04-13",
    "btc_close": 74481.64,
-   "dex_volume": 2.971,
-   "dex_momentum": -15.9,
+   "dex_volume": 2.972,
+   "dex_momentum": -15.8,
    "core_adv": 92,
    "core_dec": 8,
    "core_n": 100,
@@ -4764,7 +4764,7 @@
    "date": "2026-04-14",
    "btc_close": 74297.35,
    "dex_volume": 3.715,
-   "dex_momentum": -10.0,
+   "dex_momentum": -9.9,
    "core_adv": 8,
    "core_dec": 92,
    "core_n": 100,
@@ -4787,7 +4787,7 @@
   {
    "date": "2026-04-15",
    "btc_close": 74826.31,
-   "dex_volume": 2.678,
+   "dex_volume": 2.679,
    "dex_momentum": -8.8,
    "core_adv": 88,
    "core_dec": 12,
@@ -4811,7 +4811,7 @@
   {
    "date": "2026-04-16",
    "btc_close": 75111.96,
-   "dex_volume": 3.291,
+   "dex_volume": 3.292,
    "dex_momentum": -5.0,
    "core_adv": 76,
    "core_dec": 24,
@@ -4835,7 +4835,7 @@
   {
    "date": "2026-04-17",
    "btc_close": 77125.73,
-   "dex_volume": 3.611,
+   "dex_volume": 3.612,
    "dex_momentum": -0.4,
    "core_adv": 58,
    "core_dec": 42,
@@ -4860,7 +4860,7 @@
    "date": "2026-04-18",
    "btc_close": 75716.15,
    "dex_volume": 2.496,
-   "dex_momentum": 1.7,
+   "dex_momentum": 1.6,
    "core_adv": 11,
    "core_dec": 89,
    "core_n": 100,
@@ -4883,7 +4883,7 @@
   {
    "date": "2026-04-19",
    "btc_close": 73841.02,
-   "dex_volume": 2.796,
+   "dex_volume": 2.797,
    "dex_momentum": 5.4,
    "core_adv": 6,
    "core_dec": 94,
@@ -4908,7 +4908,7 @@
    "date": "2026-04-20",
    "btc_close": 75858.04,
    "dex_volume": 2.62,
-   "dex_momentum": 6.1,
+   "dex_momentum": 6.0,
    "core_adv": 91,
    "core_dec": 9,
    "core_n": 100,
@@ -4979,7 +4979,7 @@
   {
    "date": "2026-04-23",
    "btc_close": 78275.33,
-   "dex_volume": 2.569,
+   "dex_volume": 2.57,
    "dex_momentum": 1.1,
    "core_adv": 57,
    "core_dec": 43,
@@ -5003,7 +5003,7 @@
   {
    "date": "2026-04-24",
    "btc_close": 77447.62,
-   "dex_volume": 2.504,
+   "dex_volume": 2.505,
    "dex_momentum": -3.2,
    "core_adv": 47,
    "core_dec": 52,
@@ -5051,8 +5051,8 @@
   {
    "date": "2026-04-26",
    "btc_close": 78637.74,
-   "dex_volume": 2.143,
-   "dex_momentum": -9.5,
+   "dex_volume": 2.144,
+   "dex_momentum": -9.6,
    "core_adv": 82,
    "core_dec": 18,
    "core_n": 100,
@@ -5075,7 +5075,7 @@
   {
    "date": "2026-04-27",
    "btc_close": 77366.78,
-   "dex_volume": 2.837,
+   "dex_volume": 2.838,
    "dex_momentum": -9.1,
    "core_adv": 23,
    "core_dec": 77,
@@ -5099,8 +5099,8 @@
   {
    "date": "2026-04-28",
    "btc_close": 76331.86,
-   "dex_volume": 3.068,
-   "dex_momentum": -8.5,
+   "dex_volume": 3.069,
+   "dex_momentum": -8.6,
    "core_adv": 24,
    "core_dec": 76,
    "core_n": 100,
@@ -5148,7 +5148,7 @@
    "date": "2026-04-30",
    "btc_close": 76296.8,
    "dex_volume": 2.168,
-   "dex_momentum": -13.3,
+   "dex_momentum": -13.4,
    "core_adv": 42,
    "core_dec": 58,
    "core_n": 100,
@@ -5171,7 +5171,7 @@
   {
    "date": "2026-05-01",
    "btc_close": 78207.76,
-   "dex_volume": 2.336,
+   "dex_volume": 2.337,
    "dex_momentum": -14.3,
    "core_adv": 63,
    "core_dec": 36,
@@ -5219,8 +5219,8 @@
   {
    "date": "2026-05-03",
    "btc_close": 78512.09,
-   "dex_volume": 1.965,
-   "dex_momentum": -12.3,
+   "dex_volume": 1.967,
+   "dex_momentum": -12.4,
    "core_adv": 27,
    "core_dec": 73,
    "core_n": 100,
@@ -5243,7 +5243,7 @@
   {
    "date": "2026-05-04",
    "btc_close": 79825.88,
-   "dex_volume": 3.176,
+   "dex_volume": 3.177,
    "dex_momentum": -9.3,
    "core_adv": 64,
    "core_dec": 36,
@@ -5267,8 +5267,8 @@
   {
    "date": "2026-05-05",
    "btc_close": 80913.96,
-   "dex_volume": 2.633,
-   "dex_momentum": -10.1,
+   "dex_volume": 2.634,
+   "dex_momentum": -10.2,
    "core_adv": 89,
    "core_dec": 11,
    "core_n": 100,
@@ -5315,7 +5315,7 @@
   {
    "date": "2026-05-07",
    "btc_close": 80024.91,
-   "dex_volume": 2.97,
+   "dex_volume": 2.971,
    "dex_momentum": -2.5,
    "core_adv": 29,
    "core_dec": 71,
@@ -5339,7 +5339,7 @@
   {
    "date": "2026-05-08",
    "btc_close": 80197.27,
-   "dex_volume": 3.342,
+   "dex_volume": 3.343,
    "dex_momentum": 0.6,
    "core_adv": 89,
    "core_dec": 10,
@@ -5363,7 +5363,7 @@
   {
    "date": "2026-05-09",
    "btc_close": 80677.65,
-   "dex_volume": 2.465,
+   "dex_volume": 2.466,
    "dex_momentum": 1.7,
    "core_adv": 43,
    "core_dec": 57,
@@ -5387,7 +5387,7 @@
   {
    "date": "2026-05-10",
    "btc_close": 82018.37,
-   "dex_volume": 3.045,
+   "dex_volume": 3.046,
    "dex_momentum": 3.7,
    "core_adv": 80,
    "core_dec": 20,
@@ -5436,7 +5436,7 @@
    "date": "2026-05-12",
    "btc_close": 80482.14,
    "dex_volume": 3.231,
-   "dex_momentum": 5.9,
+   "dex_momentum": 5.8,
    "core_adv": 20,
    "core_dec": 80,
    "core_n": 100,
@@ -5483,8 +5483,8 @@
   {
    "date": "2026-05-14",
    "btc_close": 81059.12,
-   "dex_volume": 3.219,
-   "dex_momentum": 7.7,
+   "dex_volume": 3.22,
+   "dex_momentum": 7.6,
    "core_adv": 82,
    "core_dec": 18,
    "core_n": 100,
@@ -5531,7 +5531,7 @@
   {
    "date": "2026-05-16",
    "btc_close": 78132.75,
-   "dex_volume": 2.394,
+   "dex_volume": 2.395,
    "dex_momentum": 8.7,
    "core_adv": 16,
    "core_dec": 84,
@@ -5555,7 +5555,7 @@
   {
    "date": "2026-05-17",
    "btc_close": 77428.52,
-   "dex_volume": 1.897,
+   "dex_volume": 1.898,
    "dex_momentum": 5.7,
    "core_adv": 17,
    "core_dec": 83,
@@ -5579,7 +5579,7 @@
   {
    "date": "2026-05-18",
    "btc_close": 76959.41,
-   "dex_volume": 2.487,
+   "dex_volume": 2.488,
    "dex_momentum": 2.7,
    "core_adv": 71,
    "core_dec": 29,
@@ -5627,7 +5627,7 @@
   {
    "date": "2026-05-20",
    "btc_close": 77470.4,
-   "dex_volume": 2.477,
+   "dex_volume": 2.48,
    "dex_momentum": -2.6,
    "core_adv": 87,
    "core_dec": 13,
@@ -5651,7 +5651,7 @@
   {
    "date": "2026-05-21",
    "btc_close": 77550.38,
-   "dex_volume": 2.589,
+   "dex_volume": 2.591,
    "dex_momentum": -6.5,
    "core_adv": 78,
    "core_dec": 22,
@@ -5675,8 +5675,8 @@
   {
    "date": "2026-05-22",
    "btc_close": 75478.38,
-   "dex_volume": 2.54,
-   "dex_momentum": -9.1,
+   "dex_volume": 2.544,
+   "dex_momentum": -9.0,
    "core_adv": 12,
    "core_dec": 88,
    "core_n": 100,
@@ -5699,7 +5699,7 @@
   {
    "date": "2026-05-23",
    "btc_close": 76684.37,
-   "dex_volume": 2.307,
+   "dex_volume": 2.309,
    "dex_momentum": -9.6,
    "core_adv": 85,
    "core_dec": 15,
@@ -5723,8 +5723,8 @@
   {
    "date": "2026-05-24",
    "btc_close": 77016.07,
-   "dex_volume": 2.185,
-   "dex_momentum": -8.3,
+   "dex_volume": 2.188,
+   "dex_momentum": -8.2,
    "core_adv": 30,
    "core_dec": 70,
    "core_n": 100,
@@ -5747,8 +5747,8 @@
   {
    "date": "2026-05-25",
    "btc_close": 77258.4,
-   "dex_volume": 2.278,
-   "dex_momentum": -8.5,
+   "dex_volume": 2.286,
+   "dex_momentum": -8.4,
    "core_adv": 63,
    "core_dec": 37,
    "core_n": 100,
@@ -5771,8 +5771,8 @@
   {
    "date": "2026-05-26",
    "btc_close": 75851.1,
-   "dex_volume": 2.647,
-   "dex_momentum": -6.1,
+   "dex_volume": 2.652,
+   "dex_momentum": -5.9,
    "core_adv": 26,
    "core_dec": 74,
    "core_n": 100,
@@ -5795,8 +5795,8 @@
   {
    "date": "2026-05-27",
    "btc_close": 74339.62,
-   "dex_volume": 2.696,
-   "dex_momentum": -3.4,
+   "dex_volume": 2.699,
+   "dex_momentum": -3.3,
    "core_adv": 18,
    "core_dec": 82,
    "core_n": 100,
@@ -5819,8 +5819,8 @@
   {
    "date": "2026-05-28",
    "btc_close": 73651.64,
-   "dex_volume": 3.361,
-   "dex_momentum": 0.4,
+   "dex_volume": 3.363,
+   "dex_momentum": 0.5,
    "core_adv": 23,
    "core_dec": 77,
    "core_n": 100,
@@ -5843,8 +5843,8 @@
   {
    "date": "2026-05-29",
    "btc_close": 73500.91,
-   "dex_volume": 3.157,
-   "dex_momentum": 3.2,
+   "dex_volume": 3.159,
+   "dex_momentum": 3.3,
    "core_adv": 48,
    "core_dec": 52,
    "core_n": 100,
@@ -5867,8 +5867,8 @@
   {
    "date": "2026-05-30",
    "btc_close": 73820.3,
-   "dex_volume": 2.822,
-   "dex_momentum": 5.8,
+   "dex_volume": 2.824,
+   "dex_momentum": 5.9,
    "core_adv": 78,
    "core_dec": 22,
    "core_n": 100,
@@ -5891,8 +5891,8 @@
   {
    "date": "2026-05-31",
    "btc_close": 73598.67,
-   "dex_volume": 2.905,
-   "dex_momentum": 9.1,
+   "dex_volume": 2.907,
+   "dex_momentum": 9.2,
    "core_adv": 50,
    "core_dec": 50,
    "core_n": 100,
@@ -5915,7 +5915,7 @@
   {
    "date": "2026-06-01",
    "btc_close": 71320.29,
-   "dex_volume": 4.128,
+   "dex_volume": 4.13,
    "dex_momentum": 16.7,
    "core_adv": 30,
    "core_dec": 70,
@@ -5939,7 +5939,7 @@
   {
    "date": "2026-06-02",
    "btc_close": 66727.26,
-   "dex_volume": 4.208,
+   "dex_volume": 4.21,
    "dex_momentum": 21.4,
    "core_adv": 11,
    "core_dec": 89,
@@ -5963,8 +5963,8 @@
   {
    "date": "2026-06-03",
    "btc_close": 64046.61,
-   "dex_volume": 4.006,
-   "dex_momentum": 25.0,
+   "dex_volume": 4.008,
+   "dex_momentum": 24.9,
    "core_adv": 53,
    "core_dec": 47,
    "core_n": 100,
@@ -5987,7 +5987,7 @@
   {
    "date": "2026-06-04",
    "btc_close": 63810.66,
-   "dex_volume": 5.621,
+   "dex_volume": 5.623,
    "dex_momentum": 29.5,
    "core_adv": 10,
    "core_dec": 90,
@@ -6011,7 +6011,7 @@
   {
    "date": "2026-06-05",
    "btc_close": 60960.1,
-   "dex_volume": 5.598,
+   "dex_volume": 5.599,
    "dex_momentum": 34.5,
    "core_adv": 10,
    "core_dec": 90,
@@ -6035,7 +6035,7 @@
   {
    "date": "2026-06-06",
    "btc_close": 60855.25,
-   "dex_volume": 2.963,
+   "dex_volume": 2.964,
    "dex_momentum": 33.1,
    "core_adv": 50,
    "core_dec": 50,
@@ -6059,7 +6059,7 @@
   {
    "date": "2026-06-07",
    "btc_close": 63273.54,
-   "dex_volume": 2.557,
+   "dex_volume": 2.558,
    "dex_momentum": 31.1,
    "core_adv": 92,
    "core_dec": 8,
@@ -6083,8 +6083,8 @@
   {
    "date": "2026-06-08",
    "btc_close": 63069.15,
-   "dex_volume": 2.827,
-   "dex_momentum": 25.5,
+   "dex_volume": 2.828,
+   "dex_momentum": 25.4,
    "core_adv": 50,
    "core_dec": 50,
    "core_n": 100,
@@ -6107,8 +6107,8 @@
   {
    "date": "2026-06-09",
    "btc_close": 61669.76,
-   "dex_volume": 2.744,
-   "dex_momentum": 18.5,
+   "dex_volume": 2.745,
+   "dex_momentum": 18.4,
    "core_adv": 17,
    "core_dec": 83,
    "core_n": 100,
@@ -6131,7 +6131,7 @@
   {
    "date": "2026-06-10",
    "btc_close": 61480.14,
-   "dex_volume": 2.969,
+   "dex_volume": 2.971,
    "dex_momentum": 14.2,
    "core_adv": 18,
    "core_dec": 82,
@@ -6155,8 +6155,8 @@
   {
    "date": "2026-06-11",
    "btc_close": 63555.66,
-   "dex_volume": 2.91,
-   "dex_momentum": 4.0,
+   "dex_volume": 2.911,
+   "dex_momentum": 3.9,
    "core_adv": 86,
    "core_dec": 14,
    "core_n": 100,
@@ -6179,7 +6179,7 @@
   {
    "date": "2026-06-12",
    "btc_close": 63532.28,
-   "dex_volume": 2.755,
+   "dex_volume": 2.757,
    "dex_momentum": -10.4,
    "core_adv": 39,
    "core_dec": 61,
@@ -6203,8 +6203,8 @@
   {
    "date": "2026-06-13",
    "btc_close": 64408.81,
-   "dex_volume": 2.097,
-   "dex_momentum": -14.4,
+   "dex_volume": 2.098,
+   "dex_momentum": -14.5,
    "core_adv": 81,
    "core_dec": 19,
    "core_n": 100,
@@ -6227,7 +6227,7 @@
   {
    "date": "2026-06-14",
    "btc_close": 65709.31,
-   "dex_volume": 2.262,
+   "dex_volume": 2.263,
    "dex_momentum": -16.7,
    "core_adv": 82,
    "core_dec": 18,
@@ -6251,8 +6251,8 @@
   {
    "date": "2026-06-15",
    "btc_close": 66292.5,
-   "dex_volume": 3.085,
-   "dex_momentum": -16.8,
+   "dex_volume": 3.086,
+   "dex_momentum": -16.9,
    "core_adv": 71,
    "core_dec": 29,
    "core_n": 100,
@@ -6275,7 +6275,7 @@
   {
    "date": "2026-06-16",
    "btc_close": 65619.28,
-   "dex_volume": 2.877,
+   "dex_volume": 2.878,
    "dex_momentum": -16.7,
    "core_adv": 40,
    "core_dec": 60,
@@ -6299,7 +6299,7 @@
   {
    "date": "2026-06-17",
    "btc_close": 64444.54,
-   "dex_volume": 3.151,
+   "dex_volume": 3.152,
    "dex_momentum": -16.9,
    "core_adv": 25,
    "core_dec": 75,
@@ -6323,7 +6323,7 @@
   {
    "date": "2026-06-18",
    "btc_close": 62897.24,
-   "dex_volume": 2.766,
+   "dex_volume": 2.767,
    "dex_momentum": -17.9,
    "core_adv": 18,
    "core_dec": 82,
@@ -6371,8 +6371,8 @@
   {
    "date": "2026-06-20",
    "btc_close": 64253.4,
-   "dex_volume": 2.525,
-   "dex_momentum": -18.2,
+   "dex_volume": 2.526,
+   "dex_momentum": -18.3,
    "core_adv": 56,
    "core_dec": 44,
    "core_n": 100,
@@ -6395,7 +6395,7 @@
   {
    "date": "2026-06-21",
    "btc_close": 63255.49,
-   "dex_volume": 2.382,
+   "dex_volume": 2.383,
    "dex_momentum": -19.4,
    "core_adv": 17,
    "core_dec": 83,
@@ -6419,7 +6419,7 @@
   {
    "date": "2026-06-22",
    "btc_close": 63937.29,
-   "dex_volume": 2.986,
+   "dex_volume": 2.987,
    "dex_momentum": -21.5,
    "core_adv": 62,
    "core_dec": 38,
@@ -6443,7 +6443,7 @@
   {
    "date": "2026-06-23",
    "btc_close": 62662.29,
-   "dex_volume": 3.28,
+   "dex_volume": 3.281,
    "dex_momentum": -20.8,
    "core_adv": 15,
    "core_dec": 85,
@@ -6467,7 +6467,7 @@
   {
    "date": "2026-06-24",
    "btc_close": 60989.57,
-   "dex_volume": 4.296,
+   "dex_volume": 4.297,
    "dex_momentum": -18.4,
    "core_adv": 16,
    "core_dec": 84,
@@ -6515,7 +6515,7 @@
   {
    "date": "2026-06-26",
    "btc_close": 60022.33,
-   "dex_volume": 3.758,
+   "dex_volume": 3.759,
    "dex_momentum": -9.9,
    "core_adv": 69,
    "core_dec": 31,
@@ -6539,7 +6539,7 @@
   {
    "date": "2026-06-27",
    "btc_close": 59953.44,
-   "dex_volume": 1.73,
+   "dex_volume": 1.731,
    "dex_momentum": -10.4,
    "core_adv": 22,
    "core_dec": 78,
@@ -6587,7 +6587,7 @@
   {
    "date": "2026-06-29",
    "btc_close": 60152.36,
-   "dex_volume": 3.793,
+   "dex_volume": 3.794,
    "dex_momentum": -4.9,
    "core_adv": 72,
    "core_dec": 28,
@@ -6611,7 +6611,7 @@
   {
    "date": "2026-06-30",
    "btc_close": 58566.09,
-   "dex_volume": 3.135,
+   "dex_volume": 3.136,
    "dex_momentum": -3.0,
    "core_adv": 11,
    "core_dec": 89,
@@ -6660,7 +6660,7 @@
    "date": "2026-07-02",
    "btc_close": 61490.21,
    "dex_volume": 3.092,
-   "dex_momentum": -5.2,
+   "dex_momentum": -5.3,
    "core_adv": 88,
    "core_dec": 12,
    "core_n": 100,
@@ -6683,7 +6683,7 @@
   {
    "date": "2026-07-03",
    "btc_close": 62553.61,
-   "dex_volume": 2.521,
+   "dex_volume": 2.523,
    "dex_momentum": -6.1,
    "core_adv": 91,
    "core_dec": 9,
@@ -6707,7 +6707,7 @@
   {
    "date": "2026-07-04",
    "btc_close": 63088.41,
-   "dex_volume": 2.791,
+   "dex_volume": 2.792,
    "dex_momentum": -1.4,
    "core_adv": 52,
    "core_dec": 48,
@@ -6731,7 +6731,7 @@
   {
    "date": "2026-07-05",
    "btc_close": 63586.1,
-   "dex_volume": 2.758,
+   "dex_volume": 2.759,
    "dex_momentum": 2.1,
    "core_adv": 52,
    "core_dec": 48,
@@ -6755,7 +6755,7 @@
   {
    "date": "2026-07-06",
    "btc_close": 64001.24,
-   "dex_volume": 3.087,
+   "dex_volume": 3.088,
    "dex_momentum": 0.1,
    "core_adv": 41,
    "core_dec": 59,
@@ -6803,7 +6803,7 @@
   {
    "date": "2026-07-08",
    "btc_close": 62247.13,
-   "dex_volume": 3.897,
+   "dex_volume": 3.898,
    "dex_momentum": 0.6,
    "core_adv": 21,
    "core_dec": 79,
@@ -6851,7 +6851,7 @@
   {
    "date": "2026-07-10",
    "btc_close": 64110.97,
-   "dex_volume": 3.113,
+   "dex_volume": 3.114,
    "dex_momentum": -1.4,
    "core_adv": 69,
    "core_dec": 31,
@@ -6875,7 +6875,7 @@
   {
    "date": "2026-07-11",
    "btc_close": 63791.35,
-   "dex_volume": 2.523,
+   "dex_volume": 2.524,
    "dex_momentum": -5.4,
    "core_adv": 25,
    "core_dec": 75,
@@ -6899,7 +6899,7 @@
   {
    "date": "2026-07-12",
    "btc_close": 63746.66,
-   "dex_volume": 3.185,
+   "dex_volume": 3.186,
    "dex_momentum": -5.4,
    "core_adv": 39,
    "core_dec": 61,
@@ -6923,7 +6923,7 @@
   {
    "date": "2026-07-13",
    "btc_close": 62278.96,
-   "dex_volume": 3.676,
+   "dex_volume": 3.677,
    "dex_momentum": -5.0,
    "core_adv": 22,
    "core_dec": 78,
@@ -6947,7 +6947,7 @@
   {
    "date": "2026-07-14",
    "btc_close": 64983.52,
-   "dex_volume": 3.779,
+   "dex_volume": 3.78,
    "dex_momentum": 41.7,
    "core_adv": 92,
    "core_dec": 8,
@@ -6971,7 +6971,7 @@
   {
    "date": "2026-07-15",
    "btc_close": 64717.17,
-   "dex_volume": 3.389,
+   "dex_volume": 3.39,
    "dex_momentum": 37.0,
    "core_adv": 37,
    "core_dec": 63,
@@ -6995,7 +6995,7 @@
   {
    "date": "2026-07-16",
    "btc_close": 63792.29,
-   "dex_volume": 3.207,
+   "dex_volume": 3.208,
    "dex_momentum": 34.6,
    "core_adv": 19,
    "core_dec": 81,
@@ -7019,7 +7019,7 @@
   {
    "date": "2026-07-17",
    "btc_close": 63904.95,
-   "dex_volume": 3.021,
+   "dex_volume": 3.023,
    "dex_momentum": 31.5,
    "core_adv": 49,
    "core_dec": 51,
@@ -7043,7 +7043,7 @@
   {
    "date": "2026-07-18",
    "btc_close": 64795.7,
-   "dex_volume": 2.65,
+   "dex_volume": 2.651,
    "dex_momentum": 29.3,
    "core_adv": 53,
    "core_dec": 47,
@@ -7067,7 +7067,7 @@
   {
    "date": "2026-07-19",
    "btc_close": 64670.4,
-   "dex_volume": 3.019,
+   "dex_volume": 3.02,
    "dex_momentum": 25.0,
    "core_adv": 36,
    "core_dec": 64,
@@ -7091,7 +7091,7 @@
   {
    "date": "2026-07-20",
    "btc_close": 65184.92,
-   "dex_volume": 3.513,
+   "dex_volume": 3.514,
    "dex_momentum": 21.0,
    "core_adv": 67,
    "core_dec": 33,
@@ -7163,7 +7163,7 @@
   {
    "date": "2026-07-23",
    "btc_close": 65052.48,
-   "dex_volume": 3.37,
+   "dex_volume": 3.371,
    "dex_momentum": 14.1,
    "core_adv": 13,
    "core_dec": 87,
@@ -7236,7 +7236,7 @@
    "date": "2026-07-26",
    "btc_close": 65343.82,
    "dex_volume": 3.256,
-   "dex_momentum": 11.9,
+   "dex_momentum": 11.8,
    "core_adv": 85,
    "core_dec": 15,
    "core_n": 100,
@@ -7259,7 +7259,7 @@
   {
    "date": "2026-07-27",
    "btc_close": 63701.35,
-   "dex_volume": 4.126,
+   "dex_volume": 4.127,
    "dex_momentum": 12.3,
    "core_adv": 10,
    "core_dec": 90,
@@ -7331,7 +7331,7 @@
   {
    "date": "2026-07-30",
    "btc_close": 64743.34,
-   "dex_volume": 3.798,
+   "dex_volume": 3.799,
    "dex_momentum": 10.5,
    "core_adv": 80,
    "core_dec": 20,
@@ -7379,7 +7379,7 @@
   {
    "date": "2026-08-01",
    "btc_close": 62772.58,
-   "dex_volume": 2.977,
+   "dex_volume": 2.978,
    "dex_momentum": 7.0,
    "core_adv": 37,
    "core_dec": 63,
@@ -7427,7 +7427,7 @@
   {
    "date": "2026-08-03",
    "btc_close": 63465.2,
-   "dex_volume": 3.625,
+   "dex_volume": 3.626,
    "dex_momentum": -0.2,
    "core_adv": 48,
    "core_dec": 52,
@@ -7499,7 +7499,7 @@
   {
    "date": "2026-08-06",
    "btc_close": 64262.75,
-   "dex_volume": 3.694,
+   "dex_volume": 3.695,
    "dex_momentum": -3.4,
    "core_adv": 31,
    "core_dec": 69,
@@ -7523,7 +7523,7 @@
   {
    "date": "2026-08-07",
    "btc_close": 64879.76,
-   "dex_volume": 3.565,
+   "dex_volume": 3.566,
    "dex_momentum": -3.7,
    "core_adv": 51,
    "core_dec": 49,
@@ -7571,7 +7571,7 @@
   {
    "date": "2026-08-09",
    "btc_close": 64856.1,
-   "dex_volume": 2.643,
+   "dex_volume": 2.644,
    "dex_momentum": -2.9,
    "core_adv": 32,
    "core_dec": 68,
@@ -7596,7 +7596,7 @@
    "date": "2026-08-10",
    "btc_close": 63915.71,
    "dex_volume": 3.449,
-   "dex_momentum": -1.0,
+   "dex_momentum": -1.1,
    "core_adv": 48,
    "core_dec": 52,
    "core_n": 100,
@@ -7619,7 +7619,7 @@
   {
    "date": "2026-08-11",
    "btc_close": 63537.56,
-   "dex_volume": 3.097,
+   "dex_volume": 3.098,
    "dex_momentum": -1.9,
    "core_adv": 49,
    "core_dec": 51,
@@ -7643,7 +7643,7 @@
   {
    "date": "2026-08-12",
    "btc_close": 63408.63,
-   "dex_volume": 3.132,
+   "dex_volume": 3.135,
    "dex_momentum": -5.5,
    "core_adv": 27,
    "core_dec": 73,
@@ -7667,7 +7667,7 @@
   {
    "date": "2026-08-13",
    "btc_close": 63429.18,
-   "dex_volume": 3.234,
+   "dex_volume": 3.238,
    "dex_momentum": -8.9,
    "core_adv": 55,
    "core_dec": 45,
@@ -7691,7 +7691,7 @@
   {
    "date": "2026-08-14",
    "btc_close": 62984.29,
-   "dex_volume": 2.917,
+   "dex_volume": 2.918,
    "dex_momentum": -12.4,
    "core_adv": 34,
    "core_dec": 66,
@@ -7787,7 +7787,7 @@
   {
    "date": "2026-08-18",
    "btc_close": 64686.26,
-   "dex_volume": 3.35,
+   "dex_volume": 3.351,
    "dex_momentum": -14.5,
    "core_adv": 35,
    "core_dec": 65,
@@ -7811,7 +7811,7 @@
   {
    "date": "2026-08-19",
    "btc_close": 69291.01,
-   "dex_volume": 4.947,
+   "dex_volume": 4.948,
    "dex_momentum": -9.1,
    "core_adv": 90,
    "core_dec": 10,
@@ -7835,7 +7835,7 @@
   {
    "date": "2026-08-20",
    "btc_close": 73020.95,
-   "dex_volume": 4.896,
+   "dex_volume": 4.897,
    "dex_momentum": -3.8,
    "core_adv": 88,
    "core_dec": 12,
@@ -7859,7 +7859,7 @@
   {
    "date": "2026-08-21",
    "btc_close": 78317.78,
-   "dex_volume": 6.271,
+   "dex_volume": 6.272,
    "dex_momentum": 5.4,
    "core_adv": 97,
    "core_dec": 3,
@@ -7883,7 +7883,7 @@
   {
    "date": "2026-08-22",
    "btc_close": 77081.02,
-   "dex_volume": 5.967,
+   "dex_volume": 5.968,
    "dex_momentum": 12.7,
    "core_adv": 31,
    "core_dec": 69,
@@ -7907,7 +7907,7 @@
   {
    "date": "2026-08-23",
    "btc_close": 77712.32,
-   "dex_volume": 4.775,
+   "dex_volume": 4.776,
    "dex_momentum": 17.6,
    "core_adv": 82,
    "core_dec": 18,
@@ -7931,7 +7931,7 @@
   {
    "date": "2026-08-24",
    "btc_close": 78973.89,
-   "dex_volume": 4.969,
+   "dex_volume": 4.975,
    "dex_momentum": 21.8,
    "core_adv": 34,
    "core_dec": 66,
@@ -7955,7 +7955,7 @@
   {
    "date": "2026-08-25",
    "btc_close": 78511.23,
-   "dex_volume": 4.842,
+   "dex_volume": 4.847,
    "dex_momentum": 25.2,
    "core_adv": 20,
    "core_dec": 80,
@@ -7979,8 +7979,8 @@
   {
    "date": "2026-08-26",
    "btc_close": 79018.03,
-   "dex_volume": 4.436,
-   "dex_momentum": 25.8,
+   "dex_volume": 4.437,
+   "dex_momentum": 25.9,
    "core_adv": 75,
    "core_dec": 25,
    "core_n": 100,
@@ -8003,7 +8003,7 @@
   {
    "date": "2026-08-27",
    "btc_close": 80268.38,
-   "dex_volume": 5.776,
+   "dex_volume": 5.777,
    "dex_momentum": 26.6,
    "core_adv": 66,
    "core_dec": 34,
@@ -8027,7 +8027,7 @@
   {
    "date": "2026-08-28",
    "btc_close": 77820.76,
-   "dex_volume": 4.862,
+   "dex_volume": 4.863,
    "dex_momentum": 23.0,
    "core_adv": 12,
    "core_dec": 88,
@@ -8052,7 +8052,7 @@
    "date": "2026-08-29",
    "btc_close": 78225.14,
    "dex_volume": 3.496,
-   "dex_momentum": 17.7,
+   "dex_momentum": 17.8,
    "core_adv": 56,
    "core_dec": 44,
    "core_n": 100,
@@ -8075,7 +8075,7 @@
   {
    "date": "2026-08-30",
    "btc_close": 77658.23,
-   "dex_volume": 4.557,
+   "dex_volume": 4.558,
    "dex_momentum": 18.2,
    "core_adv": 14,
    "core_dec": 86,
@@ -8147,7 +8147,7 @@
   {
    "date": "2026-09-02",
    "btc_close": 77297.13,
-   "dex_volume": 6.252,
+   "dex_volume": 6.253,
    "dex_momentum": 24.2,
    "core_adv": 50,
    "core_dec": 50,
@@ -8171,7 +8171,7 @@
   {
    "date": "2026-09-03",
    "btc_close": 81264.7,
-   "dex_volume": 6.618,
+   "dex_volume": 6.619,
    "dex_momentum": 24.9,
    "core_adv": 89,
    "core_dec": 11,
@@ -8220,7 +8220,7 @@
    "date": "2026-09-05",
    "btc_close": 79821.7,
    "dex_volume": 6.133,
-   "dex_momentum": 30.5,
+   "dex_momentum": 30.4,
    "core_adv": 88,
    "core_dec": 12,
    "core_n": 100,
@@ -8244,7 +8244,7 @@
    "date": "2026-09-06",
    "btc_close": 80329.35,
    "dex_volume": 7.161,
-   "dex_momentum": 32.7,
+   "dex_momentum": 32.6,
    "core_adv": 70,
    "core_dec": 30,
    "core_n": 100,
@@ -8267,7 +8267,7 @@
   {
    "date": "2026-09-07",
    "btc_close": 79093.46,
-   "dex_volume": 6.258,
+   "dex_volume": 6.26,
    "dex_momentum": 32.2,
    "core_adv": 39,
    "core_dec": 61,
@@ -8291,7 +8291,7 @@
   {
    "date": "2026-09-08",
    "btc_close": 78450.75,
-   "dex_volume": 7.261,
+   "dex_volume": 7.262,
    "dex_momentum": 33.5,
    "core_adv": 39,
    "core_dec": 61,
@@ -8339,7 +8339,7 @@
   {
    "date": "2026-09-10",
    "btc_close": 76554.99,
-   "dex_volume": 6.292,
+   "dex_volume": 6.293,
    "dex_momentum": 28.9,
    "core_adv": 13,
    "core_dec": 87,
@@ -8411,7 +8411,7 @@
   {
    "date": "2026-09-13",
    "btc_close": 76819.04,
-   "dex_volume": 4.011,
+   "dex_volume": 4.012,
    "dex_momentum": 11.4,
    "core_adv": 18,
    "core_dec": 82,
@@ -8435,7 +8435,7 @@
   {
    "date": "2026-09-14",
    "btc_close": 78173.35,
-   "dex_volume": 5.652,
+   "dex_volume": 5.654,
    "dex_momentum": 8.1,
    "core_adv": 77,
    "core_dec": 23,
@@ -8459,7 +8459,7 @@
   {
    "date": "2026-09-15",
    "btc_close": 75590.24,
-   "dex_volume": 5.709,
+   "dex_volume": 5.711,
    "dex_momentum": 1.2,
    "core_adv": 10,
    "core_dec": 90,
@@ -8483,7 +8483,7 @@
   {
    "date": "2026-09-16",
    "btc_close": 76146.81,
-   "dex_volume": 5.466,
+   "dex_volume": 5.467,
    "dex_momentum": -2.9,
    "core_adv": 78,
    "core_dec": 22,
@@ -8507,7 +8507,7 @@
   {
    "date": "2026-09-17",
    "btc_close": 76371.36,
-   "dex_volume": 5.204,
+   "dex_volume": 5.206,
    "dex_momentum": -6.1,
    "core_adv": 83,
    "core_dec": 17,
@@ -8531,7 +8531,7 @@
   {
    "date": "2026-09-18",
    "btc_close": 80873.58,
-   "dex_volume": 6.53,
+   "dex_volume": 6.531,
    "dex_momentum": -9.0,
    "core_adv": 92,
    "core_dec": 8,
@@ -8603,7 +8603,7 @@
   {
    "date": "2026-09-21",
    "btc_close": 86596.74,
-   "dex_volume": 6.575,
+   "dex_volume": 6.576,
    "dex_momentum": -4.5,
    "core_adv": 80,
    "core_dec": 20,
@@ -8723,8 +8723,8 @@
   {
    "date": "2026-09-26",
    "btc_close": 84416.71,
-   "dex_volume": 3.674,
-   "dex_momentum": -16.4,
+   "dex_volume": 3.675,
+   "dex_momentum": -16.5,
    "core_adv": 49,
    "core_dec": 51,
    "core_n": 100,
@@ -8747,7 +8747,7 @@
   {
    "date": "2026-09-27",
    "btc_close": 84448.75,
-   "dex_volume": 3.548,
+   "dex_volume": 3.549,
    "dex_momentum": -19.6,
    "core_adv": 55,
    "core_dec": 45,
@@ -8771,7 +8771,7 @@
   {
    "date": "2026-09-28",
    "btc_close": 83479.25,
-   "dex_volume": 5.236,
+   "dex_volume": 5.237,
    "dex_momentum": -23.3,
    "core_adv": 18,
    "core_dec": 82,
@@ -8795,7 +8795,7 @@
   {
    "date": "2026-09-29",
    "btc_close": 83640.1,
-   "dex_volume": 5.162,
+   "dex_volume": 5.163,
    "dex_momentum": -23.7,
    "core_adv": 41,
    "core_dec": 59,
@@ -8819,7 +8819,7 @@
   {
    "date": "2026-09-30",
    "btc_close": 83576.13,
-   "dex_volume": 5.484,
+   "dex_volume": 5.485,
    "dex_momentum": -21.0,
    "core_adv": 60,
    "core_dec": 40,
@@ -8867,7 +8867,7 @@
   {
    "date": "2026-10-02",
    "btc_close": 84506.47,
-   "dex_volume": 5.364,
+   "dex_volume": 5.365,
    "dex_momentum": -15.6,
    "core_adv": 33,
    "core_dec": 67,
@@ -8891,7 +8891,7 @@
   {
    "date": "2026-10-03",
    "btc_close": 84742.79,
-   "dex_volume": 2.979,
+   "dex_volume": 2.98,
    "dex_momentum": -14.6,
    "core_adv": 80,
    "core_dec": 20,
@@ -8915,7 +8915,7 @@
   {
    "date": "2026-10-04",
    "btc_close": 85561.0,
-   "dex_volume": 3.35,
+   "dex_volume": 3.351,
    "dex_momentum": -12.2,
    "core_adv": 45,
    "core_dec": 55,
@@ -8999,7 +8999,7 @@
   {
    "date": "2026-10-07",
    "btc_close": 82494.0,
-   "dex_volume": 4.055,
+   "dex_volume": 4.056,
    "dex_momentum": -20.2,
    "core_adv": 15,
    "core_dec": 85,
@@ -9179,7 +9179,7 @@
   {
    "date": "2026-10-13",
    "btc_close": 83504.0,
-   "dex_volume": 4.47,
+   "dex_volume": 4.471,
    "dex_momentum": -24.4,
    "core_adv": 29,
    "core_dec": 70,
@@ -9209,7 +9209,7 @@
   {
    "date": "2026-10-14",
    "btc_close": 81511.0,
-   "dex_volume": 4.184,
+   "dex_volume": 4.185,
    "dex_momentum": -22.3,
    "core_adv": 4,
    "core_dec": 96,
@@ -9239,7 +9239,7 @@
   {
    "date": "2026-10-15",
    "btc_close": 82021.0,
-   "dex_volume": 4.942,
+   "dex_volume": 4.943,
    "dex_momentum": -21.2,
    "core_adv": 88,
    "core_dec": 12,
@@ -9269,7 +9269,7 @@
   {
    "date": "2026-10-16",
    "btc_close": 81446.0,
-   "dex_volume": 4.118,
+   "dex_volume": 4.119,
    "dex_momentum": -15.6,
    "core_adv": 24,
    "core_dec": 72,
@@ -9359,7 +9359,7 @@
   {
    "date": "2026-10-19",
    "btc_close": 81969.0,
-   "dex_volume": 3.674,
+   "dex_volume": 3.675,
    "dex_momentum": -4.9,
    "core_adv": 51,
    "core_dec": 46,
@@ -9480,7 +9480,7 @@
    "date": "2026-10-23",
    "btc_close": 81748.0,
    "dex_volume": 3.855,
-   "dex_momentum": -7.1,
+   "dex_momentum": -7.2,
    "core_adv": 20,
    "core_dec": 76,
    "core_n": 100,
@@ -9539,7 +9539,7 @@
   {
    "date": "2026-10-25",
    "btc_close": 80828.0,
-   "dex_volume": 2.681,
+   "dex_volume": 2.682,
    "dex_momentum": -9.1,
    "core_adv": 18,
    "core_dec": 81,
@@ -9569,7 +9569,7 @@
   {
    "date": "2026-10-26",
    "btc_close": 80038.0,
-   "dex_volume": 3.75,
+   "dex_volume": 3.751,
    "dex_momentum": -8.2,
    "core_adv": 29,
    "core_dec": 67,
@@ -9629,7 +9629,7 @@
   {
    "date": "2026-10-28",
    "btc_close": 80815.0,
-   "dex_volume": 3.405,
+   "dex_volume": 3.406,
    "dex_momentum": -12.5,
    "core_adv": 84,
    "core_dec": 15,
@@ -9689,7 +9689,7 @@
   {
    "date": "2026-10-30",
    "btc_close": 78518.0,
-   "dex_volume": 4.001,
+   "dex_volume": 4.003,
    "dex_momentum": -5.5,
    "core_adv": 18,
    "core_dec": 81,
@@ -9719,8 +9719,8 @@
   {
    "date": "2026-10-31",
    "btc_close": 77215.0,
-   "dex_volume": 1.902,
-   "dex_momentum": -8.3,
+   "dex_volume": 1.907,
+   "dex_momentum": -8.2,
    "core_adv": 47,
    "core_dec": 53,
    "core_n": 100,
@@ -9749,8 +9749,8 @@
   {
    "date": "2026-11-01",
    "btc_close": 77825.0,
-   "dex_volume": 1.852,
-   "dex_momentum": -10.1,
+   "dex_volume": 1.856,
+   "dex_momentum": -10.0,
    "core_adv": 65,
    "core_dec": 34,
    "core_n": 100,
@@ -9779,7 +9779,7 @@
   {
    "date": "2026-11-02",
    "btc_close": 78083.0,
-   "dex_volume": 3.25,
+   "dex_volume": 3.252,
    "dex_momentum": -11.4,
    "core_adv": 21,
    "core_dec": 76,
@@ -9809,7 +9809,7 @@
   {
    "date": "2026-11-03",
    "btc_close": 76420.0,
-   "dex_volume": 3.342,
+   "dex_volume": 3.344,
    "dex_momentum": -10.3,
    "core_adv": 11,
    "core_dec": 88,
@@ -9839,7 +9839,7 @@
   {
    "date": "2026-11-04",
    "btc_close": 77933.0,
-   "dex_volume": 4.355,
+   "dex_volume": 4.357,
    "dex_momentum": -6.8,
    "core_adv": 87,
    "core_dec": 7,
@@ -9870,7 +9870,7 @@
    "date": "2026-11-05",
    "btc_close": 80586.0,
    "dex_volume": 4.265,
-   "dex_momentum": -8.6,
+   "dex_momentum": -8.5,
    "core_adv": 75,
    "core_dec": 24,
    "core_n": 100,
@@ -10020,7 +10020,7 @@
    "date": "2026-11-10",
    "btc_close": 74773.0,
    "dex_volume": 2.754,
-   "dex_momentum": -8.4,
+   "dex_momentum": -8.5,
    "core_adv": 85,
    "core_dec": 14,
    "core_n": 100,
@@ -10109,8 +10109,8 @@
   {
    "date": "2026-11-13",
    "btc_close": 69195.0,
-   "dex_volume": null,
-   "dex_momentum": null,
+   "dex_volume": 3.453,
+   "dex_momentum": -15.2,
    "core_adv": 20,
    "core_dec": 77,
    "core_n": 99,
@@ -10165,6 +10165,36 @@
    "frontier_age_median": 16,
    "frontier_low_sample": false,
    "frontier_ramo_pooled": -389.5
+  },
+  {
+   "date": "2026-11-15",
+   "btc_close": 64335.0,
+   "dex_volume": null,
+   "dex_momentum": null,
+   "core_adv": 8,
+   "core_dec": 92,
+   "core_n": 100,
+   "core_ramo": -840.0,
+   "core_oscillator": null,
+   "core_summation": null,
+   "core_band_low": -61.11,
+   "core_band_high": 57.32,
+   "core_coverage_pct": 100.0,
+   "frontier_adv": 27,
+   "frontier_dec": 71,
+   "frontier_n": 99,
+   "frontier_ramo": -474.6,
+   "frontier_oscillator": -26.21,
+   "frontier_summation": -57.4,
+   "frontier_band_low": null,
+   "frontier_band_high": null,
+   "frontier_coverage_pct": 100.0,
+   "frontier_dead": 6,
+   "frontier_entries": 10,
+   "frontier_exits": 10,
+   "frontier_age_median": 17,
+   "frontier_low_sample": false,
+   "frontier_ramo_pooled": -449.0
   }
  ],
  "structure": {
@@ -10187,27 +10217,27 @@
    "fixed_danger_threshold": null
   },
   "current": {
-   "date": "2026-11-14",
+   "date": "2026-11-15",
    "ready": false,
    "index_ready": true,
    "status": "warming_up",
-   "consecutive_days": 1,
-   "ew_index": 97.2428,
-   "cw_index": 97.3307,
+   "consecutive_days": 2,
+   "ew_index": 91.8751,
+   "cw_index": 92.6606,
    "ew_drawdown_52w": null,
    "cw_drawdown_52w": null,
    "drawdown_gap_pp": null,
    "gap_percentile": null,
-   "median_constituent_drawdown_52w": 47.6552,
-   "drawdown_eligible": 94,
-   "pct_above_sma200": 28.5714,
-   "sma200_eligible": 98,
+   "median_constituent_drawdown_52w": 51.5134,
+   "drawdown_eligible": 93,
+   "pct_above_sma200": 23.7113,
+   "sma200_eligible": 97,
    "constituents": 100,
    "expected_constituents": 100,
    "coverage_pct": 100.0,
    "realized_vol_30d": null,
    "alt_btc_corr_30d": null,
-   "volatility_observations": 1
+   "volatility_observations": 2
   },
   "series": [
    {
@@ -19547,6 +19577,29 @@
     "realized_vol_30d": null,
     "alt_btc_corr_30d": null,
     "volatility_observations": 1
+   },
+   {
+    "date": "2026-11-15",
+    "ready": false,
+    "index_ready": true,
+    "status": "warming_up",
+    "consecutive_days": 2,
+    "ew_index": 91.8751,
+    "cw_index": 92.6606,
+    "ew_drawdown_52w": null,
+    "cw_drawdown_52w": null,
+    "drawdown_gap_pp": null,
+    "gap_percentile": null,
+    "median_constituent_drawdown_52w": 51.5134,
+    "drawdown_eligible": 93,
+    "pct_above_sma200": 23.7113,
+    "sma200_eligible": 97,
+    "constituents": 100,
+    "expected_constituents": 100,
+    "coverage_pct": 100.0,
+    "realized_vol_30d": null,
+    "alt_btc_corr_30d": null,
+    "volatility_observations": 2
    }
   ]
  }
