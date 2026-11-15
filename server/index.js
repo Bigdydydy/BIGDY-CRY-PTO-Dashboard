@@ -121,6 +121,20 @@ function clientAddress(req) {
   return Number.isInteger(hops) && hops > 0 && chain.length >= hops
     ? chain[chain.length - hops] : (req.socket?.remoteAddress || 'unknown');
 }
+
+// TEMPORARY (audit 9.3): show the shape of the proxy chain Render forwards, so
+// TRUST_PROXY_HOPS can be checked against reality. Logs only the first few API
+// requests per process: segment count, the last segment and the peer address,
+// never the full chain. Remove once the hop count is confirmed.
+let proxyChainLogsLeft = 5;
+function logProxyChainOnce(req) {
+  if (proxyChainLogsLeft <= 0) return;
+  proxyChainLogsLeft--;
+  const chain = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
+  console.log(`[ProxyChain] xff segments=${chain.length} last=${chain.length ? chain[chain.length - 1] : '-'} ` +
+    `peer=${req.socket?.remoteAddress || '-'} TRUST_PROXY_HOPS=${process.env.TRUST_PROXY_HOPS ?? '(unset)'} ` +
+    `resolved=${clientAddress(req)}`);
+}
 let activeRefreshPromise = null;
 
 // ---------------------------------------------------------------------------
@@ -728,6 +742,7 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
  */
 async function handleApiRequest(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
+  logProxyChainOnce(req); // TEMPORARY (audit 9.3)
   // Query/body types are untrusted; repeated query keys are arrays in url.parse.
   if (Object.values(parsedUrl.query || {}).some(Array.isArray)) {
     sendJsonResponse(req, res, 400, { code: 400, error: 'Repeated query parameters are not supported' });
