@@ -16,8 +16,20 @@ const memoryCache = new Map();
 /**
  * Get storage file path for currency
  */
+function getCommittedFilePath(currency = 'BTC') {
+  return path.join(DATA_DIR, `block_trades_${currency.toUpperCase()}.json`);
+}
+
 function getStorageFilePath(currency = 'BTC') {
-  return snapshotPath(path.join(DATA_DIR, `block_trades_${currency.toUpperCase()}.json`));
+  return snapshotPath(getCommittedFilePath(currency));
+}
+
+/** Parse one archive file; a damaged file throws so it can never be overwritten. */
+function readArchive(filePath) {
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || !Array.isArray(parsed.trades)) throw new Error('Invalid trade archive schema');
+  return parsed.trades;
 }
 
 /**
@@ -34,21 +46,32 @@ function ensureDataDir() {
  */
 function loadPersistedTrades(currency = 'BTC') {
   const filePath = getStorageFilePath(currency);
-  if (!fs.existsSync(filePath)) {
-    return [];
-  }
-  try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed;
+  let trades = [];
+  if (fs.existsSync(filePath)) {
+    try {
+      trades = readArchive(filePath);
+    } catch (err) {
+      console.error(`[TradeStore] Error loading ${filePath}:`, err.message);
+      throw err;
     }
-    if (!parsed || !Array.isArray(parsed.trades)) throw new Error('Invalid trade archive schema');
-    return parsed.trades;
-  } catch (err) {
-    console.error(`[TradeStore] Error loading ${filePath}:`, err.message);
-    throw err;
   }
+  // The runtime sidecar is seeded once and then only grows from this process's
+  // own polls. The committed archive keeps advancing through the daily
+  // collector, so fold in whatever it holds that the sidecar never saw (e.g.
+  // the days this machine was off). It is read-only here: a damaged committed
+  // copy is skipped, never repaired or overwritten.
+  const committed = getCommittedFilePath(currency);
+  if (committed !== filePath && fs.existsSync(committed)) {
+    try {
+      const known = new Set(trades.map(getTradeKey));
+      for (const t of readArchive(committed)) {
+        if (!known.has(getTradeKey(t))) trades.push(t);
+      }
+    } catch (err) {
+      console.warn(`[TradeStore] Committed archive ${committed} unreadable, using sidecar only:`, err.message);
+    }
+  }
+  return trades;
 }
 
 /**

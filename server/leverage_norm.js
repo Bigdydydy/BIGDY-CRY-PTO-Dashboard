@@ -206,12 +206,15 @@ function parseFundingBars(bars, now = Date.now()) {
   const byTime = new Map();
   for (const b of bars) {
     const open = Number(b?.data?.[0]);
+    if (!Number.isFinite(open) || open <= 0) throw new Error('资金费率: bar 含非法值');
+    const fundingTime = open * 1000 + 8 * HOUR_MS;
+    // The still-open bar has not settled: skip it before judging its close, so
+    // an unsettled (possibly empty) rate cannot fail the whole settled history.
+    if (fundingTime > now) continue;
     const rawClose = b?.data?.[4];
     if (rawClose == null || typeof rawClose === 'boolean' || String(rawClose).trim() === '') throw new Error('资金费率: 缺少已结算费率');
     const close = Number(rawClose);
-    if (!Number.isFinite(open) || open <= 0 || !Number.isFinite(close)) throw new Error('资金费率: bar 含非法值');
-    const fundingTime = open * 1000 + 8 * HOUR_MS;
-    if (fundingTime > now) continue;
+    if (!Number.isFinite(close)) throw new Error('资金费率: bar 含非法值');
     byTime.set(fundingTime, { fundingTime, rate: close / 100 });
   }
   const rows = [...byTime.values()].sort((a, b) => a.fundingTime - b.fundingTime);
@@ -314,8 +317,10 @@ function parseYahooDollarVolume(json, symbol, now = Date.now()) {
 }
 
 /**
- * Daily net flow and dollar volume over the funds whose volume is known that day, and the
- * trailing ETF_WINDOW-session ratio. A day missing a core fund's volume is skipped.
+ * Daily net flow and dollar volume over the funds whose volume AND flow are both known that day,
+ * and the trailing ETF_WINDOW-session ratio. A fund with only one of the two is left out of both
+ * the numerator and the denominator (an unpublished flow is not a zero flow). A day missing a core
+ * fund's volume or flow is skipped entirely.
  */
 function buildEtfTurnover(flows, volumes) {
   const tickers = Object.keys(volumes);
@@ -330,7 +335,10 @@ function buildEtfTurnover(flows, volumes) {
         if (CORE_ETF_TICKERS.includes(t)) missingCore = true;
         continue;
       }
-      if (f.funds[t] == null) { missingCore = true; continue; }
+      if (f.funds[t] == null) {
+        if (CORE_ETF_TICKERS.includes(t)) missingCore = true;
+        continue;
+      }
       vol += v;
       flow += f.funds[t];
     }
@@ -654,7 +662,7 @@ async function buildLeverageNorm(previous = null) {
       method: [
         '覆盖校正：CoinGlass 的场所覆盖逐年扩大，原始加总在新场所纳入当天跳升。OI 序列做链式拼接，每日变化只用前后两日都有数据的场所，并以最新一日全场所合计为锚。',
         `资金溢价：每次结算的 OI 加权费率 × 当日永续 OI（全市场期货 OI 剔除 CME 近似），按日加总后滚动 ${PREMIUM_WINDOW_DAYS} 天求和；窗口内结算覆盖不足 90% 不出值。`,
-        `ETF 流入/成交额：${ETF_WINDOW} 个交易日净流入 ÷ 同期成交额（成交量 × 收盘价），只计当日成交额可得的基金；±${ETF_REGIME_BAND * 100}% 为“流入/赎回主导”与“换手为主”的分界。`,
+        `ETF 流入/成交额：${ETF_WINDOW} 个交易日净流入 ÷ 同期成交额（成交量 × 收盘价），只计当日成交额与净流入都已公布的基金（核心基金缺任一项则当日不计）；±${ETF_REGIME_BAND * 100}% 为“流入/赎回主导”与“换手为主”的分界。`,
         `期权/期货：两边均按币计（链式拼接）后相除，剥离币价；期权 OI 在每个季度交割前堆高、交割后骤降，结论用 ${RATIO_AVG_DAYS} 日均值。`
       ],
       caveats: [

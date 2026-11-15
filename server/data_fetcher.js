@@ -512,6 +512,20 @@ function providerAsOf(candidateTs, receiptMs) {
 const DVOL_REFRESH_MS = 10 * 60 * 1000;
 let lastDvolSuccessMs = 0;
 
+/**
+ * Archive fallback for a round whose live trade poll failed. A damaged archive
+ * throws by design (it must never be overwritten); here that only means "no
+ * fallback rows" — it must not abort the refresh of every other source.
+ */
+function cachedTradesOrEmpty(currency) {
+  try {
+    return getCachedTrades(currency);
+  } catch (err) {
+    console.warn('[DataFetcher] trade archive fallback unavailable:', err.message);
+    return [];
+  }
+}
+
 async function doRefreshAllMarketData(currency) {
   const checkTime = new Date().toISOString();
   const attemptMs = Date.now();
@@ -573,7 +587,7 @@ async function doRefreshAllMarketData(currency) {
     const bad = validateBlockTrades(blockTradesRes.value);
     if (bad) {
       failSrc('greeks_trades', new Error(`block_trade payload 校验失败: ${bad}`));
-      if (!accumulatedTrades.length) accumulatedTrades = getCachedTrades(currency);
+      if (!accumulatedTrades.length) accumulatedTrades = cachedTradesOrEmpty(currency);
     } else {
       try {
         const mergeResult = recordAndMergeTrades(currency, blockTradesRes.value);
@@ -587,7 +601,7 @@ async function doRefreshAllMarketData(currency) {
     }
   } else {
     failSrc('greeks_trades', blockTradesRes.reason);
-    if (!accumulatedTrades.length) accumulatedTrades = getCachedTrades(currency);
+    if (!accumulatedTrades.length) accumulatedTrades = cachedTradesOrEmpty(currency);
   }
 
   // --- greeks_atm: no publisher timestamp on the matrix -> receipt time.

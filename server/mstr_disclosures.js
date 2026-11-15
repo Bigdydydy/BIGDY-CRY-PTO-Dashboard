@@ -289,7 +289,7 @@ function createDisclosureService({
   },
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 } = {}) {
-  const stateFile = snapshotPath(path.join(dataDir, 'mstr_disclosures.json'));
+  const stateFile = snapshotPath(path.join(dataDir, 'mstr_disclosures.json'), { producerOwned: true });
   const evidenceDir = path.join(dataDir, 'mstr_disclosure_evidence');
 
   let loaded = false;

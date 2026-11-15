@@ -12,7 +12,7 @@ const { exec, execSync } = require('child_process');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 
-const DATA_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'crypto_mcclellan.json'));
+const DATA_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'crypto_mcclellan.json'), { producerOwned: true });
 const PYTHON_PIPELINE_DIR = path.join(__dirname, '..', 'scripts', 'crypto_mcclellan');
 const REQUIRED_IDS = ['mcclellan_core', 'mcclellan_frontier'];
 const ANCILLARY_IDS = ['mcclellan_anchor'];

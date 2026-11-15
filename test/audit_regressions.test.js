@@ -12,8 +12,8 @@ const health = require('../server/data_health');
 test('malformed wave requests return 400 and leave the HTTP service alive', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
-  const request = (url, body) => new Promise((resolve, reject) => {
-    const req = http.request({ hostname: '127.0.0.1', port, path: url, method: body === undefined ? 'GET' : 'POST' }, res => {
+  const request = (url, body, method) => new Promise((resolve, reject) => {
+    const req = http.request({ hostname: '127.0.0.1', port, path: url, method: method || (body === undefined ? 'GET' : 'POST') }, res => {
       res.resume(); res.on('end', () => resolve(res.statusCode));
     });
     req.on('error', reject);
@@ -32,8 +32,18 @@ test('malformed wave requests return 400 and leave the HTTP service alive', asyn
     }
     assert.equal(await request('/api/wave/evaluate', JSON.stringify({ padding: 'x'.repeat(1000001) })), 413);
     assert.equal(await request('/healthz'), 200);
+    // Only a request that really starts a rebuild may consume the global
+    // refresh cooldown: a CORS preflight, a wrong-method call or force=1 on a
+    // path that ignores it must not lock the refresh button for everyone.
+    assert.equal(await request('/api/refresh', undefined, 'OPTIONS'), 204);
+    assert.equal(await request('/api/refresh'), 404);
     assert.equal(await request('/api/nonexistent?force=1'), 404);
-    assert.equal(await request('/api/nonexistent?force=1'), 429);
+    assert.equal(await request('/api/nonexistent?force=1'), 404);
+    const [first, second] = await Promise.all([request('/api/refresh', ''), request('/api/refresh', '')]);
+    assert.notEqual(first, 429, 'the first real refresh is not blocked by the requests above');
+    assert.equal(second, 429, 'an immediate second refresh is still rate limited');
+    // Inside the cooldown a panel-level force read degrades to the cached copy, never a 429.
+    assert.notEqual(await request('/api/cdri?force=1'), 429);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
@@ -74,6 +84,27 @@ test('missing funding and unpublished ETF flows cannot masquerade as zero', () =
   assert.equal(lev.parseFundingBars([{ data: [1700000000, 0, 0, 0, 0] }])[0].rate, 0);
   const volumes = { IBIT: new Map([['2026-11-01', 100]]), FBTC: new Map([['2026-11-01', 100]]) };
   assert.deepEqual(lev.buildEtfTurnover([{ date: '2026-11-01', funds: { IBIT: 10, FBTC: null } }], volumes), []);
+});
+
+test('an unsettled funding bar and a lagging small ETF do not discard valid data', () => {
+  // The open bar (settles in the future) may carry no rate yet; settled history stays usable.
+  const now = 1700000000 * 1000 + 9 * 3600000;
+  const rows = lev.parseFundingBars([
+    { data: [1700000000, 0, 0, 0, 0.01] },
+    { data: [1700000000 + 8 * 3600, 0, 0, 0, null] }
+  ], now);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].rate, 0.0001);
+  // A small fund that has not printed its flow leaves both sides of the ratio;
+  // the day survives on the funds that did print. A core fund still vetoes the day.
+  const day = '2026-11-02';
+  const vol = n => new Map([[day, n]]);
+  const volumes = { IBIT: vol(100), FBTC: vol(50), GBTC: vol(25), ARKB: vol(1000) };
+  const out = lev.buildEtfTurnover([{ date: day, funds: { IBIT: 10, FBTC: 5, GBTC: -1, ARKB: null } }], volumes);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].flowUsd, 14);
+  assert.equal(out[0].volumeUsd, 175);
+  assert.deepEqual(lev.buildEtfTurnover([{ date: day, funds: { IBIT: null, FBTC: 5, GBTC: -1, ARKB: 3 } }], volumes), []);
 });
 
 test('a failed remote ledger fetch never renews disk success receipts', async () => {
@@ -154,4 +185,81 @@ test('production McClellan reads the published archive without running Python', 
     assert.equal(fetches, 1);
     assert.equal(pythonCalls, 0);
   } finally { if (old === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = old; }
+});
+
+test('a newer committed archive supersedes only a producer-owned sidecar', () => {
+  const os = require('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-reseed-'));
+  const file = path.join(dir, 'archive.json');
+  const oldRoot = process.env.BE_SANDBOX_ROOT;
+  const oldMode = process.env.SNAPSHOT_MODE;
+  const { snapshotPath } = require('../server/snapshot_path');
+  fs.writeFileSync(file, '{"v":1}');
+  try {
+    delete process.env.BE_SANDBOX_ROOT;
+    delete process.env.SNAPSHOT_MODE;
+    const local = snapshotPath(file, { producerOwned: true });
+    fs.writeFileSync(local, '{"v":"runtime"}');
+    // The collector publishes a newer archive (e.g. it arrives with a git pull).
+    fs.writeFileSync(file, '{"v":2}');
+    const later = new Date(Date.now() + 60000);
+    fs.utimesSync(file, later, later);
+    // A file only the HTTP process refreshes keeps its runtime copy…
+    assert.equal(snapshotPath(file), local);
+    assert.equal(fs.readFileSync(local, 'utf8'), '{"v":"runtime"}');
+    // …a collector-owned archive is picked up instead of being shadowed for good.
+    assert.equal(snapshotPath(file, { producerOwned: true }), local);
+    assert.equal(fs.readFileSync(local, 'utf8'), '{"v":2}');
+    assert.equal(fs.readFileSync(file, 'utf8'), '{"v":2}');
+  } finally {
+    if (oldRoot === undefined) delete process.env.BE_SANDBOX_ROOT; else process.env.BE_SANDBOX_ROOT = oldRoot;
+    if (oldMode === undefined) delete process.env.SNAPSHOT_MODE; else process.env.SNAPSHOT_MODE = oldMode;
+    for (const name of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, name));
+    fs.rmdirSync(dir);
+  }
+});
+
+test('the trade sidecar folds in committed rows it never saw, and a damaged committed copy is left alone', () => {
+  const store = require('../server/trade_store');
+  const committed = path.join(__dirname, '../data/block_trades_MERGEAUDIT.json');
+  const sidecar = committed.replace(/\.json$/, '.local.json');
+  const oldRoot = process.env.BE_SANDBOX_ROOT;
+  const oldMode = process.env.SNAPSHOT_MODE;
+  const now = Date.now();
+  const leg = id => ({ trade_id: id, timestamp: now - id * 1000, instrument_name: 'BTC-25DEC26-100000-C', direction: 'buy', amount: 1 });
+  fs.writeFileSync(committed, JSON.stringify({ trades: [leg(1), leg(2)] }));
+  fs.writeFileSync(sidecar, JSON.stringify({ trades: [leg(1), leg(3)] }));
+  try {
+    delete process.env.BE_SANDBOX_ROOT;
+    delete process.env.SNAPSHOT_MODE;
+    const ids = store.recordAndMergeTrades('MERGEAUDIT', []).trades.map(t => t.trade_id).sort();
+    assert.deepEqual(ids, [1, 2, 3]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(sidecar, 'utf8')).trades.map(t => t.trade_id).sort(), [1, 2, 3]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(committed, 'utf8')).trades.length, 2, 'the committed archive is never written by the HTTP process');
+  } finally {
+    if (oldRoot === undefined) delete process.env.BE_SANDBOX_ROOT; else process.env.BE_SANDBOX_ROOT = oldRoot;
+    if (oldMode === undefined) delete process.env.SNAPSHOT_MODE; else process.env.SNAPSHOT_MODE = oldMode;
+    for (const f of [committed, sidecar]) if (fs.existsSync(f)) fs.unlinkSync(f);
+  }
+});
+
+test('a failed trade poll with a damaged archive does not abort the other market sources', () => {
+  // Fresh process: the in-memory trade cache must be empty for the archive
+  // fallback to be consulted at all (earlier tests in this file fill it).
+  const { spawnSync } = require('node:child_process');
+  const file = path.join(__dirname, '../data/block_trades_BADAUDIT.json');
+  const original = '{truncated';
+  fs.writeFileSync(file, original);
+  try {
+    const child = spawnSync(process.execPath, ['-e', `
+      require(${JSON.stringify(path.join(__dirname, '../server/data_fetcher.js'))})
+        .refreshAllMarketData('BADAUDIT')
+        .then(r => { console.log('ROUND_DONE ' + JSON.stringify(r.failedSources)); process.exit(0); },
+              e => { console.log('ROUND_REJECTED ' + e.message); process.exit(1); });
+    `], { encoding: 'utf8', timeout: 60000 });
+    // Offline sandbox: the live trade poll fails, the round falls back to the
+    // archive, and the archive is damaged. The round must still complete.
+    assert.match(child.stdout, /ROUND_DONE .*greeks_trades/, child.stdout + child.stderr);
+    assert.equal(fs.readFileSync(file, 'utf8'), original);
+  } finally { fs.unlinkSync(file); }
 });

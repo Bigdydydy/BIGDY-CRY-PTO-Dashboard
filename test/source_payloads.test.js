@@ -549,7 +549,13 @@ test('H/ETF linkage: local build fails → fresher usable upstream copy is serve
   const mirror = require(srv('upstream_mirror.js'));
 
   const good = await mod.getEtfLinkageData(basisSeries, true);
-  assert.equal(good.dataHealth.state, 'OK');
+  // The local COT deliberately ends one report early, so its age swings between
+  // 9 and 16 days with the weekday the suite runs on and crosses the 12-day
+  // freshness warning on four days out of seven. A successful, usable local
+  // build is what this step establishes — not a warning-free one.
+  assert.equal(good.dataHealth.analysisAllowed, true);
+  assert.notEqual(good.stale, true);
+  assert.equal(getSourceHealth('cot').lastError, null);
   assert.equal(up.calls, 0, 'a successful local build never touches the mirror');
 
   const nextTue = new Date(Date.parse(good.freshness.cotLatest) + 7 * 86400000).toISOString().slice(0, 10);

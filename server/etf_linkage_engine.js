@@ -588,8 +588,10 @@ function analyzeLinkage(weeks, { etfFlows, oiPanel } = {}) {
   const both = ws => (ws.length ? ws.filter(w => w.etfFlowBtc < 0 && w.dLfNetShortBtc < 0).length / ws.length : null);
   const unwindSync = {
     subTbillWeeks: low.length,
+    otherWeeks: high.length,
     syncShareSubTbill: round(both(low), 3),
-    syncShareOther: round(both(high), 3)
+    syncShareOther: round(both(high), 3),
+    z: round(proportionDiffZ(both(low), low.length, both(high), high.length), 2)
   };
 
   // 5. Decomposition
@@ -659,6 +661,14 @@ function corrDiffZ(a, b) {
   return (fisherZ(a.corrFlow) - fisherZ(b.corrFlow)) / Math.sqrt(1 / (a.n - 3) + 1 / (b.n - 3));
 }
 
+/** Pooled two-proportion z for p1 > p2; null when either group is empty or the pooled rate is 0 or 1 */
+function proportionDiffZ(p1, n1, p2, n2) {
+  if (p1 == null || p2 == null || !(n1 > 0) || !(n2 > 0)) return null;
+  const pooled = (p1 * n1 + p2 * n2) / (n1 + n2);
+  const se = Math.sqrt(pooled * (1 - pooled) * (1 / n1 + 1 / n2));
+  return se > 0 ? (p1 - p2) / se : null;
+}
+
 function buildVerdict({ full, splitHigh, splitLow, interaction, lead1, lag1, unwindSync, arbShare12w, recent }) {
   const leadZ = corrZ(lead1);
   const leadVsLagZ = corrDiffZ(lead1, lag1);
@@ -691,9 +701,13 @@ function buildVerdict({ full, splitHigh, splitLow, interaction, lead1, lag1, unw
     {
       key: 'unwindSync',
       label: '同步撤离',
+      // Same standard as the other checks: a gap between two shares is evidence only when
+      // it exceeds sampling noise (one-sided 5%). Sub-T-Bill weeks are few, so a 10-point
+      // gap on its own is routinely produced by chance.
       pass: unwindSync.syncShareSubTbill != null && unwindSync.syncShareOther != null
-        && unwindSync.syncShareSubTbill - unwindSync.syncShareOther > 0.1,
-      detail: `基差低于美债的周里 ETF 流出且空头回补同时发生的比例 ${pct(unwindSync.syncShareSubTbill)}，其他周 ${pct(unwindSync.syncShareOther)}`
+        && unwindSync.syncShareSubTbill - unwindSync.syncShareOther > 0.1
+        && unwindSync.z != null && unwindSync.z > 1.645,
+      detail: `基差低于美债的周（${unwindSync.subTbillWeeks} 周）里 ETF 流出且空头回补同时发生的比例 ${pct(unwindSync.syncShareSubTbill)}，其他周（${unwindSync.otherWeeks ?? '--'} 周）${pct(unwindSync.syncShareOther)}，两者之差 z = ${fmt(unwindSync.z, 1)}（需 > 1.6）`
     }
   ];
   const passed = checks.filter(c => c.pass).length;

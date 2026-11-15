@@ -107,6 +107,13 @@ function parseJsonBody(req) {
 // Rate limiting & Single-flight locks
 const refreshRateLimitMap = new Map();
 let lastPublicRefreshAt = 0;
+const PUBLIC_REFRESH_COOLDOWN_MS = 10000;
+// GET endpoints that honour ?force=1 / ?refresh=true (a cache bypass that hits upstream).
+const FORCE_REFRESH_PATHS = new Set([
+  '/api/etf-linkage', '/api/leverage-norm', '/api/mstr-preferreds', '/api/mstr-disclosures',
+  '/api/macro-chart', '/api/cdri', '/api/ssro', '/api/flow-force', '/api/coinbase-liquidity',
+  '/api/gold-correlation', '/api/crypto-mcclellan'
+]);
 // Proxy headers are trusted only when the deployment explicitly configures hops.
 function clientAddress(req) {
   const hops = Number(process.env.TRUST_PROXY_HOPS || 0);
@@ -730,15 +737,27 @@ async function handleApiRequest(req, res, parsedUrl) {
     sendJsonResponse(req, res, 429, { code: 429, error: 'Market request rate limit exceeded' });
     return;
   }
-  const wantsForce = parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true';
-  if (wantsForce || pathname === '/api/refresh') {
+  // Global cooldown bounds upstream work behind reverse proxies. Only requests
+  // that would really start a rebuild may consume it: a CORS preflight, a
+  // wrong-method call or `force=1` on a path that ignores it must not lock
+  // everyone else out of the refresh button for 10 seconds.
+  const isRefreshPost = req.method === 'POST' && pathname === '/api/refresh';
+  const wantsForce = req.method === 'GET' && FORCE_REFRESH_PATHS.has(pathname) &&
+    (parsedUrl.query?.force === '1' || parsedUrl.query?.refresh === 'true');
+  if (wantsForce || isRefreshPost) {
     const now = Date.now();
-    // Global cooldown also bounds upstream work behind reverse proxies.
-    if (now - lastPublicRefreshAt < 10000) {
-      sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后刷新 (Refresh cooldown)' }, { 'Retry-After': '10' });
-      return;
+    if (now - lastPublicRefreshAt < PUBLIC_REFRESH_COOLDOWN_MS) {
+      if (isRefreshPost) {
+        sendJsonResponse(req, res, 429, { code: 429, error: '请求过于频繁，请稍后刷新 (Refresh cooldown)' }, { 'Retry-After': '10' });
+        return;
+      }
+      // A panel's own refresh button still gets its data: inside the cooldown
+      // the request is served from cache instead of failing with 429.
+      delete parsedUrl.query.force;
+      delete parsedUrl.query.refresh;
+    } else {
+      lastPublicRefreshAt = now;
     }
-    lastPublicRefreshAt = now;
   }
 
   // Read-only self-checks and CORS preflights must not mark the instance
