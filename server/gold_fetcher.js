@@ -4,6 +4,7 @@ const path = require('path');
 const { fetchSpotDailyCloses } = require('./spot_daily');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { raceStale } = require('./swr');
 
 const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'gold_correlation.json'));
 const HISTORY_DAYS = 1000;
@@ -305,6 +306,17 @@ async function fetchGoldCorrelationFromSource() {
 }
 
 /**
+ * 缓存过期后的返回方式：强制刷新或没有旧数据时等这一轮取数；
+ * 否则先回旧数据、取数在后台继续 (见 swr.js)。
+ */
+function settleOrStale(refresh, forceRefresh) {
+  if (forceRefresh) return refresh;
+  const stale = (inMemoryCache && validateGoldPayload(inMemoryCache)) ? inMemoryCache : readCachedSeries();
+  if (!stale) return refresh;
+  return raceStale(refresh, () => withDataHealth(stale, ['gold']));
+}
+
+/**
  * Public getter with memory caching, single-flight fetching, and disk fallback
  */
 async function getGoldCorrelationData(forceRefresh = false) {
@@ -315,7 +327,7 @@ async function getGoldCorrelationData(forceRefresh = false) {
   }
 
   if (currentFetchPromise) {
-    return currentFetchPromise;
+    return settleOrStale(currentFetchPromise, forceRefresh);
   }
 
   recordAttempt('gold', { now: Date.now() });
@@ -370,7 +382,7 @@ async function getGoldCorrelationData(forceRefresh = false) {
     }
   })();
 
-  return currentFetchPromise;
+  return settleOrStale(currentFetchPromise, forceRefresh);
 }
 
 module.exports = {

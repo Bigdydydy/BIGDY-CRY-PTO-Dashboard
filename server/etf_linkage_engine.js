@@ -29,6 +29,7 @@ const { fetchWithTimeout } = require('./http_client');
 const { callCoinglassEndpoint } = require('./cdri_fetcher');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { raceStale } = require('./swr');
 const { fetchUpstreamJson } = require('./upstream_mirror');
 
 const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'etf_linkage.json'));
@@ -51,7 +52,7 @@ const isNonNegNum = v => isFiniteNum(v) && Number(v) >= 0;
 
 let memoryCache = null;
 let memoryCacheTime = 0;
-let inflight = null;
+let buildInflight = null;
 // 构建失败后的冷却：期间直接返回旧缓存，不再每个请求都重跑整套 CoinGlass/CFTC 拉取
 const FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
 let lastFailureAt = 0;
@@ -837,13 +838,14 @@ async function fetchMirroredLinkage(localCache) {
 }
 
 /** Single-flight: concurrent callers share one in-flight build. */
-function getEtfLinkageData(basisSeries, force = false) {
-  if (inflight) return inflight;
-  inflight = doGetEtfLinkageData(basisSeries, force).finally(() => { inflight = null; });
-  return inflight;
+function rebuildOnce(basisSeries) {
+  if (!buildInflight) {
+    buildInflight = rebuild(basisSeries).finally(() => { buildInflight = null; });
+  }
+  return buildInflight;
 }
 
-async function doGetEtfLinkageData(basisSeries, force = false) {
+async function getEtfLinkageData(basisSeries, force = false) {
   const now = Date.now();
   if (!force && memoryCache && now - memoryCacheTime < CACHE_TTL_MS) {
     return withDataHealth(memoryCache, REQUIRED_IDS, ANCILLARY_IDS);
@@ -864,6 +866,18 @@ async function doGetEtfLinkageData(basisSeries, force = false) {
       return withDataHealth({ ...disk, stale: true }, REQUIRED_IDS, ANCILLARY_IDS);
     }
   }
+  // 缓存已过期。手里有旧结果时先回旧结果、整套 CoinGlass/CFTC 构建在后台跑 (见 swr.js)；
+  // 强制刷新和完全没有旧结果时照旧等构建。旧结果不标 stale——那个字段只表示构建失败。
+  const build = rebuildOnce(basisSeries);
+  if (force) return build;
+  const previous = memoryCache || readDiskCache();
+  if (!previous) return build;
+  seedDiskOnce(previous);
+  return raceStale(build, () => withDataHealth(previous, REQUIRED_IDS, ANCILLARY_IDS));
+}
+
+async function rebuild(basisSeries) {
+  const now = Date.now();
   try {
     const data = await buildEtfLinkage(basisSeries);
     lastFailureAt = 0;

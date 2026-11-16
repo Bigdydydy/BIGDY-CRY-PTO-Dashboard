@@ -6,6 +6,7 @@ const zlib = require('zlib');
 const { fetchWithTimeout } = require('./http_client');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { raceStale } = require('./swr');
 
 const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'cdri_data.json'));
 let inMemoryCache = null;
@@ -246,6 +247,26 @@ async function doFetchCdriData(forceRefresh = false) {
     }
   }
 
+  // 缓存已过期。手里有通过校验的旧数据时先回旧数据、上游在后台刷新 (见 swr.js)；
+  // 强制刷新和完全没有旧数据时照旧等上游。
+  const refresh = refreshOnce();
+  if (forceRefresh) return refresh;
+  const stale = (inMemoryCache && !validateCdriPayload(inMemoryCache)) ? inMemoryCache : readValidatedDisk();
+  if (!stale) return refresh;
+  return raceStale(refresh, () => withDataHealth(stale, ['cdri']));
+}
+
+let refreshInflight = null;
+/** Single-flight upstream round, shared by waiting and background callers. */
+function refreshOnce() {
+  if (!refreshInflight) {
+    refreshInflight = fetchFreshCdri().finally(() => { refreshInflight = null; });
+  }
+  return refreshInflight;
+}
+
+async function fetchFreshCdri() {
+  const now = Date.now();
   console.log('[CdriFetcher] Fetching fresh CDRI data from Coinglass...');
   recordAttempt('cdri', { now: Date.now() });
 

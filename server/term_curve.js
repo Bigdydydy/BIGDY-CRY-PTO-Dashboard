@@ -22,12 +22,16 @@ const {
   getHistoricalBasisData,
   HURDLE_SPREAD
 } = require('./basis_fetcher');
+const { raceStale } = require('./swr');
 
 const DAY_MS = 86400000;
 const MIN_DAYS = 7;
 const MAX_DAYS = 400;
 const LIVE_TTL_MS = 60 * 1000;
 const UST_TTL_MS = 6 * 3600 * 1000;
+// A superseded curve may stand in while its replacement is being built, but only this long:
+// the same 15-minute bound the live basis source uses before it stops counting as current.
+const STALE_SERVE_MS = 15 * 60 * 1000;
 const COMPARE_DAYS = [7, 30, 90];
 // FRED constant-maturity Treasury series and their tenors in days
 const UST_SERIES = [['DGS1MO', 30], ['DGS3MO', 91], ['DGS6MO', 182], ['DGS1', 365]];
@@ -228,23 +232,50 @@ async function buildHistoricalCurve(dateStr, indexPrice, ustLookups) {
  * Live curve plus comparison curves from the daily history (08:00 UTC snapshots).
  * funding0d: the market-wide 0D funding rate, shown as a separate marker (not joined to the futures).
  */
+let lastCurve = null;      // most recent complete result (funding0d is filled in per request)
+let curveInflight = null;
+
+/**
+ * The first build walks every comparison contract's daily closes and takes several seconds, and
+ * the live leg expires every minute. Once one result exists, a request never waits on a rebuild
+ * for longer than the stale-while-revalidate budget: it gets the previous curve (its own asOf
+ * timestamp intact, flagged `revalidating`) while the rebuild finishes in the background.
+ * A rebuild that fails inside the budget still surfaces as an error, exactly as before.
+ */
 async function getTermCurve({ funding0d = null } = {}) {
+  const withFunding = curve => ({ ...curve, funding0d: round(funding0d) });
+  const age = lastCurve ? Date.now() - lastCurve.generatedAt : Infinity;
+  if (age < LIVE_TTL_MS) return withFunding(lastCurve);
+  if (!curveInflight) {
+    curveInflight = buildTermCurve()
+      .then((curve) => { lastCurve = curve; return curve; })
+      .finally(() => { curveInflight = null; });
+  }
+  if (age >= STALE_SERVE_MS) return withFunding(await curveInflight);
+  const previous = lastCurve;
+  return withFunding(await raceStale(curveInflight, () => previous, { rethrow: true }));
+}
+
+async function buildTermCurve() {
   const [ustLookups, history] = await Promise.all([getUstLookups(), getHistoricalBasisData().catch(() => [])]);
   const live = await buildLiveCurve(ustLookups);
 
-  const comparisons = [];
-  for (const back of COMPARE_DAYS) {
+  // The comparison dates are independent of one another, so they are rebuilt side by side;
+  // within one date the contracts are still fetched in sequence.
+  const built = await Promise.all(COMPARE_DAYS.map(async (back) => {
     const target = isoDate(Date.now() - back * DAY_MS);
     // Nearest stored snapshot on or before the target date gives the Deribit index at 08:00 UTC
     const row = [...history].reverse().find(r => r.date <= target && r.btcPrice > 0);
-    if (!row) continue;
+    if (!row) return null;
     try {
       const curve = await buildHistoricalCurve(row.date, row.btcPrice, ustLookups);
-      if (curve.points.length >= 2) comparisons.push({ backDays: back, label: back === 7 ? '1 周前' : back === 30 ? '1 个月前' : '3 个月前', ...curve });
+      if (curve.points.length >= 2) return { backDays: back, label: back === 7 ? '1 周前' : back === 30 ? '1 个月前' : '3 个月前', ...curve };
     } catch (err) {
       console.warn(`[TermCurve] Comparison curve ${row.date} unavailable:`, err.message);
     }
-  }
+    return null;
+  }));
+  const comparisons = built.filter(Boolean);
 
   return {
     generatedAt: Date.now(),
@@ -255,7 +286,7 @@ async function getTermCurve({ funding0d = null } = {}) {
       forward: '相邻合约推出的隐含远期年化：[(1+r₂t₂)/(1+r₁t₁) − 1] / (t₂ − t₁)',
       history: '对比曲线用各合约当日 08:00 UTC 日 K 收盘重建'
     },
-    funding0d: round(funding0d),
+    funding0d: null,
     hurdleSpread: HURDLE_SPREAD,
     live,
     comparisons

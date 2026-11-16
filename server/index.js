@@ -2022,6 +2022,12 @@ function startServer() {
     .then(() => console.log('[Server] Initial Macro chart data cache ready.'))
     .catch(e => console.warn('[Server] Initial Macro fetch warning:', e.message));
 
+  // 期限结构曲线首次构建要逐个合约回补对比日的日 K，耗时数秒：启动时先建好，
+  // 第一位访客进入 Module 2 时直接命中，不用现场等
+  getTermCurve()
+    .then(() => console.log('[Server] Initial term curve cache ready.'))
+    .catch(e => console.warn('[Server] Initial term curve warning:', e.message));
+
   // 高频行情每 30 秒后台刷新；5 分钟内无人访问则暂停，避免空转消耗免费实例的 CPU 与外部配额
   setInterval(() => {
     if (isServerIdle()) return;

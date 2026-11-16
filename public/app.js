@@ -48,6 +48,22 @@ function dhFail(moduleId, err) {
   } catch (e) { /* ignore */ }
 }
 
+// 服务器缓存过期时先回旧数据、在后台刷新，并在载荷上标 revalidating。
+// 看到这个标记就过几秒再取一次 (3s / 6s / 9s / 12s)，拿到刷新后的数据即止；
+// 四次还没等到就交还给各模块自己的定时轮询，不无限重试。
+const REVALIDATE_MAX_FOLLOWUPS = 4;
+const revalidateFollowups = {};
+function followRevalidation(key, json, reload) {
+  if (!json || !json.revalidating) {
+    revalidateFollowups[key] = 0;
+    return;
+  }
+  const n = (revalidateFollowups[key] || 0) + 1;
+  if (n > REVALIDATE_MAX_FOLLOWUPS) return;
+  revalidateFollowups[key] = n;
+  setTimeout(reload, 3000 * n);
+}
+
 // ============================================================================
 // Studio K95 Day/Night Dual-Theme Architecture & Controller
 // ============================================================================
@@ -4209,6 +4225,7 @@ async function loadCdriData() {
     rawCdriData = json;
     renderCdriMetrics(json);
     renderCdriChart();
+    followRevalidation('cdri', json, () => loadCdriData());
   } catch (err) {
     dhFail('cdri', err);
     console.error('[CDRI] Error loading CDRI data:', err);
@@ -5110,6 +5127,7 @@ async function loadEtfLinkageData(force = false) {
       status.classList.toggle('error', !!json.stale);
     }
     renderEtfLinkage();
+    followRevalidation('etf', json, () => loadEtfLinkageData(false));
   } catch (err) {
     dhFail('etf', err);
     console.error('[ETF Linkage] Failed to load:', err);
@@ -5587,6 +5605,7 @@ async function loadLeverageNorm(force = false) {
       status.classList.toggle('error', notes.length > 0);
     }
     renderLeverageNorm();
+    followRevalidation('leverage', json, () => loadLeverageNorm(false));
   } catch (err) {
     dhFail('leverage', err);
     console.error('[Leverage Norm] Failed to load:', err);
@@ -5922,6 +5941,7 @@ async function loadTermCurve(force = false) {
     rawTermCurve = json;
     termCurveLastFetch = Date.now();
     renderTermCurve();
+    followRevalidation('termCurve', json, () => loadTermCurve(true));
   } catch (err) {
     console.error('[Term Curve] Failed to load:', err);
     const asof = document.getElementById('tc-asof');
@@ -6205,6 +6225,7 @@ async function fetchSsroData() {
     rawSsroData = data;
     updateSsroKpiCards(data);
     renderSsroChart();
+    followRevalidation('ssro', data, () => fetchSsroData());
   } catch (err) {
     dhFail('ssro', err);
     console.error('[SSRO] Failed to load data:', err);
@@ -8379,6 +8400,7 @@ async function loadGoldCorrelationData(force = false) {
     if (json.code === 0 && json.series) {
       dhUpdate('gold', json.dataHealth);
       renderGoldCorrelation(json, force);
+      followRevalidation('gold', json, () => loadGoldCorrelationData(false));
     }
   } catch (err) {
     dhFail('gold', err);

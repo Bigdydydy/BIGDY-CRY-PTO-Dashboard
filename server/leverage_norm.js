@@ -26,6 +26,7 @@ const { fetchWithTimeout } = require('./http_client');
 const { callCoinglassEndpoint } = require('./cdri_fetcher');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { raceStale } = require('./swr');
 
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'leverage_norm.json');
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -49,7 +50,7 @@ const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 
 let memoryCache = null;
 let memoryCacheTime = 0;
-let inflight = null;
+let buildInflight = null;
 let diskSeeded = false;
 
 const isoDate = ts => new Date(ts).toISOString().slice(0, 10);
@@ -700,13 +701,14 @@ function seedDiskOnce(disk) {
 }
 
 /** Single-flight: concurrent callers share one in-flight build. */
-function getLeverageNormData(force = false) {
-  if (inflight) return inflight;
-  inflight = doGetLeverageNormData(force).finally(() => { inflight = null; });
-  return inflight;
+function rebuildOnce(disk) {
+  if (!buildInflight) {
+    buildInflight = rebuild(disk).finally(() => { buildInflight = null; });
+  }
+  return buildInflight;
 }
 
-async function doGetLeverageNormData(force = false) {
+async function getLeverageNormData(force = false) {
   const now = Date.now();
   if (!force && memoryCache && now - memoryCacheTime < CACHE_TTL_MS) {
     return withDataHealth(memoryCache, REQUIRED_IDS, ANCILLARY_IDS);
@@ -718,6 +720,17 @@ async function doGetLeverageNormData(force = false) {
     memoryCacheTime = now;
     return withDataHealth(disk, REQUIRED_IDS, ANCILLARY_IDS);
   }
+  // 缓存已过期。手里有旧结果时先回旧结果、构建在后台跑 (见 swr.js)；
+  // 强制刷新和完全没有旧结果时照旧等构建。旧结果不标 stale——那个字段只表示构建失败。
+  const build = rebuildOnce(disk);
+  if (force) return build;
+  const previous = memoryCache || disk;
+  if (!previous) return build;
+  return raceStale(build, () => withDataHealth(previous, REQUIRED_IDS, ANCILLARY_IDS));
+}
+
+async function rebuild(disk) {
+  const now = Date.now();
   try {
     const data = await buildLeverageNorm(memoryCache || disk);
     // Bind the accepted payload to its own health snapshot so a later sibling fetch never

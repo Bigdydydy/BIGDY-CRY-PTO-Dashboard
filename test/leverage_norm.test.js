@@ -2,6 +2,8 @@
  * Module 2-D leverage normalization — pure calculations plus an offline build
  * with mocked CoinGlass / Yahoo payloads and a temp data dir.
  */
+process.env.SWR_BUDGET_MS = '40'; // 先回旧数据的等待上限 (server/swr.js)，须在加载模块前设置
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -263,4 +265,57 @@ test('offline build: good → small-fund volume gap → core ETF gap keeps OI/fu
   assert.notEqual(r4.dataHealth.state, 'OK');
   assert.deepEqual(fs.readFileSync(cacheFile), before);
   assert.ok(goodBytes.length > 0);
+});
+
+test('expired cache + slow upstream: the previous build is served at once, flagged revalidating, then replaced', async (t) => {
+  resetHealth();
+  const holder = { state: {} };
+  const inner = upstream(holder);
+  let gate = null;
+  let builds = 0;
+  const gated = async (url) => {
+    if (url.includes('/api/priceAndIndicator')) builds++;
+    if (gate) await gate.promise;
+    return inner(url);
+  };
+  const { tmpDir } = installModuleMocks(t, { [HTTP]: { fetchWithTimeout: gated } });
+  delete require.cache[srv('cdri_fetcher.js')];
+  const warm = freshRequire('leverage_norm.js');
+  const first = await warm.getLeverageNormData(true);
+  assert.equal(first.dataHealth.state, 'OK');
+
+  // Age the disk copy past the 1-hour build cache and start from a cold module instance
+  const cacheFile = path.join(tmpDir, 'leverage_norm.json');
+  const disk = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+  const agedAt = Date.now() - 2 * HOUR;
+  disk.generatedAt = agedAt;
+  fs.writeFileSync(cacheFile, JSON.stringify(disk));
+  delete require.cache[srv('cdri_fetcher.js')];
+  const mod = freshRequire('leverage_norm.js');
+  builds = 0;
+
+  let release;
+  gate = { promise: new Promise((r) => { release = r; }) };
+  const started = Date.now();
+  const [a, b] = await Promise.all([mod.getLeverageNormData(), mod.getLeverageNormData()]);
+  assert.ok(Date.now() - started < 1000, 'the request no longer waits for the build');
+  assert.equal(a.generatedAt, agedAt, 'the previous build is what comes back');
+  assert.equal(a.revalidating, true);
+  assert.equal(b.revalidating, true);
+  assert.equal(a.stale, undefined, '`stale` stays reserved for a failed build');
+  assert.ok(a.dataHealth && a.dataHealth.sources.lev_oi, 'health is recomputed for the old copy');
+  assert.equal(builds, 1, 'concurrent callers share one build');
+
+  release();
+  gate = null;
+  for (let i = 0; i < 100; i++) {
+    const r = await mod.getLeverageNormData();
+    if (!r.revalidating) {
+      assert.ok(r.generatedAt > agedAt, 'the background build replaced the cache');
+      assert.equal(builds, 1);
+      return;
+    }
+    await new Promise(res => setTimeout(res, 10));
+  }
+  assert.fail('still revalidating after the build finished');
 });

@@ -5,6 +5,7 @@ const { fetchWithTimeout } = require('./http_client');
 const { fetchSpotDailyCloses } = require('./spot_daily');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const { raceStale } = require('./swr');
 
 const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'ssro_chart.json'));
 let inMemoryCache = null;
@@ -484,6 +485,17 @@ async function fetchAndBuildSsroData() {
 }
 
 /**
+ * 缓存过期后的返回方式：强制刷新或没有旧数据时等这一轮取数；
+ * 否则先回旧数据、取数在后台继续 (见 swr.js)。
+ */
+function settleOrStale(refresh, force) {
+  if (force) return refresh;
+  const stale = inMemoryCache || readValidatedDisk();
+  if (!stale) return refresh;
+  return raceStale(refresh, () => withDataHealth(stale, REQUIRED_IDS, ANCILLARY_IDS));
+}
+
+/**
  * Get SSRO data with memory & disk caching (single-flight)
  */
 async function getSsroData(force = false) {
@@ -509,7 +521,7 @@ async function getSsroData(force = false) {
     }
   }
 
-  if (inflight) return inflight;
+  if (inflight) return settleOrStale(inflight, force);
   inflight = (async () => {
     try {
       return await fetchAndBuildSsroData();
@@ -526,7 +538,7 @@ async function getSsroData(force = false) {
       inflight = null;
     }
   })();
-  return inflight;
+  return settleOrStale(inflight, force);
 }
 
 module.exports = {
