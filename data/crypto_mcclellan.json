@@ -3,9 +3,9 @@
   "title": "加密麦克莱伦市场宽度振荡器",
   "subtitle": "Core Top 100 (按前次采样市值) vs 链上 Meme (Solana · BSC · Robinhood) · 比率调整 McClellan",
   "version": "3.0.0",
-  "generated_at": "2026-11-15T07:11:21Z",
-  "benchmark_date": "2026-11-15",
-  "total_days": 407,
+  "generated_at": "2026-11-16T07:16:30Z",
+  "benchmark_date": "2026-11-16",
+  "total_days": 408,
   "sampling_basis": "daily_snapshots_not_fixed_utc_close",
   "quality": {
    "historical_candidate_survivorship_bias": true,
@@ -38,7 +38,7 @@
    "candidate_n": 300,
    "source": "CoinGecko",
    "history_start": "2025-10-05",
-   "excluded_count": 88
+   "excluded_count": 89
   },
   "frontier": {
    "chains": [
@@ -80,13 +80,13 @@
   "frontier": null
  },
  "current": {
-  "date": "2026-11-15",
-  "btc_close": 64335.0,
+  "date": "2026-11-16",
+  "btc_close": 64618.0,
   "core": {
    "ready": false,
-   "breadth_days": 407,
+   "breadth_days": 408,
    "warmup_days": 40,
-   "valid_streak_days": 2,
+   "valid_streak_days": 3,
    "last_valid": {
     "date": "2026-11-12",
     "oscillator": -38.71,
@@ -101,77 +101,77 @@
      "quantixai"
     ]
    },
-   "date": "2026-11-15",
-   "advances": 8,
-   "declines": 92,
-   "unchanged": 0,
+   "date": "2026-11-16",
+   "advances": 59,
+   "declines": 39,
+   "unchanged": 2,
    "constituents": 100,
-   "ramo": -840.0,
+   "ramo": 204.1,
    "oscillator": null,
    "summation": null,
    "summation_change_10d": null,
    "percentile": null,
    "expected_constituents": 100,
    "coverage_pct": 100.0,
-   "observed_at": "2026-11-15T07:09:10Z",
+   "observed_at": "2026-11-16T07:14:03Z",
    "sampling_time_verified": true
   },
   "frontier": {
    "ready": true,
-   "breadth_days": 42,
+   "breadth_days": 43,
    "warmup_days": 40,
-   "valid_streak_days": 42,
+   "valid_streak_days": 43,
    "last_valid": {
-    "date": "2026-11-15",
-    "oscillator": -26.21,
-    "summation": -57.4
+    "date": "2026-11-16",
+    "oscillator": -2.5,
+    "summation": -59.9
    },
    "last_reset": null,
-   "date": "2026-11-15",
-   "advances": 27,
-   "declines": 71,
-   "unchanged": 1,
+   "date": "2026-11-16",
+   "advances": 56,
+   "declines": 41,
+   "unchanged": 2,
    "constituents": 99,
-   "ramo": -474.6,
-   "oscillator": -26.21,
-   "summation": -57.4,
+   "ramo": 134.6,
+   "oscillator": -2.5,
+   "summation": -59.9,
    "summation_change_10d": null,
-   "percentile": 0.0,
+   "percentile": 100.0,
    "expected_constituents": 99,
    "coverage_pct": 100.0,
-   "observed_at": "2026-11-15T07:10:43Z",
+   "observed_at": "2026-11-16T07:15:56Z",
    "sampling_time_verified": true,
    "started": "2026-10-04",
-   "tracked_today": 99,
+   "tracked_today": 95,
    "tracked_by_chain": {
-    "solana": 27,
+    "solana": 26,
     "bsc": 39,
-    "robinhood": 33
+    "robinhood": 30
    },
    "chains": {
     "bsc": {
-     "adv": 11,
-     "dec": 25,
-     "n": 37
+     "adv": 24,
+     "dec": 15,
+     "n": 39
     },
     "robinhood": {
-     "adv": 13,
-     "dec": 22,
-     "n": 35
+     "adv": 20,
+     "dec": 12,
+     "n": 33
     },
     "solana": {
-     "adv": 3,
-     "dec": 24,
+     "adv": 12,
+     "dec": 14,
      "n": 27
     }
    },
-   "dead": 6,
-   "entries": 10,
+   "dead": 4,
+   "entries": 6,
    "exits": 10,
    "age_median": 17,
    "low_sample": false,
-   "ramo_pooled": -449.0,
-   "anchor_corr_days": 1,
+   "ramo_pooled": 154.6,
+   "anchor_corr_days": 2,
    "anchor_corr": null
   }
  },
@@ -10139,8 +10139,8 @@
   {
    "date": "2026-11-14",
    "btc_close": 67349.0,
-   "dex_volume": null,
-   "dex_momentum": null,
+   "dex_volume": 3.622,
+   "dex_momentum": -7.4,
    "core_adv": 13,
    "core_dec": 86,
    "core_n": 100,
@@ -10195,6 +10195,36 @@
    "frontier_age_median": 17,
    "frontier_low_sample": false,
    "frontier_ramo_pooled": -449.0
+  },
+  {
+   "date": "2026-11-16",
+   "btc_close": 64618.0,
+   "dex_volume": null,
+   "dex_momentum": null,
+   "core_adv": 59,
+   "core_dec": 39,
+   "core_n": 100,
+   "core_ramo": 204.1,
+   "core_oscillator": null,
+   "core_summation": null,
+   "core_band_low": -61.11,
+   "core_band_high": 57.32,
+   "core_coverage_pct": 100.0,
+   "frontier_adv": 56,
+   "frontier_dec": 41,
+   "frontier_n": 99,
+   "frontier_ramo": 134.6,
+   "frontier_oscillator": -2.5,
+   "frontier_summation": -59.9,
+   "frontier_band_low": null,
+   "frontier_band_high": null,
+   "frontier_coverage_pct": 100.0,
+   "frontier_dead": 4,
+   "frontier_entries": 6,
+   "frontier_exits": 10,
+   "frontier_age_median": 17,
+   "frontier_low_sample": false,
+   "frontier_ramo_pooled": 154.6
   }
  ],
  "structure": {
@@ -10217,27 +10247,27 @@
    "fixed_danger_threshold": null
   },
   "current": {
-   "date": "2026-11-15",
+   "date": "2026-11-16",
    "ready": false,
    "index_ready": true,
    "status": "warming_up",
-   "consecutive_days": 2,
-   "ew_index": 91.8751,
-   "cw_index": 92.6606,
+   "consecutive_days": 3,
+   "ew_index": 92.1546,
+   "cw_index": 93.2157,
    "ew_drawdown_52w": null,
    "cw_drawdown_52w": null,
    "drawdown_gap_pp": null,
    "gap_percentile": null,
-   "median_constituent_drawdown_52w": 51.5134,
+   "median_constituent_drawdown_52w": 50.5262,
    "drawdown_eligible": 93,
-   "pct_above_sma200": 23.7113,
+   "pct_above_sma200": 21.6495,
    "sma200_eligible": 97,
    "constituents": 100,
    "expected_constituents": 100,
    "coverage_pct": 100.0,
    "realized_vol_30d": null,
    "alt_btc_corr_30d": null,
-   "volatility_observations": 2
+   "volatility_observations": 3
   },
   "series": [
    {
@@ -19600,6 +19630,29 @@
     "realized_vol_30d": null,
     "alt_btc_corr_30d": null,
     "volatility_observations": 2
+   },
+   {
+    "date": "2026-11-16",
+    "ready": false,
+    "index_ready": true,
+    "status": "warming_up",
+    "consecutive_days": 3,
+    "ew_index": 92.1546,
+    "cw_index": 93.2157,
+    "ew_drawdown_52w": null,
+    "cw_drawdown_52w": null,
+    "drawdown_gap_pp": null,
+    "gap_percentile": null,
+    "median_constituent_drawdown_52w": 50.5262,
+    "drawdown_eligible": 93,
+    "pct_above_sma200": 21.6495,
+    "sma200_eligible": 97,
+    "constituents": 100,
+    "expected_constituents": 100,
+    "coverage_pct": 100.0,
+    "realized_vol_30d": null,
+    "alt_btc_corr_30d": null,
+    "volatility_observations": 3
    }
   ]
  }
