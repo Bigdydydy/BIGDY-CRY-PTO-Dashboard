@@ -2606,3 +2606,151 @@ html.atl-entering .atl-caption {
     pointer-events: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   取数等待层 (load_veil.js)
+   卡片首次取数时盖一层「潮线」；已有数据的卡片刷新时只在顶沿走细线；
+   页面顶端一条总进度线。快请求 (<250ms) 不出现任何一层。
+   -------------------------------------------------------------------------- */
+.lv-host-rel {
+  position: relative;
+}
+
+.lv-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 56px 16px 24px;
+  border-radius: inherit;
+  background: var(--bg-surface);
+  background: color-mix(in srgb, var(--bg-canvas) 76%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);
+  opacity: 0;
+  transition: opacity 0.36s var(--atl-ease);
+}
+
+.lv-veil.is-on {
+  opacity: 1;
+}
+
+/* 外层卡片已盖等待层时，内嵌分区不再叠第二层 */
+.lv-veiled .lv-host > .lv-veil {
+  display: none;
+}
+
+.lv-plate {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 100%;
+  text-align: center;
+}
+
+.lv-tide {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  white-space: pre;
+  color: var(--text-muted);
+  opacity: 0.75;
+  user-select: none;
+}
+
+.lv-tide b {
+  font-weight: 500;
+  color: var(--accent-primary);
+}
+
+.lv-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--atl-serif-zh);
+  font-size: 1.02rem;
+  color: var(--text-primary);
+}
+
+.lv-clock {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-primary);
+}
+
+.lv-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.lv-hair {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 31;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lv-hair::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 36%;
+  background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+  animation: atl-indeterminate 1.5s var(--atl-ease) infinite;
+}
+
+.lv-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 2300;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.lv-bar.is-on {
+  opacity: 1;
+}
+
+.lv-bar span {
+  display: block;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, var(--accent-primary));
+  transition: transform 0.3s linear;
+}
+
+html.atl-booting .lv-bar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .lv-veil { padding-top: 40px; }
+  .lv-tide { font-size: 11px; letter-spacing: 0.1em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-veil,
+  .lv-bar,
+  .lv-bar span {
+    transition: none;
+  }
+
+  .lv-hair::before {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
