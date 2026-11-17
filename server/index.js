@@ -121,40 +121,6 @@ function clientAddress(req) {
   return Number.isInteger(hops) && hops > 0 && chain.length >= hops
     ? chain[chain.length - hops] : (req.socket?.remoteAddress || 'unknown');
 }
-
-// TEMPORARY (audit 9.3): show the shape of the proxy chain Render forwards, so
-// TRUST_PROXY_HOPS can be checked against reality. Logs only the first few API
-// requests per process. Every segment is labelled private/public; public
-// addresses are masked to their first two parts, which is enough to recognise
-// your own address or a CDN edge without writing visitors' full IPs to the log.
-// Remove once the hop count is confirmed.
-let proxyChainLogsLeft = 5;
-function isPrivateAddress(ip) {
-  const v = String(ip).replace(/^::ffff:/i, '');
-  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(v);
-  if (m) {
-    const a = +m[1], b = +m[2];
-    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
-      (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
-  }
-  return /^(::1$|f[cd]|fe[89ab])/i.test(v);
-}
-function maskAddress(ip) {
-  const v = String(ip).replace(/^::ffff:/i, '');
-  if (isPrivateAddress(v)) return `${v}(private)`;
-  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(v);
-  if (m) return `${m[1]}.${m[2]}.x.x(public)`;
-  return `${v.split(':').slice(0, 2).join(':')}:x(public)`;
-}
-function logProxyChainOnce(req) {
-  if (proxyChainLogsLeft <= 0) return;
-  proxyChainLogsLeft--;
-  const chain = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
-  const pick = h => (chain.length >= h ? maskAddress(chain[chain.length - h]) : '-');
-  console.log(`[ProxyChain] xff segments=${chain.length} chain=[${chain.map(maskAddress).join(', ')}] ` +
-    `peer=${req.socket?.remoteAddress || '-'} TRUST_PROXY_HOPS=${process.env.TRUST_PROXY_HOPS ?? '(unset)'} ` +
-    `hops1=${pick(1)} hops2=${pick(2)} hops3=${pick(3)}`);
-}
 let activeRefreshPromise = null;
 
 // ---------------------------------------------------------------------------
@@ -762,7 +728,6 @@ function sendJsonResponse(req, res, statusCode, payload, extraHeaders = {}) {
  */
 async function handleApiRequest(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
-  logProxyChainOnce(req); // TEMPORARY (audit 9.3)
   // Query/body types are untrusted; repeated query keys are arrays in url.parse.
   if (Object.values(parsedUrl.query || {}).some(Array.isArray)) {
     sendJsonResponse(req, res, 400, { code: 400, error: 'Repeated query parameters are not supported' });

@@ -55,6 +55,15 @@ test('proxy headers require explicit trusted-hop configuration', () => {
     assert.equal(_internal.clientAddress(req), 'peer');
     process.env.TRUST_PROXY_HOPS = '1';
     assert.equal(_internal.clientAddress(req), 'real');
+    // Render production chain: [client, Cloudflare edge, Render internal proxy].
+    process.env.TRUST_PROXY_HOPS = '3';
+    const render = chain => ({ headers: { 'x-forwarded-for': chain }, socket: { remoteAddress: '127.0.0.1' } });
+    assert.equal(_internal.clientAddress(render('23.248.1.2, 162.159.3.4, 10.28.5.6')), '23.248.1.2');
+    // A client-supplied header is kept in front by the proxies, so counting from
+    // the right still lands on the address Cloudflare saw, not the forged one.
+    assert.equal(_internal.clientAddress(render('6.6.6.6, 23.248.1.2, 162.159.3.4, 10.28.5.6')), '23.248.1.2');
+    // A short chain is not trusted: fall back to the peer (one shared bucket).
+    assert.equal(_internal.clientAddress(render('162.159.3.4, 10.28.5.6')), '127.0.0.1');
   } finally {
     if (old === undefined) delete process.env.TRUST_PROXY_HOPS; else process.env.TRUST_PROXY_HOPS = old;
   }

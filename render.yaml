@@ -9,5 +9,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # X-Forwarded-For on Render arrives as [client, Cloudflare edge, Render
+      # internal proxy] (confirmed from production logs 2026-11-17), so the
+      # visitor is the third entry from the right.
       - key: TRUST_PROXY_HOPS
-        value: "1"
+        value: "3"
