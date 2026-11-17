@@ -3090,19 +3090,19 @@
   ],
   "evidence": {},
   "mnav": {
-    "computedAt": "2026-11-16T22:22:44.387Z",
-    "priceAsOf": "2026-11-16T22:22:44.607Z",
+    "computedAt": "2026-11-17T08:10:31.524Z",
+    "priceAsOf": "2026-11-17T08:10:30.902Z",
     "mstrPriceUsd": 103.02999877929688,
-    "btcPriceUsd": 65298.24,
+    "btcPriceUsd": 64576.77,
     "btcSource": "coinbase",
     "mstrSource": "yahoo",
     "capitalSource": "sec",
     "capitalAsOf": "2026-11-15",
     "result": {
-      "mnav": 1.0869,
-      "netBtcUsd": 40916203162,
-      "netBtcBtc": 626604.9921,
-      "netBpsUsd": 94.79,
+      "mnav": 1.1035,
+      "netBtcUsd": 40302341134,
+      "netBtcBtc": 624099.6744,
+      "netBpsUsd": 93.37,
       "fdso": 431639015,
       "usdAssetsUsd": 4901200000,
       "claimsUsd": 19543939044,
@@ -3127,7 +3127,7 @@
       },
       "inputs": {
         "mstrPriceUsd": 103.02999877929688,
-        "btcPriceUsd": 65298.24,
+        "btcPriceUsd": 64576.77,
         "capitalAsOf": "2026-11-15"
       },
       "issues": []
@@ -3137,53 +3137,53 @@
   "dataHealth": {
     "sources": {
       "mstr_official_ledger": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 75,
+        "consecutiveFailures": 76,
         "issues": [],
         "available": false
       },
       "mstr_official_shares": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 75,
+        "consecutiveFailures": 76,
         "issues": [],
         "available": false
       },
       "mstr_official_capital": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 75,
+        "consecutiveFailures": 76,
         "issues": [],
         "available": false
       },
       "mstr_official_press": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
         "lastSuccessAt": null,
         "dataAsOf": null,
         "asOfKind": null,
         "source": "disk",
         "lastError": "HTTP 403",
-        "consecutiveFailures": 75,
+        "consecutiveFailures": 76,
         "issues": [],
         "available": false
       },
       "mstr_sec_index": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
-        "lastSuccessAt": "2026-11-16T22:22:44.387Z",
-        "dataAsOf": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
+        "lastSuccessAt": "2026-11-17T08:10:31.524Z",
+        "dataAsOf": "2026-11-17T08:10:31.524Z",
         "asOfKind": "received",
         "source": "https://data.sec.gov/submissions/CIK0001050446.json",
         "lastError": null,
@@ -3192,9 +3192,9 @@
         "available": true
       },
       "mstr_mnav_inputs": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
-        "lastSuccessAt": "2026-11-16T22:22:44.387Z",
-        "dataAsOf": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
+        "lastSuccessAt": "2026-11-17T08:10:31.524Z",
+        "dataAsOf": "2026-11-17T08:10:31.524Z",
         "asOfKind": "received",
         "source": "yahoo+coinbase",
         "lastError": null,
@@ -3203,9 +3203,9 @@
         "available": true
       },
       "mstr_sec_filings": {
-        "lastAttemptAt": "2026-11-16T22:22:44.387Z",
-        "lastSuccessAt": "2026-11-16T22:22:44.387Z",
-        "dataAsOf": "2026-11-16T22:22:44.387Z",
+        "lastAttemptAt": "2026-11-17T08:10:31.524Z",
+        "lastSuccessAt": "2026-11-17T08:10:31.524Z",
+        "dataAsOf": "2026-11-17T08:10:31.524Z",
         "asOfKind": "received",
         "source": "https://data.sec.gov/submissions/CIK0001050446.json",
         "lastError": null,
@@ -3215,8 +3215,8 @@
       }
     }
   },
-  "lastAttemptAt": "2026-11-16T22:22:44.387Z",
-  "lastCompletedAt": "2026-11-16T22:22:44.985Z",
+  "lastAttemptAt": "2026-11-17T08:10:31.524Z",
+  "lastCompletedAt": "2026-11-17T08:10:32.798Z",
   "secDocs": {
     "0001193125-26-424688": {
       "accession": "0001193125-26-424688",
@@ -4690,7 +4690,7 @@
     }
   },
   "secXbrl": {
-    "fetchedAt": "2026-11-16T06:51:38.647Z",
+    "fetchedAt": "2026-11-17T08:10:31.524Z",
     "longTermDebt": {
       "value": 6715414000,
       "periodEnd": "2026-09-30",
