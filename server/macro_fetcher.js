@@ -7,6 +7,7 @@ const zlib = require('zlib');
 const { fetchWithTimeout, fetchBinanceSpot } = require('./http_client');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { withDataHealth, seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
+const macroBackup = require('./macro_backup');
 
 const CACHE_FILE = snapshotPath(path.join(__dirname, '..', 'data', 'macro_chart.json'));
 
@@ -387,43 +388,51 @@ async function fetchLiveBtSnapshot() {
 
 
 /**
- * Fetch Treasury yield series from FRED CSV
+ * FRED CSV → { map, lastDate }；坏表头、坏行、未来日期、日期乱序都整体抛错。
+ */
+async function fetchFredSeriesRaw(id) {
+  const resp = await fetchWithTimeout('https://fred.stlouisfed.org/graph/fredgraph.csv?id=' + id, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+  });
+  if (!resp.ok) throw new Error('FRED HTTP ' + resp.status);
+  const text = await resp.text();
+  const lines = text.trim().split('\n');
+  // Verify the CSV shape: a DATE/observation_date column + the series id column.
+  const headerCols = (lines[0] || '').toLowerCase().split(',').map(s => s.trim());
+  const dateCol = headerCols.findIndex(c => c === 'date' || c === 'observation_date');
+  const valCol = headerCols.findIndex(c => c === id.toLowerCase());
+  if (dateCol < 0 || valCol < 0) {
+    throw new Error(`FRED ${id}: unexpected CSV header "${lines[0]}"`);
+  }
+  const map = new Map();
+  let lastDate = '';
+  const nowMs = Date.now();
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(',');
+    if (parts.length <= Math.max(dateCol, valCol)) continue;
+    const date = parts[dateCol].trim();
+    const valStr = parts[valCol].trim();
+    if (valStr === '.' || valStr === '') continue; // publication gap — skippable
+    if (!validDateStr(date)) throw new Error(`FRED ${id}: invalid date "${date}"`);
+    if (Date.parse(date) > nowMs + MAX_FUTURE_MS) throw new Error(`FRED ${id}: future date ${date}`);
+    if (date <= lastDate) throw new Error(`FRED ${id}: non-ascending dates`);
+    lastDate = date;
+    // Non-numeric garbage must not be parseFloat-swallowed.
+    if (!STRICT_NUM_RE.test(valStr)) throw new Error(`FRED ${id}: non-numeric value "${valStr}"`);
+    map.set(date, parseFloat(valStr));
+  }
+  if (!map.size) throw new Error(`FRED ${id}: no data rows parsed`);
+  return { map, lastDate };
+}
+
+/**
+ * Fetch a FRED series as a health-recorded leaf (used by basis / preferreds).
  */
 async function fetchFredSeries(id) {
   const hid = `fred:${id}`;
   recordAttempt(hid, { now: Date.now() });
   try {
-    const resp = await fetchWithTimeout('https://fred.stlouisfed.org/graph/fredgraph.csv?id=' + id, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-    });
-    if (!resp.ok) throw new Error('FRED HTTP ' + resp.status);
-    const text = await resp.text();
-    const lines = text.trim().split('\n');
-    // Verify the CSV shape: a DATE/observation_date column + the series id column.
-    const headerCols = (lines[0] || '').toLowerCase().split(',').map(s => s.trim());
-    const dateCol = headerCols.findIndex(c => c === 'date' || c === 'observation_date');
-    const valCol = headerCols.findIndex(c => c === id.toLowerCase());
-    if (dateCol < 0 || valCol < 0) {
-      throw new Error(`FRED ${id}: unexpected CSV header "${lines[0]}"`);
-    }
-    const map = new Map();
-    let lastDate = '';
-    const nowMs = Date.now();
-    for (let i = 1; i < lines.length; i++) {
-      const parts = lines[i].split(',');
-      if (parts.length <= Math.max(dateCol, valCol)) continue;
-      const date = parts[dateCol].trim();
-      const valStr = parts[valCol].trim();
-      if (valStr === '.' || valStr === '') continue; // publication gap — skippable
-      if (!validDateStr(date)) throw new Error(`FRED ${id}: invalid date "${date}"`);
-      if (Date.parse(date) > nowMs + MAX_FUTURE_MS) throw new Error(`FRED ${id}: future date ${date}`);
-      if (date <= lastDate) throw new Error(`FRED ${id}: non-ascending dates`);
-      lastDate = date;
-      // Non-numeric garbage must not be parseFloat-swallowed.
-      if (!STRICT_NUM_RE.test(valStr)) throw new Error(`FRED ${id}: non-numeric value "${valStr}"`);
-      map.set(date, parseFloat(valStr));
-    }
-    if (!map.size) throw new Error(`FRED ${id}: no data rows parsed`);
+    const { map, lastDate } = await fetchFredSeriesRaw(id);
     // dataAsOf = latest REAL observation date (never a forward-filled point).
     recordSuccess(hid, { dataAsOf: lastDate, asOfKind: 'source', source: 'fred.stlouisfed.org' });
     return map;
@@ -432,6 +441,150 @@ async function fetchFredSeries(id) {
     recordFailure(hid, err);
     return new Map();
   }
+}
+
+// ---------------------------------------------------------------------------
+// 美债曲线 / 净流动性：FRED 为主，数据原始发布方为备用 (server/macro_backup.js)
+// ---------------------------------------------------------------------------
+
+const BACKUP_TTL_MS = 30 * 60 * 1000;
+// tol：与 FRED 重叠日的核对容差（FRED 收益率 2 位小数、RRP 3 位小数、H.4.1 整数百万）
+const LEG_BACKUP = Object.freeze({
+  DGS1: { key: 'treasury', label: 'treasury', source: 'home.treasury.gov', tol: 0.0051 },
+  DGS10: { key: 'treasury', label: 'treasury', source: 'home.treasury.gov', tol: 0.0051 },
+  RRPONTSYD: { key: 'nyfed', label: 'nyfed', source: 'markets.newyorkfed.org', tol: 0.0011 },
+  WALCL: { key: 'h41:WALCL', label: 'h41', source: 'federalreserve.gov/H.4.1', tol: 0.5 },
+  WTREGEN: { key: 'h41:WTREGEN', label: 'h41', source: 'federalreserve.gov/H.4.1', tol: 0.5 }
+});
+const backupCache = new Map(); // key → { at, promise }
+
+/** 单飞 + 30 分钟缓存（失败不缓存），避免每轮 5 分钟刷新都去打官方站点 */
+function cachedBackup(key, fn) {
+  const hit = backupCache.get(key);
+  if (hit && Date.now() - hit.at < BACKUP_TTL_MS) return hit.promise;
+  const promise = Promise.resolve().then(fn);
+  backupCache.set(key, { at: Date.now(), promise });
+  promise.catch(() => { if (backupCache.get(key)?.promise === promise) backupCache.delete(key); });
+  return promise;
+}
+
+async function fetchBackupSeries(id) {
+  const spec = LEG_BACKUP[id];
+  if (!spec) throw new Error(`no backup source for ${id}`);
+  if (spec.key === 'treasury') {
+    const y = await cachedBackup('treasury', () => macroBackup.fetchTreasuryYields(fetchWithTimeout));
+    return y[id];
+  }
+  if (spec.key === 'nyfed') return cachedBackup('nyfed', () => macroBackup.fetchNyFedRrp(fetchWithTimeout));
+  return cachedBackup(spec.key, () => macroBackup.fetchH41Series(fetchWithTimeout, id));
+}
+
+const lastKey = map => { let k = null; for (const d of map.keys()) if (k === null || d > k) k = d; return k; };
+
+/**
+ * 一条宏观腿：FRED 与备用源并行拉取。
+ *  - FRED 正常：以 FRED 为准。备用源与 FRED 的重叠日逐一核对，全部一致才用它补上
+ *    FRED 还没发布的最近几天；核对不通过就整段丢弃备用数据。健康 OK。
+ *  - FRED 失败、备用源正常：返回备用窗口，构建时叠加到上一版快照的历史上；健康 FALLBACK。
+ *  - 都失败：recordFailure，构建时沿用上一版快照。
+ */
+async function fetchMacroLeg(id) {
+  const hid = `fred:${id}`;
+  const spec = LEG_BACKUP[id];
+  recordAttempt(hid, { now: Date.now() });
+  const [fredRes, backupRes] = await Promise.allSettled([fetchFredSeriesRaw(id), fetchBackupSeries(id)]);
+  const leg = {
+    id, fred: new Map(), fredLast: null, fredError: null,
+    backup: new Map(), backupLabel: spec.label, backupError: null
+  };
+  if (fredRes.status === 'fulfilled') {
+    leg.fred = fredRes.value.map;
+    leg.fredLast = fredRes.value.lastDate;
+  } else {
+    leg.fredError = fredRes.reason;
+    console.error('[MacroFetcher] Error fetching FRED ' + id + ':', fredRes.reason?.message);
+  }
+  if (backupRes.status === 'fulfilled' && backupRes.value instanceof Map && backupRes.value.size) {
+    leg.backup = backupRes.value;
+  } else {
+    leg.backupError = backupRes.status === 'rejected' ? backupRes.reason : new Error('empty backup series');
+    console.warn(`[MacroFetcher] Backup ${spec.source} for ${id} unavailable:`, leg.backupError?.message);
+  }
+
+  if (leg.fred.size && leg.backup.size) {
+    const mismatches = [];
+    for (const [d, v] of leg.backup) {
+      if (leg.fred.has(d) && Math.abs(leg.fred.get(d) - v) > spec.tol) {
+        mismatches.push(`${d}: fred=${leg.fred.get(d)} backup=${v}`);
+      }
+    }
+    if (mismatches.length) {
+      console.warn(`[MacroFetcher] Backup ${spec.source} disagrees with FRED ${id} on ${mismatches.length} day(s), discarded:`,
+        mismatches.slice(0, 3).join('; '));
+      leg.backupError = new Error(`disagrees with FRED on ${mismatches.length} day(s)`);
+      leg.backup = new Map();
+    }
+  }
+
+  if (leg.fred.size) {
+    const tailLast = lastKey(new Map([...leg.backup].filter(([d]) => d > leg.fredLast)));
+    recordSuccess(hid, {
+      dataAsOf: tailLast || leg.fredLast, asOfKind: 'source',
+      source: tailLast ? `fred.stlouisfed.org+${spec.source}` : 'fred.stlouisfed.org'
+    });
+  } else if (leg.backup.size) {
+    recordSuccess(hid, {
+      dataAsOf: lastKey(leg.backup), asOfKind: 'source', source: spec.source,
+      issues: [`fred: ${leg.fredError?.message || 'failed'}`]
+    });
+  } else {
+    recordFailure(hid, new Error(
+      `${leg.fredError?.message || 'FRED failed'}; backup ${spec.source}: ${leg.backupError?.message || 'failed'}`
+    ));
+  }
+  return leg;
+}
+
+/**
+ * 把一条腿合成构建用的序列，并给出该腿真实的最新观测日与来源。
+ *  base = FRED 全量历史；FRED 失败时 = 上一版快照还原（含当时的前值顶替点）。
+ *  FRED 正常时备用源只补 FRED 最后观测日之后的日子；FRED 失败时备用源覆盖窗口内
+ *  所有日子 —— 真实观测会顶掉快照里的顶替值，这就是"新数据修正旧数据"。
+ */
+function resolveMacroLeg(leg, prevPoints, field, scale, prevSummary) {
+  let map;
+  let status;
+  let asOf;
+  let source;
+  if (leg.fred.size) {
+    map = new Map(leg.fred);
+    status = 'ok';
+    asOf = leg.fredLast;
+    source = 'fred';
+  } else {
+    map = new Map();
+    for (const p of prevPoints) {
+      if (p[field] !== null && p[field] !== undefined) map.set(p.date, p[field] * scale);
+    }
+    status = map.size ? 'fallback' : 'failed';
+    asOf = map.size ? (prevSummary?.seriesAsOf?.[field] || null) : null;
+    source = map.size ? 'snapshot' : null;
+  }
+  const add = leg.fred.size
+    ? [...leg.backup].filter(([d]) => d > leg.fredLast)
+    : [...leg.backup];
+  if (add.length) {
+    for (const [d, v] of add) map.set(d, v);
+    map = new Map([...map].sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0)));
+    const addLast = add.map(([d]) => d).sort().pop();
+    if (!asOf || addLast > asOf) asOf = addLast;
+    if (leg.fred.size) source = `fred+${leg.backupLabel}`;
+    else {
+      source = status === 'fallback' ? `${leg.backupLabel}+snapshot` : leg.backupLabel;
+      status = 'backup';
+    }
+  }
+  return { map, status, asOf, source };
 }
 
 /**
@@ -565,36 +718,38 @@ async function fetchMstrStockPrices() {
  */
 async function fetchAndBuildMacroData() {
   console.log('[MacroFetcher] Starting data fetch for Macro Chart...');
-  const [mstrList, liveBt, fred1yRaw, fred10yRaw, fredWalclRaw, fredWtregenRaw, fredRrpRaw, btcMap, mstrStockMap] = await Promise.all([
+  const [mstrList, liveBt, leg1y, leg10y, legWalcl, legWtregen, legRrp, btcMap, mstrStockMap] = await Promise.all([
     fetchMstrCost(),
     fetchLiveBtSnapshot(),
-    fetchFredSeries('DGS1'),
-    fetchFredSeries('DGS10'),
-    fetchFredSeries('WALCL'),
-    fetchFredSeries('WTREGEN'),
-    fetchFredSeries('RRPONTSYD'),
+    fetchMacroLeg('DGS1'),
+    fetchMacroLeg('DGS10'),
+    fetchMacroLeg('WALCL'),
+    fetchMacroLeg('WTREGEN'),
+    fetchMacroLeg('RRPONTSYD'),
     fetchBtcDailyPrices('2020-08-01'),
     fetchMstrStockPrices()
   ]);
 
-  // 单个数据源失败时沿用上一版数据集的同一序列，避免把空值写进缓存；并记录各源状态供前端提示
+  // FRED 腿：FRED 全量历史为主；FRED 失败时沿用上一版数据集的同一序列（避免把空值写进缓存），
+  // 再叠加官方备用源的真实观测。sources 记各腿状态供前端提示：
+  // ok（FRED，可能由备用源补了最新几天）/ backup（FRED 失败，改用备用源）/ fallback（只剩快照）/ failed
   const previous = inMemoryCache || readMacroCacheFile();
   const prevPoints = previous && Array.isArray(previous.points) ? previous.points : [];
   const sources = {};
-  const withFallback = (name, fresh, field, scale) => {
-    if (fresh.size > 0) { sources[name] = 'ok'; return fresh; }
-    const restored = new Map();
-    for (const p of prevPoints) {
-      if (p[field] !== null && p[field] !== undefined) restored.set(p.date, p[field] * scale);
-    }
-    sources[name] = restored.size > 0 ? 'fallback' : 'failed';
-    return restored;
+  const seriesAsOf = {};
+  const seriesSource = {};
+  const useLeg = (name, leg, field, scale) => {
+    const r = resolveMacroLeg(leg, prevPoints, field, scale, previous?.summary);
+    sources[name] = r.status;
+    seriesAsOf[field] = r.asOf;
+    seriesSource[field] = r.source;
+    return r.map;
   };
-  const fred1y = withFallback('FRED DGS1', fred1yRaw, 'us1y', 1);
-  const fred10y = withFallback('FRED DGS10', fred10yRaw, 'us10y', 1);
-  const fredWalcl = withFallback('FRED WALCL', fredWalclRaw, 'fedWalcl', 1e6);
-  const fredWtregen = withFallback('FRED WTREGEN', fredWtregenRaw, 'fedTga', 1e6);
-  const fredRrp = withFallback('FRED RRP', fredRrpRaw, 'fedRrp', 1000);
+  const fred1y = useLeg('FRED DGS1', leg1y, 'us1y', 1);
+  const fred10y = useLeg('FRED DGS10', leg10y, 'us10y', 1);
+  const fredWalcl = useLeg('FRED WALCL', legWalcl, 'fedWalcl', 1e6);
+  const fredWtregen = useLeg('FRED WTREGEN', legWtregen, 'fedTga', 1e6);
+  const fredRrp = useLeg('FRED RRP', legRrp, 'fedRrp', 1000);
   sources['Binance BTC'] = btcMap.size > 0 ? 'ok' : 'failed';
   sources['Yahoo MSTR'] = mstrStockMap.size > 0 ? 'ok' : (prevPoints.length ? 'fallback' : 'failed');
   sources['bitcointreasuries'] = liveBt ? 'ok' : 'failed';
@@ -775,9 +930,11 @@ async function fetchAndBuildMacroData() {
       us1y: last1y,
       us10y: last10y,
       yieldSpread,
-      fedWalcl: lastWalcl !== null ? Number((lastWalcl / 1000000).toFixed(3)) : null,
-      fedTga: lastWtregen !== null ? Number((lastWtregen / 1000000).toFixed(3)) : null,
-      fedRrp: lastRrp !== null ? Number((lastRrp / 1000).toFixed(3)) : null,
+      // 万亿美元，保留到百万美元精度：RRP 已近零（几亿美元），3 位小数会被抹成 0，
+      // 快照回退时也会把精度损失带回序列
+      fedWalcl: lastWalcl !== null ? Number((lastWalcl / 1000000).toFixed(6)) : null,
+      fedTga: lastWtregen !== null ? Number((lastWtregen / 1000000).toFixed(6)) : null,
+      fedRrp: lastRrp !== null ? Number((lastRrp / 1000).toFixed(6)) : null,
       fedNetLiquidity,
       fedNetLiqSma20: null
     });
@@ -852,6 +1009,11 @@ async function fetchAndBuildMacroData() {
       ? Number((latest.fedNetLiquidity - point20dAgo.fedNetLiquidity).toFixed(4))
       : null,
     sources,
+    // 各腿真实的最新观测日（不是前值顶替到的日期）与来源：
+    // fred / fred+treasury|nyfed|h41（备用源补了 FRED 未发布的最新几天）/ treasury|nyfed|h41（FRED 失败）
+    // / *+snapshot（备用窗口叠加在上一版快照历史上）/ snapshot
+    seriesAsOf,
+    seriesSource,
     totalPoints: points.length,
     dateRange: {
       start: points[0] ? points[0].date : null,
@@ -1004,6 +1166,8 @@ module.exports = {
   getMacroChartData,
   fetchAndBuildMacroData,
   fetchFredSeries,
+  fetchMacroLeg,
+  resolveMacroLeg,
   fetchBtcDailyPrices,
   classifyYieldCurveRegime,
   summarizeYieldCurve

@@ -3106,13 +3106,31 @@ function describeFreshness(summary) {
   const sources = summary.sources || {};
   const failed = Object.keys(sources).filter(k => sources[k] === 'failed');
   const fallback = Object.keys(sources).filter(k => sources[k] === 'fallback');
+  const backup = Object.keys(sources).filter(k => sources[k] === 'backup');
   let health = '数据源正常';
   if (failed.length) health = `${failed.join(' / ')} 不可用`;
   else if (fallback.length) health = `${fallback.join(' / ')} 沿用上一版`;
+  else if (backup.length) health = `${backup.join(' / ')} 改用官方备用源`;
   return {
     text: `更新于 ${time} (${ageText}) · ${health}`,
-    stale: Date.now() - updated > DATA_STALE_MS || failed.length > 0 || fallback.length > 0
+    stale: Date.now() - updated > DATA_STALE_MS || failed.length > 0 || fallback.length > 0 || backup.length > 0
   };
+}
+
+const MACRO_LEG_SOURCE_LABEL = {
+  treasury: '财政部', nyfed: '纽约联储', h41: '美联储 H.4.1', snapshot: '上一版快照'
+};
+
+/** 某条宏观腿真实的最新观测日（图上之后的点是前值顶替）+ 非 FRED 来源说明，如「截至 11-17 · 财政部补」 */
+function macroLegAsOf(summary, field) {
+  const asOf = summary?.seriesAsOf?.[field];
+  if (!asOf) return '';
+  let text = `截至 ${asOf.slice(5)}`;
+  const src = summary?.seriesSource?.[field] || '';
+  const parts = src.split('+');
+  if (parts[0] === 'fred' && parts[1]) text += ` · ${MACRO_LEG_SOURCE_LABEL[parts[1]] || parts[1]}补`;
+  else if (parts[0] && parts[0] !== 'fred') text += ` · ${parts.map(p => MACRO_LEG_SOURCE_LABEL[p] || p).join('+')}`;
+  return text;
 }
 
 function renderFreshness(elId, summary) {
@@ -3253,10 +3271,12 @@ function renderMacroSummary(summary) {
     }
   }
   if (elMacro1ySub) {
-    const parts = ['短端政策利率锚'];
+    // 截至日放在前面：副标题单行省略，排在末尾会被截掉
+    const parts = [macroLegAsOf(summary, 'us1y') || '短端政策利率锚'];
     if (r7) parts.push(`1W ${fmtBp(r7.chg1yBp)}`);
     if (rTf) parts.push(`${tfLabel} ${fmtBp(rTf.chg1yBp)}`);
     elMacro1ySub.textContent = parts.join(' · ');
+    elMacro1ySub.title = elMacro1ySub.textContent;
   }
 
   if (elMacro10yVal && summary.current10y !== null) {
@@ -3272,10 +3292,11 @@ function renderMacroSummary(summary) {
     }
   }
   if (elMacro10ySub) {
-    const parts = ['全球久期定价锚'];
+    const parts = [macroLegAsOf(summary, 'us10y') || '全球久期定价锚'];
     if (r7) parts.push(`1W ${fmtBp(r7.chg10yBp)}`);
     if (rTf) parts.push(`${tfLabel} ${fmtBp(rTf.chg10yBp)}`);
     elMacro10ySub.textContent = parts.join(' · ');
+    elMacro10ySub.title = elMacro10ySub.textContent;
   }
 
   if (elMacroSpreadVal && summary.currentSpread !== null) {
@@ -3398,7 +3419,14 @@ function renderMacroSummary(summary) {
   if (elMacroNetliqSub && summary.currentFedWalcl !== null && summary.currentFedTga !== null && summary.currentFedRrp !== null) {
     const rrpStr = summary.currentFedRrp < 0.01 ? `$${(summary.currentFedRrp * 1000).toFixed(1)}B` : `$${summary.currentFedRrp.toFixed(2)}T`;
     const rrpGone = summary.currentFedRrp < 0.01; // < $10B：RRP 项已不起作用
-    elMacroNetliqSub.textContent = `WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}${rrpGone ? ' · RRP 已近零，现实际为 WALCL − TGA' : ''}`;
+    // 周频腿（WALCL/TGA）取较早的截至日；RRP 日频单列
+    const asOfMap = summary.seriesAsOf || {};
+    const weeklyField = (asOfMap.fedTga && (!asOfMap.fedWalcl || asOfMap.fedTga < asOfMap.fedWalcl)) ? 'fedTga' : 'fedWalcl';
+    const weekly = macroLegAsOf(summary, weeklyField);
+    const rrpAsOf = macroLegAsOf(summary, 'fedRrp');
+    const asOfText = weekly ? `WALCL/TGA ${weekly}${rrpAsOf ? ` · RRP ${rrpAsOf}` : ''} · ` : '';
+    elMacroNetliqSub.textContent = `${asOfText}WALCL $${summary.currentFedWalcl.toFixed(2)}T - TGA $${summary.currentFedTga.toFixed(2)}T - RRP ${rrpStr}${rrpGone ? ' · RRP 已近零，现实际为 WALCL − TGA' : ''}`;
+    elMacroNetliqSub.title = elMacroNetliqSub.textContent;
   }
   renderMacroClaims(summary);
   lastMacroSummaryForMstr = summary;

@@ -37,7 +37,14 @@ HTTP 公共默认值：`fetchWithTimeout` 为 **10s 超时 / retries 1**（总�
 | IV Smile | `greeks_smile`, `greeks_gex` | 默认 10s/1 | 同上 |
 | 期限溢价 | `basis_live`, `basis_history`, `fred:DGS3MO` | Deribit 20s/1（带 429 队列） | bare-array 历史保留，sidecar 回执核验 |
 | 波浪 K 线 | 主周期 + 每个画图周期 | 8s / retries 0（单源预算内） | Binance→Bybit→OKX 备用源标记 `FALLBACK` |
-| 宏观图 | `macro`, `fred:*`, `macro_btc`, `yahoo:MSTR` | 各 leaf 默认 10s/1 | 快照回退，缺源 UNKNOWN |
+| 宏观图 | `macro`, `fred:*`, `macro_btc`, `yahoo:MSTR` | 各 leaf 默认 10s/1；备用源 12s/1（H.4.1 空响应再重试 2 次） | FRED 腿有官方备用源（见下）→ 快照回退，缺源 UNKNOWN |
+
+**美债曲线 / 净流动性的 FRED 备用源**（`server/macro_backup.js`，30 分钟缓存）：DGS1/DGS10 ← 财政部 par yield curve；RRPONTSYD ← 纽约联储逆回购操作结果；WALCL / WTREGEN ← 美联储 H.4.1 数据下载（`RESPPMA_N.WW` / `RESPPLLDT_XAW_N.WW`）。数值与 FRED 同源、逐日一致。
+
+- FRED 正常：以 FRED 全量历史为准；备用源与 FRED 重叠日逐一核对（任一日不一致就整段丢弃），通过后只补 FRED 尚未发布的最新几天。健康 `OK`，`source` 标 `fred.stlouisfed.org+<备用源>`。
+- FRED 失败：上一版快照的历史 + 备用源近期窗口（真实观测覆盖快照里的前值顶替点）。健康 `FALLBACK`，`sources` 标 `backup`。
+- 都失败：只沿用快照（`fallback`）。
+- 每次重建都重下全量历史，之前漏掉或用前值顶替的日子在下一次成功拉取时自动改正。`summary.seriesAsOf` / `seriesSource` 给出每条腿真实的最新观测日和来源，前端副标题显示「截至 MM-DD」。
 | 优先股 | `preferreds`, `yahoo:STR*`, `fred:DGS1MO` | 各 leaf 默认 10s/1 | 任一脚失败 → 完整 payload 回退，文件字节不变 |
 | McClellan 宽度 | `mcclellan_core`, `mcclellan_frontier` | Python 管线（CI） | 磁盘快照 + track `date` 时钟 |
 | CDRI / SSRO / 黄金 | `cdri`, `ssro`, `ssro_stable`, `ssro_quote`, `gold` | SSRO 12s/1，现货日线 `spot_daily` 12s/1，其余默认 | 单飞 + last-good 缓存 |
