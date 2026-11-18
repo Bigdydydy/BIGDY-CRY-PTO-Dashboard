@@ -2,6 +2,7 @@ const { snapshotPath } = require('./snapshot_path');
 const fs = require('fs');
 const path = require('path');
 const { formatUTC8 } = require('./analytics_engine');
+const tradeArchive = require('./trade_archive');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const RETENTION_DAYS = 60;
@@ -103,16 +104,16 @@ function saveTradesToDisk(currency = 'BTC', trades = []) {
 }
 
 /**
- * Generate unique identity key for a trade
+ * Generate unique identity key for a trade (shared with the permanent archive)
  */
-function getTradeKey(trade) {
-  if (trade.trade_id) return String(trade.trade_id);
-  return `${trade.block_trade_id || 'BLK'}_${trade.instrument_name}_${trade.timestamp}_${trade.amount}_${trade.direction}`;
-}
+const getTradeKey = tradeArchive.getTradeKey;
 
 /**
  * Merge newly fetched trades with historical 60-day database
- * Automatically prunes trades older than 60 days
+ * Automatically prunes trades older than 60 days from the hot file — but only after
+ * every trade has been folded into the permanent monthly archive (server/trade_archive.js).
+ * The archive is written by collectors only (the committed-file owner, i.e. CI); the HTTP
+ * process works on its sidecar and never touches the committed archive.
  */
 function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
   const curKey = currency.toUpperCase();
@@ -146,9 +147,21 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
     }
   }
 
-  // 4. Prune trades older than 60 days
+  // 4. Permanent archive first (collector only), then prune trades older than 60 days.
+  // If the archive cannot be written this run, nothing is pruned — no trade is ever dropped
+  // before it is safely archived.
+  let archiveOk = true;
+  if (getStorageFilePath(curKey) === getCommittedFilePath(curKey)) {
+    try {
+      const r = tradeArchive.mergeIntoArchive(curKey, [...tradeMap.values()]);
+      if (r.added || r.updated) console.log(`[TradeStore] archive: +${r.added} new, ${r.updated} enriched (${r.months.join(', ')})`);
+    } catch (err) {
+      archiveOk = false;
+      console.error('[TradeStore] permanent archive write failed — skipping the 60-day prune this run:', err.message);
+    }
+  }
   const now = Date.now();
-  const cutoffTime = now - MAX_RETENTION_MS;
+  const cutoffTime = archiveOk ? now - MAX_RETENTION_MS : -Infinity;
   const mergedList = [];
 
   for (const t of tradeMap.values()) {
@@ -186,7 +199,11 @@ function recordAndMergeTrades(currency = 'BTC', newTrades = []) {
     latestTimeUTC8: latestTs ? formatUTC8(latestTs) : '--',
     historySpanHours: Math.round(historySpanHours * 10) / 10,
     historySpanDays: parseFloat(historySpanDays),
-    storageFile: `data/block_trades_${curKey}.json`
+    storageFile: `data/block_trades_${curKey}.json`,
+    // 永久归档 (按月分文件，不受 60 天限制)；读取失败不影响热数据
+    archive: (() => {
+      try { return tradeArchive.archiveSummary(curKey); } catch (err) { return null; }
+    })()
   };
 
   return {

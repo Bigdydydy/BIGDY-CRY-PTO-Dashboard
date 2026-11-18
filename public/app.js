@@ -1398,7 +1398,11 @@ function renderBlockTrades(data) {
   if (data.tradeStoreStats) {
     const s = data.tradeStoreStats;
     if (elStoreText) {
-      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${Number(s.totalStored || 0).toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${escapeHtml(s.earliestTimeUTC8)}</strong> ~ <strong>${escapeHtml(s.latestTimeUTC8)}</strong> UTC+8，至多滚动保存 <strong>${Number(s.retentionDays || 60)} 天</strong>，已突破官方 72h 上限）`;
+      const arc = s.archive && s.archive.totalTrades ? s.archive : null;
+      const arcText = arc
+        ? `；永久归档 <strong>${Number(arc.totalTrades).toLocaleString()}</strong> 笔（自 <strong>${escapeHtml(formatUTC8(arc.earliestTs).slice(0, 10))}</strong> 起，按月存档，不受 ${Number(s.retentionDays || 60)} 天限制）`
+        : '';
+      elStoreText.innerHTML = `本地历史沉淀数据库：已累计安全归档 <strong>${Number(s.totalStored || 0).toLocaleString()}</strong> 笔大宗成交流水（沉淀区间: <strong>${escapeHtml(s.earliestTimeUTC8)}</strong> ~ <strong>${escapeHtml(s.latestTimeUTC8)}</strong> UTC+8，页面滚动展示 <strong>${Number(s.retentionDays || 60)} 天</strong>，已突破官方 72h 上限）${arcText}`;
     }
     if (elStoreSpanBadge) {
       elStoreSpanBadge.textContent = `已沉淀: ${s.historySpanDays} 天 / ${Number(s.retentionDays || 60)}天`;
