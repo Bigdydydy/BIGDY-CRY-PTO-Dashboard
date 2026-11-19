@@ -247,12 +247,15 @@ const FAMILY_LABELS = {
   'short-vol': '卖出波动率 / 区间'
 };
 
-/** 按 Delta / Vega 画像分组：|净 Delta| 超过名义额 10% 视为方向性；纯单向买入深虚值 Call/Put (|Δ|≤10%) 亦归入方向性尾部头寸，不误归为跨式买波 */
+/**
+ * 按 Delta / Vega 画像分组：|净 Delta| 超过名义额 10% 视为方向性；纯单向买入深虚值 Call/Put (|Δ|≤10%) 亦归入方向性尾部头寸，不误归为跨式买波。
+ * 净 Delta 含同一 block 的期货 / 永续对冲腿 (s.hedged)：带对冲的结构不套用「纯买 Call/Put = 方向性」的规则。
+ */
 function familyOf(s) {
   const ratio = (Number(s.netDeltaUSD) || 0) / (Number(s.notionalUSD) || 1);
   if (ratio > 0.1) return 'bull';
   if (ratio < -0.1) return 'bear';
-  if (Array.isArray(s.legs) && s.legs.length > 0) {
+  if (!s.hedged && Array.isArray(s.legs) && s.legs.length > 0) {
     const parsed = s.legs.map(l => ({ dir: l.direction, inst: parseInstrument(l.instrument || '') })).filter(x => x.inst);
     if (parsed.length === s.legs.length && parsed.every(x => x.dir === 'buy')) {
       if (parsed.every(x => !x.inst.isCall) && (Number(s.netDeltaUSD) || 0) <= 0) return 'bear';
@@ -276,18 +279,36 @@ function dominantExpiry(legs) {
  * 把 analyzeBlockTrades 的冰山组与独立大单 (按 blockId 去重) 登记入册。
  * 尚未盯过市的条目允许被更完整的版本覆盖 (例如数据窗口内冰山组又多了几片)。
  */
-function registerStructures(registry, analysis, minNotional = STRUCTURE_MIN_NOTIONAL) {
-  const byId = new Map(registry.map(s => [s.id, s]));
+/** analyzeBlockTrades 的结果 -> 待登记条目 (冰山组优先，独立大单按 blockId 去重) */
+function structureItems(analysis) {
   const clustered = new Set();
   const items = [];
   for (const c of analysis.icebergClusters || []) {
     (c.blockIds || []).forEach(id => clustered.add(id));
-    items.push({ id: `ICE:${c.blockIds[0]}`, kind: 'iceberg', ts: c.startTimestamp, notionalUSD: c.clusterNotionalUSD, src: c });
+    items.push({ id: `ICE:${c.blockIds[0]}`, kind: 'iceberg', ts: c.startTimestamp, notionalUSD: c.clusterNotionalUSD, blockIds: c.blockIds, src: c });
   }
   for (const b of analysis.whaleBlocks || []) {
     if (clustered.has(b.blockId)) continue;
-    items.push({ id: `BLK:${b.blockId}`, kind: 'whale', ts: b.timestamp, notionalUSD: b.notionalUSD, src: b });
+    items.push({ id: `BLK:${b.blockId}`, kind: 'whale', ts: b.timestamp, notionalUSD: b.notionalUSD, blockIds: [b.blockId], src: b });
   }
+  return items;
+}
+
+/** 对冲腿在登记条目里的精简记录 */
+function hedgeFields(src) {
+  const h = src.hedge;
+  if (!h) return {};
+  const spot = Number(src.legs?.[0]?.indexPrice) || 0;
+  return {
+    hedged: true,
+    hedgeDeltaUSD: round(h.deltaBTC * spot),
+    hedges: h.legs.map(l => ({ instrument: l.instrument, direction: l.direction, amount: l.amount, price: l.price }))
+  };
+}
+
+function registerStructures(registry, analysis, minNotional = STRUCTURE_MIN_NOTIONAL) {
+  const byId = new Map(registry.map(s => [s.id, s]));
+  const items = structureItems(analysis);
 
   let added = 0;
   for (const it of items) {
@@ -311,6 +332,8 @@ function registerStructures(registry, analysis, minNotional = STRUCTURE_MIN_NOTI
       strategyNameZh: it.src.strategyNameZh || '未识别构型',
       entrySpot: round(Number(it.src.legs?.[0]?.indexPrice) || 0, 1),
       expiry: dominantExpiry(legs),
+      blockIds: it.blockIds,
+      ...hedgeFields(it.src),
       legs,
       marks: prev ? prev.marks : [],
       final: null
@@ -320,6 +343,41 @@ function registerStructures(registry, analysis, minNotional = STRUCTURE_MIN_NOTI
     if (!prev) added++;
   }
   return { registry: [...byId.values()].sort((a, b) => a.ts - b.ts), added };
+}
+
+/**
+ * 已登记 (含已盯市 / 已交割) 的结构补上对冲腿：按含对冲的净 Delta 重算家族，盯市与交割记录不动。
+ * analysis 须由带 hedges 的 analyzeBlockTrades 生成，按结构 id 对应。
+ * @returns {{registry: Array, updated: number, refamilied: number}}
+ */
+function applyHedgesToRegistry(registry, analysis) {
+  const byId = new Map(structureItems(analysis).map(it => [it.id, it]));
+  let updated = 0;
+  let refamilied = 0;
+  const out = registry.map(s => {
+    const it = byId.get(s.id);
+    if (!it) return s;
+    const fields = hedgeFields(it.src);
+    const next = { ...s, blockIds: it.blockIds };
+    if (!fields.hedged && !s.hedged) {
+      // 没有对冲腿：只补 blockIds，Delta 与家族保持登记时的值
+      if (JSON.stringify(next) === JSON.stringify(s)) return s;
+      updated++;
+      return next;
+    }
+    delete next.hedged;
+    delete next.hedgeDeltaUSD;
+    delete next.hedges;
+    Object.assign(next, fields);
+    next.netDeltaUSD = round(Number(it.src.netDeltaUSD) || 0);
+    if (fields.hedged) next.strategyNameZh = it.src.strategyNameZh || s.strategyNameZh;
+    next.family = familyOf(next);
+    if (JSON.stringify(next) === JSON.stringify(s)) return s;
+    updated++;
+    if (next.family !== s.family) refamilied++;
+    return next;
+  });
+  return { registry: out, updated, refamilied };
 }
 
 /** 交割后的单张收益 (BTC)：Call max(1 − K/D, 0)，Put max(K/D − 1, 0) */
@@ -995,7 +1053,7 @@ function annotateSmartFamilies(analysis, families) {
   if (!analysis || !Array.isArray(families) || !families.length) return analysis;
   const byKey = Object.fromEntries(families.map(f => [f.key, f]));
   const tag = (x, notionalUSD) => {
-    const key = familyOf({ netDeltaUSD: x.netDeltaUSD, netVegaUSD: x.netVegaUSD, notionalUSD, legs: x.legs });
+    const key = familyOf({ netDeltaUSD: x.netDeltaUSD, netVegaUSD: x.netVegaUSD, notionalUSD, legs: x.legs, hedged: Boolean(x.hedge) });
     const f = byKey[key];
     if (!f) return;
     const hitRate = f.weightBasis === 'final' ? f.hitRate : (f.weightBasis === '7d' ? f.hitRate7d : null);
@@ -1028,6 +1086,8 @@ module.exports = {
   horizonFlows,
   familyOf,
   registerStructures,
+  structureItems,
+  applyHedgesToRegistry,
   valueStructure,
   markStructures,
   mergeRegistries,

@@ -4,6 +4,7 @@
  */
 
 const { profileFromItems } = require('./option_oi_history');
+const blockHedges = require('./block_hedges');
 const PnLEngine = require('../public/pnl_engine');
 
 const MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -1749,6 +1750,54 @@ function oiProfileOf(oiSnapshots, legs) {
   })));
 }
 
+/**
+ * 期货 / 永续对冲腿汇总 (Delta 以 BTC 计)。对冲抵消期权 Delta 至少 65% 视为 Delta 对冲的波动率交易。
+ * @param {Array} entries - block_hedges 条目 (一个 block 或冰山组的多个 block)
+ * @returns {null|{deltaBTC: number, optionDeltaBTC: number, offset: number, deltaHedged: boolean, complete: boolean, legs: Array}}
+ */
+function summarizeHedge(entries, optionDeltaBTC) {
+  const list = (entries || []).filter(e => e && Array.isArray(e.hedges) && e.hedges.length);
+  if (!list.length) return null;
+  const deltaBTC = list.reduce((s, e) => s + blockHedges.hedgeDeltaOf(e), 0);
+  // 被抵消掉的期权 Delta 比例：对冲与期权 Delta 反向时为正
+  const offset = Math.abs(optionDeltaBTC) > 1e-9 ? -deltaBTC / optionDeltaBTC : 0;
+  const legs = [];
+  for (const e of list) {
+    for (const h of e.hedges) legs.push({ instrument: h.instrument, direction: h.direction, amount: h.amount, price: h.price, deltaBTC: blockHedges.hedgeDeltaBTC(h) });
+  }
+  return {
+    deltaBTC,
+    optionDeltaBTC,
+    offset,
+    deltaHedged: Math.abs(optionDeltaBTC + deltaBTC) <= (1 - blockHedges.DELTA_HEDGED_SHARE) * Math.abs(optionDeltaBTC),
+    complete: list.every(e => e.complete !== false),
+    legs
+  };
+}
+
+/** 按对冲腿修正意图：Delta 对冲后的结构是买 / 卖波动率，不再是方向性头寸 */
+function applyHedgeToIntent(intent, hedge, netVegaUSD) {
+  if (!hedge) return intent;
+  const fmt = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)} BTC`;
+  const note = `同一笔 block 含期货 / 永续腿，合计 Delta ${fmt(hedge.deltaBTC)}，抵消期权 Delta (${fmt(hedge.optionDeltaBTC)}) 的 ${Math.round(Math.max(0, hedge.offset) * 100)}%。`;
+  if (hedge.deltaHedged) {
+    const longVol = netVegaUSD >= 0;
+    return {
+      ...intent,
+      strategyNameZh: `${intent.strategyNameZh || '期权结构'} + 期货 Delta 对冲`,
+      intentBadge: longVol ? 'Delta 对冲 · 买入波动率' : 'Delta 对冲 · 卖出波动率',
+      intentBadgeClass: longVol ? 'badge-vol-buy' : 'badge-vol-sell',
+      intentNarrative: `${note}方向敞口基本被对冲掉，这是一笔${longVol ? '买入' : '卖出'}波动率的交易，而非方向性押注。${intent.intentNarrative || ''}`,
+      deltaHedged: true
+    };
+  }
+  return {
+    ...intent,
+    strategyNameZh: `${intent.strategyNameZh || '期权结构'} + 期货腿${hedge.offset > 0 ? ' (部分对冲)' : ''}`,
+    intentNarrative: `${note}${intent.intentNarrative || ''}`
+  };
+}
+
 const LIFECYCLE_ICON = { open: '＋', close: '−', roll: '⟳', mixed: '⇄', split: '±', unknown: '·' };
 const LIFECYCLE_TEXT = { open: '开仓', close: '平仓', roll: '展期', mixed: '换手 / 开平相抵', split: '腿间分化', unknown: '开平未明' };
 const OI_KIND = { opening: 'open', closing: 'close', mixed: 'mixed', roll: 'roll', split: 'split' };
@@ -1924,6 +1973,8 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
   }
 
   const smileContext = opts?.smileContext || null;
+  // 期货 / 永续对冲腿 (server/block_hedges.js 的合并档案)：按含对冲在内的净 Delta 判断方向
+  const hedgeBlocks = opts?.hedges?.blocks || null;
   const forwardsByExpiry = opts?.forwardsByExpiry || null;
 
   // 1. Group Trades by Block Trade ID (or unique trade ID for non-blocks) & Calculate Greeks
@@ -2019,10 +2070,21 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
       legSignatures.push(`${leg.direction}:${leg.instrument_name}`);
     }
 
-    const structureSignature = legSignatures.join('|');
+    const hedgeEntry = hedgeBlocks ? hedgeBlocks[bid] : null;
+    const optionDeltaBTC = netDeltaBTC;
+    const hedge = summarizeHedge(hedgeEntry ? [hedgeEntry] : [], optionDeltaBTC);
+    if (hedge) {
+      const S0 = processedLegs[0]?.indexPrice || spotPrice || 77250;
+      netDeltaBTC += hedge.deltaBTC;
+      netDeltaUSD += hedge.deltaBTC * S0;
+    }
+    // 带对冲腿与不带的同构型切片不算同一组冰山
+    const structureSignature = legSignatures.join('|') + (hedge ? `|hedge:${hedge.deltaBTC >= 0 ? '+' : '-'}` : '');
     const timestamp = Math.min(...legs.map(l => l.timestamp));
 
     blockUnits.push({
+      hedge,
+      optionDeltaBTC,
       blockId: bid,
       timestamp,
       legs: processedLegs,
@@ -2037,7 +2099,11 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
     });
 
     if (totalNotional >= notionalThresholdUSD) {
-      const intent = classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional, smileContext);
+      const intent = applyHedgeToIntent(
+        classifyTradeIntent(processedLegs, netDeltaUSD, netVegaUSD, netThetaUSD, totalNotional, smileContext),
+        hedge,
+        netVegaUSD
+      );
 
       const blockCandidate = {
         legs: processedLegs,
@@ -2085,6 +2151,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         is0DTE: timingProfile.is0DTE,
         oiProfile,
         lifecycle: reconcileLifecycle(actionProfile, oiProfile),
+        hedge,
         ...intent
       });
     }
@@ -2185,14 +2252,30 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         notionalM: l.notionalUSD / 1e6
       }));
 
-      const intent = classifyTradeIntent(
+      // 冰山组的对冲腿：各片 block 的对冲合计
+      const hedgedUnits = group.filter(b => b.hedge);
+      let clusterHedge = null;
+      if (hedgedUnits.length) {
+        const optionDeltaBTC = group.reduce((acc, b) => acc + (b.optionDeltaBTC ?? b.netDeltaBTC), 0);
+        const deltaBTC = hedgedUnits.reduce((acc, b) => acc + b.hedge.deltaBTC, 0);
+        clusterHedge = {
+          deltaBTC,
+          optionDeltaBTC,
+          offset: Math.abs(optionDeltaBTC) > 1e-9 ? -deltaBTC / optionDeltaBTC : 0,
+          deltaHedged: Math.abs(optionDeltaBTC + deltaBTC) <= (1 - blockHedges.DELTA_HEDGED_SHARE) * Math.abs(optionDeltaBTC),
+          complete: hedgedUnits.every(b => b.hedge.complete),
+          legs: hedgedUnits.flatMap(b => b.hedge.legs)
+        };
+      }
+
+      const intent = applyHedgeToIntent(classifyTradeIntent(
         aggregatedLegs,
         clusterDeltaUSD,
         clusterVegaUSD,
         clusterThetaUSD,
         clusterNotional,
         smileContext
-      );
+      ), clusterHedge, clusterVegaUSD);
 
       const isMultiLeg = aggregatedLegs.length > 1;
       let displayInstrument = '';
@@ -2279,6 +2362,7 @@ function analyzeBlockTrades(rawTrades, notionalThresholdUSD = 30000000, timeRang
         is0DTE: timingProfile.is0DTE,
         oiProfile,
         lifecycle: reconcileLifecycle(actionProfile, oiProfile),
+        hedge: clusterHedge,
         ...intent
       });
     }
@@ -2948,6 +3032,8 @@ function analyze25DeltaSkew(skewChart, ctx = {}) {
 }
 
 module.exports = {
+  summarizeHedge,
+  applyHedgeToIntent,
   formatUTC8,
   analyzeAtmIv,
   analyzeDynamicGex,

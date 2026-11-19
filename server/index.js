@@ -35,6 +35,7 @@ const { getTermCurve } = require('./term_curve');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
 const optionOiHistory = require('./option_oi_history');
+const blockHedges = require('./block_hedges');
 const blockInsight = require('./block_insight');
 const volSurfaceHistory = require('./vol_surface_history');
 const { analyzeDealerExposure } = require('./dealer_engine');
@@ -875,10 +876,28 @@ async function handleApiRequest(req, res, parsedUrl) {
       if (allowed('blockTrades') && spotPrice !== null) {
         // 最近一次快照之后的成交：用实时 book summary 做盘中初判 (距快照 ≤ 24h 时 24h 成交量是窗口上界，区间仍成立)
         const oiForBlocks = optionOiHistory.withProvisionalSnapshot(oiSnapshots, marksSnapshot);
+        // 期货 / 永续对冲腿：每日任务提交的档案 + 本机对更新大单的即时查询 (后台进行，不阻塞本次请求)
+        let hedgeSet = null;
+        try {
+          hedgeSet = await blockHedges.getMergedHedges();
+        } catch (err) {
+          console.warn('[API] block hedge legs unavailable:', err.message);
+        }
         blockAnalysis = analyzeBlockTrades(activeTrades, thresholdParam, timeRangeParam, spotPrice, oiForBlocks, {
           smileContext,
-          forwardsByExpiry
+          forwardsByExpiry,
+          hedges: hedgeSet
         });
+        if (hedgeSet && Array.isArray(blockAnalysis.whaleBlocks)) {
+          const wanted = new Set(blockAnalysis.whaleBlocks.map(b => b.blockId));
+          for (const c of blockAnalysis.icebergClusters || []) (c.blockIds || []).forEach(id => wanted.add(id));
+          const firstTs = new Map();
+          for (const t of activeTrades) {
+            const id = t.block_trade_id;
+            if (id && wanted.has(id) && !(firstTs.get(id) <= t.timestamp)) firstTs.set(id, t.timestamp);
+          }
+          blockHedges.maybeFetchLiveHedges(hedgeSet, [...firstTs.entries()].map(([blockId, ts]) => ({ blockId, ts })));
+        }
       } else {
         blockAnalysis = unavailableAnalysis(analysisHealth.blockTrades, activeTrades);
         if (spotPrice === null && analysisHealth.blockTrades.analysisAllowed) {

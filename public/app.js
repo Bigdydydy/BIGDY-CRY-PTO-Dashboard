@@ -1459,6 +1459,17 @@ function lifecycleChipHtml(item) {
   return html;
 }
 
+/** 同一笔 block 里的期货 / 永续对冲腿：结构信息，用中性样式；方向已按含对冲的净 Delta 判定 */
+function hedgeChipHtml(item) {
+  const h = item.hedge;
+  if (!h) return '';
+  const fmt = v => `${v >= 0 ? '+' : ''}${(Number(v) || 0).toFixed(1)}`;
+  const legs = (h.legs || []).map(l => `${l.direction === 'buy' ? '买' : '卖'} ${escapeHtml(l.instrument)} ${Number(l.amount).toLocaleString()} @ ${Number(l.price).toLocaleString()}（Δ ${fmt(l.deltaBTC)} BTC）`).join('；');
+  const title = `同一笔 block 含期货 / 永续腿：${legs}。期权 Delta ${fmt(h.optionDeltaBTC)} BTC，对冲 ${fmt(h.deltaBTC)} BTC，抵消 ${Math.round(Math.max(0, h.offset) * 100)}%${h.complete === false ? '（部分腿未找到）' : ''}`;
+  const label = h.deltaHedged ? `Δ 对冲 ${fmt(h.deltaBTC)} BTC` : `Δ 期货腿 ${fmt(h.deltaBTC)} BTC`;
+  return `<span class="intent-badge-pill lc-chip lc-leaning" title="${escapeHtml(title)}">${label}</span>`;
+}
+
 function smartStarHtml(item) {
   const sm = item.smart;
   if (!sm || !sm.star) return '';
@@ -1549,6 +1560,7 @@ function renderIcebergsList(clusters) {
               ${smartStarHtml(c)}
               <span class="intent-badge-pill ${escapeHtml(c.intentBadgeClass || 'badge-neutral')}">${escapeHtml(c.intentBadge || '意图解析')}</span>
               ${lifecycleChipHtml(c)}
+              ${hedgeChipHtml(c)}
               ${zeroDteChipHtml(c)}
             </div>
             ${c.strategyNameZh ? `<div style="font-size:0.7rem;color:var(--text-muted);text-align:right;">${escapeHtml(c.strategyNameZh)}</div>` : ''}
@@ -1628,6 +1640,7 @@ function renderWhaleSinglesList(blocks) {
             ${smartStarHtml(b)}
             <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
             ${lifecycleChipHtml(b)}
+            ${hedgeChipHtml(b)}
             ${zeroDteChipHtml(b)}
           </div>
           ${b.strategyNameZh ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${escapeHtml(b.strategyNameZh)}</div>` : ''}
@@ -1656,6 +1669,7 @@ function renderWhaleSinglesList(blocks) {
             ${smartStarHtml(b)}
             <span class="intent-badge-pill ${escapeHtml(b.intentBadgeClass || 'badge-neutral')}">${escapeHtml(b.intentBadge || '--')}</span>
             ${lifecycleChipHtml(b)}
+            ${hedgeChipHtml(b)}
             ${zeroDteChipHtml(b, false)}
           </div>
         </div>
