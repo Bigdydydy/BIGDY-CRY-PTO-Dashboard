@@ -762,22 +762,29 @@ function writeRegistryFile(registry, file = SMART_FILE, producerHealth = null) {
 }
 
 /** Deribit 交割价：{ 'YYYY-MM-DD': price } */
+// Deribit 每次最多返回 100 条交割价 (按日期倒序)，更多时按 offset 分页
+const DELIVERY_PAGE = 100;
+
 async function fetchDeliveryPrices(count = 120) {
-  const url = `https://www.deribit.com/api/v2/public/get_delivery_prices?index_name=btc_usd&offset=0&count=${count}`;
-  const resp = await fetchWithTimeout(url, { timeout: 8000 });
-  if (!resp.ok) throw new Error(`Deribit delivery prices HTTP ${resp.status}`);
-  const json = await resp.json();
-  // Schema is contractual: a renamed/reshaped field must fail loudly rather
-  // than masquerade as "no deliveries" — every row needs a real date and a
-  // finite positive delivery_price.
-  const data = json && json.result && json.result.data;
-  if (!Array.isArray(data)) throw new Error('Deribit delivery prices schema 校验失败: result.data missing');
   const out = {};
-  for (const d of data) {
-    if (!d || typeof d.date !== 'string' || !d.date || !Number.isFinite(Number(d.delivery_price)) || Number(d.delivery_price) <= 0) {
-      throw new Error('Deribit delivery prices schema 校验失败: bad row');
+  for (let offset = 0; offset < count; offset += DELIVERY_PAGE) {
+    const pageSize = Math.min(DELIVERY_PAGE, count - offset);
+    const url = `https://www.deribit.com/api/v2/public/get_delivery_prices?index_name=btc_usd&offset=${offset}&count=${pageSize}`;
+    const resp = await fetchWithTimeout(url, { timeout: 8000 });
+    if (!resp.ok) throw new Error(`Deribit delivery prices HTTP ${resp.status}`);
+    const json = await resp.json();
+    // Schema is contractual: a renamed/reshaped field must fail loudly rather
+    // than masquerade as "no deliveries" — every row needs a real date and a
+    // finite positive delivery_price.
+    const data = json && json.result && json.result.data;
+    if (!Array.isArray(data)) throw new Error('Deribit delivery prices schema 校验失败: result.data missing');
+    for (const d of data) {
+      if (!d || typeof d.date !== 'string' || !d.date || !Number.isFinite(Number(d.delivery_price)) || Number(d.delivery_price) <= 0) {
+        throw new Error('Deribit delivery prices schema 校验失败: bad row');
+      }
+      out[d.date] = Number(d.delivery_price);
     }
-    out[d.date] = Number(d.delivery_price);
+    if (data.length < pageSize) break;
   }
   return out;
 }
