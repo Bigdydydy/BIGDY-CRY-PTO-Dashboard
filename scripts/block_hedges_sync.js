@@ -41,8 +41,9 @@ async function scanBlockLegs(fromTs, toTs, log) {
         page = await fetchTradesPage('BTC', cursor, toTs - 1);
         break;
       } catch (err) {
-        if (attempt >= 5) throw err;
-        await sleep(2000 * attempt);
+        // history 接口偶发 400 / 5xx：指数退避，最多约 4 分钟
+        if (attempt >= 8) throw err;
+        await sleep(Math.min(60000, 1500 * 2 ** attempt));
       }
     }
     pages++;

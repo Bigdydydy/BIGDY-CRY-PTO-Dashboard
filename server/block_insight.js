@@ -21,6 +21,7 @@ const { dayKey, profileFromItems } = require('./option_oi_history');
 const { recordAttempt, recordSuccess, recordFailure } = require('./data_health');
 const { seedCachedHealth, atomicWriteJson } = require('./data_health_cache');
 const PnLEngine = require('../public/pnl_engine');
+const blockMarkouts = require('./block_markouts');
 
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -506,6 +507,13 @@ function summarizeSmartMoney(registry, nowMs = Date.now()) {
       weightBasis: basis
     };
   });
+  // markout 检验 (server/block_markouts.js)：按日聚类的 +1 / +7 天 markout，取代胜率作为聪明钱的判据
+  const markoutStats = blockMarkouts.summarizeMarkouts(registry, Object.keys(FAMILY_LABELS));
+  for (const f of families) {
+    const m = markoutStats[f.key];
+    f.markout = m;
+    f.signal = m ? m.signal : 'insufficient';
+  }
   const weightOf = Object.fromEntries(families.map(f => [f.key, f.weight]));
 
 
@@ -524,7 +532,10 @@ function summarizeSmartMoney(registry, nowMs = Date.now()) {
       pnlBtc: s.final ? s.final.pnlBtc : (last ? last.pnlBtc : null),
       markedAt: s.final ? s.final.ts : (last ? last.ts : null),
       settled: !!s.final,
-      familyWeight: weightOf[s.family] ?? 0.5
+      familyWeight: weightOf[s.family] ?? 0.5,
+      markout1d: s.markouts?.d1 || null,
+      markout7d: s.markouts?.d7 || null,
+      hedged: Boolean(s.hedged)
     };
   });
 
@@ -538,6 +549,12 @@ function summarizeSmartMoney(registry, nowMs = Date.now()) {
     directionalBias: null,
     volBias: null,
     weightingStatus: 'disabled_unvalidated_expected_returns',
+    markoutCoverage: {
+      d1: registry.filter(s => s.markouts?.d1).length,
+      d7: registry.filter(s => s.markouts?.d7).length
+    },
+    markoutHorizons: blockMarkouts.HORIZONS,
+    signalRule: `7 日主指标按成交日聚类 t ≥ ${blockMarkouts.STAR_MIN_T}、样本日 ≥ ${blockMarkouts.STAR_MIN_DAYS}`,
     recent
   };
 }
@@ -1040,11 +1057,10 @@ function buildBlockInsight({ daily, registry, oiSnapshots = [], nowMs = Date.now
   };
 }
 
-const SMART_STAR_MIN_WEIGHT = 0.6;
 
 /**
  * Module 4 卡片的聪明钱标注：按 4B 的结构家族 (方向看多 / 看空 / 买波 / 卖波) 挂上该家族的历史胜率。
- * 只有历史胜率高的家族 (weight ≥ 0.6，按交割结果或 7 日盯市，至少 5 个样本) 新开仓、且开仓经 OI 区间确证时才标 ★，
+ * 只有 7 日 markout 按成交日聚类显著为正的家族 (server/block_markouts.js) 新开仓、且开仓经 OI 区间确证时才标 ★，
  * 避免同一家族的每张卡都亮星。
  * @param {Object} analysis - analyzeBlockTrades 的结果 (原地补充 smart 字段)
  * @param {Array} families - summarizeSmartMoney(registry).families
@@ -1056,16 +1072,17 @@ function annotateSmartFamilies(analysis, families) {
     const key = familyOf({ netDeltaUSD: x.netDeltaUSD, netVegaUSD: x.netVegaUSD, notionalUSD, legs: x.legs, hedged: Boolean(x.hedge) });
     const f = byKey[key];
     if (!f) return;
-    const hitRate = f.weightBasis === 'final' ? f.hitRate : (f.weightBasis === '7d' ? f.hitRate7d : null);
     const oiBacked = Boolean(x.lifecycle && x.lifecycle.kind === 'open' && x.lifecycle.basis === 'oi-confirmed');
+    const p7 = f.markout?.horizons?.d7?.primary || null;
     x.smart = {
       family: key,
       label: f.label,
-      weight: f.weight,
-      basis: f.weightBasis,
-      samples: f.weightBasis === 'final' ? f.finals : (f.weightBasis === '7d' ? f.n7 : 0),
-      hitRate,
-      star: Boolean(f.weightBasis && f.weight >= SMART_STAR_MIN_WEIGHT && oiBacked)
+      signal: f.signal || 'insufficient',
+      primaryMetric: f.markout?.primaryMetric || null,
+      markout7d: p7,
+      hitRate: f.hitRate ?? null,
+      // ★：该家族 7 日 markout 按日聚类显著为正，且本单经 OI 确证为新开仓
+      star: Boolean(f.signal === 'positive' && oiBacked)
     };
   };
   for (const b of analysis.whaleBlocks || []) tag(b, b.notionalUSD);

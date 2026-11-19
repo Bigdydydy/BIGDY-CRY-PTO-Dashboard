@@ -50,12 +50,26 @@ jobs:
         continue-on-error: true
         run: node scripts/block_hedges_sync.js --days 3
 
+      # 期权每日 08:00 UTC mark 快照 (从逐笔成交还原)，供大宗结构的 markout 估值
+      - name: Daily option marks from the trade tape
+        id: option_marks
+        if: ${{ !cancelled() && steps.block_flow.outcome != 'skipped' }}
+        continue-on-error: true
+        run: node scripts/option_marks_history.js --days 3
+
+      # 聪明钱登记的 +1 / +7 天 markout (依赖上一步的 mark 快照)
+      - name: Smart-money markouts
+        id: markouts
+        if: ${{ !cancelled() && steps.option_marks.outcome == 'success' }}
+        continue-on-error: true
+        run: node scripts/block_markouts.js
+
       - name: Commit and push
         if: ${{ !cancelled() && steps.block_flow.outcome != 'skipped' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/block_trades_BTC.json data/block_trades_archive data/block_hedges_BTC.json data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json data/job_health_block_insight_daily.json
+          git add data/block_trades_BTC.json data/block_trades_archive data/block_hedges_BTC.json data/option_marks_daily data/option_oi_history_BTC.json data/block_flow_daily_BTC.json data/smart_money_BTC.json data/job_health_block_insight_daily.json
           if git diff --cached --quiet; then
             echo "No changes; skipping commit."
             exit 0

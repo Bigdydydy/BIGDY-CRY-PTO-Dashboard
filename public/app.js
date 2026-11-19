@@ -1473,9 +1473,10 @@ function hedgeChipHtml(item) {
 function smartStarHtml(item) {
   const sm = item.smart;
   if (!sm || !sm.star) return '';
-  const rate = sm.hitRate != null ? `${Math.round(sm.hitRate * 100)}%` : '--';
-  const basis = sm.basis === 'final' ? '交割结果' : '7 日盯市';
-  return `<span class="intent-badge-pill badge-smart" title="4B 聪明钱：「${escapeHtml(sm.label)}」家族按${basis}的历史胜率 ${rate}（${Number(sm.samples) || 0} 个样本），且本单经 OI 确证为新开仓">★ 聪明钱 · ${escapeHtml(sm.label)} ${rate}</span>`;
+  const p = sm.markout7d || {};
+  const unit = sm.primaryMetric === 'totalBps' ? 'bp' : 'vp';
+  const mean = p.mean == null ? '--' : `${p.mean > 0 ? '+' : ''}${p.mean.toFixed(unit === 'bp' ? 0 : 2)} ${unit}`;
+  return `<span class="intent-badge-pill badge-smart" title="4B 聪明钱：「${escapeHtml(sm.label)}」家族成交后 7 天的 markout 按日聚类显著为正（均值 ${mean}，t=${p.t ?? '--'}，${p.days ?? 0} 个成交日），且本单经 OI 确证为新开仓">★ 聪明钱 · ${escapeHtml(sm.label)} ${mean}</span>`;
 }
 
 function zeroDteChipHtml(item, withTag = true) {
@@ -2835,37 +2836,50 @@ function renderInsightSmart() {
   const sm = blockInsightData?.smartMoney;
   if (!sm) return;
   const pct = v => (v == null ? '--' : `${Math.round(v * 100)}%`);
-  const bias = (v, pos, neg) => {
-    if (v == null) return { text: '--', cls: '', sub: '胜率不能代表预期收益，暂不加权' };
-    const cls = v > 0.05 ? 'text-pos' : (v < -0.05 ? 'text-neg' : '');
-    const word = v > 0.05 ? pos : (v < -0.05 ? neg : '中性');
-    return { text: `${v > 0 ? '+' : ''}${v.toFixed(2)}`, cls, sub: word };
+  const num = (v, unit) => (v == null ? '--' : `${v > 0 ? '+' : ''}${v.toFixed(unit === 'bp' ? 0 : 2)}${unit === 'bp' ? ' bp' : ' vp'}`);
+  const unitOf = metric => (metric === 'totalBps' ? 'bp' : 'vp');
+  const SIGNAL = {
+    positive: ['显著为正', 'text-pos'],
+    negative: ['显著为负', 'text-neg'],
+    not_significant: ['不显著', ''],
+    insufficient: ['样本不足', 'horizon-muted']
   };
-  const dir = bias(sm.directionalBias, '偏多', '偏空');
-  const vol = bias(sm.volBias, '偏买波动率', '偏卖波动率');
+  const cell = (st, unit) => {
+    if (!st || st.mean == null) return '<span class="horizon-muted">--</span>';
+    const cls = st.t >= 2 ? 'text-pos' : (st.t <= -2 ? 'text-neg' : '');
+    return `<span class="${cls}">${num(st.mean, unit)}</span><span class="horizon-range">t=${st.t == null ? '--' : st.t.toFixed(2)} · ${st.days} 天 / ${st.n} 笔</span>`;
+  };
+  const families = sm.families || [];
+  const significant = families.filter(f => f.signal === 'positive' || f.signal === 'negative').length;
   const elKpis = document.getElementById('insight-smart-kpis');
   if (elKpis) {
+    const cov = sm.markoutCoverage || {};
     elKpis.innerHTML = `
       <div class="insight-kpi"><span class="stat-label">已登记结构</span><span class="stat-val">${sm.tracked}</span><span class="stat-sub">已结算 ${sm.settled} · 未结算 ${sm.open}</span></div>
-      <div class="insight-kpi"><span class="stat-label">到期总命中率</span><span class="stat-val">${pct(sm.overallHitRate)}</span><span class="stat-sub">主动方结算盈亏 &gt; 0 的比例</span></div>
-      <div class="insight-kpi"><span class="stat-label" title="近 30 天未结算的方向性结构：Σ 方向 × 名义额 × (2 × 权重 − 1) / Σ 名义额">胜率加权方向倾向</span><span class="stat-val ${dir.cls}">${dir.text}</span><span class="stat-sub">${dir.sub}</span></div>
-      <div class="insight-kpi"><span class="stat-label" title="近 30 天未结算的波动率结构，买入波动率为正">胜率加权波动率倾向</span><span class="stat-val ${vol.cls}">${vol.text}</span><span class="stat-sub">${vol.sub}</span></div>
+      <div class="insight-kpi"><span class="stat-label">markout 覆盖</span><span class="stat-val">${cov.d7 ?? '--'}</span><span class="stat-sub">+7 天已估值 · +1 天 ${cov.d1 ?? '--'}</span></div>
+      <div class="insight-kpi"><span class="stat-label">显著家族</span><span class="stat-val">${significant} / ${families.length}</span><span class="stat-sub" title="${escapeHtml(sm.signalRule || '')}">7 天 markout 按日聚类 |t| ≥ 2</span></div>
+      <div class="insight-kpi"><span class="stat-label">到期总命中率</span><span class="stat-val">${pct(sm.overallHitRate)}</span><span class="stat-sub">仅供参考：胜率不代表预期收益</span></div>
     `;
   }
   const elFam = document.getElementById('insight-family-body');
   if (elFam) {
-    elFam.innerHTML = sm.families.map(f => {
-      const basis = f.weightBasis === 'final' ? '按到期结果' : (f.weightBasis === '7d' ? '按 7 天结果' : '暂不加权');
-      const avg = f.avgPnlBtc == null ? '--' : `<span class="${f.avgPnlBtc >= 0 ? 'text-pos' : 'text-neg'}">${f.avgPnlBtc >= 0 ? '+' : ''}${f.avgPnlBtc.toFixed(2)} ₿</span>`;
+    elFam.innerHTML = families.map(f => {
+      const m = f.markout || {};
+      const unit = unitOf(m.primaryMetric);
+      const d7 = (m.horizons && m.horizons.d7) || {};
+      const sig = SIGNAL[f.signal] || SIGNAL.insufficient;
+      const split = d7.totalBps && d7.totalBps.mean != null
+        ? `总 ${num(d7.totalBps.mean, 'bp')}<span class="horizon-range">波动部分 ${num(d7.volPoints && d7.volPoints.mean, 'vp')}</span>`
+        : '<span class="horizon-muted">--</span>';
       return `
         <tr>
           <td><strong>${escapeHtml(f.label)}</strong></td>
-          <td>${f.finals}</td>
-          <td>${pct(f.hitRate)}</td>
-          <td>${avg}</td>
-          <td>${pct(f.hitRate7d)}<span class="horizon-range">n=${f.n7}</span></td>
-          <td>${f.open}</td>
-          <td><strong>${f.weight == null ? '--' : Math.round(f.weight * 100) + '%'}</strong><span class="horizon-range">${basis}</span></td>
+          <td>${unit === 'bp' ? '总盈亏 (bp)' : '波动率点 (vp)'}</td>
+          <td>${cell(m.horizons && m.horizons.d1 && m.horizons.d1.primary, unit)}</td>
+          <td>${cell(d7.primary, unit)}</td>
+          <td>${split}</td>
+          <td>${pct(f.hitRate)}<span class="horizon-range">已结算 ${f.finals}</span></td>
+          <td><strong class="${sig[1]}">${sig[0]}</strong></td>
         </tr>
       `;
     }).join('');
@@ -2879,16 +2893,20 @@ function renderInsightSmart() {
       }).join(' ');
       const pnl = r.pnlBtc == null ? '<span class="horizon-muted">--</span>' : `<span class="${r.pnlBtc >= 0 ? 'text-pos' : 'text-neg'}">${r.pnlBtc >= 0 ? '+' : ''}${r.pnlBtc.toFixed(2)}</span>`;
       const status = r.settled ? '已结算' : (r.markedAt ? `盯市 ${formatUTC8(r.markedAt, false).slice(5, 10)}` : '待盯市');
+      const m7 = r.markout7d;
+      const mk = m7
+        ? `<span class="${m7.totalBps >= 0 ? 'text-pos' : 'text-neg'}">${num(m7.totalBps, 'bp')}</span><span class="horizon-range">波动 ${num(m7.volPoints, 'vp')}</span>`
+        : '<span class="horizon-muted">未到期限</span>';
       return `
         <tr>
           <td>${formatUTC8(r.ts, false)}</td>
-          <td>${escapeHtml(r.strategyNameZh)}<span class="horizon-range">${escapeHtml(legs)}</span></td>
+          <td>${escapeHtml(r.strategyNameZh)}${r.hedged ? ' <span class="horizon-range">含期货对冲</span>' : ''}<span class="horizon-range">${escapeHtml(legs)}</span></td>
           <td>${escapeHtml(r.expiry || '--')}</td>
           <td>${fmtUsdCompact(r.notionalUSD)}</td>
           <td>${escapeHtml(r.familyLabel || '')}</td>
           <td>${pnl}</td>
           <td>${status}</td>
-          <td>${Math.round((r.familyWeight ?? 0.5) * 100)}%</td>
+          <td>${mk}</td>
         </tr>
       `;
     }).join('') || '<tr><td colspan="8" class="text-center">暂无登记</td></tr>';

@@ -2376,19 +2376,19 @@
         </div>
       </div>
       <div class="card-body">
-        <p class="insight-note">≥ $30M 的冰山组 / 独立大单登记入册，每天按 Deribit 标记价估一次主动方盈亏（BTC 计），到期后按交割价结算；按 Delta / Vega 画像分组统计命中率，权重 = (胜 + 1) / (样本 + 2)。</p>
+        <p class="insight-note">≥ $30M 的冰山组 / 独立大单登记入册（净 Delta 含同一笔 block 的期货 / 永续对冲腿），按 Delta / Vega 画像分组。检验口径是 markout：成交后 +1 天、+7 天按 08:00 UTC 的 Deribit 标记价估值主动方盈亏，拆成方向部分（成交时净 Delta × 币价变动）与波动率部分（其余，折成波动率点）；方向家族看总盈亏（占名义额 bp），波动率家族看波动率点。同一天的结构共享行情，先按成交日平均再算 t 值；7 天 t ≥ 2 且样本日 ≥ 15 才视为显著。</p>
         <div class="insight-kpis" id="insight-smart-kpis"></div>
         <div class="horizon-table-scroll">
           <table class="horizon-flow-table insight-family-table">
             <thead>
               <tr>
                 <th>画像</th>
-                <th>已结算</th>
+                <th title="方向家族：总盈亏占名义额 (bp)；波动率家族：波动率部分 (波动率点)">主指标</th>
+                <th title="成交后第一个 08:00 UTC 快照 (≥ 24 小时)：按日聚类均值 · t 值 · 样本日数">+1 天 markout</th>
+                <th title="成交后 ≥ 7 天的第一个 08:00 UTC 快照：按日聚类均值 · t 值 · 样本日数">+7 天 markout</th>
+                <th title="+7 天：总盈亏 (bp) 与其中的波动率部分 (波动率点)">+7 天拆分</th>
                 <th>到期命中率</th>
-                <th>平均结算盈亏</th>
-                <th title="成交后 7~10 天的盯市结果">7 天命中率</th>
-                <th>未结算</th>
-                <th title="(胜 + 1) / (样本 + 2)；结算样本 ≥ 5 用到期结果，否则 7 天结果 ≥ 5 时用 7 天结果，都不足时为 50%">信号权重</th>
+                <th title="7 天主指标按日聚类 t ≥ 2 且样本日 ≥ 15">信号</th>
               </tr>
             </thead>
             <tbody id="insight-family-body"></tbody>
@@ -2406,7 +2406,7 @@
                 <th>画像</th>
                 <th>主动方盈亏 (₿)</th>
                 <th>状态</th>
-                <th>同类权重</th>
+                <th title="成交后 +7 天：总盈亏占名义额 (bp) 与其中的波动率部分 (波动率点)">+7 天 markout</th>
               </tr>
             </thead>
             <tbody id="insight-recent-body"></tbody>
@@ -3543,7 +3543,7 @@
   <!-- Module 8 的 lightweight-charts / wave_engine / wave_ui 由 app.js 在首次进入该模块时按需加载 -->
   <!-- mcclellan_structure 必须先于 app.js：Module 1-B 结构宽度面板由 app.js 调用其 window 全局 -->
   <script src="/mcclellan_structure.js"></script>
-  <script src="/app.js?v=20261119_hedge2"></script>
+  <script src="/app.js?v=20261119_markout2"></script>
   <!-- Strategy 官方披露账本面板：独立加载，不影响既有渲染管线 -->
   <script src="/mstr_disclosures_ui.js?v=20261111_1" defer></script>
 </body>

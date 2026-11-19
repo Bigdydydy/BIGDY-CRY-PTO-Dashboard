@@ -210,11 +210,11 @@ test('reconcileLifecycle: OI overrides the rule only when it pins the block down
   assert.equal(reconcileLifecycle({ action: 'UNCONFIRMED' }, null).kind, 'unknown');
 });
 
-test('annotateSmartFamilies stars only OI-confirmed opens of a historically strong family', () => {
+test('annotateSmartFamilies stars only OI-confirmed opens of a family with a significant 7-day markout', () => {
   const { annotateSmartFamilies } = require('../server/block_insight.js');
   const families = [
-    { key: 'bear', label: '方向看空', weight: 0.63, weightBasis: 'final', finals: 39, hitRate: 0.64 },
-    { key: 'bull', label: '方向看多', weight: 0.24, weightBasis: 'final', finals: 47, hitRate: 0.23 }
+    { key: 'bear', label: '方向看空', signal: 'positive', markout: { primaryMetric: 'totalBps', horizons: { d7: { primary: { mean: 42, t: 2.6, days: 30 } } } } },
+    { key: 'bull', label: '方向看多', signal: 'not_significant', markout: { primaryMetric: 'totalBps', horizons: { d7: { primary: { mean: 5, t: 0.4, days: 30 } } } } }
   ];
   const confirmedOpen = { kind: 'open', basis: 'oi-confirmed' };
   const analysis = {
@@ -228,6 +228,7 @@ test('annotateSmartFamilies stars only OI-confirmed opens of a historically stro
   annotateSmartFamilies(analysis, families);
   assert.deepEqual(analysis.whaleBlocks.map(b => b.smart.star), [true, false, false]);
   assert.equal(analysis.whaleBlocks[0].smart.family, 'bear');
+  assert.equal(analysis.whaleBlocks[0].smart.markout7d.t, 2.6);
 });
 
 test('windowVolumesFromTape: pages from the last millisecond, dedupes, keeps only (from, to]', async () => {
