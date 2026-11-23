@@ -232,5 +232,10 @@
   "collected_at": "2026-11-22T07:26:57Z",
   "failed": [],
   "sampling_basis": "utc_snapshot"
+ },
+ "2026-11-23": {
+  "collected_at": "2026-11-23T08:11:53Z",
+  "failed": [],
+  "sampling_basis": "utc_snapshot"
  }
 }
