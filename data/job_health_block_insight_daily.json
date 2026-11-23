@@ -1,31 +1,31 @@
 {
   "id": "block_insight_daily",
   "status": "partial",
-  "lastAttemptAt": "2026-11-22T17:05:18.821Z",
+  "lastAttemptAt": "2026-11-23T20:10:14.639Z",
   "lastSuccessAt": "2026-11-18T17:59:07.484Z",
-  "lastError": "marks: 63 open structure(s) missing mark/delivery for 2026-11-22 (e.g. ICE:BLOCK-254367)",
+  "lastError": "marks: 63 open structure(s) missing mark/delivery for 2026-11-23 (e.g. ICE:BLOCK-254367)",
   "steps": {
     "option_oi": {
       "status": "ok",
-      "lastAttemptAt": "2026-11-22T17:05:18.924Z",
-      "lastSuccessAt": "2026-11-22T17:05:18.924Z",
+      "lastAttemptAt": "2026-11-23T20:10:14.747Z",
+      "lastSuccessAt": "2026-11-23T20:10:14.747Z",
       "lastError": null,
       "dataAsOf": null,
       "verifiedSkip": true
     },
     "block_trades": {
       "status": "ok",
-      "lastAttemptAt": "2026-11-22T17:05:20.063Z",
-      "lastSuccessAt": "2026-11-22T17:05:20.063Z",
+      "lastAttemptAt": "2026-11-23T20:10:15.647Z",
+      "lastSuccessAt": "2026-11-23T20:10:15.647Z",
       "lastError": null,
-      "dataAsOf": "2026-11-21T00:00:00.000Z",
+      "dataAsOf": "2026-11-22T00:00:00.000Z",
       "verifiedSkip": false
     },
     "marks": {
       "status": "failed",
-      "lastAttemptAt": "2026-11-22T17:05:20.302Z",
+      "lastAttemptAt": "2026-11-23T20:10:16.151Z",
       "lastSuccessAt": "2026-11-18T17:59:07.474Z",
-      "lastError": "63 open structure(s) missing mark/delivery for 2026-11-22 (e.g. ICE:BLOCK-254367)",
+      "lastError": "63 open structure(s) missing mark/delivery for 2026-11-23 (e.g. ICE:BLOCK-254367)",
       "dataAsOf": null,
       "verifiedSkip": false
     }
