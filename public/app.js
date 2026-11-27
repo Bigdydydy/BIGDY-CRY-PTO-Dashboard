@@ -262,6 +262,12 @@ function reloadAllChartsForTheme() {
   if (typeof renderLeverageNorm === 'function' && typeof rawLeverageNorm !== 'undefined' && rawLeverageNorm) {
     renderLeverageNorm();
   }
+  if (typeof renderCycleState === 'function' && typeof rawCycleState !== 'undefined' && rawCycleState) {
+    [ccChartInstance, apChartInstance].forEach(ch => { if (ch) { try { ch.dispose(); } catch (e) {} } });
+    ccChartInstance = null;
+    apChartInstance = null;
+    renderCycleState();
+  }
   if (typeof renderTermCurveChart === 'function' && typeof rawTermCurve !== 'undefined' && rawTermCurve) {
     renderTermCurveChart();
   }
@@ -6039,6 +6045,329 @@ function initLeverageNormEvents() {
 }
 
 // ============================================================================
+// Module 1-E / 1-F: Cycle clock & volume / volatility / OI percentiles
+// ============================================================================
+
+let rawCycleState = null;
+let ccChartInstance = null;
+let apChartInstance = null;
+let apRange = '1825';
+let apZoomReset = false;
+
+const CC_KIND_LABEL = { cycle_bear: '周期熊市', correction: '牛市中段回撤', undetermined: '未满一年' };
+const AP_REGIME_LABEL = { bear_aged: '熊市 · 距高点满一年', bear_young: '熊市 · 距高点不满一年', not_bear: '非熊市' };
+const CC_BEAR_COLORS = ['#a78bfa', '#38bdf8', '#10b981', '#f472b6'];
+
+function ccPct(v, d = 0) {
+  return v == null || !isFinite(v) ? '--' : `${(v * 100).toFixed(d)}%`;
+}
+function ccSigned(v, d = 0) {
+  return v == null || !isFinite(v) ? '--' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)}%`;
+}
+function ccUsd(v) {
+  return v == null || !isFinite(v) ? '--' : `$${Math.round(v).toLocaleString('en-US')}`;
+}
+function ccSeriesName(e) {
+  return `${e.peakDate} 起${e.ongoing ? '（本轮）' : ''}`;
+}
+
+async function loadCycleState(force = false) {
+  const ccStatus = document.getElementById('cc-status');
+  const apStatus = document.getElementById('ap-status');
+  try {
+    const resp = await fetch(`/api/cycle-state${force ? '?force=1' : ''}`);
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.error || `HTTP ${resp.status}`);
+    // The clock reads only the daily closes; the OI leg (ancillary) must not mark it as fallback
+    const dh = json.dataHealth;
+    const clockOk = dh && dh.analysisAllowed && Object.values(dh.sources || {}).every(src => src.state === 'OK');
+    dhUpdate('cycle_clock', clockOk ? { ...dh, state: 'OK' } : dh);
+    dhUpdate('cycle_activity', json.dataHealth);
+    rawCycleState = json;
+    const stale = json.stale ? ['⚠ Coinbase 日线暂不可用，显示最近一次结果'] : [];
+    if (ccStatus) {
+      ccStatus.textContent = stale.join(' · ');
+      ccStatus.classList.toggle('error', stale.length > 0);
+    }
+    if (apStatus) {
+      const notes = [...stale];
+      const oiLeg = (json.activity?.legs || []).find(l => l.key === 'oi');
+      if (json.oiError) notes.push(`期货 OI 暂不可用（${json.oiError}）${oiLeg && oiLeg.percentile != null ? '，沿用上一次的 OI 序列' : ''}`);
+      apStatus.textContent = notes.join(' · ');
+      apStatus.classList.toggle('error', notes.length > 0);
+    }
+    renderCycleState();
+    followRevalidation('cycle', json, () => loadCycleState(false));
+  } catch (err) {
+    dhFail('cycle_clock', err);
+    dhFail('cycle_activity', err);
+    console.error('[Cycle State] Failed to load:', err);
+    [ccStatus, apStatus].forEach(el => {
+      if (!el) return;
+      el.textContent = `周期数据加载失败：${err.message}`;
+      el.classList.add('error');
+    });
+  }
+}
+
+function renderCycleState() {
+  const d = rawCycleState;
+  if (!d) return;
+  const setText = (id, text, color) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (color !== undefined) el.style.color = color || '';
+  };
+  const fr = d.freshness || {};
+  const c = d.clock || {};
+  setText('cc-update-time', `日线截至 ${fr.spotLatest || '--'} · 生成 ${formatUTC8(d.generatedAt, false)}`);
+  setText('ap-update-time', `日线截至 ${fr.spotLatest || '--'} · OI 截至 ${fr.oiLatest || '--'}`);
+
+  // Card 1: cycle clock
+  setText('cc-kpi-days', c.sinceAth != null ? `${c.sinceAth} 天` : '--');
+  setText('cc-kpi-days-sub', c.ath ? `高点 ${c.ath.date} · ${ccUsd(c.ath.close)}` : '--');
+  setText('cc-kpi-dd', ccPct(c.drawdown), c.drawdown <= -0.4 ? '#f43f5e' : '');
+  setText('cc-kpi-dd-sub', c.lowSinceAth ? `高点后最低 ${c.lowSinceAth.date} · ${ccPct(c.lowSinceAth.drawdown)} · 第 ${c.lowSinceAth.daysFromAth} 天` : '--');
+  const ps = c.priorStats;
+  const span = (a, b, f) => (a === b ? f(a) : `${f(a)}–${f(b)}`);
+  const pctAbs = v => `${Math.round(Math.abs(v) * 100)}%`;
+  setText('cc-kpi-trough', ps ? `${span(ps.daysToTroughMin, ps.daysToTroughMax, v => v)} 天` : '--');
+  setText('cc-kpi-trough-sub', ps ? `最大回撤 ${span(ps.maxDrawdownShallowest, ps.maxDrawdownDeepest, pctAbs)} · ${ps.n} 轮` : '--');
+  setText('cc-kpi-recover', ps ? `${span(ps.daysToRecoverMin, ps.daysToRecoverMax, v => v)} 天` : '--');
+  setText('cc-kpi-recover-sub', c.currentKind ? `本轮已 ${c.sinceAth} 天未收复（${CC_KIND_LABEL[c.currentKind] || '--'}）` : '当前不在 ≥ 40% 的回撤阶段');
+  setText('cc-headline', c.headline || '--');
+
+  const body = document.getElementById('cc-table-body');
+  if (body) {
+    body.innerHTML = [...(d.cycles || [])].reverse().map(e => `
+      <tr>
+        <td>${escapeHtml(e.peakDate)}</td>
+        <td>${ccUsd(e.peakClose)}</td>
+        <td>${escapeHtml(e.troughDate)} · ${ccUsd(e.troughClose)}</td>
+        <td>${e.daysToTrough} 天</td>
+        <td style="color:#f43f5e;">${ccPct(e.maxDrawdown)}</td>
+        <td>${e.recoveryDate ? escapeHtml(e.recoveryDate) : '未收复'}</td>
+        <td>${e.daysToRecover != null ? `${e.daysToRecover} 天` : `已 ${e.daysSincePeak} 天`}</td>
+        <td><span class="el-tag ${e.kind === 'cycle_bear' ? 'neg' : 'neutral'}">${escapeHtml(CC_KIND_LABEL[e.kind] || e.kind)}</span></td>
+      </tr>`).join('');
+  }
+
+  // Card 2: activity percentiles
+  const a = d.activity || {};
+  const legBy = Object.fromEntries((a.legs || []).map(l => [l.key, l]));
+  const stateColor = { low: '#22d3ee', high: '#f59e0b', mid: '' };
+  const stateWord = { low: '低位', high: '高位', mid: '中间' };
+  const legKpi = (key, rawFmt) => {
+    const l = legBy[key];
+    const ok = l && l.percentile != null;
+    setText(`ap-kpi-${key}`, ok ? `第 ${Math.round(l.percentile)} 分位` : '--', ok ? stateColor[l.state] : '');
+    setText(`ap-kpi-${key}-sub`, ok && l.value != null ? `${rawFmt(l.value)} · ${stateWord[l.state] || '--'} · ${l.date}` : '样本不足');
+  };
+  legKpi('volume', v => `${Math.round(v).toLocaleString('en-US')} BTC/日`);
+  legKpi('atr', v => `${Number(v).toFixed(2)}%`);
+  legKpi('oi', v => elFmtBtc(v, false));
+  setText('ap-kpi-regime', AP_REGIME_LABEL[a.regimeNow] || '--');
+  setText('ap-kpi-regime-sub', c.sinceAth != null ? `距高点 ${c.sinceAth} 天 · 回撤 ${ccPct(c.drawdown)}` : '--');
+  setText('ap-headline', a.headline || '--');
+
+  const eps = a.episodes || [];
+  const done = eps.filter(e => e.ret180 != null);
+  const aged = eps.filter(e => e.regime === 'bear_aged');
+  const agedYears = [...new Set(aged.map(e => e.start.slice(0, 4)))];
+  const others = done.filter(e => e.regime !== 'bear_aged');
+  setText('ap-episode-note', eps.length
+    ? `共 ${eps.length} 段，180 天结果已出的 ${done.length} 段中之后上涨 ${done.filter(e => e.ret180 > 0).length} 段。“熊市且距高点满一年”的 ${aged.length} 段落在 ${agedYears.join('、') || '--'} 年，按年份算只有 ${agedYears.length} 个独立样本；其他阶段出现的 ${others.length} 段里，180 天后下跌 ${others.filter(e => e.ret180 <= 0).length} 段。这张表只说明市场是否安静，不是入场信号。`
+    : '--');
+  const apBody = document.getElementById('ap-table-body');
+  if (apBody) {
+    const retCell = v => (v == null ? '<td>--</td>' : `<td style="color:${v > 0 ? '#10b981' : '#f43f5e'};">${ccSigned(v)}</td>`);
+    apBody.innerHTML = [...eps].reverse().map(e => {
+      const range = e.end !== e.start ? `${escapeHtml(e.start)} → ${escapeHtml(e.end)}` : escapeHtml(e.start);
+      return `
+      <tr>
+        <td>${range}</td>
+        <td>${e.days}</td>
+        <td>${ccUsd(e.close)}</td>
+        <td>${ccPct(e.drawdown)}</td>
+        <td>${e.sinceAth} 天</td>
+        <td><span class="el-tag neutral">${escapeHtml(AP_REGIME_LABEL[e.regime] || e.regime)}</span></td>
+        <td>${e.pOi != null ? Math.round(e.pOi) : '--'}</td>
+        ${retCell(e.ret90)}
+        ${retCell(e.ret180)}
+      </tr>`;
+    }).join('');
+  }
+
+  const md = d.metadata || {};
+  const strip = (id, sources, notes) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = [
+      `<span><strong class="text-cyan">数据:</strong> ${sources.map(escapeHtml).join(' · ')}</span>`,
+      ...(notes?.method || []).map(t => `<span>· ${escapeHtml(t)}</span>`),
+      ...(notes?.caveats || []).map(t => `<span>· ${escapeHtml(t)}</span>`)
+    ].join('');
+  };
+  strip('cc-caveats', [md.sources?.spot || ''], md.clock);
+  strip('ap-caveats', [md.sources?.spot || '', md.sources?.oi || ''], md.activity);
+
+  renderCcChart();
+  renderApChart();
+}
+
+function renderCcChart() {
+  const d = rawCycleState;
+  if (!d?.cycles?.length) return;
+  ccChartInstance = elInitChart(ccChartInstance, 'cc-echarts');
+  if (!ccChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  let bearIdx = 0;
+  const legendSelected = {};
+  const byName = new Map();
+  const series = d.cycles.map(e => {
+    const name = ccSeriesName(e);
+    byName.set(name, e);
+    const isBear = e.kind === 'cycle_bear' && !e.ongoing;
+    const color = e.ongoing ? '#f59e0b' : (isBear ? CC_BEAR_COLORS[bearIdx++ % CC_BEAR_COLORS.length] : '#64748b');
+    if (!e.ongoing && !isBear) legendSelected[name] = false;
+    return {
+      name, type: 'line', showSymbol: false, z: e.ongoing ? 5 : 2,
+      data: e.path.map(([x, y]) => [x, Number((y * 100).toFixed(2))]),
+      lineStyle: { width: e.ongoing ? 2.6 : (isBear ? 1.6 : 1.1), color, type: isBear || e.ongoing ? 'solid' : 'dashed' },
+      itemStyle: { color },
+      markPoint: {
+        symbol: 'circle', symbolSize: 7,
+        // Completed troughs sit within a few weeks of each other; label them on hover only
+        label: { show: e.ongoing, position: 'bottom', color, fontSize: 10, fontFamily: 'JetBrains Mono', formatter: () => `${e.daysToTrough}d ${Math.round(e.maxDrawdown * 100)}%` },
+        emphasis: { label: { show: true } },
+        data: [{ coord: [e.daysToTrough, Number((e.maxDrawdown * 100).toFixed(2))] }]
+      },
+      ...(e.ongoing ? {
+        markLine: {
+          silent: true, symbol: 'none',
+          lineStyle: { color: '#f59e0b', type: 'dotted', width: 1 },
+          label: { color: '#f59e0b', fontSize: 10, formatter: `今天 · 第 ${e.daysSincePeak} 天` },
+          data: [{ xAxis: e.daysSincePeak }]
+        }
+      } : {})
+    };
+  });
+  ccChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: { left: 56, right: 28, top: 48, bottom: 44 },
+    legend: { top: 0, selected: legendSelected, textStyle: { color: colors.textSecondary, fontSize: 11 } },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        if (!params.length) return '';
+        const day = params[0].value[0];
+        const lines = params.map(p => {
+          const e = byName.get(p.seriesName);
+          return `<div><span style="color:${p.color};">●</span> ${escapeHtml(p.seriesName)}: <b>${p.value[1].toFixed(1)}%</b>${e ? ` <span style="color:${colors.textMuted};">高点 ${ccUsd(e.peakClose)}</span>` : ''}</div>`;
+        });
+        return `<div style="font-weight:600;margin-bottom:4px;">距高点第 ${day} 天</div>${lines.join('')}`;
+      }
+    },
+    xAxis: {
+      type: 'value', min: 0, max: 1200,
+      name: '距高点天数', nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: colors.textMuted, fontSize: 10 },
+      ...common
+    },
+    yAxis: { type: 'value', max: 0, min: -90, ...common, axisLabel: { ...common.axisLabel, formatter: '{value}%' } },
+    series
+  }, true);
+}
+
+function renderApChart() {
+  const d = rawCycleState;
+  const rows = d?.activity?.series;
+  if (!rows?.length) return;
+  apChartInstance = elInitChart(apChartInstance, 'ap-echarts');
+  if (!apChartInstance) return;
+  const colors = getChartThemeColors();
+  const common = elAxisCommon(colors);
+  const dates = rows.map(r => r.date);
+  const win = (!apZoomReset && keptZoomWindow(apChartInstance)) || recentDaysZoomWindow(rows, apRange);
+  const low = d.activity.lowThreshold ?? 20;
+  const eps = d.activity.episodes || [];
+  const pctLine = (name, field, color) => ({
+    name, type: 'line', xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, connectNulls: false,
+    data: rows.map(r => r[field]), lineStyle: { width: 1.4, color }, itemStyle: { color }
+  });
+  apChartInstance.setOption({
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: [
+      { left: 64, right: 28, top: 30, height: '40%' },
+      { left: 64, right: 28, top: '56%', height: '30%' }
+    ],
+    dataZoom: [timeZoomSlider(colors, { xAxisIndex: [0, 1], win })],
+    legend: { top: 0, textStyle: { color: colors.textSecondary, fontSize: 11 }, data: ['BTC 收盘', '成交量分位', 'ATR% 分位', '期货 OI 分位'] },
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    tooltip: {
+      ...elTooltipBase(colors),
+      formatter: params => {
+        const r = rows[params[0].dataIndex];
+        if (!r) return '';
+        const p = v => (v == null ? '--' : Math.round(v));
+        return `<div style="font-weight:600;margin-bottom:4px;">${r.date}</div>
+          <div>BTC 收盘 <b>${ccUsd(r.close)}</b></div>
+          <div>成交量 30 日均 ${r.vol30 != null ? `${Math.round(r.vol30).toLocaleString('en-US')} BTC` : '--'} · 分位 <b>${p(r.pVolume)}</b></div>
+          <div>ATR% ${r.atrPct != null ? `${r.atrPct.toFixed(2)}%` : '--'} · 分位 <b>${p(r.pAtr)}</b></div>
+          <div>期货 OI ${elFmtBtc(r.oiBtc, false)} · 分位 <b>${p(r.pOi)}</b></div>`;
+      }
+    },
+    xAxis: [
+      { type: 'category', gridIndex: 0, data: dates, ...common, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: 'category', gridIndex: 1, data: dates, ...common, splitLine: { show: false } }
+    ],
+    yAxis: [
+      { type: 'log', gridIndex: 0, min: 'dataMin', max: 'dataMax', ...common, axisLabel: { ...common.axisLabel, formatter: v => (v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`) } },
+      { type: 'value', gridIndex: 1, min: 0, max: 100, interval: 20, ...common }
+    ],
+    series: [
+      {
+        name: 'BTC 收盘', type: 'line', xAxisIndex: 0, yAxisIndex: 0, showSymbol: false,
+        data: rows.map(r => r.close), lineStyle: { width: 1.4, color: colors.textSecondary }, itemStyle: { color: colors.textSecondary },
+        markArea: {
+          silent: true,
+          itemStyle: { color: 'rgba(34, 211, 238, 0.16)' },
+          data: eps.map(e => [{ xAxis: e.start }, { xAxis: e.end }])
+        }
+      },
+      {
+        ...pctLine('成交量分位', 'pVolume', '#38bdf8'),
+        markArea: { silent: true, itemStyle: { color: 'rgba(34, 211, 238, 0.08)' }, data: [[{ yAxis: 0 }, { yAxis: low }]] }
+      },
+      pctLine('ATR% 分位', 'pAtr', '#a78bfa'),
+      pctLine('期货 OI 分位', 'pOi', '#f59e0b')
+    ]
+  }, true);
+}
+
+function resizeCycleStateCharts() {
+  [ccChartInstance, apChartInstance].forEach(ch => { if (ch) ch.resize(); });
+}
+
+function initCycleStateEvents() {
+  const seg = document.getElementById('ap-range-selector');
+  if (seg) {
+    seg.addEventListener('click', e => {
+      const btn = e.target.closest('.timeframe-btn');
+      if (!btn || btn.dataset.range === apRange) return;
+      apRange = btn.dataset.range;
+      seg.querySelectorAll('.timeframe-btn').forEach(b => b.classList.toggle('active', b === btn));
+      apZoomReset = true;
+      try { renderApChart(); } finally { apZoomReset = false; }
+    });
+  }
+  window.addEventListener('resize', resizeCycleStateCharts);
+}
+
+// ============================================================================
 // Module 2-C: Cross-sectional term structure (Deribit basis vs Treasury curve)
 // ============================================================================
 
@@ -8136,7 +8465,9 @@ const NAV_TREE = {
     { id: 'module-mstr-financing', label: 'MSTR 融资压力与披露' },
     { id: 'module-macro-chart', label: '美债曲线 × Fed 净流动性' },
     { id: 'module-crypto-mcclellan', label: '加密麦克莱伦宽度' },
-    { id: 'module-cdri', label: '衍生品风险指数 CDRI' }
+    { id: 'module-cdri', label: '衍生品风险指数 CDRI' },
+    { id: 'module-cycle-clock', label: '周期时钟' },
+    { id: 'module-activity-pct', label: '成交量、波动与持仓分位' }
   ],
   'view-term-premium': [
     { id: 'module-term-premium', label: '基差期限结构与溢价' },
@@ -9424,6 +9755,7 @@ initCdriEvents();
 initTermPremiumEvents();
 initEtfLinkageEvents();
 initLeverageNormEvents();
+initCycleStateEvents();
 initTermCurveEvents();
 initSsroEvents();
 initFlowForceEvents();
@@ -9434,6 +9766,7 @@ initNavigation();
 loadMarketData(false);
 loadEtfLinkageData(false);
 loadLeverageNorm(false);
+loadCycleState(false);
 loadTermCurve(false);
 fetchCoinbaseLiquidityData(false);
 fetchCbLiquidityHistory(false);

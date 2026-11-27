@@ -306,7 +306,8 @@ describe('DataHealthUI', () => {
       'options.atmIv', 'options.ivSmile', 'options.delta25Skew', 'options.gex',
       'options.blockTrades', 'term_premium', 'etf', 'macro', 'preferreds',
       'cdri', 'ssro', 'flow', 'coinbase', 'liquidity_history', 'gold',
-      'block_insight', 'option_marks', 'mcclellan', 'wave', 'leverage'
+      'block_insight', 'option_marks', 'mcclellan', 'wave', 'leverage',
+      'cycle_clock', 'cycle_activity'
     ];
     for (const id of required) {
       const mod = UI._modules.get(id);

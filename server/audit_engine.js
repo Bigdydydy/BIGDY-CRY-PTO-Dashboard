@@ -461,6 +461,22 @@ async function getSystemAuditData(doProbe = false) {
       ancillaryIds: ['lev_etf_flow', 'etf_volume']
     },
     {
+      id: 'cycle_state',
+      name: '周期时钟 · 成交量 / ATR / 期货 OI 因果分位',
+      viewId: 'view-overview',
+      primarySource: 'Coinbase Exchange BTC-USD 日线 (2015-07 起) + Bitstamp 2011–2015 日收盘档案 + CoinGlass 全场所期货 OI (按币计)',
+      targetEndpoints: [
+        'https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400',
+        'https://capi.coinglass.com/api/openInterest/v3/chart'
+      ],
+      timeframe: '日频：价格 2011 起，成交量 / ATR 分位 2016 起，OI 分位 2020-12 起',
+      updateInterval: '1h 缓存 / 每个 UTC 日收盘后增量追加',
+      isRealtime: false,
+      provenanceSignatures: ['ATH_DRAWDOWN_EPISODES_40PCT', 'CAUSAL_365D_PERCENTILE'],
+      sourceIds: ['cycle_spot_daily'],
+      ancillaryIds: ['lev_oi']
+    },
+    {
       id: 'flow_force',
       name: '多场所资金流向力度 (Flow Force)',
       viewId: 'view-ssro',

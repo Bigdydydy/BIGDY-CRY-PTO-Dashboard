@@ -55,3 +55,9 @@ nul
 
 # 偏斜事件研究的原始逐笔抓取缓存 (约 13 MB，可由 scripts/research/skew_dvol_fetch.js 重新生成)
 research/skew_dvol/
+
+# 周期时钟的运行期构建缓存 (服务器按需重建，1h TTL)
+data/cycle_state.json
+
+# "四低"回测的原始抓取与结果 (约 5 MB，可由 scripts/research/four_lows_fetch.js / four_lows_study.js 重新生成)
+research/four_lows/

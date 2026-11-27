@@ -1256,7 +1256,7 @@ describe('System Audit & Data Provenance Verification Engine', () => {
     assert.ok(audit.serverTimeUTC);
     assert.ok(typeof audit.serverUptimeSeconds === 'number');
     assert.ok(['HEALTHY', 'DEGRADED', 'UNKNOWN', 'CRITICAL'].includes(audit.overallHealth));
-    assert.equal(audit.modulesCount, 21, 'Must register all 21 core modules and data pipelines');
+    assert.equal(audit.modulesCount, 22, 'Must register all 22 core modules and data pipelines');
 
     const expectedModules = [
       'macro_liquidity',
@@ -1279,7 +1279,8 @@ describe('System Audit & Data Provenance Verification Engine', () => {
       'option_oi_history',
       'coinbase_liquidity_history',
       'mstr_disclosures',
-      'leverage_norm'
+      'leverage_norm',
+      'cycle_state'
     ];
 
     for (const modId of expectedModules) {
@@ -1320,7 +1321,7 @@ describe('System Audit & Data Provenance Verification Engine', () => {
           assert.equal(resp.status, 200);
           const json = await resp.json();
           assert.equal(json.code, 0);
-          assert.equal(json.modulesCount, 21);
+          assert.equal(json.modulesCount, 22);
           assert.ok(json.modules.macro_liquidity);
           assert.ok(json.modules.coinbase_orderbook_liquidity);
           assert.ok(json.modules.wave_engine);

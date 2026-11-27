@@ -68,7 +68,10 @@ const SOURCE_POLICIES = Object.freeze({
   lev_oi: policy(6 * HOUR, 2 * DAY, 2 * DAY, 5 * DAY),
   lev_funding: policy(6 * HOUR, 2 * DAY, 2 * DAY, 5 * DAY),
   lev_etf_flow: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY),
-  etf_volume: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY)
+  etf_volume: policy(12 * HOUR, 3 * DAY, 5 * DAY, 14 * DAY),
+  // Module 1-E/1-F cycle clock: Coinbase daily closes appended once a UTC day
+  // closes (1h build cache); a daily bar is ≤ 2 days old when the archive is current.
+  cycle_spot_daily: policy(6 * HOUR, 2 * DAY, 3 * DAY, 7 * DAY)
 });
 
 // A forming candle is dated by its opening time. Its allowed data age includes
