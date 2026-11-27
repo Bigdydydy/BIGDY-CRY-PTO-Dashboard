@@ -1495,6 +1495,29 @@ const SIGNAL_OF_INTENT = {
   'badge-vol-buy': 'volbuy',
   'badge-vol-sell': 'volsell'
 };
+/**
+ * 卡片方向徽章表达「敞口」而非「下单方向」：买入 Put 是看空，卖出 Put 是看多。
+ * 不用 LONG / SHORT 表达 Delta —— 期权语境里 short put 指卖出 Put，会与买入 Put 混淆；LONG / SHORT 只用于波动率。
+ * 与意图徽章同一口径；意图中性 (日历、鹰式等) 时按主轴 (Delta / Vega) 的净敞口符号判断。
+ */
+const EXPOSURE_BADGE = {
+  bull: ['dir-buy', 'BULL 看多'],
+  bear: ['dir-sell', 'BEAR 看空'],
+  volbuy: ['dir-volbuy', 'LONG VOL 买波动率'],
+  volsell: ['dir-volsell', 'SHORT VOL 卖波动率']
+};
+function exposureSignalOf(item) {
+  const sig = SIGNAL_OF_INTENT[item.intentBadgeClass];
+  if (sig) return sig;
+  if (item.primaryAxis === 'vega') return (Number(item.netVegaUSD) || 0) >= 0 ? 'volbuy' : 'volsell';
+  return (Number(item.netDeltaBTC) || 0) >= 0 ? 'bull' : 'bear';
+}
+/** 分腿的买 / 卖是下单方向，不是多空：用中性样式，避免「买入 Put」显示成绿色 */
+function legSideHtml(direction) {
+  const buy = String(direction).toLowerCase() === 'buy';
+  return `<span class="pnl-dir-badge ${buy ? 'leg-buy' : 'leg-sell'}">${buy ? 'BUY' : 'SELL'}</span>`;
+}
+
 const LIFECYCLE_TIER = { 'oi-confirmed': 'lc-confirmed', 'oi-leaning': 'lc-leaning', 'oi-weak': 'lc-rule', rule: 'lc-rule', none: 'lc-none' };
 
 function cardSignalClass(item) {
@@ -1593,15 +1616,8 @@ function renderIcebergsList(clusters) {
   let clusterHtml = '';
   pageClusters.forEach((c, idx) => {
     const globalIdx = startIdx + idx;
-    // 方向徽章与意图分类同一口径：意图判为买 / 卖波动的 (如宽跨式) 不再因残余 Delta 显示成多头 / 空头
-    const intentSig = SIGNAL_OF_INTENT[c.intentBadgeClass];
-    const isVolAxis = intentSig === 'volbuy' || intentSig === 'volsell' || (!intentSig && c.primaryAxis === 'vega');
-    const isBuy = intentSig === 'volbuy' || intentSig === 'bull' ? true
-      : (intentSig === 'volsell' || intentSig === 'bear' ? false : c.direction === 'buy');
-    const dirClass = isVolAxis ? (isBuy ? 'dir-volbuy' : 'dir-volsell') : (isBuy ? 'dir-buy' : 'dir-sell');
-    const dirText = isVolAxis
-      ? (isBuy ? 'LONG VOL 买波动拆单' : 'SHORT VOL 卖波动拆单')
-      : (c.isMultiLeg ? (isBuy ? 'BULL 多头策略拆单' : 'BEAR 空头策略拆单') : (isBuy ? 'BUY 多头拆单' : 'SELL 空头拆单'));
+    const [dirClass, dirLabel] = EXPOSURE_BADGE[exposureSignalOf(c)];
+    const dirText = `${dirLabel}${c.isMultiLeg ? '策略' : ''}拆单`;
 
     clusterHtml += `
       <div class="cluster-card ${cardSignalClass(c)}" onclick="openIcebergDetail(${Number(globalIdx)})">
@@ -1901,11 +1917,9 @@ window.openWhaleDetail = function(idx) {
 
   let legsHtml = '';
   for (const leg of b.legs) {
-    const isBuy = leg.direction === 'buy';
-    const dirClass = isBuy ? 'text-pos' : 'text-neg';
     legsHtml += `
       <tr>
-        <td class="${dirClass}"><strong>${escapeHtml(leg.direction).toUpperCase()}</strong></td>
+        <td>${legSideHtml(leg.direction)}</td>
         <td><strong>${escapeHtml(leg.instrument)}</strong></td>
         <td>${Number(leg.amount) || 0} BTC</td>
         <td>${escapeHtml(leg.price)}</td>
@@ -1976,11 +1990,9 @@ window.openIcebergDetail = function(idx) {
 
   if (c.legs && c.legs.length > 0) {
     mLegsBody.innerHTML = c.legs.map(l => {
-      const legBuy = l.direction === 'buy';
-      const legClass = legBuy ? 'text-pos' : 'text-neg';
       return `
         <tr>
-          <td class="${legClass}"><strong>${escapeHtml(l.direction).toUpperCase()}</strong></td>
+          <td>${legSideHtml(l.direction)}</td>
           <td><strong>${escapeHtml(l.instrument)}</strong></td>
           <td>${Number(l.amount) || 0} BTC</td>
           <td>均价: ${(Number(l.price) || 0).toFixed(4)}</td>
@@ -1993,11 +2005,9 @@ window.openIcebergDetail = function(idx) {
       `;
     }).join('');
   } else {
-    const isBuy = c.direction === 'buy';
-    const dirClass = isBuy ? 'text-pos' : 'text-neg';
     mLegsBody.innerHTML = `
       <tr>
-        <td class="${dirClass}"><strong>${escapeHtml(c.direction).toUpperCase()}</strong></td>
+        <td>${legSideHtml(c.direction)}</td>
         <td><strong>${escapeHtml(c.instrument)}</strong> (合成累计)</td>
         <td>${Number(c.totalContracts) || 0} BTC</td>
         <td>均价: ${(Number(c.avgPrice) || 0).toFixed(4)}</td>
@@ -2856,7 +2866,7 @@ function renderInsightZones(sm, spot) {
     const dist = z.peakPrice && spot ? ` <span class="horizon-share">(较现价 ${z.peakPrice >= spot ? '+' : ''}${(((z.peakPrice - spot) / spot) * 100).toFixed(1)}%)</span>` : '';
     const legs = z.legs.map(l => {
       const parts = l.instrument.split('-');
-      return `<span class="${l.direction === 'buy' ? 'text-pos' : 'text-neg'}">${l.direction === 'buy' ? '+' : '−'}${fmtK(l.amount)} ${fmtStrike(Number(parts[2]))}${parts[3]}</span>`;
+      return `<span class="${l.direction === 'buy' ? 'leg-side-buy' : 'leg-side-sell'}">${l.direction === 'buy' ? '+' : '−'}${fmtK(l.amount)} ${fmtStrike(Number(parts[2]))}${parts[3]}</span>`;
     }).join(' ');
     const when = z.firstTs === z.lastTs ? formatUTC8(z.firstTs, false).slice(5) : `${formatUTC8(z.firstTs, false).slice(5, 10)} ~ ${formatUTC8(z.lastTs, false).slice(5, 10)}`;
     return `

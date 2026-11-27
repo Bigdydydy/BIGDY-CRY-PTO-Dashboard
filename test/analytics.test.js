@@ -1816,3 +1816,34 @@ describe('Module 9: Derivative Strategy Identification & Pricing Calibration (Me
 });
 
 
+
+describe('Single-leg short options: direction vs premium sale', () => {
+  const leg = (inst, strike) => [{ instrument: inst, direction: 'sell', amount: 100, price: 0.02, strike, expiryStr: '26DEC26' }];
+  test('short call / put with |Δ| above 10% of notional are directional and symmetric', () => {
+    const call = identifyInstitutionalStrategy(leg('BTC-26DEC26-85000-C', 85000), -3000000, -2000, 1500, 8000000);
+    const put = identifyInstitutionalStrategy(leg('BTC-26DEC26-70000-P', 70000), 3000000, -2000, 1500, 8000000);
+    assert.equal(call.strategyType, 'SHORT_CALL');
+    assert.equal(call.intentBadgeClass, 'badge-bear');
+    assert.equal(put.strategyType, 'SHORT_PUT');
+    assert.equal(put.intentBadgeClass, 'badge-bull');
+  });
+  test('deep OTM short legs (|Δ| ≤ 10%) are premium sales, not direction', () => {
+    const call = identifyInstitutionalStrategy(leg('BTC-26DEC26-120000-C', 120000), -400000, -2000, 1500, 8000000);
+    const put = identifyInstitutionalStrategy(leg('BTC-26DEC26-50000-P', 50000), 400000, -2000, 1500, 8000000);
+    assert.equal(call.intentBadgeClass, 'badge-vol-sell');
+    assert.equal(put.intentBadgeClass, 'badge-vol-sell');
+  });
+});
+
+describe('Cross-expiry two-leg naming', () => {
+  const mk = (inst, dir) => { const [, e, k, t] = inst.split('-'); return { instrument: inst, direction: dir, amount: 50, price: 0.02, strike: Number(k), expiryStr: e, optType: t }; };
+  test('same strike same type = calendar; different strike = diagonal; call + put is not a calendar', () => {
+    const cal = identifyInstitutionalStrategy([mk('BTC-4DEC26-60000-P', 'sell'), mk('BTC-25DEC26-60000-P', 'buy')], 0, 2000, -500, 6000000);
+    assert.equal(cal.strategyType, 'LONG_CALENDAR_SPREAD');
+    const diag = identifyInstitutionalStrategy([mk('BTC-25DEC26-60000-P', 'buy'), mk('BTC-4DEC26-63000-P', 'sell')], 0, 2000, -500, 6000000);
+    assert.equal(diag.strategyType, 'LONG_DIAGONAL_SPREAD');
+    const mixed = identifyInstitutionalStrategy([mk('BTC-25DEC26-58000-P', 'buy'), mk('BTC-4DEC26-63000-C', 'sell')], -3000000, 2000, -500, 6000000);
+    assert.ok(!/CALENDAR|DIAGONAL/.test(mixed.strategyType));
+    assert.equal(mixed.intentBadgeClass, 'badge-bear');
+  });
+});

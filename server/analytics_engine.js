@@ -858,6 +858,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
     const premiumBtc = (leg.price * leg.amount).toFixed(2);
     const K = `$${leg.strike.toLocaleString()}`;
     const unseen = '单笔成交无法区分新开仓与平仓，也看不到同一主体在现货、期货或其他场所的对冲腿。';
+    // 卖出单腿：|Delta| 超过名义额 10% 才算方向性 (与 4B 分组 familyOf 同一门槛)，否则是收权利金的卖波动率
+    const shortLegDirectional = Math.abs(Number(netDeltaUSD) || 0) > 0.1 * (Number(totalNotionalUSD) || Infinity);
 
     if (leg.isCall) {
       if (leg.isBuy) {
@@ -877,8 +879,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       } else {
         strategyType = 'SHORT_CALL';
         strategyNameZh = '单腿卖出看涨 (Short Call)';
-        intentBadge = '卖出看涨 / 负 Gamma 收权利金';
-        intentBadgeClass = 'badge-vol-sell';
+        intentBadge = shortLegDirectional ? '卖出看涨 / 负 Delta 收权利金' : '卖出虚值看涨 / 负 Vega 收权利金';
+        intentBadgeClass = shortLegDirectional ? 'badge-bear' : 'badge-vol-sell';
         riskProfile = {
           inverseCurvature: '卖出反向看涨：每张到期亏损 1 - K/S 随币价上涨趋近 1 BTC，以 USD 计亏损无上限；若卖方持有等量现货，则相当于备兑，代价是放弃行权价以上的收益。'
         };
@@ -908,8 +910,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       } else {
         strategyType = 'SHORT_PUT';
         strategyNameZh = '单腿卖出看跌 (Short Put)';
-        intentBadge = '卖出看跌 / 正 Delta 收权利金';
-        intentBadgeClass = 'badge-bull';
+        intentBadge = shortLegDirectional ? '卖出看跌 / 正 Delta 收权利金' : '卖出虚值看跌 / 负 Vega 收权利金';
+        intentBadgeClass = shortLegDirectional ? 'badge-bull' : 'badge-vol-sell';
         riskProfile = {
           inverseCurvature: '以 BTC 计价卖出反向看跌：每张到期亏损 K/S - 1 在币价趋零时发散；跌破行权价后，币价下跌会同时放大 BTC 计的亏损。'
         };
@@ -965,7 +967,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
       strategyType = 'IRON_CONDOR';
       strategyNameZh = '经典铁鹰策略 (Iron Condor / 4-Leg Strangle Credit)';
-      intentBadge = '做空波动率 / 宽幅区间收租';
+      intentBadge = '卖出波动率 / 铁鹰';
       intentBadgeClass = 'badge-vol-sell';
       riskProfile = {
         inverseCurvature: '铁鹰策略通过卖出虚值宽跨式同时在更深虚值买入保护翅膀，在 Deribit 反向合约中有效锁死双边穿仓风险，净现金流以 BTC 稳定进账。'
@@ -980,7 +982,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
       strategyType = 'IRON_BUTTERFLY';
       strategyNameZh = '经典铁蝶策略 (Iron Butterfly / ATM Straddle Protection)';
-      intentBadge = '精准中枢做空波动率 / 极高Theta收割';
+      intentBadge = '卖出波动率 / 铁蝶';
       intentBadgeClass = 'badge-vol-sell';
       riskProfile = {
         inverseCurvature: '铁蝶由平值平价卖出跨式与外侧买入宽跨式组合而成，收取的权利金显著高于铁鹰，平值钉盘 Gamma 敏感度极高。'
@@ -1074,7 +1076,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
           strategyType = 'RATIO_CALL_BACKSPREAD';
           strategyNameZh = '看涨反比例价差 (1x2 Call Backspread)';
-          intentBadge = '做多波动率凸性 / 爆发性看涨突破';
+          intentBadge = '买入波动率 / 偏向上行';
           intentBadgeClass = 'badge-vol-buy';
           riskProfile = {
             inverseCurvature: 'Deribit 反向合约特性：在 $K_2$ 处承受最大下凹亏损；突破 $K_2$ 后随着现货暴拉，净多头 1 份 Call 产生无限 USD 收益，BTC 计价收益渐近收敛至 1.0 BTC。'
@@ -1090,7 +1092,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         else if (leg1.isBuy && leg2.isSell && is1x2Ratio) {
           strategyType = 'RATIO_CALL_FRONT_SPREAD';
           strategyNameZh = '看涨正比例价差 (1x2 Call Front Spread)';
-          intentBadge = '温和看涨收租 / 上行极端敞口暴露';
+          intentBadge = '卖出波动率 / 温和看多 (上方裸卖)';
           intentBadgeClass = 'badge-vol-sell';
           theoreticalPointers = [
             `高胜率收割偏度溢价：在虚值 Call 具有极高波动率微笑溢价时，卖出双倍虚值期权获取大额贷方。`,
@@ -1104,7 +1106,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           
           strategyType = 'BULL_CALL_SPREAD';
           strategyNameZh = '牛市看涨价差 (Bull Call Spread / Debit Call Spread)';
-          intentBadge = '温和看涨 / 锁定风险杠杆做多';
+          intentBadge = '温和看多 / 买入 Call 价差';
           intentBadgeClass = 'badge-bull';
           theoreticalPointers = [
             `权利金补贴 (Financing Leg)：通过卖出虚值 $${leg2.strike.toLocaleString()} Call 大幅降低买入 $${leg1.strike.toLocaleString()} Call 的持仓成本。`,
@@ -1118,7 +1120,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
           strategyType = 'BEAR_CALL_SPREAD';
           strategyNameZh = '熊市看涨价差 (Bear Call Spread / Credit Call Spread)';
-          intentBadge = '看跌防守 / 阻力区贷方收租';
+          intentBadge = '温和看空 / 卖出 Call 价差收权利金';
           intentBadgeClass = 'badge-bear';
           theoreticalPointers = [
             `概率优势 (Statistical Edge)：利用高行权价买腿将做空裸 Call 的无限爆仓风险降为有限风险，在阻力区赚取高胜率时间价值。`,
@@ -1137,7 +1139,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         if (leg1.isBuy && leg2.isSell && is1x2PutRatio) {
           strategyType = 'RATIO_PUT_BACKSPREAD';
           strategyNameZh = '看跌反比例价差 (1x2 Put Backspread)';
-          intentBadge = '做多波动率凸性 / 极端下行崩盘博弈';
+          intentBadge = '买入波动率 / 偏向下行';
           intentBadgeClass = 'badge-vol-buy';
           theoreticalPointers = [
             `零成本深度尾部对冲：卖出高行权价 Put 资助买入双倍虚值 Put，在标的暴跌击穿支撑位后释放极强正 Gamma。`,
@@ -1151,7 +1153,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
           strategyType = 'BEAR_PUT_SPREAD';
           strategyNameZh = '熊市看跌价差 (Bear Put Spread / Debit Put Spread)';
-          intentBadge = '看空防守 / 廉价下行对冲';
+          intentBadge = '温和看空 / 买入 Put 价差';
           intentBadgeClass = 'badge-bear';
           theoreticalPointers = [
             `低成本下行防线：通过卖出更低行权价的 Put 补贴高行权价 Put，相比单腿 Long Put 显著减少 Theta 衰减磨损。`,
@@ -1165,7 +1167,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
 
           strategyType = 'BULL_PUT_SPREAD';
           strategyNameZh = '牛市看跌价差 (Bull Put Spread / Credit Put Spread)';
-          intentBadge = '温和看多 / 支撑区保底收息';
+          intentBadge = '温和看多 / 卖出 Put 价差收权利金';
           intentBadgeClass = 'badge-bull';
           theoreticalPointers = [
             `高安全边际：在标的下方支撑位构建，只要标的未跌破 $${leg2.strike.toLocaleString()} 即可稳收全部现金收益。`,
@@ -1193,7 +1195,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           if (callLeg.isBuy && putLeg.isSell) {
             strategyType = 'SYNTHETIC_LONG_FUTURE';
             strategyNameZh = '合成标的多头 (Synthetic Long Future / Parity Replication)';
-            intentBadge = '合成现货做多 / 100%正Delta';
+            intentBadge = '看多 / 合成期货多头 (Δ≈+1)';
             intentBadgeClass = 'badge-bull';
             theoreticalPointers = [
               `期权平价公式复制 (Put-Call Parity)：C - P = S - K。买入 Call 同时卖出同行权价 Put，净 Delta 严格恒等于 +1.0。`,
@@ -1204,7 +1206,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           } else if (callLeg.isSell && putLeg.isBuy) {
             strategyType = 'SYNTHETIC_SHORT_FUTURE';
             strategyNameZh = '合成标的空头 (Synthetic Short Future)';
-            intentBadge = '合成现货做空 / 100%负Delta';
+            intentBadge = '看空 / 合成期货空头 (Δ≈−1)';
             intentBadgeClass = 'badge-bear';
             theoreticalPointers = [
               `合成纯空头头寸：卖出 Call 同时买入同行权价 Put，净 Delta 恒等于 -1.0。`,
@@ -1214,7 +1216,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           } else if (callLeg.isBuy && putLeg.isBuy) {
             strategyType = 'LONG_STRADDLE';
             strategyNameZh = '买入平值跨式组合 (Long Straddle)';
-            intentBadge = '纯做多波动率 / 双向变盘突破';
+            intentBadge = '买入波动率 / 平值跨式';
             intentBadgeClass = 'badge-vol-buy';
             theoreticalPointers = [
               `纯粹做多波动率 (Pure Long Vol)：同时暴露正 Gamma 与正 Vega，不设方向预设立场。`,
@@ -1225,7 +1227,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           } else if (callLeg.isSell && putLeg.isSell) {
             strategyType = 'SHORT_STRADDLE';
             strategyNameZh = '卖出平值跨式组合 (Short Straddle)';
-            intentBadge = '做空波动率 / 中枢收敛收租';
+            intentBadge = '卖出波动率 / 平值跨式';
             intentBadgeClass = 'badge-vol-sell';
             const totalCreditBTC = Number(((callLeg.price * callLeg.amount) + (putLeg.price * putLeg.amount)).toFixed(2));
             theoreticalPointers = [
@@ -1240,8 +1242,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         else {
           if (callLeg.isBuy && putLeg.isSell) {
             strategyType = 'BULLISH_RISK_REVERSAL';
-            strategyNameZh = '牛市风险逆转组合 (Bullish Risk Reversal / Synthetic Long)';
-            intentBadge = '合成现货多头 / 做空偏度买涨';
+            strategyNameZh = '看多风险逆转 (Bullish Risk Reversal)';
+            intentBadge = '看多 / 卖 Put 买 Call';
             intentBadgeClass = 'badge-bull';
             theoreticalPointers = [
               `做空偏度套利 (Short Skew)：利用市场上 Put 隐含波动率常态化溢价（Put Skew），卖出高估的 Put 免费或极低成本资助买入虚值 Call。`,
@@ -1251,19 +1253,19 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
             intentNarrative = `本笔交易为规模达 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的顶级投行标配【牛市风险逆转组合 (Bullish Risk Reversal)】。大资金果断卖出 $${putLeg.strike.toLocaleString()} 看跌期权，全额资助买入 $${callLeg.strike.toLocaleString()} 看涨期权。既利用了市场看跌期权的偏度溢价，又以极低成本合成了强大的多头杠杆。`;
           } else if (callLeg.isSell && putLeg.isBuy) {
             strategyType = 'BEARISH_RISK_REVERSAL';
-            strategyNameZh = '熊市风险逆转 / 零成本领口对冲 (Collar / Synthetic Short)';
-            intentBadge = '零成本硬核防守 / 锁死下行';
+            strategyNameZh = '看空风险逆转 (Bearish Risk Reversal；持有现货时即领口 Collar)';
+            intentBadge = '看空 / 买 Put 卖 Call';
             intentBadgeClass = 'badge-bear';
             theoreticalPointers = [
               `零成本防守对冲 (Zero-Cost Hedge)：利用上方卖出 Call 的收入完全覆盖下方买入保护性 Put 的成本，实现近乎零成本的下行全封锁。`,
               `天花板锁利置换：愿意牺牲 $${callLeg.strike.toLocaleString()} 之上的浮盈空间，换取组合在 $${putLeg.strike.toLocaleString()} 下方的绝对本金安全。`,
               `宏观避险特征：常出现于重大宏观事件公布前夕，反映机构级保守风控资产管理思路。`
             ];
-            intentNarrative = `本笔交易为总额超 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【熊市风险逆转 / 零成本领口对冲组合 (Collar)】。机构卖出高位 $${callLeg.strike.toLocaleString()} Call 的权利金，为购买 $${putLeg.strike.toLocaleString()} Put 提供了全部资金。`;
+            intentNarrative = `本笔交易为总额超 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【看空风险逆转 (Bearish Risk Reversal)】，若交易方持有现货则构成领口 (Collar)。机构卖出高位 $${callLeg.strike.toLocaleString()} Call 的权利金，为购买 $${putLeg.strike.toLocaleString()} Put 提供了全部资金。`;
           } else if (callLeg.isBuy && putLeg.isBuy) {
             strategyType = 'LONG_STRANGLE';
             strategyNameZh = '买入宽跨式组合 (Long Strangle)';
-            intentBadge = '做多波动率 / 双向宽幅突破';
+            intentBadge = '买入波动率 / 宽跨式';
             intentBadgeClass = 'badge-vol-buy';
             theoreticalPointers = [
               `廉价做多波动率：相比 Straddle 成本更低，但要求标的产生更大维度的价格位移。`,
@@ -1273,7 +1275,7 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
           } else if (callLeg.isSell && putLeg.isSell) {
             strategyType = 'SHORT_STRANGLE';
             strategyNameZh = '卖出宽跨式组合 (Short Strangle)';
-            intentBadge = '做空波动率 / 宽幅通道收租';
+            intentBadge = '卖出波动率 / 宽跨式';
             intentBadgeClass = 'badge-vol-sell';
             theoreticalPointers = [
               `高安全垫宽幅震荡收租：行权价间距为现货提供了巨大的安全缓冲空间。`,
@@ -1285,34 +1287,38 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
       }
     }
 
-    else if (!sameExpiry) {
+    // 日历 / 对角价差只适用于同类型 (都是 Call 或都是 Put)；跨期 Call + Put 交给下方按希腊字母判读
+    else if (!sameExpiry && sameType) {
       const d1 = parseDeribitExpiry(leg1.expiryStr)?.getTime() || 0;
       const d2 = parseDeribitExpiry(leg2.expiryStr)?.getTime() || 0;
       const nearLeg = d1 < d2 ? leg1 : leg2;
       const farLeg = d1 < d2 ? leg2 : leg1;
+      // 行权价不同即为对角价差：除了期限结构，还带一部分方向敞口
+      const diagonal = nearLeg.strike !== farLeg.strike;
+      const typeZh = nearLeg.isCall ? 'Call' : 'Put';
 
       if (farLeg.isBuy && nearLeg.isSell) {
-        strategyType = 'LONG_CALENDAR_SPREAD';
-        strategyNameZh = '买入日历价差 (Long Calendar Spread)';
-        intentBadge = '期限结构套利 / 近端收息远端做多';
+        strategyType = diagonal ? 'LONG_DIAGONAL_SPREAD' : 'LONG_CALENDAR_SPREAD';
+        strategyNameZh = diagonal ? `${typeZh} 对角价差 (Long Diagonal：卖近买远)` : `买入日历价差 (Long Calendar Spread)`;
+        intentBadge = '期限结构 / 卖近月买远月';
         intentBadgeClass = 'badge-neutral';
         theoreticalPointers = [
           `Theta 衰减不对称性：利用近端期权 Theta 衰减速率显著快于远期期权的数学特征，稳步赚取近端加速耗损。`,
           `远端 Vega 杠杆：远期期权 Vega 敏感度更高，远端 IV 补涨升水将带来显著账面增值。`,
           `时间平方根期限结构优势：在低波震荡市中具备极高的风险报酬比。`
         ];
-        intentNarrative = `本笔交易为规模达 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【日历价差策略 (Calendar Spread)】。机构卖出近月期权收租，买入远月期权布局，巧妙利用不同期限的时间价值衰减速率差异与远期波动率抬升预期套利。`;
+        intentNarrative = `本笔交易为规模达 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【${strategyNameZh}】。机构卖出近月期权收租，买入远月期权布局，巧妙利用不同期限的时间价值衰减速率差异与远期波动率抬升预期套利。`;
       } else if (farLeg.isSell && nearLeg.isBuy) {
-        strategyType = 'REVERSE_CALENDAR_SPREAD';
-        strategyNameZh = '反向日历价差 (Reverse Calendar Spread)';
-        intentBadge = '反向日历 / 押注近端剧烈突破';
+        strategyType = diagonal ? 'REVERSE_DIAGONAL_SPREAD' : 'REVERSE_CALENDAR_SPREAD';
+        strategyNameZh = diagonal ? `${typeZh} 反向对角价差 (Reverse Diagonal：买近卖远)` : '反向日历价差 (Reverse Calendar Spread)';
+        intentBadge = '期限结构 / 买近月卖远月';
         intentBadgeClass = 'badge-neutral';
         theoreticalPointers = [
           `近端变盘博弈：买入近端以极高 Gamma 捕捉眼前即将落地的突发催化剂，同时卖出远端补贴持仓。`,
           `期限倒挂收益：若近端因突发行情出现剧烈 Backwardation（倒挂），近端涨幅将压倒远端。`,
           `逆向结构思维：适合在平静期前瞻性博弈即将到来的重大决议或数据发布。`
         ];
-        intentNarrative = `本笔交易为总额超 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【反向日历价差组合 (Reverse Calendar Spread)】。机构买入近月期权博弈近端突发变盘，同时卖出远月期权以控制持仓净敞口，意在精准捕捉近端爆发性行情。`;
+        intentNarrative = `本笔交易为总额超 $${(totalNotionalUSD / 1e6).toFixed(1)}M 的【${strategyNameZh}】。机构买入近月期权博弈近端突发变盘，同时卖出远月期权以控制持仓净敞口，意在精准捕捉近端爆发性行情。`;
       }
     }
   }
@@ -1325,8 +1331,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
     if (deltaRatio >= 0.25 || Math.abs(netDeltaUSD) >= 10000000) {
       if (netDeltaUSD > 0) {
         strategyType = 'DIRECTIONAL_BULL';
-        strategyNameZh = '多头方向性策略组合';
-        intentBadge = '看强方向 (多头建仓)';
+        strategyNameZh = '方向性看多组合';
+        intentBadge = '看多 / 净 Delta 为正';
         intentBadgeClass = 'badge-bull';
         theoreticalPointers = [
           `显著正 Delta 敞口：持仓直接受标的现货价格上拉驱动。`,
@@ -1336,21 +1342,21 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         intentNarrative = `本笔交易呈现强烈的【多头方向性押注】（净 Delta 达 +$${(netDeltaUSD / 1e6).toFixed(1)}M）。大资金主动暴露正向 Delta 敞口，明确预期标的将在到期日前迎来单边突破。`;
       } else {
         strategyType = 'DIRECTIONAL_BEAR';
-        strategyNameZh = '空头方向性对冲组合';
-        intentBadge = '看强方向 (空头防守/做空)';
+        strategyNameZh = '方向性看空组合';
+        intentBadge = '看空 / 净 Delta 为负';
         intentBadgeClass = 'badge-bear';
         theoreticalPointers = [
-          `负 Delta 防御：有效抵御现货持仓的下行亏损，起到防波堤作用。`,
-          `恐慌波动率防护：通常伴随正 Vega 或低成本卖腿结构，应对流动性挤压。`,
-          `下行安全垫增厚：在不直接抛售现货的前提下实现平滑风险。`
+          `显著负 Delta 敞口：持仓随标的下跌而增值。`,
+          `可能是纯方向性看空，也可能是对现货多头的保护；成交记录里看不到现货，二者无法区分。`,
+          `综合希腊字母控制：通过多腿协同调节 Vega 与 Theta 成本。`
         ];
-        intentNarrative = `本笔交易呈现显著的【空头方向性押注或宏观下行对冲】（净 Delta 达 -$${(Math.abs(netDeltaUSD) / 1e6).toFixed(1)}M）。机构通过大额配置建立负 Delta 敞口，防范现货回调破位风险。`;
+        intentNarrative = `本笔交易呈现显著的【方向性看空敞口】（净 Delta 达 -$${(Math.abs(netDeltaUSD) / 1e6).toFixed(1)}M）：可能是纯看空押注，也可能是对现货多头的下行保护。`;
       }
     } else {
       if (netVegaUSD < -2000 && netThetaUSD > 2000) {
         strategyType = 'RANGEBOUND_SHORT_VOL';
-        strategyNameZh = '区间震荡做空波动率';
-        intentBadge = '看震荡 (沽空波动率 / Theta 收割)';
+        strategyNameZh = '净卖出波动率组合';
+        intentBadge = '卖出波动率 / 看区间震荡';
         intentBadgeClass = 'badge-vol-sell';
         theoreticalPointers = [
           `Delta 趋于中性：规避了大部分单边现货价格波动的扰动。`,
@@ -1360,8 +1366,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         intentNarrative = `本笔交易核心意图为【做空波动率与看区间震荡】。Delta 敞口接近中性，净 Vega 为负，净 Theta 为正。机构预期后市将在行权价区间内窄幅震荡，旨在精准收割时间价值衰减与赚取 IV 回落溢价。`;
       } else if (netVegaUSD > 2000 && netThetaUSD < -2000) {
         strategyType = 'BREAKOUT_LONG_VOL';
-        strategyNameZh = '突破变盘做多波动率';
-        intentBadge = '看变盘 (做多波动率 / 突破博弈)';
+        strategyNameZh = '净买入波动率组合';
+        intentBadge = '买入波动率 / 看变盘';
         intentBadgeClass = 'badge-vol-buy';
         theoreticalPointers = [
           `正 Vega / 正 Gamma 敞口：极度契合低波动率末期的变盘节点。`,
@@ -1371,8 +1377,8 @@ function identifyInstitutionalStrategy(legs, netDeltaUSD, netVegaUSD, netThetaUS
         intentNarrative = `本笔交易属于经典的【做多波动率（Long Vega）变盘押注】。Delta 保持相对中性，但净 Vega 达 +$${Math.round(netVegaUSD).toLocaleString()}/1% IV。机构预期当前极低波动率不可持续，押注后市将爆发重大单边突破或剧烈洗盘行情。`;
       } else {
         strategyType = 'SPREAD_SKEW_PLAY';
-        strategyNameZh = '价差套利与行权价偏度配置';
-        intentBadge = '价差套利 (行权价/期限偏度配置)';
+        strategyNameZh = '定制价差组合 (Delta / Vega 均不显著)';
+        intentBadge = '价差 / 偏度与期限配置';
         intentBadgeClass = 'badge-neutral';
         theoreticalPointers = [
           `风险中性化调控：平衡了单边价格风险与波动率大起大落冲击。`,
@@ -1622,7 +1628,7 @@ function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming 
     'BULLISH_RISK_REVERSAL', 'BEARISH_RISK_REVERSAL', 'SYNTHETIC_LONG_FUTURE', 'SYNTHETIC_SHORT_FUTURE',
     'LONG_BUTTERFLY_SPREAD', 'LONG_PUT_BUTTERFLY', 'PUT_BUTTERFLY',
     'BROKEN_WING_BUTTERFLY', 'BROKEN_WING_PUT_BUTTERFLY',
-    'LONG_CALENDAR_SPREAD', 'REVERSE_CALENDAR_SPREAD'
+    'LONG_CALENDAR_SPREAD', 'REVERSE_CALENDAR_SPREAD', 'LONG_DIAGONAL_SPREAD', 'REVERSE_DIAGONAL_SPREAD'
   ];
   if (isMultiLeg && STANDARD_STRATEGIES.includes(strategyType)) {
     return {
@@ -1705,7 +1711,7 @@ function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming 
         action: 'OPENING',
         actionType: 'AGGRESSIVE_OPEN',
         confidence: 'MEDIUM',
-        tag: '🎯 主动扫盘开仓 (Taker Buy)',
+        tag: '🎯 主动买入吃单 (Taker Buy)',
         badgeClass: 'badge-action-open',
         rationale: '交易以主动买方吃单 (Ask Taker) 撮合成交，具有积极的主动开仓攻击性特征。'
       };
@@ -1716,7 +1722,7 @@ function evaluateTradeAction(tradeOrGroup, spotPrice = 77250, precomputedTiming 
         action: 'CLOSING',
         actionType: 'DISCOUNTED_CLOSE',
         confidence: 'MEDIUM',
-        tag: '🚪 砸盘平仓减亏 (Taker Sell)',
+        tag: '🚪 主动卖出吃单 (Taker Sell)',
         badgeClass: 'badge-action-close',
         rationale: '交易以主动卖方砸盘 (Bid Taker) 撮合成交，反映大资金离场意愿急迫，具有较强平仓离场特征。'
       };

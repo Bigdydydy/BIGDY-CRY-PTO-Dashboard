@@ -6642,15 +6642,21 @@ body {
   font-weight: 700;
 }
 
+/* 分腿买 / 卖是下单方向，不代表多空：中性色，买 = 实底，卖 = 描边 (绿 / 红只留给 Delta 方向) */
 .pnl-dir-badge.leg-buy {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--text-primary);
+  background: var(--border-default);
+  border: 1px solid var(--border-default);
 }
 
 .pnl-dir-badge.leg-sell {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-default);
 }
+
+.leg-side-buy { color: var(--text-primary); font-weight: 600; }
+.leg-side-sell { color: var(--text-secondary); }
 
 .pnl-expired-tag {
   margin-left: 6px;
