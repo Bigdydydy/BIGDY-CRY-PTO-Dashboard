@@ -775,6 +775,81 @@ body {
   text-align: justify;
 }
 
+/* 三层研判：结论行 → 要点 → 折叠区 (试点：Card 05 偏斜、02B 做市商) */
+.brief-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.brief-headline-text {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.brief-tag {
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: help;
+}
+
+.brief-tag-low { color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+.brief-tag-medium { color: var(--accent-teal); border-color: rgba(45, 212, 191, 0.4); }
+
+.brief-points {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.brief-details {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.brief-details > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  user-select: none;
+}
+
+.brief-details > summary:hover { color: var(--text-secondary); }
+
+.brief-detail-block { margin-top: 8px; }
+
+.brief-detail-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.brief-detail-text {
+  margin: 0;
+  line-height: 1.55;
+  text-align: justify;
+}
+
+.brief-detail-link { color: var(--accent-primary-light); text-decoration: none; white-space: nowrap; }
+.brief-detail-link:hover { text-decoration: underline; }
+
 /* ==========================================================================
    Module 4 & 5: Smile & 25Δ Skew Custom Layouts
    ========================================================================== */

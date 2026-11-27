@@ -1000,7 +1000,64 @@ function render25DeltaSkew(data) {
   setTextIfPresent('skew-regime-sub', data.skewRegimeDesc || '--');
   setTextIfPresent('skew-regime-badge', regimeBadge[data.skewRegimeKey] || '25D RR');
 
-  elSkewNarrativeText.textContent = data.paragraph || '';
+  renderBrief(elSkewNarrativeText, data.brief, data.paragraph);
+}
+
+/**
+ * 三层研判：结论行 (+ 标签) → 至多 3 条要点 → 折叠的"口径 · 推导 · 敏感性"。
+ * 服务端没有 brief 时退回整段 paragraph。全部用 textContent 写入，不拼 HTML。
+ */
+function renderBrief(container, brief, fallbackParagraph) {
+  if (!container) return;
+  // 定时刷新会重建内容：保留读者已展开的折叠区
+  const wasOpen = Boolean(container.querySelector('details.brief-details')?.open);
+  container.replaceChildren();
+  if (!brief || !brief.headline) {
+    container.textContent = fallbackParagraph || '';
+    return;
+  }
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  const head = el('div', 'brief-headline');
+  head.append(el('span', 'brief-headline-text', brief.headline));
+  if (brief.tag && brief.tag.label) {
+    const tag = el('span', `brief-tag brief-tag-${brief.tag.level || 'info'}`, brief.tag.label);
+    if (brief.tag.reason) tag.title = brief.tag.reason;
+    head.append(tag);
+  }
+  container.append(head);
+
+  if (Array.isArray(brief.points) && brief.points.length) {
+    const ul = el('ul', 'brief-points');
+    for (const p of brief.points.slice(0, 3)) ul.append(el('li', null, p));
+    container.append(ul);
+  }
+
+  const details = (brief.details || []).filter(d => d && d.text);
+  if (details.length) {
+    const box = el('details', 'brief-details');
+    box.open = wasOpen;
+    box.append(el('summary', null, `口径 · 推导 · 敏感性（${details.length}）`));
+    for (const d of details) {
+      const block = el('div', 'brief-detail-block');
+      block.append(el('div', 'brief-detail-label', d.label));
+      const p = el('p', 'brief-detail-text', d.text);
+      if (d.href && /^https:\/\//.test(d.href)) {
+        const a = el('a', 'brief-detail-link', '查看报告 ↗');
+        a.href = d.href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        p.append(' ', a);
+      }
+      block.append(p);
+      box.append(block);
+    }
+    container.append(box);
+  }
 }
 
 /**
@@ -1235,7 +1292,7 @@ function renderDealerExposure(data) {
       </tr>`).join('');
   }
 
-  narrative.textContent = data.paragraph || '';
+  renderBrief(narrative, data.brief, data.paragraph);
   lastDealerExposure = data;
   renderDealerSlideChart();
   renderDealerHistoryChart();

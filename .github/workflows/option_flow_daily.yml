@@ -40,13 +40,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/dealer_exposure_snapshot.js
 
+      # 偏斜重建档案：补齐最近 7 天 (04:00–08:00 UTC 窗口，定时在 08:23 之后)；失败不影响台账提交
+      - name: Skew history daily record
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: node scripts/skew_history.js
+
       - name: Commit and push
         if: ${{ !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 任一步失败时对应文件可能不存在，只添加实际存在的文件
-          for f in data/option_flow_ledger_BTC.json data/dealer_exposure_history_BTC.json; do
+          for f in data/option_flow_ledger_BTC.json data/dealer_exposure_history_BTC.json data/skew_history_BTC.json; do
             if [ -f "$f" ]; then git add "$f"; fi
           done
           if git diff --cached --quiet; then

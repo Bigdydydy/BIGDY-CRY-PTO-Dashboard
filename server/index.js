@@ -38,6 +38,7 @@ const optionOiHistory = require('./option_oi_history');
 const blockHedges = require('./block_hedges');
 const blockInsight = require('./block_insight');
 const volSurfaceHistory = require('./vol_surface_history');
+const skewHistory = require('./skew_history');
 const { analyzeDealerExposure } = require('./dealer_engine');
 const optionFlowLedger = require('./option_flow_ledger');
 const dealerHistory = require('./dealer_history');
@@ -850,6 +851,13 @@ async function handleApiRequest(req, res, parsedUrl) {
       }
 
       const volHist = volSurfaceHistory.getHistory();
+      // 偏斜贵贱的长历史基准 (逐笔成交重建，每日任务追加)；不可用时 analyze25DeltaSkew 退回本地档案
+      let skewRichness = null;
+      try {
+        skewRichness = skewHistory.richnessFromHistory(await skewHistory.getHistory());
+      } catch (err) {
+        console.warn('[API] skew history unavailable:', err.message);
+      }
       const smileAnalysis = (allowed('ivSmile') && spotPrice !== null)
         ? analyzeIvSmile(data.ivSkewMonth, spotPrice, new Date(), { history: volHist })
         : unavailableAnalysis(analysisHealth.ivSmile, data.ivSkewMonth);
@@ -858,7 +866,9 @@ async function handleApiRequest(req, res, parsedUrl) {
           // Never feed an unavailable-shaped placeholder into a live analyzer.
           atm: atmAnalysis.status === 'data_unavailable' ? null : atmAnalysis,
           dvolStats: data.dvolStats,
-          history: volHist
+          history: volHist,
+          skewRichness,
+          skewStudy: skewHistory.STUDY
         })
         : unavailableAnalysis(analysisHealth.delta25Skew, data.skewChart);
 

@@ -79,7 +79,7 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     assert.equal(D.depthComparison(-1, 1, null), null);
   });
 
-  test('预警：负 Gamma 助跌 + Put 偏斜极端 + IV 上升时卖出 → 高优先级；结论不稳健时降一级', () => {
+  test('预警：负 Gamma 助跌时为中优先级；Put 偏斜偏贵不升级 (事件研究无增量)；结论不稳健时降一级', () => {
     const args = {
       state: D.hedgingState(-10, -30e6, -1),
       vexUsd: 5e6,
@@ -93,10 +93,11 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     const high = D.buildAlerts(args);
     assert.equal(high.length, 1);
     assert.equal(high[0].key, 'downside_cascade');
-    assert.equal(high[0].level, 'high');
+    assert.equal(high[0].level, 'medium', 'Put 偏贵历史上不预示下跌型跳升，不再升为高优先级');
     assert.ok(!high[0].detail.includes('盘口') && !high[0].detail.includes('深度'), '单一现货场所的瞬时深度比不进入预警文本');
     assert.ok(high[0].detail.includes('相对自身历史偏贵'));
-    assert.equal(D.buildAlerts({ ...args, robust: false })[0].level, 'medium');
+    assert.ok(high[0].detail.includes('不升级'));
+    assert.equal(D.buildAlerts({ ...args, robust: false })[0].level, 'low');
     const noHist = D.buildAlerts({ ...args, skew: { d30: -3.6, richness: { verdict: 'insufficient_history' } } })[0];
     assert.equal(noHist.level, 'medium', '偏度历史不足时不升为高优先级');
     assert.ok(noHist.detail.includes('历史样本不足'));
@@ -139,6 +140,12 @@ describe('dealer_engine · 已触发对冲流、状态、预警与深度', () =>
     assert.equal(r.sensitivity.scenarios.find(s => s.key === 'otm_call_bought').curve, undefined);
     assert.equal(JSON.stringify(r).includes('flowBook'), false, '校正账本不进入输出');
     assert.ok(r.paragraph.includes('【对冲状态·全成交校正口径】'));
+    // 三层研判：结论行 = 对冲状态说明；要点 ≤ 3 条；置信度标签不出现"高"；折叠区子段不重复【标签】
+    assert.equal(r.brief.headline, r.state.desc);
+    assert.ok(r.brief.points.length >= 2 && r.brief.points.length <= 3);
+    assert.ok(['low', 'medium'].includes(r.brief.tag.level));
+    assert.ok(r.brief.details.some(d => d.label === '符号敏感性'));
+    assert.ok(r.brief.details.every(d => !d.text.startsWith('【')));
     assert.ok(r.paragraph.includes('过去 24 小时'));
     assert.ok(r.paragraph.includes('全成交校正口径净 GEX'), '体制叙述以主口径为准');
     assert.ok(r.paragraph.includes('（惯例口径 '), '惯例口径数字并列');
