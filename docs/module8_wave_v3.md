@@ -522,7 +522,7 @@ Worker 加载引擎的地址带页面加载时刻（`/wave_engine.js?b=…`）�
 | 过期 | 177 条 | 147 条 |
 | 检验段首选计数 | 1.07 | 1.074，校准后 1.079 |
 
-## 5.6 指引校准与动能检验（`scripts/wave_calibrate.js`，结果 `data/wave_calibration_current.json`）
+## 5.6 指引校准与动能检验（`scripts/wave_calibrate.js`，结果写入 `data/wave_calibration_<tag>.json`，离线产物不入库）
 
 问题：「指引符合度」和候选排序是否真能区分对错？做法：
 
