@@ -1,0 +1,1065 @@
+{
+  "generatedAt": "2026-11-18T05:16:38.114Z",
+  "input": "data/term_premium_history.local.json",
+  "range": {
+    "first": "2024-01-01",
+    "last": "2026-11-16",
+    "days": 1051
+  },
+  "costs": {
+    "low": {
+      "spotFeeBps": 5,
+      "futFeeBps": 2,
+      "perpFeeBps": 2,
+      "slipBps": 1,
+      "settleBps": 2.5
+    },
+    "base": {
+      "spotFeeBps": 10,
+      "futFeeBps": 5,
+      "perpFeeBps": 5,
+      "slipBps": 2,
+      "settleBps": 2.5
+    },
+    "high": {
+      "spotFeeBps": 20,
+      "futFeeBps": 5,
+      "perpFeeBps": 5,
+      "slipBps": 5,
+      "settleBps": 2.5
+    }
+  },
+  "strategies": [
+    {
+      "id": "cash",
+      "label": "只持有 3M 美债",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 13.612683374273637,
+        "cagrPct": 4.536370534924905,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 0,
+        "volAnnPct": 0.033019947168672736,
+        "sharpe": null,
+        "maxDrawdownPct": 0,
+        "exposurePct": 0,
+        "trades": 0,
+        "winRatePct": null,
+        "avgHoldDays": null,
+        "worstTradeDdPct": null
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 5.315975358616476,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 4.296680512771789,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.4337039423990134,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": []
+    },
+    {
+      "id": "q_always",
+      "label": "季度基差·常驻（到期滚动）",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 25.48527235523059,
+        "cagrPct": 8.211326416956188,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 3.6749558820312833,
+        "volAnnPct": 3.202447594102595,
+        "sharpe": 1.095875317855482,
+        "maxDrawdownPct": -1.828396990972836,
+        "exposurePct": 99.90476190476191,
+        "trades": 1,
+        "winRatePct": null,
+        "avgHoldDays": 1049,
+        "worstTradeDdPct": -1.828396990972836
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 14.286621725292893,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 6.642309084685505,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 2.959831272081903,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-01-02",
+          "exitDate": "2026-11-16",
+          "contracts": [
+            "BTC-29MAR24",
+            "BTC-28JUN24",
+            "BTC-27SEP24",
+            "BTC-27DEC24",
+            "BTC-28MAR25",
+            "BTC-27JUN25",
+            "BTC-26SEP25",
+            "BTC-26DEC25",
+            "BTC-27MAR26",
+            "BTC-26JUN26",
+            "BTC-25SEP26",
+            "BTC-25DEC26"
+          ],
+          "ddPct": -1.828396990972836,
+          "entryApr": 18.59,
+          "entryNetApr": 18.00931818181818,
+          "holdDays": 1049,
+          "returnPct": 25.705550703351943,
+          "open": true
+        }
+      ]
+    },
+    {
+      "id": "q_hurdle",
+      "label": "季度·净基差 ≥ 美债+3.5% 入场，持有到期",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 27.898584545330827,
+        "cagrPct": 8.93026649504205,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 4.393895960117145,
+        "volAnnPct": 3.6005282818012416,
+        "sharpe": 1.1622576057078655,
+        "maxDrawdownPct": -4.344679489373071,
+        "exposurePct": 70.95238095238095,
+        "trades": 4,
+        "winRatePct": 100,
+        "avgHoldDays": 186.25,
+        "worstTradeDdPct": -4.344679489373071
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 12.464191761027731,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 10.186212536732931,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.2105794970203716,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-01-02",
+          "exitDate": "2024-09-27",
+          "contracts": [
+            "BTC-29MAR24",
+            "BTC-28JUN24",
+            "BTC-27SEP24"
+          ],
+          "ddPct": -1.828396990972836,
+          "entryApr": 18.59,
+          "entryNetApr": 18.00931818181818,
+          "holdDays": 269,
+          "returnPct": 12.750728392089217,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-09-29",
+          "exitDate": "2025-03-28",
+          "contracts": [
+            "BTC-28MAR25"
+          ],
+          "ddPct": -4.344679489373071,
+          "entryApr": 8.78,
+          "entryNetApr": 8.497679558011049,
+          "holdDays": 180,
+          "returnPct": 4.039195559108677,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-05-27",
+          "exitDate": "2025-09-26",
+          "contracts": [
+            "BTC-26SEP25"
+          ],
+          "ddPct": -0.9649287859523903,
+          "entryApr": 8.33,
+          "entryNetApr": 7.914552845528456,
+          "holdDays": 122,
+          "returnPct": 2.525825524590952,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-10-04",
+          "exitDate": "2026-03-27",
+          "contracts": [
+            "BTC-27MAR26"
+          ],
+          "ddPct": -0.36513958105771627,
+          "entryApr": 7.93,
+          "entryNetApr": 7.638,
+          "holdDays": 174,
+          "returnPct": 3.6275350186502964,
+          "open": false
+        }
+      ]
+    },
+    {
+      "id": "q_hurdle_exit",
+      "label": "季度·同上，剩余基差 < 美债 提前平仓",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 27.19034994021994,
+        "cagrPct": 8.720203439215958,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 4.183832904291052,
+        "volAnnPct": 3.6063712676002835,
+        "sharpe": 1.1068978513155978,
+        "maxDrawdownPct": -4.344679489373071,
+        "exposurePct": 53.23809523809524,
+        "trades": 4,
+        "winRatePct": 100,
+        "avgHoldDays": 139.75,
+        "worstTradeDdPct": -4.344679489373071
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 12.453302555461377,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 9.35027279627394,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.433703942398947,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-01-02",
+          "exitDate": "2024-09-02",
+          "contracts": [
+            "BTC-29MAR24",
+            "BTC-28JUN24",
+            "BTC-27SEP24"
+          ],
+          "ddPct": -1.828396990972836,
+          "entryApr": 18.59,
+          "entryNetApr": 18.00931818181818,
+          "holdDays": 244,
+          "returnPct": 12.357665449496945,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-09-29",
+          "exitDate": "2025-03-09",
+          "contracts": [
+            "BTC-28MAR25"
+          ],
+          "ddPct": -4.344679489373071,
+          "entryApr": 8.78,
+          "entryNetApr": 8.497679558011049,
+          "holdDays": 161,
+          "returnPct": 3.7838454944459254,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-05-27",
+          "exitDate": "2025-07-02",
+          "contracts": [
+            "BTC-26SEP25"
+          ],
+          "ddPct": -0.25769070380976533,
+          "entryApr": 8.33,
+          "entryNetApr": 7.914552845528456,
+          "holdDays": 36,
+          "returnPct": 1.4553317405871846,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-07-15",
+          "exitDate": "2025-11-10",
+          "contracts": [
+            "BTC-26DEC25"
+          ],
+          "ddPct": -1.0690770691735074,
+          "entryApr": 8.35,
+          "entryNetApr": 8.04030303030303,
+          "holdDays": 118,
+          "returnPct": 2.6565366035134153,
+          "open": false
+        }
+      ]
+    },
+    {
+      "id": "q_tbill",
+      "label": "季度·净基差 ≥ 美债 入场，< 美债 平仓",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 26.652510116908257,
+        "cagrPct": 8.560169300227871,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 4.023798765302966,
+        "volAnnPct": 3.617919701678738,
+        "sharpe": 1.0628243511872029,
+        "maxDrawdownPct": -1.9641920064351504,
+        "exposurePct": 84.28571428571429,
+        "trades": 4,
+        "winRatePct": 66.66666666666666,
+        "avgHoldDays": 221.25,
+        "worstTradeDdPct": -1.9641920064351504
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 14.958241569644226,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 7.516638231350536,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 2.4703011869122493,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-01-02",
+          "exitDate": "2026-02-03",
+          "contracts": [
+            "BTC-29MAR24",
+            "BTC-28JUN24",
+            "BTC-27SEP24",
+            "BTC-27DEC24",
+            "BTC-28MAR25",
+            "BTC-27JUN25",
+            "BTC-26SEP25",
+            "BTC-26DEC25",
+            "BTC-27MAR26"
+          ],
+          "ddPct": -1.9641920064351504,
+          "entryApr": 18.59,
+          "entryNetApr": 18.00931818181818,
+          "holdDays": 763,
+          "returnPct": 24.30421537005849,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-02-05",
+          "exitDate": "2026-02-07",
+          "contracts": [
+            "BTC-26JUN26"
+          ],
+          "ddPct": -0.27962367116347586,
+          "entryApr": 4.68,
+          "entryNetApr": 4.320140845070422,
+          "holdDays": 2,
+          "returnPct": 0.27080677286497323,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-07-18",
+          "exitDate": "2026-09-09",
+          "contracts": [
+            "BTC-25DEC26"
+          ],
+          "ddPct": -0.6601441772742911,
+          "entryApr": 4.38,
+          "entryNetApr": 4.062608695652174,
+          "holdDays": 53,
+          "returnPct": -0.16950790608211141,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-09-10",
+          "exitDate": "2026-11-16",
+          "contracts": [
+            "BTC-25DEC26"
+          ],
+          "ddPct": -0.3434474180877056,
+          "entryApr": 4.71,
+          "entryNetApr": 4.232429906542056,
+          "holdDays": 67,
+          "returnPct": 0.842226962411563,
+          "open": true
+        }
+      ]
+    },
+    {
+      "id": "q_score",
+      "label": "季度·看板套利评分 ≥45 入场 / <30 平仓",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 27.31339537270432,
+        "cagrPct": 8.75675350490701,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 4.220382969982106,
+        "volAnnPct": 3.86928231116592,
+        "sharpe": 1.0429140989167613,
+        "maxDrawdownPct": -2.4561025695240213,
+        "exposurePct": 74,
+        "trades": 12,
+        "winRatePct": 100,
+        "avgHoldDays": 64.75,
+        "worstTradeDdPct": -2.4561025695240213
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 14.9525243244349,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 7.139962228486474,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.3722809006596632,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-01-02",
+          "exitDate": "2024-04-15",
+          "contracts": [
+            "BTC-29MAR24",
+            "BTC-28JUN24"
+          ],
+          "ddPct": -1.828396990972836,
+          "entryApr": 18.59,
+          "entryNetApr": 18.00931818181818,
+          "holdDays": 104,
+          "returnPct": 7.9050435998950785,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-04-20",
+          "exitDate": "2024-05-02",
+          "contracts": [
+            "BTC-27SEP24"
+          ],
+          "ddPct": -1.3907059838635272,
+          "entryApr": 10.74,
+          "entryNetApr": 10.422608695652174,
+          "holdDays": 12,
+          "returnPct": 0.9872249238126907,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2024-05-05",
+          "exitDate": "2025-03-09",
+          "contracts": [
+            "BTC-27SEP24",
+            "BTC-27DEC24",
+            "BTC-28MAR25"
+          ],
+          "ddPct": -2.4561025695240213,
+          "entryApr": 9.57,
+          "entryNetApr": 9.22,
+          "holdDays": 308,
+          "returnPct": 8.588809834058054,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-03-12",
+          "exitDate": "2025-03-31",
+          "contracts": [
+            "BTC-27JUN25"
+          ],
+          "ddPct": -0.19000000000001238,
+          "entryApr": 6.44,
+          "entryNetApr": 5.966851851851852,
+          "holdDays": 19,
+          "returnPct": 0.8216538841744114,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-04-10",
+          "exitDate": "2025-07-02",
+          "contracts": [
+            "BTC-26SEP25"
+          ],
+          "ddPct": -1.3604274605889533,
+          "entryApr": 6.06,
+          "entryNetApr": 5.759411764705882,
+          "holdDays": 83,
+          "returnPct": 1.4581068232194294,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-07-08",
+          "exitDate": "2025-08-20",
+          "contracts": [
+            "BTC-26DEC25"
+          ],
+          "ddPct": -1.478338382301514,
+          "entryApr": 6.23,
+          "entryNetApr": 5.932906976744187,
+          "holdDays": 43,
+          "returnPct": 0.033999411387952705,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-08-22",
+          "exitDate": "2025-11-05",
+          "contracts": [
+            "BTC-26DEC25"
+          ],
+          "ddPct": -0.6196813272682733,
+          "entryApr": 7.44,
+          "entryNetApr": 7.037637795275591,
+          "holdDays": 75,
+          "returnPct": 1.9083674476115808,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-11-29",
+          "exitDate": "2025-12-12",
+          "contracts": [
+            "BTC-27MAR26"
+          ],
+          "ddPct": -0.3049832860435253,
+          "entryApr": 5.48,
+          "entryNetApr": 5.050588235294118,
+          "holdDays": 13,
+          "returnPct": 0.3323226353378894,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2025-12-28",
+          "exitDate": "2026-01-03",
+          "contracts": [
+            "BTC-27MAR26"
+          ],
+          "ddPct": -0.28832351341808726,
+          "entryApr": 5.86,
+          "entryNetApr": 5.292222222222223,
+          "holdDays": 6,
+          "returnPct": 0.24372279007189857,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-01-06",
+          "exitDate": "2026-02-03",
+          "contracts": [
+            "BTC-26JUN26"
+          ],
+          "ddPct": -0.32160051390672795,
+          "entryApr": 4.98,
+          "entryNetApr": 4.682906976744187,
+          "holdDays": 28,
+          "returnPct": 0.9430318632530632,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-07-28",
+          "exitDate": "2026-08-28",
+          "contracts": [
+            "BTC-25SEP26"
+          ],
+          "ddPct": -0.2208669952337372,
+          "entryApr": 4.99,
+          "entryNetApr": 4.138333333333334,
+          "holdDays": 31,
+          "returnPct": 0.07869180959754196,
+          "open": false
+        },
+        {
+          "kind": "quarterly",
+          "entryDate": "2026-09-22",
+          "exitDate": "2026-11-16",
+          "contracts": [
+            "BTC-25DEC26"
+          ],
+          "ddPct": -0.1674164459401717,
+          "entryApr": 6.08,
+          "entryNetApr": 5.542105263157895,
+          "holdDays": 55,
+          "returnPct": 0.9205217699535417,
+          "open": true
+        }
+      ]
+    },
+    {
+      "id": "p_always",
+      "label": "永续资金费·常驻",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 24.994666434202806,
+        "cagrPct": 8.064071091672309,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 3.527700556747404,
+        "volAnnPct": 0.4668480108517628,
+        "sharpe": 7.282986406381801,
+        "maxDrawdownPct": -0.25520337178057684,
+        "exposurePct": 99.90476190476191,
+        "trades": 1,
+        "winRatePct": null,
+        "avgHoldDays": 1049,
+        "worstTradeDdPct": -0.25520337178057684
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 13.130306981501727,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 6.497666014071424,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.7462544559657918,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "perp",
+          "entryDate": "2024-01-02",
+          "exitDate": "2026-11-16",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.25520337178057684,
+          "entryApr": 44.65,
+          "holdDays": 1049,
+          "returnPct": 25.214083566821866,
+          "open": true
+        }
+      ]
+    },
+    {
+      "id": "p_hurdle",
+      "label": "永续·7日资金费 ≥ 美债+3.5% 入场，< 美债 平仓",
+      "metrics": {
+        "years": 2.8767123287671232,
+        "totalReturnPct": 20.70360547899679,
+        "cagrPct": 6.759741366354577,
+        "cashCagrPct": 4.536370534924905,
+        "excessCagrPct": 2.223370831429672,
+        "volAnnPct": 0.687738487788034,
+        "sharpe": 3.0942922827686283,
+        "maxDrawdownPct": -0.3125330718856678,
+        "exposurePct": 55.80952380952381,
+        "trades": 11,
+        "winRatePct": 80,
+        "avgHoldDays": 53.27272727272727,
+        "worstTradeDdPct": -0.19369165843403646
+      },
+      "years": [
+        {
+          "year": "2024",
+          "returnPct": 11.709079264035815,
+          "cashPct": 5.315975358616476,
+          "partial": false
+        },
+        {
+          "year": "2025",
+          "returnPct": 4.636049809274856,
+          "cashPct": 4.296680512771789,
+          "partial": false
+        },
+        {
+          "year": "2026",
+          "returnPct": 3.2643545182232003,
+          "cashPct": 3.433703942399058,
+          "partial": true
+        }
+      ],
+      "trades": [
+        {
+          "kind": "perp",
+          "entryDate": "2024-01-02",
+          "exitDate": "2024-04-20",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19369165843403646,
+          "entryApr": 44.65,
+          "holdDays": 109,
+          "returnPct": 5.920586001585804,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2024-05-24",
+          "exitDate": "2024-06-26",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19000000000000128,
+          "entryApr": 9.86,
+          "holdDays": 33,
+          "returnPct": 0.7037859429794402,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2024-07-29",
+          "exitDate": "2024-08-10",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19000000000001238,
+          "entryApr": 9.71,
+          "holdDays": 12,
+          "returnPct": 0.011305748642409519,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2024-10-03",
+          "exitDate": "2025-03-08",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.18999999999999018,
+          "entryApr": 8.38,
+          "holdDays": 156,
+          "returnPct": 4.976162348719759,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2025-05-15",
+          "exitDate": "2025-06-08",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19251589411677372,
+          "entryApr": 8.09,
+          "holdDays": 24,
+          "returnPct": 0.19221265205660032,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2025-07-16",
+          "exitDate": "2025-10-18",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19000000000000128,
+          "entryApr": 8.48,
+          "holdDays": 94,
+          "returnPct": 1.9602666612189124,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2025-11-19",
+          "exitDate": "2025-11-28",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19000000000000128,
+          "entryApr": 7.88,
+          "holdDays": 9,
+          "returnPct": -0.09523828768674969,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2025-12-26",
+          "exitDate": "2026-02-05",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.18999999999999018,
+          "entryApr": 7.28,
+          "holdDays": 41,
+          "returnPct": 0.47135719420881017,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2026-06-03",
+          "exitDate": "2026-06-10",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.19000000000000128,
+          "entryApr": 7.79,
+          "holdDays": 7,
+          "returnPct": -0.13308134936931282,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2026-07-12",
+          "exitDate": "2026-09-29",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": -0.18999999999999018,
+          "entryApr": 7.69,
+          "holdDays": 79,
+          "returnPct": 1.2029981195223582,
+          "open": false
+        },
+        {
+          "kind": "perp",
+          "entryDate": "2026-10-25",
+          "exitDate": "2026-11-16",
+          "contracts": [
+            "BTC-PERPETUAL"
+          ],
+          "ddPct": 0,
+          "entryApr": 7.78,
+          "holdDays": 22,
+          "returnPct": 0.525610945192545,
+          "open": true
+        }
+      ]
+    }
+  ],
+  "grid": [
+    {
+      "entrySpread": 0,
+      "exitSpread": null,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 25.655371779793246,
+      "cagrPct": 8.262294047628217,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 3.725923512703311,
+      "volAnnPct": 3.228213148135193,
+      "sharpe": 1.101971215203358,
+      "maxDrawdownPct": -1.828396990972836,
+      "exposurePct": 89.14285714285714,
+      "trades": 2,
+      "winRatePct": 100,
+      "avgHoldDays": 468,
+      "worstTradeDdPct": -1.828396990972836
+    },
+    {
+      "entrySpread": 0,
+      "exitSpread": 0,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 26.652510116908257,
+      "cagrPct": 8.560169300227871,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.023798765302966,
+      "volAnnPct": 3.617919701678738,
+      "sharpe": 1.0628243511872029,
+      "maxDrawdownPct": -1.9641920064351504,
+      "exposurePct": 84.28571428571429,
+      "trades": 4,
+      "winRatePct": 66.66666666666666,
+      "avgHoldDays": 221.25,
+      "worstTradeDdPct": -1.9641920064351504
+    },
+    {
+      "entrySpread": 2,
+      "exitSpread": null,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 26.93125526547537,
+      "cagrPct": 8.64316509313805,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.106794558213145,
+      "volAnnPct": 3.1837094564526423,
+      "sharpe": 1.227325254764657,
+      "maxDrawdownPct": -1.828396990972836,
+      "exposurePct": 74.38095238095238,
+      "trades": 3,
+      "winRatePct": 100,
+      "avgHoldDays": 260.3333333333333,
+      "worstTradeDdPct": -1.828396990972836
+    },
+    {
+      "entrySpread": 2,
+      "exitSpread": 0,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 27.90582262771717,
+      "cagrPct": 8.932409395011165,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.39603886008626,
+      "volAnnPct": 3.340417237344985,
+      "sharpe": 1.2508745632190812,
+      "maxDrawdownPct": -1.9641920064351504,
+      "exposurePct": 62.28571428571429,
+      "trades": 4,
+      "winRatePct": 100,
+      "avgHoldDays": 163.5,
+      "worstTradeDdPct": -1.9641920064351504
+    },
+    {
+      "entrySpread": 3.5,
+      "exitSpread": null,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 27.898584545330827,
+      "cagrPct": 8.93026649504205,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.393895960117145,
+      "volAnnPct": 3.6005282818012416,
+      "sharpe": 1.1622576057078655,
+      "maxDrawdownPct": -4.344679489373071,
+      "exposurePct": 70.95238095238095,
+      "trades": 4,
+      "winRatePct": 100,
+      "avgHoldDays": 186.25,
+      "worstTradeDdPct": -4.344679489373071
+    },
+    {
+      "entrySpread": 3.5,
+      "exitSpread": 0,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 27.19034994021994,
+      "cagrPct": 8.720203439215958,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.183832904291052,
+      "volAnnPct": 3.6063712676002835,
+      "sharpe": 1.1068978513155978,
+      "maxDrawdownPct": -4.344679489373071,
+      "exposurePct": 53.23809523809524,
+      "trades": 4,
+      "winRatePct": 100,
+      "avgHoldDays": 139.75,
+      "worstTradeDdPct": -4.344679489373071
+    },
+    {
+      "entrySpread": 5,
+      "exitSpread": null,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 28.741369654952067,
+      "cagrPct": 9.179250896206392,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.642880361281487,
+      "volAnnPct": 3.4420185476880207,
+      "sharpe": 1.2807894177837387,
+      "maxDrawdownPct": -2.7373029552332007,
+      "exposurePct": 55.42857142857143,
+      "trades": 3,
+      "winRatePct": 100,
+      "avgHoldDays": 194,
+      "worstTradeDdPct": -2.7373029552332007
+    },
+    {
+      "entrySpread": 5,
+      "exitSpread": 0,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 28.521439426410012,
+      "cagrPct": 9.114379590363452,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.578009055438548,
+      "volAnnPct": 3.4411576629852765,
+      "sharpe": 1.2638176183598542,
+      "maxDrawdownPct": -2.7373029552332007,
+      "exposurePct": 49.238095238095234,
+      "trades": 3,
+      "winRatePct": 100,
+      "avgHoldDays": 172.33333333333334,
+      "worstTradeDdPct": -2.7373029552332007
+    },
+    {
+      "entrySpread": 7.5,
+      "exitSpread": null,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 27.87478612535832,
+      "cagrPct": 8.923220199106009,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.386849664181103,
+      "volAnnPct": 2.9787385804087467,
+      "sharpe": 1.396614975338629,
+      "maxDrawdownPct": -1.828396990972836,
+      "exposurePct": 40,
+      "trades": 3,
+      "winRatePct": 100,
+      "avgHoldDays": 140,
+      "worstTradeDdPct": -1.828396990972836
+    },
+    {
+      "entrySpread": 7.5,
+      "exitSpread": 0,
+      "years": 2.8767123287671232,
+      "totalReturnPct": 27.91852568356874,
+      "cagrPct": 8.936170058714987,
+      "cashCagrPct": 4.536370534924905,
+      "excessCagrPct": 4.399799523790082,
+      "volAnnPct": 2.977112696006549,
+      "sharpe": 1.4013605231441066,
+      "maxDrawdownPct": -1.828396990972836,
+      "exposurePct": 38.19047619047619,
+      "trades": 3,
+      "winRatePct": 100,
+      "avgHoldDays": 133.66666666666666,
+      "worstTradeDdPct": -1.828396990972836
+    }
+  ]
+}

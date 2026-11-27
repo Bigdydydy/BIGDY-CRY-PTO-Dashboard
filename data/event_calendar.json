@@ -1,0 +1,13 @@
+{
+  "note": "手工维护的宏观日程，供 scripts/weekly_screener.js 的事件日历使用。FOMC 为联储公布的 2026 年议息会议日程（取决议日）；CPI、QRA 等按需补充。tags 用于匹配选题角度：fomc、macro、expiry、quarterly、mstr。",
+  "events": [
+    { "date": "2026-01-28", "title": "FOMC 利率决议", "tags": ["fomc", "macro"] },
+    { "date": "2026-03-18", "title": "FOMC 利率决议（含经济预测）", "tags": ["fomc", "macro"] },
+    { "date": "2026-04-29", "title": "FOMC 利率决议", "tags": ["fomc", "macro"] },
+    { "date": "2026-06-17", "title": "FOMC 利率决议（含经济预测）", "tags": ["fomc", "macro"] },
+    { "date": "2026-07-29", "title": "FOMC 利率决议", "tags": ["fomc", "macro"] },
+    { "date": "2026-09-16", "title": "FOMC 利率决议（含经济预测）", "tags": ["fomc", "macro"] },
+    { "date": "2026-10-28", "title": "FOMC 利率决议", "tags": ["fomc", "macro"] },
+    { "date": "2026-12-09", "title": "FOMC 利率决议（含经济预测）", "tags": ["fomc", "macro"] }
+  ]
+}
