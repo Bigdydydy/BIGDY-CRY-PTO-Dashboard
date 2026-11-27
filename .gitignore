@@ -52,3 +52,6 @@ data/*.local.json
 
 # Windows `> nul` 重定向误生成的空文件
 nul
+
+# 偏斜事件研究的原始逐笔抓取缓存 (约 13 MB，可由 scripts/research/skew_dvol_fetch.js 重新生成)
+research/skew_dvol/
