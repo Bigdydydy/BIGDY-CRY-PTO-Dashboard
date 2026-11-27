@@ -2973,19 +2973,32 @@ function analyze25DeltaSkew(skewChart, ctx = {}) {
     regimeText = `【实现机制：${realizedRegime.name}】${skewRegimeDesc}`;
   }
 
-  // 偏度贵贱：与本地累积的 30D RR 日度历史比较
-  const histVals = (ctx.history || []).map(h => h?.rr30).filter(Number.isFinite);
-  let richness = { verdict: 'insufficient_history', percentile: null, n: histVals.length };
-  if (histVals.length >= SKEW_HISTORY_MIN_DAYS && Number.isFinite(d30)) {
-    const pct = percentileOf(histVals, d30);
-    let verdict = 'normal';
-    if (pct <= 20) verdict = 'put_rich';        // RR 处于历史最负区间：Put 侧相对自身历史偏贵
-    else if (pct >= 80) verdict = 'call_rich';  // RR 处于历史最正区间：Call 侧相对自身历史偏贵
-    richness = { verdict, percentile: Math.round(pct * 10) / 10, n: histVals.length };
+  // 偏度贵贱：优先用逐笔成交重建的长历史 (同口径比同口径)；不可用时退回本地累积的 30D RR 日度历史
+  let richness = null;
+  const rebuilt = ctx.skewRichness;
+  if (rebuilt && (rebuilt.verdict === 'put_rich' || rebuilt.verdict === 'call_rich' || rebuilt.verdict === 'normal')) {
+    richness = rebuilt;
   }
-  const richnessText = richness.verdict === 'insufficient_history'
-    ? `本地偏度日度样本 ${richness.n}/${SKEW_HISTORY_MIN_DAYS} 天，不足以判断 30D 偏度相对自身历史的贵贱。`
-    : `30D RR 处于本地 ${richness.n} 日样本的 ${richness.percentile}% 分位${richness.verdict === 'put_rich' ? '（Put 侧相对历史偏贵）' : richness.verdict === 'call_rich' ? '（Call 侧相对历史偏贵）' : '（处于历史常态）'}。`;
+  if (!richness) {
+    const histVals = (ctx.history || []).map(h => h?.rr30).filter(Number.isFinite);
+    richness = { verdict: 'insufficient_history', percentile: null, n: histVals.length, basis: 'local' };
+    if (histVals.length >= SKEW_HISTORY_MIN_DAYS && Number.isFinite(d30)) {
+      const pct = percentileOf(histVals, d30);
+      let verdict = 'normal';
+      if (pct <= 20) verdict = 'put_rich';        // RR 处于历史最负区间：Put 侧相对自身历史偏贵
+      else if (pct >= 80) verdict = 'call_rich';  // RR 处于历史最正区间：Call 侧相对自身历史偏贵
+      richness = { verdict, percentile: Math.round(pct * 10) / 10, n: histVals.length, basis: 'local' };
+    }
+  }
+  const verdictWord = { put_rich: '（Put 侧相对历史偏贵）', call_rich: '（Call 侧相对历史偏贵）', normal: '（处于历史常态）' };
+  let richnessText;
+  if (richness.verdict === 'insufficient_history') {
+    richnessText = `本地偏度日度样本 ${richness.n}/${SKEW_HISTORY_MIN_DAYS} 天，不足以判断 30D 偏度相对自身历史的贵贱。`;
+  } else if (richness.basis === 'reconstructed') {
+    richnessText = `按逐笔成交重建的 30D RR（${richness.asOf} 04:00–08:00 UTC，${fmtSkew(richness.value)}）处于此前 ${richness.n} 日的第 ${richness.percentile} 分位${verdictWord[richness.verdict]}。重建口径与实时 RR 平均差约 0.7 点，分位只拿重建值比重建历史。`;
+  } else {
+    richnessText = `30D RR 处于本地 ${richness.n} 日样本的 ${richness.percentile}% 分位${verdictWord[richness.verdict]}。`;
+  }
 
   // 交易倾向：需要"偏度贵"与"实现机制不支持较贵一翼"同时成立
   const sellsRichWing = realizedRegime.ratio !== null && realizedRegime.key !== 'jumpy';
@@ -3004,7 +3017,9 @@ function analyze25DeltaSkew(skewChart, ctx = {}) {
   const mid = sentimentOf([d30, d90]);
   const far = sentimentOf([d180, d365]);
   const fmt = v => (v === null ? '--' : fmtSkew(v));
-  const paragraph = `当下 Bitcoin 25Δ 风险逆转（Call − Put）期限结构：短端 1D ${fmt(d1)} / 7D ${fmt(d7)}【${near}】，中端 30D ${fmt(d30)} / 90D ${fmt(d90)}【${mid}】，远端 180D ${fmt(d180)} / 365D ${fmt(d365)}【${far}】。${termText}${regimeText}${richnessText}${institutionalAction}`;
+  const termStructureText = `25Δ 风险逆转（Call − Put）期限结构：短端 1D ${fmt(d1)} / 7D ${fmt(d7)}【${near}】，中端 30D ${fmt(d30)} / 90D ${fmt(d90)}【${mid}】，远端 180D ${fmt(d180)} / 365D ${fmt(d365)}【${far}】。`;
+  const paragraph = `当下 Bitcoin ${termStructureText}${termText}${regimeText}${richnessText}${institutionalAction}`;
+  const brief = buildSkewBrief({ d30, richness, termConsistency, realizedRegime, termStructureText, termText, regimeText, richnessText, institutionalAction, study: ctx.skewStudy });
 
   return {
     latestTimestamp: latest.timestamps,
@@ -3027,8 +3042,63 @@ function analyze25DeltaSkew(skewChart, ctx = {}) {
     skewRegimeKey: realizedRegime.key,
     skewRegimeDesc,
     institutionalAction,
-    paragraph
+    paragraph,
+    brief
   };
+}
+
+/** 去掉子段开头的【标签】(折叠区已有小标题) */
+const stripLeadTag = s => String(s || '').replace(/^【[^】]*】/, '').trim();
+
+/**
+ * Card 05 三层研判：结论行 (≤40 字) + 至多 3 条要点 + 折叠区。
+ * 历史读法引用事件研究的基准率：Put 偏贵不是崩盘预警，主要压低上涨型跳升；Call 偏贵抬高上涨型跳升。
+ */
+function buildSkewBrief({ d30, richness, termConsistency, realizedRegime, termStructureText, termText, regimeText, richnessText, institutionalAction, study }) {
+  const pctText = richness.percentile !== null && richness.percentile !== undefined ? `近一年第 ${Math.round(richness.percentile)} 分位` : null;
+  let headline;
+  if (!Number.isFinite(d30)) headline = '30D 偏斜暂无读数';
+  else if (richness.verdict === 'put_rich') headline = `30D Put 偏斜偏贵：${pctText}`;
+  else if (richness.verdict === 'call_rich') headline = `30D Call 偏斜偏贵：${pctText}`;
+  else if (richness.verdict === 'normal') headline = `30D 偏斜处于常态：${pctText}`;
+  else headline = `30D RR ${fmtSkew(d30)}，暂无历史分位`;
+
+  const tag = termConsistency.verdict === 'front_steeper' ? { level: 'info', label: '短端更陡' }
+    : termConsistency.verdict === 'front_flatter' ? { level: 'info', label: '短端更平' }
+      : termConsistency.verdict === 'consistent' ? { level: 'info', label: '期限一致' } : null;
+
+  const points = [];
+  const s = study;
+  const h = s ? s.horizonDays : 28;
+  if (s && richness.verdict === 'put_rich') {
+    points.push(`历史读法：Put 偏贵时，${h} 天内上涨型跳升 ${s.putRich.up}%（基准 ${s.base.up}%），下跌型 ${s.putRich.down}%（基准 ${s.base.down}%）——不是崩盘预警`);
+  } else if (s && richness.verdict === 'call_rich') {
+    points.push(`历史读法：Call 偏贵时，${h} 天内上涨型跳升 ${s.callRich.up}%（基准 ${s.base.up}%），下跌型 ${s.callRich.down}%（基准 ${s.base.down}%）`);
+  } else if (s && richness.verdict === 'normal') {
+    points.push('偏斜不在两端，对波动率跳升的方向没有提示');
+  }
+  points.push('会不会跳升看 DVOL 分位（Card 01）：历史上低位才是领先条件');
+  if (realizedRegime.ratio !== null) {
+    points.push(`实现机制 β/s ${realizedRegime.ratio.toFixed(2)}：${realizedRegime.ratio > 2 ? '持有较贵一翼占优' : '持有较贵一翼在付租金'}`);
+  } else if (realizedRegime.key === 'insignificant') {
+    points.push('现货与波动率联动不显著，实现机制无法判定');
+  }
+
+  const details = [
+    { label: '期限结构', text: `${termStructureText}${termText}` },
+    { label: '实现机制', text: stripLeadTag(regimeText) },
+    { label: '贵贱口径', text: richnessText }
+  ];
+  if (s) {
+    details.push({
+      label: '研究出处',
+      text: `事件研究（${s.sample}，${s.events} 次 DVOL 跳升）：偏斜不领先"会不会跳升"，只和跳升方向相关；按事前 28 日涨跌分层后，Put 偏贵对下跌型跳升没有增量。信号日高度成簇（Put 偏贵 ${s.putRich.days} 天只有 ${s.putRich.episodes} 段），基准率只作参考。`,
+      href: s.reportUrl
+    });
+  }
+  details.push({ label: '交易含义（非建议）', text: stripLeadTag(institutionalAction) });
+
+  return { headline, tag, points: points.slice(0, 3), details };
 }
 
 module.exports = {

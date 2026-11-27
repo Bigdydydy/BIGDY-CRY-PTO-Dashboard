@@ -841,17 +841,22 @@ function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeeze
   const robustNote = robust ? '' : '（持仓符号结论置信度不足，已降一级）';
   const skewNote = (s, side) => {
     const name = side === 'put' ? 'Put' : 'Call';
-    if (s.side === side && s.extreme) return `（${name} 侧相对自身历史偏贵）`;
+    if (s.side === side && s.extreme) {
+      // 事件研究 (docs/reports/skew-dvol-event-study-2026-11-25.md)：Put 偏贵不预示下跌型跳升，Call 偏贵预示上涨型跳升
+      return side === 'put' ? '（Put 侧相对自身历史偏贵；历史上不预示下跌型跳升，不升级）' : '（Call 侧相对自身历史偏贵）';
+    }
     if (s.basis === '历史不足') return '（偏度历史样本不足，无法判断是否极端）';
     return `（${name} 侧未到极端）`;
   };
   if (state.key === 'downside_accel' || state.key === 'two_way_accel') {
     const vannaSells = vexUsd > 0; // IV 上升时做市商需卖出
-    const level = sk.side === 'put' && sk.extreme && vannaSells ? 'high' : 'medium';
+    // Put 偏贵不再把下行预警升为高优先级：2021-04 → 2026-11 的事件研究中，Put 偏贵时 28 天内下跌型跳升
+    // 24.5% vs 基准 21.0%，按事前趋势分层后无增量。Call 偏贵对上涨型跳升有增量 (27.1% vs 14.4%)，上行升级保留。
+    const level = 'medium';
     out.push({
       key: 'downside_cascade',
       level: downgrade(level),
-      title: '下行踩踏加速器',
+      title: '下行对冲放大',
       detail: `${basisLabel}：做市商负 Gamma，现货 −3% 且 IV +5 点时需卖出 ${fmtAbsUsdM(crashFlowUsd)}；`
         + `IV 每升 1 点需${vannaSells ? '卖出' : '买入'} ${fmtAbsUsdM(vexUsd)}；`
         + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${skewNote(sk, 'put')}${robustNote}`
@@ -862,7 +867,7 @@ function buildAlerts({ state, vexUsd, skew, robust, depth, crashFlowUsd, squeeze
     out.push({
       key: 'upside_squeeze',
       level: downgrade(level),
-      title: '上行 Gamma 逼空',
+      title: '上行对冲放大',
       detail: `${basisLabel}：做市商负 Gamma，现货 +3% 且 IV +2 点时需买入 ${fmtAbsUsdM(squeezeFlowUsd)}；`
         + `25Δ RR ${sk.d30 !== null ? sk.d30.toFixed(2) : '--'}${skewNote(sk, 'call')}${robustNote}`
     });
@@ -1063,6 +1068,41 @@ function analyzeDealerExposure(snapshot, opts = {}) {
 
   const paragraph = `${alertText}${stateText}${regimeText}${flipText}${realizedText}${depthText}${sensitivityText}${vexText}${rollText}${maturityText}${stressText}${referenceText}${assumptionText}`;
 
+  // 三层研判：结论行 + 至多 3 条要点 + 折叠区 (paragraph 保留做兼容)
+  const confidence = !primaryRobust
+    ? { level: 'low', label: '置信度低', reason: flowBook ? '净 GEX 随屏幕成交折扣系数变号' : '净 GEX 随持仓符号口径变号' }
+    : sensitivity.confidence.key !== 'consistent'
+      ? { level: 'low', label: '置信度低', reason: sensitivity.confidence.label }
+      : { level: 'medium', label: '置信度中', reason: '各口径同号；持仓方向由成交推断，非直接观测' };
+  const points = [];
+  if (pFlip) {
+    const spotAbove = pFlip.distancePct < 0;
+    const crossSide = spotAbove ? pFlip.from : pFlip.to;
+    points.push(`翻转位 $${pFlip.price.toLocaleString()}（现货${spotAbove ? '下方' : '上方'} ${Math.abs(pFlip.distancePct)}%）：${spotAbove ? '跌破' : '升破'}后转${sideWord(crossSide)} Gamma`);
+  } else {
+    points.push(`现货 ±${SLIDE_RANGE * 100}% 内无翻转位，${pLong ? '正' : '负'} Gamma 体制稳定`);
+  }
+  const crashVerb = flowWord(pCrash.flowUsd);
+  points.push(`下跌 3% 且 IV +5：需${crashVerb} ${fmtAbsUsdM(pCrash.flowUsd)}`
+    + (depth && depth.downsideSellUsd > 0 ? `（${depth.venue} ${depth.band} 买盘的 ${(depth.downsideRatioPct / 100).toFixed(1)} 倍）` : ''));
+  if (nextMajor) {
+    points.push(`${nextMajor.expiry} 占 OI ${nextMajor.oiShare}%`
+      + (cliff.afterNextMajor ? `，交割后残余 GEX ${fmtUsdM(cliff.afterNextMajor.residualGexUsd)}/1%${cliff.afterNextMajor.regimeFlips ? '（体制翻转）' : ''}` : ''));
+  }
+  const brief = {
+    headline: state.desc,
+    tag: confidence,
+    points,
+    details: [
+      { label: '对冲状态与净 GEX', text: `${stripLeadTag(regimeText)}${flipText}` },
+      { label: '已触发对冲流与盘口深度', text: `${realizedText}${depthText}` },
+      { label: '符号敏感性', text: stripLeadTag(sensitivityText) },
+      { label: 'Vanna / Charm 与压力情景', text: `${vexText}${stressText}` },
+      { label: '期限与尾部', text: `${rollText}${stripLeadTag(maturityText)}` },
+      { label: '口径与方法', text: `${stripLeadTag(assumptionText)}${referenceText}` }
+    ].filter(d => d.text)
+  };
+
   return {
     status: 'ok',
     convention: 'dealer_long_calls_short_puts',
@@ -1096,8 +1136,14 @@ function analyzeDealerExposure(snapshot, opts = {}) {
     alerts,
     realized24h,
     depth,
-    paragraph
+    paragraph,
+    brief
   };
+}
+
+/** 去掉子段开头的【标签】(折叠区已有小标题) */
+function stripLeadTag(s) {
+  return String(s || '').replace(/^【[^】]*】/, '').trim();
 }
 
 module.exports = {
