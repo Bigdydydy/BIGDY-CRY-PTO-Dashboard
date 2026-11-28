@@ -753,7 +753,7 @@
       const title = viewTitle(viewId);
       elTitle.setAttribute('aria-label', title);
       elTitle.innerHTML = Array.from(title).map((ch, i) =>
-        `<span class="atl-ch" aria-hidden="true" style="--d:${Math.min(i, 24) * 26}ms">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`
+        `<span class="atl-ch" aria-hidden="true" style="--d:${Math.min(i, 24) * 14}ms">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`
       ).join('');
       if (elDesc) {
         elDesc.textContent = viewDesc(viewId);
@@ -764,6 +764,98 @@
     }
     return { render };
   })();
+
+  // ===========================================================================
+  // 市场读数条：跨模块关键读数常驻头图下方，点击直达所在模块
+  // 数值镜像各模块已渲染好的元素（MutationObserver），不另发数据请求
+  // ===========================================================================
+  const PULSE_ITEMS = [
+    { src: 'iv-1m', label: '1M ATM IV', view: 'view-options', module: 'module-atm-iv' },
+    { src: 'skew-30d', label: '25Δ Skew 30D', view: 'view-options', module: 'module-25d-skew' },
+    { src: 'dealer-flip', label: 'Gamma 翻转', view: 'view-options', module: 'module-dealer-exposure' },
+    { src: 'tp-val-90d', label: '90D 基差', view: 'view-term-premium', module: 'module-term-premium' },
+    { src: 'tp-val-funding', label: '永续资金费', view: 'view-term-premium', module: 'module-term-premium' },
+    { src: 'macro-mnav-val', label: 'mNAV', view: 'view-overview', module: 'module-mstr-financing' },
+    { src: 'pref-strc-val', label: 'STRC', view: 'view-overview', module: 'module-mstr-financing' },
+    { src: 'kpi-mc-core-osc', label: '麦克莱伦 Core', view: 'view-overview', module: 'module-crypto-mcclellan' }
+  ];
+  const Pulse = (function () {
+    const hero = document.getElementById('atl-hero');
+    if (!hero) return { setCurrent() {} };
+    const nav = document.createElement('nav');
+    nav.className = 'atl-pulse';
+    nav.setAttribute('aria-label', '市场读数');
+    nav.setAttribute('aria-live', 'off'); // 头图本身是 aria-live，读数刷新不要逐条播报
+    const rows = [];
+    PULSE_ITEMS.forEach(item => {
+      const src = document.getElementById(item.src);
+      if (!src) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atl-pulse-item is-empty';
+      btn.dataset.module = item.module;
+      btn.innerHTML = `<span class="atl-pulse-lbl">${esc(item.label)}</span><span class="atl-pulse-val">—</span>`;
+      btn.addEventListener('click', () => {
+        if (typeof window.switchView === 'function') window.switchView(item.view, true, item.module);
+      });
+      nav.appendChild(btn);
+      rows.push({ item, src, btn, val: btn.lastElementChild, last: '' });
+    });
+    if (!rows.length) return { setCurrent() {} };
+    hero.appendChild(nav);
+
+    // 占位符（"--%"、"$--"、"--×"）视为暂无数据
+    const isPlaceholder = (t) => !t || /^[\s\-–—$%×x.]*$/i.test(t) || /^(加载中|分析中|计算中)/.test(t);
+    function sync(row, initial) {
+      const text = (row.src.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text === row.last) return;
+      row.last = text;
+      const empty = isPlaceholder(text);
+      row.val.textContent = empty ? '—' : (text.length > 16 ? text.slice(0, 15) + '…' : text);
+      row.btn.classList.toggle('is-empty', empty);
+      row.btn.title = empty ? `${row.item.label}：暂无数据` : `${row.item.label}：${text}（点击查看模块）`;
+      if (!initial && !empty && !prefersReducedMotion) {
+        row.btn.classList.remove('is-tick');
+        void row.btn.offsetWidth;
+        row.btn.classList.add('is-tick');
+      }
+    }
+    rows.forEach(row => {
+      sync(row, true);
+      let pending = 0;
+      new MutationObserver(() => {
+        if (pending) return;
+        pending = requestAnimationFrame(() => { pending = 0; sync(row, false); });
+      }).observe(row.src, { childList: true, characterData: true, subtree: true });
+    });
+    nav.addEventListener('animationend', (e) => {
+      const b = e.target.closest && e.target.closest('.atl-pulse-item');
+      if (b) b.classList.remove('is-tick');
+    });
+
+    function setCurrent(moduleId) {
+      rows.forEach(r => r.btn.classList.toggle('is-current', !!moduleId && r.item.module === moduleId));
+    }
+    return { setCurrent };
+  })();
+
+  // 被省略号截断的文字：悬停时自动补上全文 title
+  document.addEventListener('pointerover', (e) => {
+    const el = e.target;
+    if (!el || el.nodeType !== 1 || el.closest('svg, canvas, button, [data-no-autotitle]')) return;
+    if (el.hasAttribute('title') && !el.dataset.atlAutoTitle) return;
+    const cs = getComputedStyle(el);
+    const clamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
+    if (cs.textOverflow !== 'ellipsis' && !clamp) return;
+    const over = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+    if (over) {
+      el.title = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      el.dataset.atlAutoTitle = '1';
+    } else if (el.dataset.atlAutoTitle) {
+      el.removeAttribute('title');
+      delete el.dataset.atlAutoTitle;
+    }
+  }, { passive: true });
 
   // ===========================================================================
   // 入场编排：卡片与指标瓷砖错峰升起
@@ -779,11 +871,11 @@
       panel.querySelectorAll('.bento-card').forEach(card => {
         if (card.parentElement && card.parentElement.closest('.bento-card')) return; // 只编排顶层卡片
         if (n > 8) return;
-        animateOnce(card, 'atl-rise', n++ * 80);
+        animateOnce(card, 'atl-rise', n++ * 45);
       });
       panel.querySelectorAll(TILE_SELECTOR).forEach((tile, i) => {
         if (i > 18) return;
-        animateOnce(tile, 'atl-tile-in', 160 + i * 32);
+        animateOnce(tile, 'atl-tile-in', 90 + i * 16);
       });
     });
   }
@@ -804,6 +896,7 @@
   document.addEventListener('bigdy:viewchange', (e) => {
     activeViewId = (e.detail && e.detail.viewId) || 'view-overview';
     Hero.render(activeViewId);
+    Pulse.setCurrent(e.detail && e.detail.moduleId);
     requestAnimationFrame(() => {
       Rail.moveIndicator();
       // 手机底部导航可横滑：把当前模块滚到可视中间
@@ -1432,6 +1525,14 @@
   Stage.show(currentPainting());
   renderCaption();
   Gallery.syncCurrent();
+
+  // 图表工具条（全屏 / 导出 PNG / 导出 CSV），独立文件按需加载
+  if (window.echarts) {
+    const tools = document.createElement('script');
+    tools.src = '/chart_tools.js?v=20261127';
+    tools.async = true;
+    document.body.appendChild(tools);
+  }
 
   window.Atelier = {
     paintings: PAINTINGS,

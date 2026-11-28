@@ -44,6 +44,7 @@
     '/api/term-curve': { label: '期限结构曲线', typical: 9000, cards: ['#tc-panel'] },
     '/api/etf-linkage': { label: 'ETF 联动', typical: 6000, cards: ['#module-etf-linkage'] },
     '/api/leverage-norm': { label: '杠杆归一化', typical: 4000, cards: ['#module-leverage-norm'] },
+    '/api/cycle-state': { label: '周期时钟', typical: 6000, cards: ['#module-cycle-clock', '#module-activity-pct'] },
     '/api/macro-chart': { label: '宏观与流动性', typical: 6000, cards: ['#module-macro-chart', '#module-mstr-financing'] },
     '/api/mstr-preferreds': { label: 'MSTR 优先股', typical: 3000, cards: ['#mstr-pref-section'] },
     '/api/mstr-disclosures': { label: '官方披露', typical: 4000, cards: ['#mstr-disclosures'] },

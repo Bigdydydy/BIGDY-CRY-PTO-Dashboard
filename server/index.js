@@ -31,6 +31,7 @@ const { getMcClellanData } = require('./crypto_mcclellan_fetcher');
 const { getSystemAuditData } = require('./audit_engine');
 const { getEtfLinkageData } = require('./etf_linkage_engine');
 const leverageNorm = require('./leverage_norm');
+const cycleState = require('./cycle_state');
 const { getTermCurve } = require('./term_curve');
 const { getHistoricalBasisData } = require('./basis_fetcher');
 const { getOptionMarks, pickInstruments, fetchBookSummaryRows } = require('./option_marks');
@@ -112,7 +113,7 @@ let lastPublicRefreshAt = 0;
 const PUBLIC_REFRESH_COOLDOWN_MS = 10000;
 // GET endpoints that honour ?force=1 / ?refresh=true (a cache bypass that hits upstream).
 const FORCE_REFRESH_PATHS = new Set([
-  '/api/etf-linkage', '/api/leverage-norm', '/api/mstr-preferreds', '/api/mstr-disclosures',
+  '/api/etf-linkage', '/api/leverage-norm', '/api/cycle-state', '/api/mstr-preferreds', '/api/mstr-disclosures',
   '/api/macro-chart', '/api/cdri', '/api/ssro', '/api/flow-force', '/api/coinbase-liquidity',
   '/api/gold-correlation', '/api/crypto-mcclellan'
 ]);
@@ -1168,6 +1169,19 @@ async function handleApiRequest(req, res, parsedUrl) {
       sendJsonResponse(req, res, 200, { code: 0, ...withApiHealth(data, leverageNorm.REQUIRED_IDS) });
     } catch (err) {
       console.error('[API Error] leverage-norm:', err.message);
+      sendJsonResponse(req, res, 502, { code: -1, error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/cycle-state — 周期时钟 + 成交量 / ATR / 期货 OI 因果分位 (Module 1-E / 1-F)
+  if (pathname === '/api/cycle-state' && req.method === 'GET') {
+    try {
+      const force = parsedUrl.query?.force === '1';
+      const data = await cycleState.getCycleStateData(force);
+      sendJsonResponse(req, res, 200, { code: 0, ...withApiHealth(data, cycleState.REQUIRED_IDS) });
+    } catch (err) {
+      console.error('[API Error] cycle-state:', err.message);
       sendJsonResponse(req, res, 502, { code: -1, error: err.message });
     }
     return;

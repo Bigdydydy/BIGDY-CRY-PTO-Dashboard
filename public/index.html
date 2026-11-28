@@ -1112,6 +1112,118 @@
         </div>
       </div>
     </section>
+
+    <!-- Module 1-E: Cycle clock -->
+    <section class="bento-card el-card" id="module-cycle-clock">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">CYCLE CLOCK</span>
+          <h2>周期时钟</h2>
+          <span class="card-subtitle-inline">距历史最高收盘多少天、跌了多少，与此前每一段 ≥ 40% 的回撤并排比较</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <span class="tz-badge" id="cc-update-time">加载中...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body el-body">
+        <div class="el-status" id="cc-status">正在拉取 Coinbase 日线…</div>
+
+        <div class="el-kpi-grid">
+          <div class="el-kpi"><span class="el-kpi-lbl">距历史最高收盘</span><span class="el-kpi-val" id="cc-kpi-days">--</span><span class="el-kpi-sub" id="cc-kpi-days-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">较高点回撤</span><span class="el-kpi-val" id="cc-kpi-dd">--</span><span class="el-kpi-sub" id="cc-kpi-dd-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">前几轮熊市 高点 → 最低</span><span class="el-kpi-val" id="cc-kpi-trough">--</span><span class="el-kpi-sub" id="cc-kpi-trough-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">前几轮熊市 高点 → 收复</span><span class="el-kpi-val" id="cc-kpi-recover">--</span><span class="el-kpi-sub" id="cc-kpi-recover-sub">--</span></div>
+        </div>
+
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>各轮回撤路径：横轴为距高点天数，纵轴为较高点回撤（点击图例显示牛市中段回撤）</span></div>
+          </div>
+          <p class="ln-headline" id="cc-headline">--</p>
+          <div id="cc-echarts" class="el-chart el-chart-tall"></div>
+        </div>
+
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>≥ 40% 回撤阶段一览（收盘价口径）</span></div>
+          </div>
+          <div class="el-table-wrap">
+            <table class="el-table">
+              <thead>
+                <tr><th>高点</th><th>高点收盘</th><th>最低收盘</th><th>高点 → 最低</th><th>最大回撤</th><th>收复日</th><th>高点 → 收复</th><th>类型</th></tr>
+              </thead>
+              <tbody id="cc-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tp-data-audit-strip">
+          <div class="tp-audit-left" id="cc-caveats"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Module 1-F: Volume / volatility / OI percentiles -->
+    <section class="bento-card el-card" id="module-activity-pct">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-module-tag">ACTIVITY PERCENTILES</span>
+          <h2>成交量、波动与持仓分位</h2>
+          <span class="card-subtitle-inline">三项各自与此前一年比较：市场是安静还是活跃</span>
+        </div>
+        <div class="header-controls">
+          <div class="tp-header-badges">
+            <div class="btn-group-segmented" id="ap-range-selector">
+              <button class="timeframe-btn" data-range="730">2Y</button>
+              <button class="timeframe-btn active" data-range="1825">5Y</button>
+              <button class="timeframe-btn" data-range="all">全部</button>
+            </div>
+            <span class="tz-badge" id="ap-update-time">加载中...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body el-body">
+        <div class="el-status" id="ap-status"></div>
+
+        <div class="el-kpi-grid">
+          <div class="el-kpi"><span class="el-kpi-lbl">Coinbase 30 日均成交量</span><span class="el-kpi-val" id="ap-kpi-volume">--</span><span class="el-kpi-sub" id="ap-kpi-volume-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">ATR%（14 日）</span><span class="el-kpi-val" id="ap-kpi-atr">--</span><span class="el-kpi-sub" id="ap-kpi-atr-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">期货 OI（按币计）</span><span class="el-kpi-val" id="ap-kpi-oi">--</span><span class="el-kpi-sub" id="ap-kpi-oi-sub">--</span></div>
+          <div class="el-kpi"><span class="el-kpi-lbl">所处阶段</span><span class="el-kpi-val" id="ap-kpi-regime">--</span><span class="el-kpi-sub" id="ap-kpi-regime-sub">--</span></div>
+        </div>
+
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>BTC 价格（阴影 = 低波动与低量同时出现）与三项分位</span></div>
+          </div>
+          <p class="ln-headline" id="ap-headline">--</p>
+          <div id="ap-echarts" class="el-chart el-chart-tall"></div>
+        </div>
+
+        <div class="tp-chart-panel">
+          <div class="tp-chart-header">
+            <div class="tp-chart-title"><span>历史上“低波动 + 低量”同时出现的时段，以及之后的表现</span></div>
+          </div>
+          <p class="ln-headline" id="ap-episode-note">--</p>
+          <div class="el-table-wrap">
+            <table class="el-table">
+              <thead>
+                <tr><th>时段</th><th>天数</th><th>首日收盘</th><th>较高点回撤</th><th>距高点</th><th>阶段</th><th>OI 分位</th><th>90 天后</th><th>180 天后</th></tr>
+              </thead>
+              <tbody id="ap-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tp-data-audit-strip">
+          <div class="tp-audit-left" id="ap-caveats"></div>
+        </div>
+      </div>
+    </section>
   </div> <!-- /#view-overview -->
 
   <!-- View 2: 期现基差期限结构与期限溢价雷达 -->

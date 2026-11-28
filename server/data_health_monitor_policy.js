@@ -12,7 +12,7 @@ const MONITOR_LIVE_MODULES = Object.freeze([
   'gold_btc_correlation', 'ssro_oscillator', 'crypto_mcclellan_breadth',
   'cdri', 'mstr_preferreds', 'etf_linkage', 'flow_force', 'wave_engine',
   'block_insight', 'option_marks', 'option_oi_history', 'coinbase_liquidity_history',
-  'mstr_disclosures', 'leverage_norm'
+  'mstr_disclosures', 'leverage_norm', 'cycle_state'
 ]);
 
 const SNAPSHOT_CHECKS = Object.freeze([
